@@ -1,5 +1,18 @@
 # Changelog
 
+## denubis-research-agents 1.1.0
+
+Renamed from ed3d-research-agents.
+
+**Changed:**
+- Renamed plugin from `ed3d-research-agents` to `denubis-research-agents`
+- Updated author and license info
+
+**Proleptic Review Notes:**
+- Design validated: response-only output prevents file pollution while design docs capture findings
+- Shallow cloning (`--depth 1`) addresses performance concerns
+- Sequential exploration appropriate for iterative investigation (parallelization better for independent checks)
+
 ## [REMOVED] ed3d-house-style
 
 Removed TypeScript/React-focused house style plugin. Not relevant to Python/SQL/LaTeX workflow.
