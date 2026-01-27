@@ -1,5 +1,23 @@
 # Changelog
 
+## denubis-plan-and-execute 2.0.0
+
+Renamed from ed3d-plan-and-execute with significant philosophy changes.
+
+**Changed:**
+- Renamed plugin from `ed3d-plan-and-execute` to `denubis-plan-and-execute`
+- **task-implementor now uses Opus** (was Haiku) - fewer mistakes, fewer review cycles
+- Renamed `task-implementor-fast` to `task-implementor` (no longer optimizing for speed)
+- Updated Python references (pytest, ruff instead of npm/eslint)
+
+**New:**
+- **Halt-on-non-obvious-failures policy**: If test fails in non-obvious way, STOP immediately and report. No grinding for 30 minutes working around problems.
+
+**Proleptic Review Notes:**
+- Kept "block on ALL severities" (quality over velocity)
+- Three-phase workflow validated (not for simple tasks, but boundary guidance could be clearer)
+- /clear between phases validated (artifacts are committed, can re-read)
+
 ## denubis-research-agents 1.1.0
 
 Renamed from ed3d-research-agents.

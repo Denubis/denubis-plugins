@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionStart hook for ed3d-plan-and-execute plugin
+# SessionStart hook for denubis-plan-and-execute plugin
 
 set -euo pipefail
 

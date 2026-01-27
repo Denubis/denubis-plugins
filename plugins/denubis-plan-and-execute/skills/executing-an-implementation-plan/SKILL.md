@@ -130,11 +130,11 @@ If a functionality task (code that does something) has no tests specified:
 
 Do NOT implement functionality without tests. Missing tests = plan gap, not something to skip.
 
-**Execute all tasks in sequence.** For each task, dispatch `task-implementor-fast` with the phase file path:
+**Execute all tasks in sequence.** For each task, dispatch `task-implementor` with the phase file path:
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-plan-and-execute:task-implementor-fast</parameter>
+<parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Task Y: [description]</parameter>
 <parameter name="prompt">
   Implement Task N from the phase file.
@@ -163,7 +163,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-plan-and-execute:task-implementor-fast</parameter>
+<parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Subcomponent A (Tasks 3-5): [description]</parameter>
 <parameter name="prompt">
   Implement Subcomponent A (Tasks 3, 4, 5) from the phase file.
@@ -220,7 +220,7 @@ The phase changed too much for a single review. Chunk the review:
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-plan-and-execute:task-bug-fixer</parameter>
+<parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues for Phase X</parameter>
 <parameter name="prompt">
   Fix issues from code review for Phase X.
@@ -345,10 +345,10 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Mark 1a complete, 1b in_progress]
 
-[Dispatch task-implementor-fast for Task 1]
+[Dispatch task-implementor for Task 1]
 → Created package.json, tsconfig.json.
 
-[Dispatch task-implementor-fast for Task 2]
+[Dispatch task-implementor for Task 2]
 → Created config files. Build succeeds.
 
 [Mark 1b complete, 1c in_progress]

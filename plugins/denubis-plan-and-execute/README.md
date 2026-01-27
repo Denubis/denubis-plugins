@@ -1,4 +1,4 @@
-# ed3d-plan-and-execute
+# denubis-plan-and-execute
 
 A workflow plugin for Claude Code that guides you from rough idea to working implementation through structured design, planning, and execution phases.
 
@@ -161,9 +161,9 @@ The plugin uses specialized subagents for different roles:
 |-------|--------|------|
 | **codebase-investigator** | ed3d-research-agents | Verifies file paths, finds patterns, confirms assumptions |
 | **internet-researcher** | ed3d-research-agents | Finds current API docs, library patterns, best practices |
-| **task-implementor-fast** | ed3d-plan-and-execute | Implements tasks with TDD, runs verification, commits |
-| **code-reviewer** | ed3d-plan-and-execute | Enforces quality standards, blocks on issues |
-| **task-bug-fixer** | ed3d-plan-and-execute | Fixes issues identified by code reviewer |
+| **task-implementor** | denubis-plan-and-execute | Implements tasks with TDD, runs verification, commits |
+| **code-reviewer** | denubis-plan-and-execute | Enforces quality standards, blocks on issues |
+| **task-bug-fixer** | denubis-plan-and-execute | Fixes issues identified by code reviewer |
 | **project-claude-librarian** | ed3d-extending-claude | Updates CLAUDE.md files when contracts change |
 
 You interact with the main orchestrating agent. It dispatches subagents and shows you their full responses.
