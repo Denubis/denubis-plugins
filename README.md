@@ -1,13 +1,15 @@
-# ed3d-plugins
+# denubis-plugins
 
-This is my collection of plugins that I use on a day-to-day basis for getting stuff done with Claude Code. Most of these are development-oriented in some way or another, but also often end up being useful for other things. Product design, general research, accidentally becoming my homelab sysadmin—these are a lot of what I've learned so far and what I've found helpful.
+Claude Code plugins for Python/SQL/LaTeX development workflows, customized for academic research.
 
-The big stick in this repository is `ed3d-plan-and-execute`, which implements an "RPI" (research-plan-implement) loop that I think does a really good job of avoiding hallucination in the planning stages, adhering to high-level product requirements, avoiding drift between design planning and implementation planning, and reviewing the results such that you get out the other end not just what you asked for, but what you actually wanted.
+Forked from [ed3d-plugins](https://github.com/ed3dai/ed3d-plugins) and adapted for:
+- **Python 3.14+** with t-strings, deferred annotations, and modern idioms
+- **Academic workflows** with proper citations, LaTeX conventions, and scholarly rigor
+- **Quality over velocity** - Opus for implementation, halt-on-failure policy
 
-**NOTE:** `ed3d-plugins` is generally a more stable marketplace. If you'd like to track changes as they happen a bit more aggressively, take a look at [`ed3d-plugins-testing`](https://github.com/ed3dai/ed3d-plugins-testing).
+## The Big Stick: `denubis-plan-and-execute`
 
-## Using `ed3d-plan-and-execute`
-More in [the README for the plugin](plugins/ed3d-plan-and-execute/README.md), and it's worth skimming, but here's a quickstart:
+An RPI (research-plan-implement) loop that avoids hallucination by separating design from implementation:
 
 ```
 Rough Idea
@@ -22,65 +24,101 @@ Rough Idea
 /execute-implementation-plan ──► Working Code (reviewed & committed)
 ```
 
+Key philosophy changes from upstream:
+- **Opus for task implementation** (not Haiku) - fewer mistakes, fewer review cycles
+- **Halt on non-obvious failures** - don't grind for 30 minutes working around problems
+- **Block on ALL severities** - quality over velocity
+
 ## Plugins
 
 | Plugin | Description |
 |--------|-------------|
-| **`ed3d-00-getting-started`** | Getting started guide and onboarding for ed3d-plugins. Run `/getting-started` to see this README. |
-| **`ed3d-plan-and-execute`** | Planning and execution workflows for Claude Code. Feed it a decent-sized task and it'll help you get it done in a sustainable and thought-through way |
-| **`ed3d-house-style`** | House style for software development; Very Opinionated |
-| **`ed3d-basic-agents`** | Core agents for general-purpose tasks (haiku, sonnet, opus). Other plugins expect this to exist |
-| **`ed3d-research-agents`** | Agents for research across multiple data sources (codebase, internet, combined); other plugins expect this to exist |
-| **`ed3d-extending-claude`** | Knowledge skills for extending Claude Code: plugins, commands, agents, skills, hooks, MCP servers. Other plugins expect this to exist |
-| **`ed3d-playwright`**| Playwright automation with subagents |
-| **`ed3d-hook-skill-reinforcement`** | UserPromptSubmit hook that reinforces the need to activate skills—helps make sure skills actually get used. Requires `ed3d-extending-claude` to work |
-| **`ed3d-hook-claudemd-reminder`** | PostToolUse hook that reminds to update CLAUDE.md before committing |
+| **`denubis-00-getting-started`** | Getting started guide. Run `/getting-started`. |
+| **`denubis-plan-and-execute`** | Three-phase workflow: design → plan → execute. Slow and steady. |
+| **`denubis-basic-agents`** | Generic agents (haiku/sonnet/opus) plus domain variants: `python-developer`, `academic-researcher` |
+| **`denubis-research-agents`** | Codebase investigation and internet research agents |
+| **`denubis-extending-claude`** | Meta-skills for plugins, agents, skills, CLAUDE.md maintenance, and `/transcript` archiving |
+| **`denubis-hook-skill-reinforcement`** | UserPromptSubmit hook that reminds to activate relevant skills |
+| **`denubis-hook-claudemd-reminder`** | PostToolUse hook that reminds to update CLAUDE.md before commits |
+
+### Domain Agents
+
+**`python-developer`** (Sonnet) - Python 3.14+ with:
+- T-strings for SQL/HTML/shell (security-sensitive strings)
+- Deferred annotations (no quotes for forward references)
+- Bracketless exception handling
+- `concurrent.interpreters` for CPU-bound parallelism
+
+**`academic-researcher`** (Opus) - Academic rigor with:
+- Proper citations and source attribution
+- LaTeX conventions (environments, BibTeX)
+- Scholarly argument structure
+
+### Transcript Archiving
+
+The `/transcript` command archives conversations with IDW2025 research metadata:
+
+```
+/transcript
+```
+
+Outputs:
+- **SUMMARY.md** - Human-readable markdown summary
+- `index.html` - Full HTML transcript
+- `session.meta.json` - Structured metadata (Three Ps framework)
 
 ## Installation
 
 ### Add the marketplace
 ```bash
-/plugin marketplace add https://github.com/ed3dai/ed3d-plugins.git
+/plugin marketplace add https://github.com/Denubis/denubis-plugins.git
 ```
 
 ### Install plugins
-All plugins are available from the `ed3d-plugins` marketplace:
 ```bash
-/plugin install ed3d-plan-and-execute@ed3d-plugins
-/plugin install ed3d-house-style@ed3d-plugins
-# ... etc
+/plugin install denubis-plan-and-execute@denubis-plugins
+/plugin install denubis-basic-agents@denubis-plugins
+/plugin install denubis-research-agents@denubis-plugins
+/plugin install denubis-extending-claude@denubis-plugins
+/plugin install denubis-hook-skill-reinforcement@denubis-plugins
+/plugin install denubis-hook-claudemd-reminder@denubis-plugins
+```
+
+Or install the getting-started guide first:
+```bash
+/plugin install denubis-00-getting-started@denubis-plugins
 ```
 
 ## Repository Structure
 
 ```
-ed3d-plugins/
+denubis-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json
 ├── plugins/
-│   ├── ed3d-00-getting-started/
-│   ├── ed3d-plan-and-execute/
-│   ├── ed3d-house-style/
-│   ├── ed3d-basic-agents/
-│   ├── ed3d-research-agents/
-│   ├── ed3d-extending-claude/
-│   ├── ed3d-playwright/
-│   ├── ed3d-hook-skill-reinforcement/
-│   └── ed3d-hook-claudemd-reminder/
+│   ├── denubis-00-getting-started/
+│   ├── denubis-plan-and-execute/
+│   ├── denubis-basic-agents/
+│   ├── denubis-research-agents/
+│   ├── denubis-extending-claude/
+│   ├── denubis-hook-skill-reinforcement/
+│   └── denubis-hook-claudemd-reminder/
+├── CHANGELOG.md
 └── README.md
 ```
 
-## Contributing
-Issues and pull requests gratefully solicited, except `ed3d-house-style` is _my_ house style, and provided for reference, so I might not take contributions there. (You can make your own house-style plugin though and use that instead!)
+## Removed from Upstream
+
+These plugins were removed as not relevant to Python/SQL/LaTeX workflow:
+- `ed3d-house-style` - TypeScript/React focused
+- `ed3d-playwright` - JavaScript E2E testing
 
 ## Attribution
 
-`ed3d-plan-and-execute` and parts of `ed3d-extending-claude` are derived from [`obra/superpowers`](https://github.com/obra/superpowers) by Jesse Vincent. The original plugin has been folded, spindled, and mutilated extensively.
-
-Some skills in `ed3d-house-style` are derived from `obra/superpowers` and others (`property-based-testing` is a big one) are derived from the [Trail of Bits Skills repository](https://github.com/trailofbits/skills).
+Derived from [`ed3dai/ed3d-plugins`](https://github.com/ed3dai/ed3d-plugins) by Ed Ropple, which itself derives from [`obra/superpowers`](https://github.com/obra/superpowers) by Jesse Vincent.
 
 ## License
 
-The original [obra/superpowers](https://github.com/obra/superpowers) code in this repository is licensed under the MIT License, copyright Jesse Vincent. See `plugins/ed3d-plan-and-execute/LICENSE.superpowers`.
+Original [obra/superpowers](https://github.com/obra/superpowers) code is MIT License, copyright Jesse Vincent.
 
-All other content is licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/).
+All other content is [CC-BY-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/).
