@@ -1,5 +1,53 @@
 # Changelog
 
+## denubis-00-getting-started 1.1.0
+
+Renamed from ed3d-00-getting-started.
+
+**Changed:**
+- Renamed plugin from `ed3d-00-getting-started` to `denubis-00-getting-started`
+- Updated all references from ed3d-plugins to denubis-plugins
+- Updated author and license info
+
+## denubis-hook-skill-reinforcement 1.1.0
+
+Renamed from ed3d-hook-skill-reinforcement.
+
+**Changed:**
+- Renamed plugin from `ed3d-hook-skill-reinforcement` to `denubis-hook-skill-reinforcement`
+- Removed "EXPERIMENTAL" label (validated by practice)
+- Updated author and license info
+
+**Proleptic Review Notes:**
+- Claim: Skills should be auto-invoked via hook reminders
+- Objection: Adds overhead to every prompt
+- Response: Small latency cost vs. quality benefit of using appropriate skills
+
+## denubis-hook-claudemd-reminder 1.1.0
+
+Renamed from ed3d-hook-claudemd-reminder.
+
+**Changed:**
+- Renamed plugin from `ed3d-hook-claudemd-reminder` to `denubis-hook-claudemd-reminder`
+- Updated reference from `ed3d-extending-claude` to `denubis-extending-claude`
+- Updated author and license info
+
+**Proleptic Review Notes:**
+- Claim: CLAUDE.md should be maintained before commits
+- Objection: Adds friction to commit workflow
+- Response: Documentation drift is real; small reminder cost is worth it
+
+## [REMOVED] ed3d-playwright
+
+Removed JavaScript/TypeScript E2E testing plugin. Not relevant to Python/SQL/LaTeX workflow.
+
+**Removed:**
+- `playwright-explorer` agent (browser automation via MCP)
+- `playwright-patterns` skill (test writing patterns)
+- `playwright-debugging` skill (debugging test scripts)
+
+Same reasoning as ed3d-house-style removal: wrong ecosystem.
+
 ## denubis-extending-claude 1.1.0
 
 Renamed from ed3d-extending-claude.

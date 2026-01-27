@@ -1,0 +1,15 @@
+{
+    "name": "denubis-hook-skill-reinforcement",
+    "description": "UserPromptSubmit hook that directs the model to consider and activate useful skills.",
+    "version": "1.1.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "homepage": "https://github.com/denubis/denubis-plugins",
+    "repository": "https://github.com/denubis/denubis-plugins",
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "hooks"
+    ]
+}

@@ -30,7 +30,7 @@ if re.match(r"^git\s+(status|log(?!\s+--oneline\s+-\d+$))", command):
             "additionalContext": (
                 "Reminder: If you're about to commit changes that affect contracts, "
                 "APIs, or domain structure, consider invoking `project-claude-librarian` "
-                "(ed3d-extending-claude:project-claude-librarian) to review and update "
+                "(denubis-extending-claude:project-claude-librarian) to review and update "
                 "CLAUDE.md files before committing."
             )
         }

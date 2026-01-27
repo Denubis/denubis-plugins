@@ -1,22 +1,23 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-    "name": "ed3d-plugins",
+    "name": "denubis-plugins",
     "version": "2.0.0",
-    "description": "Unified marketplace for ed3d's Claude Code development toolkit",
+    "description": "Claude Code plugins for Python/SQL/LaTeX development workflows - customized for academic research",
     "owner": {
-        "name": "Ed",
-        "email": "ed@ed3d.net"
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
     },
     "plugins": [
         {
-            "name": "ed3d-00-getting-started",
-            "description": "Getting started guide and onboarding for ed3d-plugins",
-            "version": "1.0.0",
-            "source": "./plugins/ed3d-00-getting-started",
+            "name": "denubis-00-getting-started",
+            "description": "Getting started guide and onboarding for denubis-plugins",
+            "version": "1.1.0",
+            "source": "./plugins/denubis-00-getting-started",
             "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
-            }
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
+            },
+            "license": "CC-BY-SA-4.0"
         },
         {
             "name": "denubis-plan-and-execute",
@@ -63,51 +64,33 @@
             "license": "CC-BY-SA-4.0"
         },
         {
-            "name": "ed3d-hook-skill-reinforcement",
-            "description": "EXPERIMENTAL. A UserPromptSubmit hook that directs the model to consider and activate useful skills.",
-            "version": "1.0.0",
-            "source": "./plugins/ed3d-hook-skill-reinforcement",
+            "name": "denubis-hook-skill-reinforcement",
+            "description": "UserPromptSubmit hook that directs the model to consider and activate useful skills.",
+            "version": "1.1.0",
+            "source": "./plugins/denubis-hook-skill-reinforcement",
             "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
             },
-            "license": "UNLICENSED",
+            "license": "CC-BY-SA-4.0",
             "keywords": [
                 "hooks"
             ]
         },
         {
-            "name": "ed3d-hook-claudemd-reminder",
-            "description": "A PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-            "version": "1.0.0",
-            "source": "./plugins/ed3d-hook-claudemd-reminder",
+            "name": "denubis-hook-claudemd-reminder",
+            "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
+            "version": "1.1.0",
+            "source": "./plugins/denubis-hook-claudemd-reminder",
             "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
             },
-            "license": "UNLICENSED",
+            "license": "CC-BY-SA-4.0",
             "keywords": [
                 "hooks",
                 "documentation",
                 "claude-md"
-            ]
-        },
-        {
-            "name": "ed3d-playwright",
-            "description": "Playwright automation toolkit with MCP integration, specialized agent for browser control, and best practice skills",
-            "version": "1.0.0",
-            "source": "./plugins/ed3d-playwright",
-            "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
-            },
-            "license": "UNLICENSED",
-            "keywords": [
-                "playwright",
-                "browser-automation",
-                "testing",
-                "e2e",
-                "web-scraping"
             ]
         }
     ]

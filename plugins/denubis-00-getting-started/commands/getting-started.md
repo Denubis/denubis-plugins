@@ -1,9 +1,9 @@
 ---
-description: Show the ed3d-plugins README and getting started information
+description: Show the denubis-plugins README and getting started information
 allowed-tools:
 ---
 
-# Getting Started with ed3d-plugins
+# Getting Started with denubis-plugins
 
 Display the contents of the first two sections of @../../README.md to the user. Stop before `Installation`.
 
