@@ -1,5 +1,17 @@
 # Changelog
 
+## [REMOVED] ed3d-house-style
+
+Removed TypeScript/React-focused house style plugin. Not relevant to Python/SQL/LaTeX workflow.
+
+**Removed skills:**
+- howto-code-in-typescript (and typebox, type-fest sub-resources)
+- programming-in-react (and useEffect, react-testing sub-resources)
+- coding-effectively (TypeScript-focused)
+- All other Ed's opinionated standards
+
+May create denubis-house-style with Python/SQL/LaTeX focus later.
+
 ## denubis-basic-agents 2.0.0
 
 Renamed from ed3d-basic-agents and customized for Python/academic workflows.

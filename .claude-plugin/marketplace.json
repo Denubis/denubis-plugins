@@ -28,17 +28,7 @@
                 "email": "ed@ed3d.net"
             }
         },
-        {
-            "name": "ed3d-house-style",
-            "description": "ed3d's house style for software development",
-            "version": "1.0.1",
-            "source": "./plugins/ed3d-house-style",
-            "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
-            }
-        },
-        {
+                {
             "name": "denubis-basic-agents",
             "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
             "version": "2.0.0",
