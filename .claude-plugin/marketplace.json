@@ -54,8 +54,8 @@
         },
         {
             "name": "denubis-extending-claude",
-            "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md",
-            "version": "1.1.0",
+            "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, maintaining CLAUDE.md, and archiving transcripts",
+            "version": "1.2.0",
             "source": "./plugins/denubis-extending-claude",
             "author": {
                 "name": "Brian Ballsun-Stanton",

@@ -1,5 +1,21 @@
 # Changelog
 
+## denubis-extending-claude 1.2.0
+
+Added transcript archiving skill with markdown output.
+
+**New:**
+- `transcript` skill - Archive conversations with IDW2025 research metadata (Three Ps: Prompt/Process/Provenance)
+- `/transcript` command to invoke the skill
+- **SUMMARY.md output** - Human-readable markdown summary of archived sessions
+- Integrates with `claude-transcript-archive` CLI tool
+
+**Outputs:**
+- `SUMMARY.md` - Markdown summary with Three Ps, artifacts, statistics
+- `index.html` - Full HTML transcript (via claude-code-transcripts)
+- `session.meta.json` - Complete structured metadata
+- `raw-transcript.jsonl` - Raw conversation data
+
 ## denubis-00-getting-started 1.1.0
 
 Renamed from ed3d-00-getting-started.
