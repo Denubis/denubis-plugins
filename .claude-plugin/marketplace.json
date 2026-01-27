@@ -39,15 +39,15 @@
             }
         },
         {
-            "name": "ed3d-basic-agents",
-            "description": "Core agents for general-purpose tasks. Other plugins expect this to exist.",
-            "version": "1.0.0",
-            "source": "./plugins/ed3d-basic-agents",
+            "name": "denubis-basic-agents",
+            "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
+            "version": "2.0.0",
+            "source": "./plugins/denubis-basic-agents",
             "author": {
-                "name": "Ed",
-                "email": "ed@ed3d.net"
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
             },
-            "license": "UNLICENSED"
+            "license": "CC-BY-SA-4.0"
         },
         {
             "name": "ed3d-research-agents",

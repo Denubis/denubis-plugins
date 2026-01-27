@@ -1,5 +1,30 @@
 # Changelog
 
+## denubis-basic-agents 2.0.0
+
+Renamed from ed3d-basic-agents and customized for Python/academic workflows.
+
+**New:**
+- `python-developer` agent - Sonnet-based agent with Python 3.14 idioms:
+  - T-strings for security-sensitive string processing (SQL, HTML, shell)
+  - Deferred annotations (no string quotes for forward references)
+  - Bracketless exception handling (PEP 758)
+  - Finally block discipline (PEP 765)
+  - Unified compression module with zstd preference (PEP 784)
+  - concurrent.interpreters for CPU-bound parallelism (PEP 734)
+- `academic-researcher` agent - Opus-based agent with academic rigor (citations, argument structure, LaTeX conventions) baked in
+
+**Changed:**
+- Renamed plugin from `ed3d-basic-agents` to `denubis-basic-agents`
+- Updated `using-generic-agents` skill to document domain agents alongside generic agents
+- Model characterizations reframed as "heuristics, not absolute truths"
+- Added explicit "when to use domain agents" guidance
+
+**Proleptic Review Notes:**
+- Addressed objection that "unprompted" agents lack domain guidance by adding domain variants
+- Addressed objection that model tier hierarchy is oversimplified by reframing as heuristics
+- Kept mandatory skill-checking (latency cost is small vs. quality benefit)
+
 ## ed3d-plan-and-execute 1.6.2
 
 Fixes "Re-read skill" task dependency ordering.

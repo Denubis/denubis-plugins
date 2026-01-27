@@ -1,0 +1,17 @@
+{
+    "name": "denubis-basic-agents",
+    "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
+    "version": "2.0.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "homepage": "https://github.com/denubis/denubis-plugins",
+    "repository": "https://github.com/denubis/denubis-plugins",
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "agents",
+        "python",
+        "academic"
+    ]
+}
