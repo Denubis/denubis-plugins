@@ -1,5 +1,18 @@
 # Changelog
 
+## denubis-extending-claude 1.1.0
+
+Renamed from ed3d-extending-claude.
+
+**Changed:**
+- Renamed plugin from `ed3d-extending-claude` to `denubis-extending-claude`
+- Updated all internal references
+
+**Proleptic Review Notes:**
+- TDD for skills validated: pressure scenarios verify behavior change
+- "One excellent example" principle validated (use Python for Brian's workflow)
+- project-claude-librarian useful for maintaining documentation
+
 ## denubis-plan-and-execute 2.0.0
 
 Renamed from ed3d-plan-and-execute with significant philosophy changes.

@@ -5,7 +5,7 @@ description: Use when creating or updating CLAUDE.md files for projects or subdi
 
 # Writing CLAUDE.md Files
 
-**REQUIRED BACKGROUND:** Read ed3d-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure.
+**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure.
 
 ## Core Principle
 

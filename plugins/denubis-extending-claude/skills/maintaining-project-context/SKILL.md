@@ -5,7 +5,7 @@ description: Use when completing development phases or branches to identify and 
 
 # Maintaining Project Context
 
-**REQUIRED SUB-SKILL:** Use ed3d-extending-claude:writing-claude-md-files for all context file creation and updates.
+**REQUIRED SUB-SKILL:** Use denubis-extending-claude:writing-claude-md-files for all context file creation and updates.
 
 ## Core Principle
 

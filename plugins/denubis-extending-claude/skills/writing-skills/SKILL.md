@@ -5,7 +5,7 @@ description: Use when creating new skills, editing existing skills, or verifying
 
 # Writing Skills
 
-**REQUIRED BACKGROUND:** Read ed3d-extending-claude:writing-claude-directives for foundational guidance on token efficiency, discovery optimization, and compliance techniques. This skill focuses on TDD methodology specific to skill creation.
+**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, discovery optimization, and compliance techniques. This skill focuses on TDD methodology specific to skill creation.
 
 ## Core Principle
 
@@ -106,7 +106,7 @@ Run pressure scenario WITHOUT skill:
 2. Add explicit counters
 3. Re-test until bulletproof
 
-**REQUIRED:** Use ed3d-extending-claude:testing-skills-with-subagents for complete methodology.
+**REQUIRED:** Use denubis-extending-claude:testing-skills-with-subagents for complete methodology.
 
 ## Testing by Skill Type
 

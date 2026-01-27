@@ -5,7 +5,7 @@ description: Use when creating specialized subagents for Claude Code plugins or 
 
 # Creating an Agent
 
-**REQUIRED BACKGROUND:** Read ed3d-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure. This skill focuses on agent-specific patterns.
+**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure. This skill focuses on agent-specific patterns.
 
 ## What is an Agent?
 
