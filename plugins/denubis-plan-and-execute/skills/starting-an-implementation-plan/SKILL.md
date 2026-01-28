@@ -43,8 +43,11 @@ Use TaskCreate to track the orchestration steps:
 
 ```
 TaskCreate: "Branch setup"
-TaskCreate: "Create implementation plan"
+(conditional) TaskCreate: "Read project implementation guidance from [absolute path]"
   → TaskUpdate: addBlockedBy: [Branch setup]
+  → (only if .ed3d/implementation-plan-guidance.md exists)
+TaskCreate: "Create implementation plan"
+  → TaskUpdate: addBlockedBy: [Branch setup] (or [Read guidance] if it exists)
 TaskCreate: "Re-read starting-an-implementation-plan skill (restore context)"
   → (DO NOT set blockedBy yet - will be updated after granular tasks are created)
 TaskCreate: "Execution handoff"
@@ -115,6 +118,34 @@ Options:
 4. **If branch creation fails:** Report error to user and ask if they want to use current branch instead
 
 Mark "Branch setup" task as completed. **THEN proceed to Planning.**
+
+### Check for Implementation Guidance
+
+After branch setup, check for project-specific implementation guidance.
+
+**Check if `.ed3d/implementation-plan-guidance.md` exists:**
+
+Use the Read tool to check if `.ed3d/implementation-plan-guidance.md` exists in the session's working directory.
+
+**If the file exists:**
+
+1. Use TaskCreate to add: "Read project implementation guidance from [absolute path to .ed3d/implementation-plan-guidance.md]"
+   - Set this task as blocked by "Branch setup"
+   - Update "Create implementation plan" to be blocked by this new task
+2. Mark the task in_progress
+3. Read the file and incorporate the guidance into your understanding
+4. Mark the task completed
+5. Proceed to Planning
+
+**If the file does not exist:**
+
+Proceed directly to Planning. Do not create a task or mention the missing file.
+
+**What implementation guidance provides:**
+- Coding standards and conventions
+- Testing requirements and patterns
+- Review criteria beyond defaults
+- Project-specific quality gates
 
 ### Planning
 
