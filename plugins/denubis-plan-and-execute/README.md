@@ -111,6 +111,34 @@ After all tasks:
 
 ---
 
+## Proleptic Reasoning and UAT Gates
+
+This plugin implements proleptic reasoning as a workflow discipline, based on [Kudina, Ballsun-Stanton & Alfano (2025)](https://doi.org/10.1007/s44204-025-00247-1).
+
+**What is proleptic reasoning?** Anticipating objections to a position, articulating them charitably, and responding preemptively. The value is not in the counterarguments being correct - it's in forcing deliberate evaluation before committing.
+
+**When it fires:**
+- Before design is committed (design → implementation transition)
+- Between implementation phases
+- During UAT (before declaring complete)
+
+**The "drunk tutor" framing:** Both proposals AND counterarguments may be flawed. The human must evaluate both critically. This prevents premature consensus and forces thinking.
+
+**Human UAT gates:** After code review passes, the workflow stops and presents acceptance criteria from the Definition of Done. The human must explicitly verify the implementation meets requirements before proceeding. Rejection loops back to fix and re-verify.
+
+---
+
+## Project Customisation
+
+Create optional guidance files in `.ed3d/` at your project root:
+
+- **`.ed3d/design-plan-guidance.md`** - Domain terminology, architectural constraints, technology preferences. Loaded before clarification.
+- **`.ed3d/implementation-plan-guidance.md`** - Coding standards, testing requirements, review criteria. Loaded at plan start and during code reviews.
+
+Run `/how-to-customize` for examples and details.
+
+---
+
 ## Why This Structure?
 
 **Design before code.** Brainstorming surfaces constraints and alternatives you'd otherwise discover mid-implementation. The design document becomes a contract between "what we decided" and "what we'll build."
@@ -164,6 +192,7 @@ The plugin uses specialized subagents for different roles:
 | **task-implementor** | denubis-plan-and-execute | Implements tasks with TDD, runs verification, commits |
 | **code-reviewer** | denubis-plan-and-execute | Enforces quality standards, blocks on issues |
 | **task-bug-fixer** | denubis-plan-and-execute | Fixes issues identified by code reviewer |
+| **proleptic-challenger** | denubis-plan-and-execute | Generates counterarguments at phase transitions |
 | **project-claude-librarian** | ed3d-extending-claude | Updates CLAUDE.md files when contracts change |
 
 You interact with the main orchestrating agent. It dispatches subagents and shows you their full responses.

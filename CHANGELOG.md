@@ -1,5 +1,29 @@
 # Changelog
 
+## denubis-plan-and-execute 2.1.0
+
+Proleptic reasoning and human UAT gates.
+
+**New:**
+- `proleptic-challenger` agent - Generates counterarguments at phase transitions based on Kudina, Ballsun-Stanton & Alfano (2025) proleptic reasoning framework (DOI: 10.1007/s44204-025-00247-1)
+- `proleptic-challenge` skill - Documents when and how to invoke the challenger (design finalisation, between phases, during UAT)
+- `human-uat-gate` skill - Presents acceptance criteria and waits for explicit human verification after code review
+- `/how-to-customize` command - Documents `.ed3d/` guidance files for project-specific customisation
+
+**Changed:**
+- `writing-design-plans` now invokes proleptic challenge before committing design
+- `executing-an-implementation-plan` now includes proleptic challenge between phases and UAT gate after code review
+- `requesting-code-review` now leads to proleptic challenge → UAT gate flow
+- `starting-a-design-plan` loads `.ed3d/design-plan-guidance.md` before clarification (if exists)
+- `starting-an-implementation-plan` loads `.ed3d/implementation-plan-guidance.md` at start (if exists)
+- Code reviewers now receive implementation guidance for project-specific standards (if exists)
+
+**Philosophy:**
+- Proleptic reasoning forces deliberate evaluation before phase transitions
+- "Drunk tutor" framing: both proposals AND counterarguments may be flawed
+- Human UAT ensures implementations meet actual needs, not just automated checks
+- Guidance files enable project-specific customisation without modifying plugin code
+
 ## [denubis-hook-shortcut-detection] 1.0.0
 
 Initial release of shortcut detection hook.
