@@ -4,18 +4,17 @@
 
 This design introduces two mechanisms to improve decision-making quality in Claude Code workflows: proleptic reasoning and human UAT gates. Proleptic reasoning operationalises a philosophical practice from argumentation theory—anticipating and articulating counterarguments before settling on a decision—by dispatching a specialised "proleptic challenger" subagent at key workflow decision points. This challenger generates 2-4 counterarguments against proposals (design options, code review conclusions, acceptance criteria) and presents them to the human alongside a "drunk tutor" framing: both the original proposal and the counterarguments may be flawed, requiring human judgement to evaluate which concerns are legitimate. The value lies not in the quality of the counterarguments but in forcing deliberate evaluation of alternatives before committing.
 
-The second mechanism introduces explicit human User Acceptance Testing (UAT) gates into implementation workflows. After code review passes and proleptic counterarguments are presented, the workflow stops and displays the Definition of Done criteria from earlier in the process, waiting for explicit human verification that the work satisfies requirements. This prevents premature completion declarations and ensures humans validate that implementations meet their actual needs rather than just passing automated checks. The design also adds support for loading project-specific guidance files from `.claude/design-plan-guidance.md` and `.claude/implementation-plan-guidance.md` to inject domain constraints and coding standards at appropriate workflow stages.
+The second mechanism introduces explicit human User Acceptance Testing (UAT) gates into implementation workflows. After code review passes and proleptic counterarguments are presented, the workflow stops and displays the Definition of Done criteria from earlier in the process, waiting for explicit human verification that the work satisfies requirements. This prevents premature completion declarations and ensures humans validate that implementations meet their actual needs rather than just passing automated checks. The design also adds support for loading project-specific guidance files from `.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md` to inject domain constraints and coding standards at appropriate workflow stages.
 
 ## Definition of Done
 
-1. **Proleptic challenger subagent exists** - A subagent that generates counterarguments to proposed approaches, triggered at decision points
-2. **Human UAT gate in workflows** - After code review passes, workflow stops and presents acceptance criteria for human verification before proceeding
-3. **Project guidance files in `.claude/`** - Design and implementation guidance loaded from `.claude/design-plan-guidance.md` and `.claude/implementation-plan-guidance.md`
-4. **Proleptic challenges at decision points**:
-   - After options are presented (before human chooses)
-   - After code review completes (challenge the review's conclusions)
-   - After UAT criteria are defined (challenge the acceptance criteria)
-   - After substantive human input that settles direction
+1. **Proleptic challenger subagent exists** - A subagent that generates counterarguments to proposed approaches, triggered before phase transitions
+2. **Human UAT gate in workflows** - After code review passes, workflow stops and presents acceptance criteria for human verification; if rejected, fix and re-verify
+3. **Project guidance files in `.ed3d/`** - Design and implementation guidance loaded from `.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md`
+4. **Proleptic challenges before phase transitions**:
+   - Before design is finalised (design→implementation transition)
+   - Between implementation phases
+   - During UAT (before declaring complete)
 5. **"Drunk tutor" framing** - Both proposals AND counterarguments are presented as potentially flawed, requiring human judgement
 6. **Academic citation** - Plugin references the source paper (DOI: 10.1007/s44204-025-00247-1)
 
@@ -58,23 +57,23 @@ The "drunk tutor" framing applies: the proleptic challenger sounds authoritative
 - Does not proceed until human confirms
 
 **Updated Skills** (modifications to existing files):
-- `executing-an-implementation-plan/SKILL.md` - Add UAT gate after code review, invoke proleptic challenger after phase completion
-- `starting-a-design-plan/SKILL.md` - Invoke proleptic challenger after Definition of Done is drafted
-- `requesting-code-review/SKILL.md` - Invoke proleptic challenger after review completes
-- `brainstorming/SKILL.md` - Invoke proleptic challenger when options are presented
+- `writing-design-plans/SKILL.md` - Invoke proleptic challenger before committing design (design→implementation transition)
+- `executing-an-implementation-plan/SKILL.md` - Add UAT gate after code review, invoke proleptic challenger between phases
+- `requesting-code-review/SKILL.md` - Invoke proleptic challenger after review completes (before UAT)
 
 **Guidance Files** (user-created, not plugin files):
-- `.claude/design-plan-guidance.md` - Project-specific design constraints, loaded before clarification
-- `.claude/implementation-plan-guidance.md` - Project-specific coding standards, loaded during implementation and review
+- `.ed3d/design-plan-guidance.md` - Project-specific design constraints, loaded before clarification
+- `.ed3d/implementation-plan-guidance.md` - Project-specific coding standards, loaded during implementation and review
 
 ### Trigger Points for Proleptic Challenge
 
+Proleptic challenges fire **before phase transitions**, not at every decision point:
+
 | Trigger | What Gets Challenged | Expected Outcome |
 |---------|---------------------|------------------|
-| Options presented | The options themselves | Human chooses with awareness of tradeoffs |
-| Code review completes | The review's conclusions | Human judges if review is persuasive |
-| UAT criteria defined | The acceptance criteria | Human confirms criteria are sufficient |
-| Substantive human input | The direction being settled | Human confirms or revises based on counterarguments |
+| Design finalisation | The design before implementation planning begins | Human confirms design is sound before committing to implementation |
+| Between implementation phases | The completed phase before moving to the next | Human confirms phase is truly complete and approach remains valid |
+| During UAT | The implementation before declaring complete | Human verifies acceptance criteria are met with awareness of potential gaps |
 
 ### Flow: Code Review → Proleptic Challenge → UAT Gate
 
@@ -93,10 +92,12 @@ UAT gate invoked
     → [Acceptance criteria listed]
     → "Please verify these are met. I'll wait for your confirmation."
     ↓
-Human confirms (or identifies gaps)
-    ↓
-Workflow proceeds (or loops back to fix)
+Human responds
+    ├─ Confirms → Workflow proceeds to next phase
+    └─ Rejects → Fix issues → Re-run code review → Loop back to proleptic challenge
 ```
+
+**UAT rejection is not a dead end.** If the human identifies gaps, the workflow loops back: fix the issues, re-run code review, proleptic challenge again, then re-present UAT. This continues until the human confirms.
 
 ## Existing Patterns
 
@@ -106,7 +107,7 @@ Workflow proceeds (or loops back to fix)
 
 **Workflow gates** - Code review already acts as a gate. UAT gate extends this pattern with explicit human verification requirement.
 
-**Guidance file loading** - Upstream ed3d-plugins introduced `.ed3d/` guidance files. This design adapts to `.claude/` for semantic consistency with Claude Code's existing `.claude/` settings directory.
+**Guidance file loading** - Upstream ed3d-plugins introduced `.ed3d/` guidance files. This design follows the upstream convention for cross-fork compatibility.
 
 ## Implementation Phases
 
@@ -153,16 +154,16 @@ Workflow proceeds (or loops back to fix)
 <!-- START_PHASE_4 -->
 ### Phase 4: Integrate Proleptic Challenge into Existing Skills
 
-**Goal:** Update existing skills to invoke proleptic challenger at decision points
+**Goal:** Update existing skills to invoke proleptic challenger before phase transitions
 
 **Components:**
-- `plugins/denubis-plan-and-execute/skills/brainstorming/SKILL.md` - Add proleptic challenge when options presented
-- `plugins/denubis-plan-and-execute/skills/starting-a-design-plan/SKILL.md` - Add proleptic challenge after Definition of Done
-- `plugins/denubis-plan-and-execute/skills/requesting-code-review/SKILL.md` - Add proleptic challenge after review completes
+- `plugins/denubis-plan-and-execute/skills/writing-design-plans/SKILL.md` - Add proleptic challenge before committing design (design→implementation transition)
+- `plugins/denubis-plan-and-execute/skills/executing-an-implementation-plan/SKILL.md` - Add proleptic challenge between implementation phases
+- `plugins/denubis-plan-and-execute/skills/requesting-code-review/SKILL.md` - Add proleptic challenge after review completes (before UAT)
 
 **Dependencies:** Phases 1, 2 (challenger and skill exist)
 
-**Done when:** Each skill invokes proleptic challenger at appropriate decision points
+**Done when:** Each skill invokes proleptic challenger at appropriate phase transitions
 <!-- END_PHASE_4 -->
 
 <!-- START_PHASE_5 -->
@@ -181,11 +182,11 @@ Workflow proceeds (or loops back to fix)
 <!-- START_PHASE_6 -->
 ### Phase 6: Guidance File Support
 
-**Goal:** Load project-specific guidance from `.claude/` directory
+**Goal:** Load project-specific guidance from `.ed3d/` directory
 
 **Components:**
-- `plugins/denubis-plan-and-execute/skills/starting-a-design-plan/SKILL.md` - Load `.claude/design-plan-guidance.md` before clarification
-- `plugins/denubis-plan-and-execute/skills/starting-an-implementation-plan/SKILL.md` - Load `.claude/implementation-plan-guidance.md` at plan start
+- `plugins/denubis-plan-and-execute/skills/starting-a-design-plan/SKILL.md` - Load `.ed3d/design-plan-guidance.md` before clarification
+- `plugins/denubis-plan-and-execute/skills/starting-an-implementation-plan/SKILL.md` - Load `.ed3d/implementation-plan-guidance.md` at plan start
 - `plugins/denubis-plan-and-execute/skills/executing-an-implementation-plan/SKILL.md` - Pass guidance to code reviewers
 - `plugins/denubis-plan-and-execute/commands/how-to-customize.md` - Document the feature with examples
 
@@ -214,7 +215,7 @@ Workflow proceeds (or loops back to fix)
 
 **Proleptic challenge is not adversarial** - The goal is not to defeat proposals but to surface considerations the human should evaluate. Counterarguments should be charitable and substantive, not strawmen.
 
-**Frequency calibration** - Proleptic challenges fire at decision points, not every turn. "Substantive human input" means direction-setting input, not routine confirmations like "yes, proceed."
+**Frequency calibration** - Proleptic challenges fire before phase transitions, not every turn. This means: when design is about to be finalised, between implementation phases, and during UAT. Routine confirmations like "yes, proceed" do not trigger challenges.
 
 **Escape hatch** - Humans can dismiss counterarguments quickly if they've already considered them. The gate doesn't require lengthy engagement, just acknowledgement.
 
