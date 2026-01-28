@@ -294,10 +294,6 @@ Present counterarguments to human. Wait for response.
 
 **Only after UAT confirmed:** Mark phase complete and proceed to next phase.
 
-#### 3d. Move to Next Phase
-
-Proceed to the next phase's "Read" step. Repeat 3a-3c for each phase.
-
 **Phase completion flow:**
 ```
 Phase code review passes
@@ -312,6 +308,10 @@ Human confirms phase complete
     ↓
 Proceed to next phase
 ```
+
+#### 3d. Move to Next Phase
+
+Proceed to the next phase's "Read" step. Repeat 3a-3c for each phase.
 
 ### 4. Update Project Context
 

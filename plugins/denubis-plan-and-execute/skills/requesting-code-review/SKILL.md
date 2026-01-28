@@ -80,7 +80,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 All categories empty → proceed to proleptic challenge.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:proleptic-challenge
+**REQUIRED:** Invoke proleptic challenge before proceeding.
 
 Before proceeding to UAT or next task:
 
