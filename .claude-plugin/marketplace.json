@@ -92,6 +92,20 @@
                 "documentation",
                 "claude-md"
             ]
+        },
+        {
+            "name": "denubis-hook-shortcut-detection",
+            "description": "Stop hook that detects shortcut phrases and blocks until user approves approach changes.",
+            "version": "1.0.0",
+            "source": "./plugins/denubis-hook-shortcut-detection",
+            "author": {
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
+            },
+            "license": "CC-BY-SA-4.0",
+            "keywords": [
+                "hooks"
+            ]
         }
     ]
 }
