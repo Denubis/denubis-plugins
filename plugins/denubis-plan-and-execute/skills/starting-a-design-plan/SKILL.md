@@ -76,6 +76,37 @@ Share whatever details you have. We'll clarify anything unclear in the next step
 
 Mark Phase 1 as completed when you have initial context.
 
+### Between Phase 1 and Phase 2: Check for Project Guidance
+
+Before clarification, check for project-specific design guidance.
+
+**Check if `.ed3d/design-plan-guidance.md` exists:**
+
+Use the Read tool to check if `.ed3d/design-plan-guidance.md` exists in the session's working directory.
+
+**If the file exists:**
+
+1. Use TaskCreate to add: "Read project design guidance from [absolute path to .ed3d/design-plan-guidance.md]"
+   - Set this task as blocked by Phase 1 (Context Gathering)
+   - Update Phase 2 (Clarification) to be blocked by this new task
+2. Mark the task in_progress
+3. Read the file and incorporate the guidance into your understanding
+4. Mark the task completed
+5. Proceed to Phase 2
+
+**If the file does not exist:**
+
+Proceed directly to Phase 2. Do not create a task or mention the missing file.
+
+**What project guidance provides:**
+- Domain-specific terminology to use in clarification
+- Architectural constraints or preferences
+- Technologies that are required, preferred, or forbidden
+- Stakeholders and their priorities
+- Project conventions that designs must follow
+
+The guidance informs what questions you ask during clarification.
+
 ### Phase 2: Clarification
 
 Use TaskUpdate to mark Phase 2 as in_progress.
