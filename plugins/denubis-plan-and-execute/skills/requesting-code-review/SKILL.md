@@ -77,7 +77,41 @@ HEAD_SHA=$(git rev-parse HEAD)
 ## Step 2: Handle Reviewer Response
 
 ### If Zero Issues
-All categories empty → proceed to next task.
+
+All categories empty → proceed to proleptic challenge.
+
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:proleptic-challenge
+
+Before proceeding to UAT or next task:
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
+<parameter name="description">Proleptic challenge: code review passed</parameter>
+<parameter name="prompt">
+PROPOSAL:
+Code review passed with zero issues for:
+[summary of what was reviewed]
+
+Changes: BASE_SHA to HEAD_SHA
+Requirements: [plan or requirements reference]
+
+TRIGGER: Phase transition (code review → UAT)
+
+CONTEXT:
+The code review verified:
+- Tests pass
+- Code quality standards met
+- Requirements aligned
+
+This code is about to be accepted as complete for this phase.
+</parameter>
+</invoke>
+```
+
+Present counterarguments to human. Wait for response before proceeding.
+
+**After human evaluates counterarguments:** Proceed to human-uat-gate skill for acceptance verification.
 
 ### If Any Issues Found
 Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
@@ -207,5 +241,9 @@ HEAD_SHA: [sha]
 - executing-an-implementation-plan (after each task)
 - finishing-a-development-branch (final review)
 - Ad-hoc when you need a review
+
+**Leads to:**
+- proleptic-challenge (after zero issues)
+- human-uat-gate (after proleptic challenge addressed)
 
 **Template location:** requesting-code-review/code-reviewer.md
