@@ -290,9 +290,64 @@ This phase is about to be marked complete. The next phase depends on this work.
 
 Present counterarguments to human. Wait for response.
 
-**After human evaluates counterarguments:** Proceed to human-uat-gate for phase acceptance.
+### After Proleptic Challenge: Human UAT Gate
 
-**Only after UAT confirmed:** Mark phase complete and proceed to next phase.
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:human-uat-gate
+
+After human has evaluated proleptic counterarguments, present UAT:
+
+Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
+
+**Locate Definition of Done:**
+- For this phase: from the implementation plan's phase description
+- For overall implementation: from the design document's Definition of Done
+
+**Present UAT:**
+
+```markdown
+## User Acceptance Testing: Phase [N]
+
+Code review passed. Proleptic counterarguments evaluated. Please verify this phase meets requirements.
+
+### Phase [N] Definition of Done
+
+- [ ] [Criterion from phase description]
+- [ ] [Criterion from phase description]
+...
+
+### How to Verify
+
+1. [Specific verification step]
+2. [Specific verification step]
+...
+
+### Your Verification Required
+
+Please verify and respond:
+- **"Confirmed"** - Phase complete, proceed to next phase
+- **"[Criterion] not met: [reason]"** - Will fix and re-verify
+
+I'll wait for your response.
+```
+
+**Handle UAT Response:**
+
+| Response | Action |
+|----------|--------|
+| Confirmed | Mark phase complete, proceed to next phase |
+| Criterion not met | Fix issue → Re-run code review → Proleptic challenge → UAT (loop) |
+
+**UAT rejection flow:**
+```
+UAT rejected
+    → Fix issues
+    → Re-run phase code review
+    → Proleptic challenge again
+    → Re-present UAT
+    → Repeat until confirmed
+```
+
+**Only after UAT confirmed:** Mark phase tasks complete. Proceed to next phase.
 
 **Phase completion flow:**
 ```
