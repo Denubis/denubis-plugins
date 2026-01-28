@@ -260,9 +260,58 @@ After bug-fixer completes, re-review per the `requesting-code-review` skill. Con
 
 Mark "Phase Nc: Code review" as complete.
 
+### After Phase Code Review Passes
+
+**REQUIRED:** Invoke proleptic challenge before proceeding to next phase.
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
+<parameter name="description">Proleptic challenge: Phase N complete</parameter>
+<parameter name="prompt">
+PROPOSAL:
+Phase [N]: [Phase Name] is complete.
+
+What was built:
+[summary of phase deliverables]
+
+Code review status: APPROVED with zero issues
+
+TRIGGER: Phase transition (Phase N → Phase N+1)
+
+CONTEXT:
+Remaining phases: [list]
+Definition of Done for overall implementation: [reference]
+
+This phase is about to be marked complete. The next phase depends on this work.
+</parameter>
+</invoke>
+```
+
+Present counterarguments to human. Wait for response.
+
+**After human evaluates counterarguments:** Proceed to human-uat-gate for phase acceptance.
+
+**Only after UAT confirmed:** Mark phase complete and proceed to next phase.
+
 #### 3d. Move to Next Phase
 
 Proceed to the next phase's "Read" step. Repeat 3a-3c for each phase.
+
+**Phase completion flow:**
+```
+Phase code review passes
+    ↓
+Proleptic challenge
+    ↓
+Human evaluates counterarguments
+    ↓
+UAT gate (human-uat-gate skill)
+    ↓
+Human confirms phase complete
+    ↓
+Proceed to next phase
+```
 
 ### 4. Update Project Context
 
