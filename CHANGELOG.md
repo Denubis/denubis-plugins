@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-hook-shortcut-detection] 1.0.0
+
+Initial release of shortcut detection hook.
+
+**New:**
+- Stop hook that reads Claude's transcript for shortcut phrases
+- Detects high-signal phrases: "let me try a different approach", "simpler approach", "for simplicity", etc.
+- Detects medium-signal phrases: "instead of", "easier to", "more efficient", etc.
+- Blocks response and requires Claude to explain the problem, what was tried, and ask for explicit approval
+
 ## denubis-extending-claude 1.2.0
 
 Added transcript archiving skill with markdown output.
