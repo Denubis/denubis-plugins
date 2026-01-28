@@ -497,7 +497,49 @@ Replace the Summary and Glossary placeholder comments with the subagent's output
 
 Briefly review the generated sections for accuracy. The subagent may miss nuance from the conversation — adjust if needed, but prefer the subagent's version when it's accurate (it reflects what the document actually says, not what you remember).
 
-## After Summary and Glossary: Commit
+## Before Commit: Proleptic Challenge
+
+**REQUIRED:** Before committing the design, invoke proleptic challenge.
+
+This is a phase transition (design → implementation). Challenge the design before it becomes permanent.
+
+**Dispatch proleptic-challenger:**
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
+<parameter name="description">Proleptic challenge: design finalisation</parameter>
+<parameter name="prompt">
+PROPOSAL:
+The design document at [file path] is about to be committed. Key decisions:
+- Architecture: [summarise]
+- Phases: [count] implementation phases
+- Key components: [list]
+
+TRIGGER: Design finalisation
+
+CONTEXT:
+Definition of Done:
+[paste from document]
+
+This design will guide implementation. Once committed, changes require revisiting the design process.
+</parameter>
+</invoke>
+```
+
+**Present counterarguments to user:**
+
+"Before committing this design, here are counterarguments to consider:"
+
+[Insert agent output]
+
+"Your judgement is required. Evaluate these concerns and let me know how to proceed."
+
+**Wait for human response before committing.**
+
+## After Proleptic Challenge: Commit
+
+**Only commit after human has evaluated proleptic challenge.**
 
 **Commit the design document:**
 
