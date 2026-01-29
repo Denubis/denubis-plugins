@@ -1,6 +1,6 @@
 ---
 name: syncing-with-upstream
-description: Use when integrating changes from upstream ed3d-plugins into this fork - handles the ed3d->denubis rename, conflict resolution, and selective cherry-picking
+description: Use when integrating changes from upstream ed3d-plugins into this fork - handles the ed3d->denubis rename, conflict resolution, and merge workflow
 ---
 
 # Syncing with Upstream
@@ -13,13 +13,7 @@ This fork (denubis-plugins) diverged from upstream (ed3d-plugins) with:
 - Additional plugins: shortcut-detection hook, transcript archiving
 - Removed plugins: house-style, playwright (wrong ecosystem)
 
-Upstream continues development. This skill guides selective integration of useful changes.
-
-## When to Use
-
-- Periodically check upstream for new features
-- When upstream fixes bugs you also have
-- When upstream improves skills you use
+When the user asks to sync, do it. This skill documents how.
 
 ## Prerequisites
 
@@ -44,49 +38,59 @@ git fetch upstream
 git log --oneline main..upstream/main
 ```
 
-Review each commit. Categorise:
-- **Content changes**: New features, bug fixes, skill improvements
-- **Infrastructure changes**: Version bumps, changelog updates (usually skip)
-- **Rename-only changes**: File moves within ed3d-* structure (skip)
+Present the commits to the user. Let them identify which changes they want.
 
-### 2. Cherry-Pick Content Changes
+### 2. Merge or Cherry-Pick
 
-Cherry-pick one commit at a time for review:
+**Prefer merge** for multiple commits (preserves history, easier future syncs):
+
+```bash
+git merge --no-commit upstream/main
+```
+
+**Use cherry-pick** for selective single commits:
 
 ```bash
 git cherry-pick --no-commit <commit-hash>
 ```
 
-**Why --no-commit:** Allows reviewing and resolving conflicts before committing.
+**Why --no-commit:** Review and resolve before committing.
 
 ### 3. Resolve Conflicts
 
-Common conflict patterns:
+**Read every conflict.** Don't apply mechanical rules blindly.
 
-| File | Resolution |
-|------|------------|
-| `CHANGELOG.md` | Keep HEAD (your changelog is authoritative) |
-| `README.md` | Merge both: keep your philosophy + add new content |
-| `marketplace.json` | Keep HEAD (your plugin list is correct) |
-| `how-to-customize.md` | Usually keep HEAD wording if better |
-| `plugins/ed3d-*/...` | Delete orphaned ed3d-* files |
+Common patterns (as starting points, not rules):
 
-**For content files (skills, agents):**
-- If change applies to your denubis-* version, apply manually
-- Check if you already have the change (may have diverged earlier)
+| File | Typical Resolution | But Check For... |
+|------|-------------------|------------------|
+| `CHANGELOG.md` | Keep HEAD | Bug fixes to tooling |
+| `README.md` | Merge both sections | Structural changes |
+| `marketplace.json` | Keep HEAD | Schema changes |
+| `plugins/ed3d-*/...` | Delete orphaned files | New plugins you might want |
 
-### 4. Run Rename Script (if needed)
+**For skill/agent content:**
+1. Read both versions
+2. Check if you already have the change
+3. If upstream improves something, apply the improvement to your version
+4. If it conflicts with your philosophy, keep yours
 
-If cherry-pick created ed3d-* files or references:
+### 4. Run Rename Script (with review)
+
+If merge/cherry-pick created ed3d-* files or references:
 
 ```bash
+# Dry run first - see what would change
+./scripts/rename-upstream.sh --dry-run
+
+# Review the output, then apply
 ./scripts/rename-upstream.sh
 ```
 
-This script:
-- Renames `plugins/ed3d-*` → `plugins/denubis-*`
-- Replaces `ed3d` with `denubis` in file contents
-- Updates author info
+**Review the diff before committing.** The script does bulk replacement which may have edge cases:
+- URLs containing `ed3d` that shouldn't change
+- Comments referencing upstream that should stay as-is
+- New plugins you might want to keep as `ed3d-*`
 
 ### 5. Commit with Upstream Reference
 
@@ -106,46 +110,52 @@ EOF
 
 **Always reference the upstream commit hash** for traceability.
 
-### 6. Repeat for Each Commit
-
-Process commits in order. Small commits = easier conflict resolution.
-
 ## Automation Script
 
-The `scripts/rename-upstream.sh` script handles bulk renaming. Run it after cherry-picks that introduce ed3d-* content.
+The `scripts/rename-upstream.sh` script:
+- Renames `plugins/ed3d-*` → `plugins/denubis-*`
+- Replaces `ed3d` with `denubis` in file contents
+- Updates author info
+
+**Always run with `--dry-run` first** to review changes before applying.
 
 ## What NOT to Merge
 
 - **Version bumps**: Your versions diverge intentionally
 - **Changelog entries**: Maintain your own changelog
 - **Plugins you removed**: house-style, playwright
-- **Philosophy changes**: If upstream changes model tiers, review carefully
 
 ## Example Session
 
 ```bash
-# 1. Fetch
+# 1. Fetch and show user
 git fetch upstream
-
-# 2. Review
 git log --oneline main..upstream/main
-# 4b0ef81 feat(plan-and-execute): pass implementation guidance to per-phase code reviews
-# 7b54ef9 doc: how-to-customize further assistance from the model
 
-# 3. Cherry-pick first commit
-git cherry-pick --no-commit 7b54ef9
+# 2. User says "merge those"
+git merge --no-commit upstream/main
 
-# 4. Check status, resolve conflicts
-git status
-# Edit conflicted files...
-
-# 5. Commit
-git add -A
-git commit -m "doc: how-to-customize suggest CLAUDE.md reading (7b54ef9)..."
-
-# 6. Repeat for next commit
-git cherry-pick --no-commit 4b0ef81
+# 3. Check conflicts
+git status --short
+# UU .claude-plugin/marketplace.json
+# UU CHANGELOG.md
 # ...
+
+# 4. Resolve each conflict (read both sides!)
+# Edit files...
+
+# 5. Check rename script impact
+./scripts/rename-upstream.sh --dry-run
+
+# 6. Apply renames if appropriate
+./scripts/rename-upstream.sh
+
+# 7. Review full diff
+git diff --cached
+
+# 8. Commit
+git add -A
+git commit -m "feat: merge upstream guidance improvements..."
 ```
 
 ## After Syncing
@@ -153,14 +163,3 @@ git cherry-pick --no-commit 4b0ef81
 1. Run tests if any exist
 2. Test affected skills manually
 3. Push to origin when satisfied
-
-## Tracking Sync State
-
-After syncing, note the last upstream commit you integrated:
-
-```bash
-git log --oneline upstream/main -1
-# Record this in your commit message or a tracking file
-```
-
-This helps identify what's new on next sync.
