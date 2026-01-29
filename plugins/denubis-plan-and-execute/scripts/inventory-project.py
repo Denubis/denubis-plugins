@@ -203,6 +203,69 @@ def format_mcp_section(configs: list[dict[str, str | list[str]]]) -> str:
     return "\n".join(lines)
 
 
+def find_installed_plugins() -> list[dict[str, str]]:
+    """Read installed plugins from Claude Code config.
+
+    Reads ~/.claude/plugins/installed_plugins.json
+
+    Returns list of dicts with 'name', 'version', 'scope'.
+    """
+    plugins_file = Path.home() / ".claude" / "plugins" / "installed_plugins.json"
+
+    if not plugins_file.is_file():
+        return []
+
+    try:
+        content = plugins_file.read_text(encoding="utf-8")
+        data = json.loads(content)
+
+        results = []
+        plugins = data.get("plugins", {})
+
+        for plugin_key, installations in plugins.items():
+            if not isinstance(installations, list) or not installations:
+                continue
+
+            # Take the first (most recent) installation
+            install = installations[0]
+            if isinstance(install, dict):
+                # Parse plugin name from key (format: "name@source")
+                name = plugin_key.split("@")[0] if "@" in plugin_key else plugin_key
+                results.append({
+                    "name": name,
+                    "version": install.get("version", "unknown"),
+                    "scope": install.get("scope", "unknown"),
+                })
+
+        return sorted(results, key=lambda x: x["name"])
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return []
+
+
+def format_plugins_section(plugins: list[dict[str, str]]) -> str:
+    """Format installed plugins section."""
+    lines = [
+        "## Installed Plugins",
+        "",
+        "Claude Code plugins available in this environment:",
+        "",
+    ]
+
+    if not plugins:
+        lines.append("*None found*")
+        lines.append("")
+        return "\n".join(lines)
+
+    for plugin in plugins:
+        name = plugin["name"]
+        version = plugin["version"]
+        scope = plugin["scope"]
+        lines.append(f"- **{name}** v{version} ({scope})")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
 def format_markdown_files_section(
     files: list[dict[str, str | list[str]]],
     title: str,
@@ -318,6 +381,10 @@ def main() -> int:
     # Discover MCP configurations
     mcp_configs = find_mcp_configs(project_root)
     output_lines.append(format_mcp_section(mcp_configs))
+
+    # Discover installed plugins
+    installed_plugins = find_installed_plugins()
+    output_lines.append(format_plugins_section(installed_plugins))
 
     output = "\n".join(output_lines)
 
