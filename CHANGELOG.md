@@ -1,5 +1,13 @@
 # Changelog
 
+## denubis-extending-claude 1.3.0
+
+Added upstream sync skill and rename automation script.
+
+**New:**
+- `syncing-with-upstream` skill - Documents process for integrating changes from upstream ed3d-plugins
+- `scripts/rename-upstream.sh` - Automates ed3d-* to denubis-* renaming after cherry-picks
+
 ## denubis-plan-and-execute 2.1.0
 
 Proleptic reasoning and human UAT gates.
