@@ -132,6 +132,77 @@ def extract_command_patterns(filepath: Path) -> list[str]:
     return patterns
 
 
+def find_mcp_configs(project_root: Path) -> list[dict[str, str | list[str]]]:
+    """Find and parse .mcp.json files.
+
+    Checks:
+    - Project root .mcp.json
+    - ~/.mcp.json (global)
+    - ~/.claude/mcp.json (global alternate)
+
+    Returns list of dicts with 'path' and 'servers' (server names).
+    """
+    results = []
+    home = Path.home()
+
+    locations = [
+        project_root / ".mcp.json",
+        home / ".mcp.json",
+        home / ".claude" / "mcp.json",
+    ]
+
+    for config_path in locations:
+        if config_path.is_file():
+            try:
+                content = config_path.read_text(encoding="utf-8")
+                data = json.loads(content)
+                servers = []
+
+                # MCP config structure: {"mcpServers": {"name": {...}}}
+                if isinstance(data, dict):
+                    mcp_servers = data.get("mcpServers", {})
+                    if isinstance(mcp_servers, dict):
+                        servers = list(mcp_servers.keys())
+
+                results.append({
+                    "path": str(config_path),
+                    "servers": servers,
+                })
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+                pass
+
+    return results
+
+
+def format_mcp_section(configs: list[dict[str, str | list[str]]]) -> str:
+    """Format MCP servers section."""
+    lines = [
+        "## MCP Servers",
+        "",
+        "Model Context Protocol servers configured for this project:",
+        "",
+    ]
+
+    if not configs:
+        lines.append("*None found*")
+        lines.append("")
+        return "\n".join(lines)
+
+    for config in configs:
+        path = config["path"]
+        servers = config["servers"]
+        lines.append(f"### `{path}`")
+        lines.append("")
+        if servers:
+            for server in servers:
+                lines.append(f"- {server}")
+        else:
+            lines.append("*No servers defined*")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def format_markdown_files_section(
     files: list[dict[str, str | list[str]]],
     title: str,
@@ -243,6 +314,10 @@ def main() -> int:
     else:
         output_lines.append("*None found*")
     output_lines.append("")
+
+    # Discover MCP configurations
+    mcp_configs = find_mcp_configs(project_root)
+    output_lines.append(format_mcp_section(mcp_configs))
 
     output = "\n".join(output_lines)
 
