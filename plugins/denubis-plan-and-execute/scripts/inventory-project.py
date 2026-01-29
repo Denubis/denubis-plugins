@@ -51,7 +51,7 @@ def get_current_commit_sha() -> str | None:
 def find_markdown_files(root: Path, filename: str) -> list[dict[str, str | list[str]]]:
     """Find all files matching filename recursively under root.
 
-    Returns list of dicts with 'path' and 'sections' (H2 headers).
+    Returns list of dicts with 'path', 'sections' (H2 headers), and 'commands'.
     """
     results = []
     for path in root.rglob(filename):
@@ -63,9 +63,11 @@ def find_markdown_files(root: Path, filename: str) -> list[dict[str, str | list[
             continue
 
         sections = extract_h2_headers(path)
+        commands = extract_command_patterns(path)
         results.append({
             "path": str(path.relative_to(root)),
             "sections": sections,
+            "commands": commands,
         })
 
     return sorted(results, key=lambda x: x["path"])
@@ -84,6 +86,52 @@ def extract_h2_headers(filepath: Path) -> list[str]:
     return headers
 
 
+def extract_command_patterns(filepath: Path) -> list[str]:
+    """Extract command patterns from a markdown file.
+
+    Looks for patterns like:
+    - `uv run ...`
+    - `pytest ...`
+    - `ruff ...`
+    - `npm run ...`
+    - `yarn ...`
+    - `pnpm ...`
+    - `cargo ...`
+    - `go run ...`
+    - `make ...`
+    """
+    patterns = []
+    command_prefixes = [
+        r"uv run\s+\S+",
+        r"pytest\b[^`\n]*",
+        r"ruff\b[^`\n]*",
+        r"npm run\s+\S+",
+        r"yarn\s+\S+",
+        r"pnpm\s+\S+",
+        r"cargo\s+\S+",
+        r"go run\s+\S+",
+        r"go test\b[^`\n]*",
+        r"make\s+\S+",
+        r"python[3]?\s+\S+",
+    ]
+
+    combined_pattern = r"`(" + "|".join(command_prefixes) + r")`"
+
+    try:
+        content = filepath.read_text(encoding="utf-8")
+        matches = re.findall(combined_pattern, content)
+        # Deduplicate while preserving order
+        seen = set()
+        for match in matches:
+            if match not in seen:
+                seen.add(match)
+                patterns.append(match)
+    except (OSError, UnicodeDecodeError):
+        pass
+
+    return patterns
+
+
 def format_markdown_files_section(
     files: list[dict[str, str | list[str]]],
     title: str,
@@ -100,15 +148,22 @@ def format_markdown_files_section(
     for file_info in files:
         path = file_info["path"]
         sections = file_info["sections"]
+        commands = file_info.get("commands", [])
         lines.append(f"### `{path}`")
         lines.append("")
         if sections:
-            lines.append("Sections:")
+            lines.append("**Sections:**")
             for section in sections:
                 lines.append(f"- {section}")
-        else:
-            lines.append("*No sections found*")
-        lines.append("")
+            lines.append("")
+        if commands:
+            lines.append("**Commands:**")
+            for cmd in commands:
+                lines.append(f"- `{cmd}`")
+            lines.append("")
+        if not sections and not commands:
+            lines.append("*No sections or commands found*")
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -167,6 +222,27 @@ def main() -> int:
         "AGENTS.md Files",
         "Subagent configuration and documentation files.",
     ))
+
+    # Collect all unique commands across all files
+    all_commands = []
+    seen_commands = set()
+    for file_info in claude_files + agents_files:
+        for cmd in file_info.get("commands", []):
+            if cmd not in seen_commands:
+                seen_commands.add(cmd)
+                all_commands.append(cmd)
+
+    # Add commands summary section
+    output_lines.append("## Command Patterns")
+    output_lines.append("")
+    output_lines.append("Commands extracted from project documentation:")
+    output_lines.append("")
+    if all_commands:
+        for cmd in all_commands:
+            output_lines.append(f"- `{cmd}`")
+    else:
+        output_lines.append("*None found*")
+    output_lines.append("")
 
     output = "\n".join(output_lines)
 
