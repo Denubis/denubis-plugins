@@ -2,7 +2,7 @@
 description: Explains how to customize design and implementation plans with project-specific guidance
 ---
 
-Read back the below information EXACTLY AND VERBATIM. Do not summarize. AFTER you have repeated it verbatim, you may suggest starting points to the user based on your understanding of the project you are operating in.
+Read back the below information EXACTLY AND VERBATIM. Do not summarize. AFTER you have repeated it verbatim, you may suggest starting points to the user based on your understanding of the project you are operating in. After suggesting those starting points, suggest that you could go read CLAUDE.md and AGENTS.md files in subdirectories to further expand on the customization suggestions that may be appropriate.
 
 # Customizing Plan-and-Execute
 
