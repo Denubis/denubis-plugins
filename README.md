@@ -29,6 +29,8 @@ Key philosophy changes from upstream:
 - **Halt on non-obvious failures** - don't grind for 30 minutes working around problems
 - **Block on ALL severities** - quality over velocity
 
+**Customization:** Create `.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md` in your project to provide project-specific constraints, terminology, and standards. Run `/how-to-customize` for details.
+
 ## Plugins
 
 | Plugin | Description |

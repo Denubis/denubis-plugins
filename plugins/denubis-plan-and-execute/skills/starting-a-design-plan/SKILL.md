@@ -31,6 +31,7 @@ Orchestrate the complete design workflow from initial idea to implementation-rea
 Use TaskCreate to create todos for each phase (or TodoWrite in older Claude Code versions):
 
 - Phase 1: Context Gathering (initial information collected)
+- (conditional) Read project design guidance (if `.ed3d/design-plan-guidance.md` exists)
 - Phase 2: Clarification (requirements disambiguated)
 - Phase 3: Definition of Done (deliverables confirmed)
 - Phase 4: Brainstorming (design validated)

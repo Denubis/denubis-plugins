@@ -239,6 +239,17 @@ The goal is to resolve unacknowledged trade-offs and turn vague intentions into 
 
 ---
 
+## Customization
+
+Provide project-specific guidance by creating files in a `.ed3d/` directory:
+
+- `.ed3d/design-plan-guidance.md` — Loaded before clarification in `/start-design-plan`. Define domain terminology, architectural constraints, technology preferences, and scope boundaries.
+- `.ed3d/implementation-plan-guidance.md` — Loaded when creating implementation plans and during final code review. Specify coding standards, testing requirements, and review criteria.
+
+Run `/how-to-customize` for details and example files.
+
+---
+
 ## What This Is Not
 
 - **Not for simple tasks.** If you know exactly what to change and it's a few files, just do it. This workflow adds overhead that pays off for larger features.
