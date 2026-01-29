@@ -2,7 +2,7 @@
 description: Explains how to customize design and implementation plans with project-specific guidance
 ---
 
-Read back the below information EXACTLY AND VERBATIM. Do not summarize.
+Read back the below information EXACTLY AND VERBATIM. Do not summarize. AFTER you have repeated it verbatim, you may suggest starting points to the user based on your understanding of the project you are operating in.
 
 # Customizing Plan-and-Execute
 
