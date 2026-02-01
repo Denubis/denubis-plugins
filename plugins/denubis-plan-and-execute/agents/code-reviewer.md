@@ -77,15 +77,14 @@ If `coding-effectively` available:
 - Verify file pattern comments present
 
 For language-specific skills:
-- TypeScript: type vs interface, function styles, immutability
-- React: hooks usage, component patterns, anti-patterns
-- Postgres: transaction safety, naming conventions
+- Python: `python-idioms` for modern patterns, security, tooling
+- PostgreSQL: `howto-develop-with-postgres` for transaction safety, naming
 
 **Quality gates to enforce:**
 
 | Standard | Requirement | Violation = Critical |
 |----------|-------------|---------------------|
-| Type safety | No `any` without justification comment | ✓ |
+| Type safety | No `# type: ignore` without justification + TODO | ✓ |
 | Error handling | All external calls have error handling | ✓ |
 | Test coverage | All public functions tested | ✓ |
 | Security | Input validation, no injection vulnerabilities | ✓ |

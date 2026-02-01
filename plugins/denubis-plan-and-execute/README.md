@@ -173,9 +173,10 @@ This plugin uses subagents and skills from other plugins. Install these for full
 
 | Plugin | What It Provides | Required For |
 |--------|------------------|--------------|
-| **ed3d-research-agents** | `codebase-investigator`, `internet-researcher` | Codebase verification, external research during design |
-| **ed3d-house-style** | `coding-effectively` and sub-skills | Code quality standards during implementation and review |
-| **ed3d-extending-claude** | `project-claude-librarian` | Updating CLAUDE.md files after implementation |
+| **denubis-research-agents** | `codebase-investigator`, `internet-researcher` | Codebase verification, external research during design |
+| **denubis-extending-claude** | `project-claude-librarian` | Updating CLAUDE.md files after implementation |
+
+**Note:** The `coding-effectively` skill and its sub-skills are included in this plugin.
 
 Without these plugins, the workflow will still run but will skip the corresponding subagent dispatches (with a warning).
 
