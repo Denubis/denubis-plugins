@@ -1,5 +1,23 @@
 # Changelog
 
+## denubis-plan-and-execute 2.2.0
+
+Python-focused coding standards for code-reviewer agent.
+
+**New:**
+- `coding-effectively` skill - Main orchestrator for coding standards
+- `python-idioms` skill - Python 3.14+, t-strings, ty, security, tooling
+- `functional-core-imperative-shell` skill - FCIS pattern for testability
+- `defense-in-depth` skill - Validation at system boundaries
+- `writing-good-tests` skill - pytest patterns, mock strategy
+- `property-based-testing` skill - Hypothesis patterns
+- `howto-develop-with-postgres` skill - Transactions, ACID, naming
+- `docs/coding-effectively-design.md` - Design decisions document
+
+**Changed:**
+- `code-reviewer` agent now references Python-specific skills
+- Removed dependency on `ed3d-house-style` plugin
+
 ## denubis-extending-claude 1.3.0
 
 Added upstream sync skill and rename automation script.
