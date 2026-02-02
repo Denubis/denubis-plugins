@@ -4,10 +4,15 @@ Stop hook that detects shortcut phrases in Claude's assistant messages.
 
 Reads a transcript file and checks the last assistant message for phrases
 that indicate Claude is taking shortcuts rather than debugging properly.
+
+Loop prevention:
+- After blocking, skip the next assistant message (Claude re-explaining)
+- Re-arm after user sends a message (user stop)
 """
 import json
 import re
 import sys
+from pathlib import Path
 
 # High-signal phrases - almost always indicate Claude is taking a shortcut
 HIGH_SIGNAL_PHRASES = [
@@ -33,9 +38,44 @@ MEDIUM_SIGNAL_PHRASES = [
 # Combine all patterns
 ALL_PHRASES = HIGH_SIGNAL_PHRASES + MEDIUM_SIGNAL_PHRASES
 
+# State file to track blocking state
+STATE_FILE = Path("/tmp/shortcut-detector-state.json")
 
-def get_last_assistant_content(transcript_path: str) -> str | None:
-    """Read JSONL transcript and extract last assistant message content."""
+
+def load_state() -> dict:
+    """Load state from file."""
+    try:
+        if STATE_FILE.exists():
+            return json.loads(STATE_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {}
+
+
+def save_state(state: dict) -> None:
+    """Save state to file."""
+    try:
+        STATE_FILE.write_text(json.dumps(state))
+    except OSError:
+        pass
+
+
+def clear_state() -> None:
+    """Clear state file."""
+    try:
+        if STATE_FILE.exists():
+            STATE_FILE.unlink()
+    except OSError:
+        pass
+
+
+def count_messages(transcript_path: str) -> tuple[int, int, str | None]:
+    """Count assistant and user messages, return last assistant content.
+
+    Returns (assistant_count, user_count, last_assistant_content)
+    """
+    assistant_count = 0
+    user_count = 0
     last_assistant_content = None
 
     try:
@@ -46,11 +86,12 @@ def get_last_assistant_content(transcript_path: str) -> str | None:
                     continue
                 try:
                     entry = json.loads(line)
-                    # Look for assistant messages
-                    if entry.get("type") == "assistant":
+                    msg_type = entry.get("type")
+
+                    if msg_type == "assistant":
+                        assistant_count += 1
                         message = entry.get("message", {})
                         content_parts = message.get("content", [])
-                        # Extract text from content blocks
                         text_parts = []
                         for part in content_parts:
                             if isinstance(part, dict) and part.get("type") == "text":
@@ -59,12 +100,14 @@ def get_last_assistant_content(transcript_path: str) -> str | None:
                                 text_parts.append(part)
                         if text_parts:
                             last_assistant_content = " ".join(text_parts)
+                    elif msg_type == "human":
+                        user_count += 1
                 except json.JSONDecodeError:
                     continue
     except (FileNotFoundError, PermissionError, OSError):
-        return None
+        pass
 
-    return last_assistant_content
+    return assistant_count, user_count, last_assistant_content
 
 
 def check_for_shortcuts(content: str) -> tuple[bool, str | None]:
@@ -81,24 +124,44 @@ def main():
     try:
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError:
-        # Invalid input, allow to proceed
         sys.exit(0)
 
     transcript_path = input_data.get("transcript_path")
     if not transcript_path:
-        # No transcript path, allow to proceed
         sys.exit(0)
 
-    # Get last assistant message content
-    content = get_last_assistant_content(transcript_path)
+    # Get message counts and last assistant content
+    assistant_count, user_count, content = count_messages(transcript_path)
     if not content:
-        # No content found, allow to proceed
         sys.exit(0)
+
+    # Load state
+    state = load_state()
+    blocked_at_assistant = state.get("blocked_at_assistant")
+    blocked_at_user = state.get("blocked_at_user")
+
+    # Check if we're in cooldown (blocked recently)
+    if blocked_at_assistant is not None:
+        # We blocked when there were N assistant messages
+        # Skip if this is the immediate next assistant message (N+1)
+        # AND user hasn't sent a new message yet (user count same as when we blocked)
+        if assistant_count == blocked_at_assistant + 1 and user_count == blocked_at_user:
+            # Claude is re-explaining, skip but keep state for re-arm check
+            sys.exit(0)
+
+        # User has sent a message (user_count > blocked_at_user) - re-arm
+        clear_state()
 
     # Check for shortcut phrases
     found, matched_phrase = check_for_shortcuts(content)
 
     if found:
+        # Save state: record when we blocked
+        save_state({
+            "blocked_at_assistant": assistant_count,
+            "blocked_at_user": user_count,
+        })
+
         blocking_message = f'''SHORTCUT DETECTED: "{matched_phrase}"
 
 Before changing approaches, you must:
@@ -114,9 +177,7 @@ Do not proceed until you have done the above and received user approval.'''
             "reason": blocking_message,
         }
         print(json.dumps(output))
-        sys.exit(0)
 
-    # No shortcut detected, allow to proceed
     sys.exit(0)
 
 

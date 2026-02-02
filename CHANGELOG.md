@@ -1,5 +1,14 @@
 # Changelog
 
+## denubis-hook-shortcut-detection 1.1.0
+
+Loop prevention to avoid blocking repeatedly when Claude explains itself.
+
+**Fixed:**
+- Hook no longer fires repeatedly when Claude re-explains after being blocked
+- After blocking, skips the next assistant message (Claude's explanation)
+- Re-arms after user sends a message (user stop)
+
 ## denubis-plan-and-execute 2.2.0
 
 Python-focused coding standards for code-reviewer agent.
