@@ -1,6 +1,7 @@
 ---
 name: maintaining-project-context
 description: Use when completing development phases or branches to identify and update CLAUDE.md or AGENTS.md files that may have become stale - analyzes what changed, determines affected contracts and documentation, and coordinates updates
+user-invocable: false
 ---
 
 # Maintaining Project Context

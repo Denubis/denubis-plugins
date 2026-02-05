@@ -35,7 +35,10 @@
       "WebFetch(domain:github.com)",
       "Bash(git rev-parse:*)",
       "Bash(git -C /home/brian/people/Brian/brian-ed3d-plugins push origin main)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)",
+      "Bash(xargs -I{} sh -c 'echo \"\"=== {} ===\"\" && head -10 {}')"
     ]
   }
 }

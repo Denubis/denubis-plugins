@@ -1,6 +1,7 @@
 ---
 name: finishing-a-development-branch
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
+user-invocable: false
 ---
 
 # Finishing a Development Branch
@@ -181,14 +182,33 @@ git worktree remove <worktree-path>
 
 **For Option 3:** Keep worktree.
 
+### Step 7: Remind About Test Plan
+
+**For Options 1, 2, and 3:**
+
+If a human test plan was generated (check `docs/test-plans/`), remind the user:
+
+```
+Human test plan available at: docs/test-plans/<plan-name>.md
+
+This documents:
+- What automated tests cover
+- What requires human verification
+- End-to-end scenarios to manually test
+
+Review before considering this work fully complete.
+```
+
+**Skip for Option 4 (Discard).**
+
 ## Quick Reference
 
-| Option | Merge | Push | Update Context | Keep Worktree | Cleanup Branch |
-|--------|-------|------|----------------|---------------|----------------|
-| 1. Merge locally | ✓ | - | ✓ | - | ✓ |
-| 2. Create PR | - | ✓ | ✓ | ✓ | - |
-| 3. Keep as-is | - | - | - | ✓ | - |
-| 4. Discard | - | - | - | - | ✓ (force) |
+| Option | Merge | Push | Update Context | Keep Worktree | Cleanup Branch | Test Plan Reminder |
+|--------|-------|------|----------------|---------------|----------------|-------------------|
+| 1. Merge locally | ✓ | - | ✓ | - | ✓ | ✓ |
+| 2. Create PR | - | ✓ | ✓ | ✓ | - | ✓ |
+| 3. Keep as-is | - | - | - | ✓ | - | ✓ |
+| 4. Discard | - | - | - | - | ✓ (force) | - |
 
 ## Common Mistakes
 
@@ -221,6 +241,7 @@ git worktree remove <worktree-path>
 - Present exactly 4 options
 - Get typed confirmation for Option 4
 - Clean up worktree for Options 1 & 4 only
+- Remind about human test plan for Options 1, 2 & 3 (if exists)
 
 ## Integration
 

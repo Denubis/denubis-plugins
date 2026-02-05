@@ -1,6 +1,7 @@
 ---
 name: asking-clarifying-questions
 description: Use after initial design context is gathered, before brainstorming - resolves contradictions in requirements, disambiguates terminology, clarifies scope boundaries, and verifies assumptions to prevent building the wrong solution
+user-invocable: false
 ---
 
 # Asking Clarifying Questions

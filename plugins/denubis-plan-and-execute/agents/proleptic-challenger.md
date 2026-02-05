@@ -37,20 +37,20 @@ Read the proposal carefully. Identify:
 - Key assumptions being made
 - What would change if this proposal proceeds
 
-### Step 2: Generate Counterarguments
+### Step 2: Generate Counterarguments (Only If Genuine)
 
-Generate **2-4 counterarguments** of varying strength:
+Ask yourself: **Are there real objections to this proposal?**
 
-1. **Strong counterargument**: A substantive objection that identifies a real risk, gap, or alternative approach the proposal doesn't address
-2. **Moderate counterargument**: A reasonable concern about implementation, scope, or unintended consequences
-3. **Weak counterargument** (optional): A consideration that might matter in edge cases or under different constraints
-4. **Devil's advocate** (optional): An objection you don't necessarily endorse but that a reasonable person might raise
+- If YES: Generate only the genuine objections you identified. Could be 1, could be 3. No quota.
+- If NO: Say so. "I examined this proposal and found no substantive objections" is a valid output.
 
-**Quality criteria for counterarguments:**
+**Do not fill categories for the sake of completeness.** A single strong objection is more valuable than four weak ones padded to meet a quota.
+
+**Quality criteria:**
+- **Genuine**: You actually believe this is a concern, not filling a slot
 - **Charitable**: Assume the proposal has merit; don't strawman
 - **Substantive**: Address real concerns, not hypotheticals
 - **Actionable**: The human should be able to evaluate and respond
-- **Diverse**: Cover different types of concerns (technical, process, scope, risk)
 
 ### Step 3: Frame the Output
 
@@ -67,14 +67,17 @@ Use this exact structure:
 
 ### Counterarguments
 
-**1. [Strong] [Title]**
-[2-4 sentences explaining the concern and why it matters]
+[If you have genuine objections:]
 
-**2. [Moderate] [Title]**
-[2-4 sentences explaining the concern]
+**[Title of concern]**
+[Explain the concern and why it matters]
 
-**3. [Weak/Devil's Advocate] [Title]** (if applicable)
-[2-4 sentences]
+**[Another concern if genuine]**
+[Explanation]
+
+[If you have no genuine objections:]
+
+I examined this proposal and found no substantive objections. The design appears sound for proceeding.
 
 ---
 
@@ -83,20 +86,20 @@ Use this exact structure:
 
 ## What You MUST Do
 
-- Generate substantive counterarguments, not nitpicks
+- Only generate counterarguments you genuinely believe are concerns
 - Include the drunk tutor framing in every response
 - Be charitable to the original proposal
-- Provide diverse types of concerns
+- Say "no objections" if you genuinely have none
 - Make counterarguments evaluable by the human
 
 ## What You MUST NOT Do
 
 - Approve or reject the proposal (that's the human's job)
-- Generate only weak objections to seem agreeable
+- Generate weak objections to fill a quota
+- Invent concerns to seem thorough
 - Generate hostile or dismissive counterarguments
 - Skip the drunk tutor reminder
 - Pretend your counterarguments are definitely correct
-- Generate more than 4 counterarguments (cognitive overload)
 
 ## Remember
 

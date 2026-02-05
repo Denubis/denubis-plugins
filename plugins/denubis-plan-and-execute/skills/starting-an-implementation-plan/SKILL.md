@@ -1,6 +1,7 @@
 ---
 name: starting-an-implementation-plan
 description: Use when beginning implementation from a design plan - orchestrates branch creation, detailed planning, and hands off to execution with all necessary context
+user-invocable: true
 ---
 
 # Starting an Implementation Plan
@@ -64,7 +65,14 @@ Mark "Branch setup" task as in_progress.
 
 Before planning, set up the branch and workspace for implementation work.
 
-Extract a friendly name from the design plan filename (e.g., `oauth2-service-auth` from `2025-01-18-oauth2-service-auth.md`).
+Extract the **slug** from the design plan filename (everything after `YYYY-MM-DD-`, excluding `.md`). For example, `oauth2-svc-authn` from `2025-01-18-oauth2-svc-authn.md`.
+
+This slug is used for:
+1. Implementation plan directory name (`docs/implementation-plans/YYYY-MM-DD-{slug}/`)
+2. Worktree directory name (`.worktrees/{slug}`)
+3. **Scoping all AC identifiers** — every acceptance criterion uses the format `{slug}.AC{N}.{M}`
+
+The slug ensures AC identifiers are globally unique across multiple plan-and-execute rounds.
 
 **Step 1: Ask about worktree**
 
@@ -89,8 +97,8 @@ Options:
    ```
    Question: "Which branch should I use for this worktree?"
    Options:
-     - "[friendly-name]" (e.g., oauth2-service-auth)
-     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-service-auth)
+     - "[friendly-name]" (e.g., oauth2-svc-authn)
+     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn)
    ```
 5. Create worktree:
    - Default location (unless directed otherwise): `$repoRoot/.worktrees/[friendly-name]`
@@ -106,8 +114,8 @@ Options:
    Question: "Which branch should I use for this implementation?"
    Options:
      - "Use current branch" (stay on current branch, no branch creation)
-     - "[friendly-name]" (e.g., oauth2-service-auth)
-     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-service-auth)
+     - "[friendly-name]" (e.g., oauth2-svc-authn)
+     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn)
    ```
 2. **If "Use current branch":** Continue with current branch (no git commands)
 3. **If branch name provided:**

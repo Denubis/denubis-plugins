@@ -1,6 +1,7 @@
 ---
 name: writing-design-plans
 description: Use after brainstorming completes - writes validated designs to docs/design-plans/ with structured format and discrete implementation phases required for creating detailed implementation plans
+user-invocable: false
 ---
 
 # Writing Design Plans
@@ -71,8 +72,8 @@ The first defines what the boundary looks like. The second implements behavior �
 The file is created by starting-a-design-plan Phase 3. This skill appends to that file.
 
 **Expected naming convention:**
-- Good: `docs/design-plans/2025-01-18-oauth2-service-auth.md`
-- Good: `docs/design-plans/2025-01-18-user-profile-redesign.md`
+- Good: `docs/design-plans/2025-01-18-oauth2-svc-authn.md`
+- Good: `docs/design-plans/2025-01-18-user-prof-redesign.md`
 - Bad: `docs/design-plans/design.md`
 - Bad: `docs/design-plans/new-feature.md`
 
@@ -88,6 +89,9 @@ The file is created by starting-a-design-plan Phase 3. This skill appends to tha
 
 ## Definition of Done
 [Already written - confirmed in Phase 3]
+
+## Acceptance Criteria
+<!-- TO BE GENERATED and validated before glossary -->
 
 ## Glossary
 <!-- TO BE GENERATED after body is written -->
@@ -142,7 +146,9 @@ Break implementation into discrete phases (<=8 recommended).
 [Don't include hypothetical "nice to have" features]
 ```
 
-**Then this skill generates** Summary and Glossary to replace the placeholders.
+**Then this skill:**
+1. Generates Acceptance Criteria (inline) and gets human validation
+2. Generates Summary and Glossary to replace the placeholders
 
 ## Legibility Header
 
@@ -171,15 +177,17 @@ See "After Writing: Generating Summary and Glossary" below for the extraction pr
 | Phase Type | Done When | Examples |
 |------------|-----------|----------|
 | Infrastructure/scaffolding | Operational success | Project installs, builds, runs, deploys |
-| Functionality/behavior | Tests pass for new behavior | Unit tests, integration tests, E2E tests |
+| Functionality/behavior | Tests pass that verify the ACs this phase covers | Unit tests, integration tests, E2E tests |
 
-**The rule:** If a phase adds code that implements behavior, that phase includes tests proving the behavior works. Tests are a deliverable of the phase, not a separate "testing phase" later.
+**The rule:** If a phase implements functionality, it must include tests that verify the specific acceptance criteria it claims to cover. Tests are a deliverable of the phase, not a separate "testing phase" later.
 
-**Don't over-engineer infrastructure verification.** You don't need unit tests for package.json. "npm install succeeds" is sufficient verification for a dependency setup phase.
+**Tying tests to ACs:** A functionality phase lists which ACs it covers (e.g., `oauth2-svc-authn.AC1.1`, `oauth2-svc-authn.AC1.3`). The phase is not "done" until tests exist that verify each of those specific cases. This creates traceability: AC → phase → test.
 
-**Do require tests for functionality.** Any code that does something needs tests that prove it does that thing. These tests are part of the phase, not deferred.
+**Don't over-engineer infrastructure verification.** You don't need unit tests for package.json. "npm install succeeds" is sufficient verification for a dependency setup phase. Infrastructure phases typically don't list ACs—their verification is operational.
 
-**Tests can evolve.** A test written in Phase 2 may be modified in Phase 4 as requirements expand. This is expected. The constraint is that Phase 2 ends with passing tests for what Phase 2 delivers.
+**Do require tests for functionality.** Any code that does something needs tests that prove it does that thing. These tests must map to specific ACs, not just "test the code." If a phase covers `oauth2-svc-authn.AC1.3` ("Invalid password returns 401"), a test must verify exactly that.
+
+**Tests can evolve.** A test written in Phase 2 may be modified in Phase 4 as requirements expand. This is expected. The constraint is that Phase 2 ends with passing tests for the ACs Phase 2 claims to cover.
 
 **Structure phases as subcomponents.** A phase may contain multiple logical subcomponents. List them at the component level — the implementation plan will break these into tasks.
 
@@ -406,6 +414,79 @@ Divergence justified by: Legacy code violates FCIS pattern, difficult to test, h
 - Hypothetical future requirements
 - Generic platitudes ("should be secure", "needs good testing")
 
+## After Body: Generating and Validating Acceptance Criteria
+
+After appending the body, generate Acceptance Criteria and get human validation BEFORE Summary/Glossary.
+
+Acceptance Criteria translate the Definition of Done into specific, verifiable items that become the basis for test requirements during implementation. You have full context from just writing the phases—do this inline, no subagent needed.
+
+### What Acceptance Criteria Must Cover
+
+For **each Definition of Done item**, think through:
+
+1. **Success cases**: What are all the ways this can succeed? List each distinctly.
+   - Happy path: the normal, expected flow
+   - Variations: different valid inputs, configurations, user types
+   - Edge cases: boundary values, empty inputs, maximum sizes
+
+2. **Important failure cases**: What should the system reject or handle gracefully?
+   - Invalid inputs (malformed, out of range, wrong type)
+   - Unauthorized access attempts
+   - Resource exhaustion or unavailability
+   - Concurrent access conflicts
+
+Then look at the **Implementation Phases and brainstorming details** for additional cases:
+- Integration points between phases (data flows correctly between components)
+- Behavior implied by architectural decisions (caching, retries, timeouts)
+- Edge cases surfaced during design discussion
+
+### Writing Criteria
+
+Each criterion must be **observable and testable**:
+
+**Good:** "API returns 401 when token is expired"
+**Good:** "User sees error message when password is less than 8 characters"
+**Good:** "System processes 100 concurrent requests within 2 seconds"
+
+**Bad:** "System is secure" (vague)
+**Bad:** "Code is clean" (subjective)
+**Bad:** "Performance is acceptable" (unmeasurable)
+
+### Structure
+
+**Scoped AC format:** `{slug}.AC{N}.{M}` where `{slug}` is extracted from the design plan filename (everything after `YYYY-MM-DD-`, excluding `.md`).
+
+For design plan `2025-01-18-oauth2-svc-authn.md`, the slug is `oauth2-svc-authn`. All AC identifiers use this prefix:
+
+```markdown
+## Acceptance Criteria
+
+### oauth2-svc-authn.AC1: Users can authenticate
+- **oauth2-svc-authn.AC1.1 Success:** User with valid credentials receives auth token
+- **oauth2-svc-authn.AC1.2 Success:** Token contains correct user ID and permissions
+- **oauth2-svc-authn.AC1.3 Failure:** Invalid password returns 401 with generic error (no password hint)
+- **oauth2-svc-authn.AC1.4 Failure:** Locked account returns 403 with lockout duration
+- **oauth2-svc-authn.AC1.5 Edge:** Empty password field shows validation error before submission
+
+### oauth2-svc-authn.AC2: Sessions persist across page refresh
+- **oauth2-svc-authn.AC2.1 Success:** ...
+- **oauth2-svc-authn.AC2.2 Failure:** ...
+...
+
+### oauth2-svc-authn.AC[N]: Cross-Cutting Behaviors
+- **oauth2-svc-authn.AC[N].1:** Token expiration triggers re-authentication prompt (not silent failure)
+- **oauth2-svc-authn.AC[N].2:** All API errors include correlation ID for debugging
+- ...
+```
+
+**Why scoped:** Multiple plan-and-execute rounds accumulate tests in the same codebase. Scoped identifiers prevent collision—`oauth2-svc-authn.AC2.1` and `user-prof.AC2.1` are unambiguous. Implementation phases, task specs, and test names all use the full scoped identifier.
+
+### Validation
+
+Present generated criteria to the user. Use AskUserQuestion: "Review the acceptance criteria. Approve to continue, or describe what's missing or needs revision."
+
+Loop until approved. Then replace the placeholder in the document and proceed to Summary/Glossary.
+
 ## After Writing: Generating Summary and Glossary
 
 After appending the body (Architecture through Additional Considerations), generate Summary and Glossary using a subagent with fresh context.
@@ -415,9 +496,9 @@ After appending the body (Architecture through Additional Considerations), gener
 - Acts as a forcing function: if the subagent can't extract a coherent summary, the document is unclear
 - Mirrors the experience of a human reviewer seeing the document for the first time
 
-**Step 1: Append the body first**
+**Step 1: At this point the document looks like:**
 
-The document already exists with Definition of Done. Append the body sections:
+The body has been appended and Acceptance Criteria validated:
 
 ```markdown
 # [Feature Name] Design
@@ -428,20 +509,23 @@ The document already exists with Definition of Done. Append the body sections:
 ## Definition of Done
 [Already written from Phase 3]
 
+## Acceptance Criteria
+[Validated in previous step]
+
 ## Glossary
 <!-- TO BE GENERATED after body is written -->
 
 ## Architecture
-[... append actual content ...]
+[... body content ...]
 
 ## Existing Patterns
-[... append actual content ...]
+[... body content ...]
 
 ## Implementation Phases
-[... append actual content ...]
+[... body content ...]
 
 ## Additional Considerations
-[... append actual content ...]
+[... body content ...]
 ```
 
 **Step 2: Dispatch extraction subagent**
@@ -582,6 +666,10 @@ EOF
 | "Infrastructure needs unit tests too" | No. Infrastructure verified operationally. Don't over-engineer. |
 | "Phase 3 tests will cover Phase 2 code" | Each phase tests its own deliverables. Later phases may extend tests, but don't defer. |
 | "Phase markers are just noise" | Markers enable granular parsing. Implementation planning depends on them. Always include. |
+| "Acceptance criteria are just the Definition of Done restated" | Criteria must be specific and verifiable. "System is secure" becomes "API rejects invalid tokens with 401." |
+| "User approved DoD, don't need to validate criteria" | Criteria translate DoD into testable items. User must confirm this translation is correct. |
+| "I'll skip criteria validation to save time" | Implementation planning depends on validated criteria. Skipping creates downstream confusion. |
+| "Criteria are obvious from the phases" | Obvious to you. User must confirm they agree on what 'done' means before proceeding. |
 
 **All of these mean: STOP. Follow the structure exactly.**
 
@@ -592,7 +680,7 @@ This skill completes the design document started in Phase 3:
 ```
 Phase 3 (Definition of Done) completes
   -> User confirms Definition of Done
-  -> File created with Title, Summary placeholder, DoD, Glossary placeholder
+  -> File created with Title, Summary placeholder, DoD, AC placeholder, Glossary placeholder
   -> DoD captured at full fidelity
 
 Brainstorming (Phase 4) completes
@@ -600,17 +688,21 @@ Brainstorming (Phase 4) completes
   -> User approved incrementally
 
 Writing Design Plans (this skill)
-  -> Append body: Architecture, Existing Patterns, Implementation Phases
+  -> Append body: Architecture, Existing Patterns, Implementation Phases, Additional Considerations
   -> Add exact paths from investigation
   -> Create discrete phases (<=8)
+  -> Generate Acceptance Criteria inline (success + failure cases for each DoD item)
+  -> USER VALIDATES Acceptance Criteria
+  -> Replace AC placeholder with validated criteria
   -> Dispatch subagent to generate Summary and Glossary
-  -> Replace placeholders with generated content
+  -> Replace Summary/Glossary placeholders with generated content
   -> Commit to git
 
-Writing Plans (next step)
+Writing Implementation Plans (next step)
   -> Reads this design document
   -> Uses phases as basis for detailed tasks
+  -> Uses Acceptance Criteria to generate test-requirements.md
   -> Expects exact paths and structure
 ```
 
-**Purpose:** Create contract between design and implementation. Writing-plans relies on this structure. The legibility header ensures human reviewers can quickly understand the document.
+**Purpose:** Create contract between design and implementation. Writing-plans relies on this structure. The legibility header (Summary, DoD, Acceptance Criteria, Glossary) ensures human reviewers can quickly understand the document. Acceptance Criteria provide traceability for test requirements.

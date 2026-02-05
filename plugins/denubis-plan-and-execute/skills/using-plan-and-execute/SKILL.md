@@ -1,6 +1,7 @@
 ---
 name: using-plan-and-execute
 description: Use when starting any conversation - establishes mandatory workflows for finding and using skills, including using Read tool before announcing usage, following brainstorming before coding, and creating task todos for checklists
+user-invocable: false
 ---
 
 <EXTREMELY-IMPORTANT>
