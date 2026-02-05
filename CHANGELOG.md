@@ -1,5 +1,30 @@
 # Changelog
 
+## denubis-plan-and-execute 2.3.0
+
+Merged upstream test planning and AC traceability features.
+
+**New:**
+- `test-analyst` agent - Analyzes test coverage and suggests test strategies
+- Acceptance criteria (AC) traceability in implementation plans
+- AC coverage check in final code review
+- Scoped AC identifiers for cross-plan uniqueness
+- Verbatim task name requirement (prevents paraphrasing that loses context)
+- `user-invocable: false` for sub-skills (entry points remain invocable)
+
+**Changed:**
+- `writing-design-plans` now includes test planning workflow
+- `writing-implementation-plans` adds AC traceability and skill activation during investigation
+- `executing-an-implementation-plan` tracks AC coverage
+- `proleptic-challenger` generates only genuine objections (no forced categories)
+
+**Philosophy:**
+- Dynamic skill activation during investigation (belt-and-suspenders with hooks)
+- Tests tied to acceptance criteria at design time
+- Verbatim task names preserve context through compaction
+
+**Upstream commits:** fa258cb..bd4341f from ed3dai/ed3d-plugins
+
 ## denubis-hook-shortcut-detection 1.1.0
 
 Loop prevention to avoid blocking repeatedly when Claude explains itself.
