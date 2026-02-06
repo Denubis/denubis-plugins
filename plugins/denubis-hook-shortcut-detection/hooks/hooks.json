@@ -6,7 +6,8 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/shortcut-detector.py\"",
-            "timeout": 10
+            "timeout": 10,
+            "suppressOutput": true
           }
         ]
       }

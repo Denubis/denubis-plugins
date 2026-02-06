@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/hook-reminder.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/hook-reminder.sh",
+            "suppressOutput": true
           }
         ]
       }

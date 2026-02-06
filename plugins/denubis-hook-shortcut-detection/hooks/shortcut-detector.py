@@ -5,10 +5,16 @@ Stop hook that detects shortcut phrases in Claude's assistant messages.
 Reads a transcript file and checks the last assistant message for phrases
 that indicate Claude is taking shortcuts rather than debugging properly.
 
+When triggered, blocks with an E-STOP so the user can decide whether
+to continue or ask Claude to explain.
+
 Loop prevention:
-- After blocking, skip the next assistant message (Claude re-explaining)
-- Re-arm after user sends a message (user stop)
+- After blocking, creates a session-specific lockfile.
+- The lockfile is keyed to the transcript path, so it's unique per session.
+- Once blocked in a session, stays quiet for the rest of that session.
+- New session = new transcript path = no lockfile = re-armed.
 """
+import hashlib
 import json
 import re
 import sys
@@ -38,44 +44,17 @@ MEDIUM_SIGNAL_PHRASES = [
 # Combine all patterns
 ALL_PHRASES = HIGH_SIGNAL_PHRASES + MEDIUM_SIGNAL_PHRASES
 
-# State file to track blocking state
-STATE_FILE = Path("/tmp/shortcut-detector-state.json")
+LOCKFILE_DIR = Path("/tmp/shortcut-detector")
 
 
-def load_state() -> dict:
-    """Load state from file."""
-    try:
-        if STATE_FILE.exists():
-            return json.loads(STATE_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        pass
-    return {}
+def lockfile_for_session(transcript_path: str) -> Path:
+    """Return a session-specific lockfile path based on the transcript path."""
+    session_hash = hashlib.sha256(transcript_path.encode()).hexdigest()[:16]
+    return LOCKFILE_DIR / f"{session_hash}.blocked"
 
 
-def save_state(state: dict) -> None:
-    """Save state to file."""
-    try:
-        STATE_FILE.write_text(json.dumps(state))
-    except OSError:
-        pass
-
-
-def clear_state() -> None:
-    """Clear state file."""
-    try:
-        if STATE_FILE.exists():
-            STATE_FILE.unlink()
-    except OSError:
-        pass
-
-
-def count_messages(transcript_path: str) -> tuple[int, int, str | None]:
-    """Count assistant and user messages, return last assistant content.
-
-    Returns (assistant_count, user_count, last_assistant_content)
-    """
-    assistant_count = 0
-    user_count = 0
+def get_last_assistant_content(transcript_path: str) -> str | None:
+    """Extract the last assistant message text from the transcript."""
     last_assistant_content = None
 
     try:
@@ -86,28 +65,25 @@ def count_messages(transcript_path: str) -> tuple[int, int, str | None]:
                     continue
                 try:
                     entry = json.loads(line)
-                    msg_type = entry.get("type")
+                    if entry.get("type") != "assistant":
+                        continue
 
-                    if msg_type == "assistant":
-                        assistant_count += 1
-                        message = entry.get("message", {})
-                        content_parts = message.get("content", [])
-                        text_parts = []
-                        for part in content_parts:
-                            if isinstance(part, dict) and part.get("type") == "text":
-                                text_parts.append(part.get("text", ""))
-                            elif isinstance(part, str):
-                                text_parts.append(part)
-                        if text_parts:
-                            last_assistant_content = " ".join(text_parts)
-                    elif msg_type == "human":
-                        user_count += 1
+                    message = entry.get("message", {})
+                    content_parts = message.get("content", [])
+                    text_parts = []
+                    for part in content_parts:
+                        if isinstance(part, dict) and part.get("type") == "text":
+                            text_parts.append(part.get("text", ""))
+                        elif isinstance(part, str):
+                            text_parts.append(part)
+                    if text_parts:
+                        last_assistant_content = " ".join(text_parts)
                 except json.JSONDecodeError:
                     continue
     except (FileNotFoundError, PermissionError, OSError):
         pass
 
-    return assistant_count, user_count, last_assistant_content
+    return last_assistant_content
 
 
 def check_for_shortcuts(content: str) -> tuple[bool, str | None]:
@@ -130,47 +106,28 @@ def main():
     if not transcript_path:
         sys.exit(0)
 
-    # Get message counts and last assistant content
-    assistant_count, user_count, content = count_messages(transcript_path)
-    if not content:
+    # Check if already blocked this session
+    lockfile = lockfile_for_session(transcript_path)
+    if lockfile.exists():
         sys.exit(0)
 
-    # Load state
-    state = load_state()
-    blocked_at_assistant = state.get("blocked_at_assistant")
-    blocked_at_user = state.get("blocked_at_user")
-
-    # Check if we're in cooldown (blocked recently)
-    if blocked_at_assistant is not None:
-        # We blocked when there were N assistant messages
-        # Skip if this is the immediate next assistant message (N+1)
-        # AND user hasn't sent a new message yet (user count same as when we blocked)
-        if assistant_count == blocked_at_assistant + 1 and user_count == blocked_at_user:
-            # Claude is re-explaining, skip but keep state for re-arm check
-            sys.exit(0)
-
-        # User has sent a message (user_count > blocked_at_user) - re-arm
-        clear_state()
+    # Get last assistant content
+    content = get_last_assistant_content(transcript_path)
+    if not content:
+        sys.exit(0)
 
     # Check for shortcut phrases
     found, matched_phrase = check_for_shortcuts(content)
 
     if found:
-        # Save state: record when we blocked
-        save_state({
-            "blocked_at_assistant": assistant_count,
-            "blocked_at_user": user_count,
-        })
+        # Create lockfile — disarm for the rest of this session
+        LOCKFILE_DIR.mkdir(parents=True, exist_ok=True)
+        lockfile.write_text(matched_phrase)
 
-        blocking_message = f'''SHORTCUT DETECTED: "{matched_phrase}"
+        blocking_message = f'''SHORTCUT DETECTED: phrase "{matched_phrase}" found in assistant response.
 
-Before changing approaches, you must:
-1. Explain what specific error or problem you encountered
-2. Describe what you tried to fix it
-3. Explain why the original approach fundamentally cannot work
-4. Ask the user explicitly: "Do you approve changing to [new approach]?"
-
-Do not proceed until you have done the above and received user approval.'''
+This may indicate Claude is abandoning an approach without proper debugging.
+If this is a false positive, tell Claude to continue. Otherwise, ask Claude to explain what went wrong before changing approach.'''
 
         output = {
             "decision": "block",
