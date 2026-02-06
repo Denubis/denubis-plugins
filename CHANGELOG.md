@@ -1,5 +1,37 @@
 # Changelog
 
+## denubis-hook-shortcut-detection 2.0.0
+
+E-STOP behavior and reliable loop prevention.
+
+**Changed:**
+- Blocks now surface the detected phrase to the user for go/no-go decision instead of asking Claude to justify itself
+- Replaced message-counting loop prevention with session-keyed lockfile (one detection per session, no re-trigger loops)
+- Added `suppressOutput: true` to hide hook logs from chat window
+
+**Fixed:**
+- Loop prevention no longer breaks due to system-injected messages inflating user message counts
+
+## denubis-hook-skill-reinforcement 1.1.1
+
+**Changed:**
+- Added `suppressOutput: true` to hide hook logs from chat window
+
+## denubis-hook-claudemd-reminder 1.1.1
+
+**Changed:**
+- Added `suppressOutput: true` to hide hook logs from chat window
+
+## denubis-basic-agents 2.0.1
+
+**Changed:**
+- Added `suppressOutput: true` to SessionStart hook
+
+## denubis-plan-and-execute 2.3.1
+
+**Changed:**
+- Added `suppressOutput: true` to SessionStart hook
+
 ## denubis-plan-and-execute 2.3.0
 
 Merged upstream test planning and AC traceability features.
