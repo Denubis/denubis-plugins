@@ -52,7 +52,8 @@ This ensures Claude Code sees the content while other AI agents (Codex, Copilot)
 5. Coordinate updates using writing-claude-md-files skill
 6. For AGENTS.md repos: ensure companion CLAUDE.md files exist
 7. Verify freshness dates are current (use `date +%Y-%m-%d`)
-8. Commit documentation updates
+8. **Dependency rationale:** If `pyproject.toml` (or equivalent) changed, check `docs/dependency-rationale.md` — new dependencies need entries, removed dependencies need entries removed, changed dependencies need updated claims
+9. Commit documentation updates
 
 ## Expected Inputs
 
@@ -73,7 +74,9 @@ If not provided, ask for the base commit.
 6. **Verify:** For each affected file, check contracts still hold
 7. **Update:** Apply updates using writing-claude-md-files patterns
 8. **Companion files:** For AGENTS.md repos, ensure companion CLAUDE.md exists
-9. **Commit:** `docs: update project context for <context>`
+9. **Dependencies:** If dependency files changed (`pyproject.toml`, `package.json`, etc.), update `docs/dependency-rationale.md` — add entries for new deps (with falsifiable claim, evidence, who it serves), remove entries for removed deps, update entries for changed deps
+10. **Test pseudocode:** If test files changed, update `tests/test-pseudocode.md` — see Test Pseudocode Maintenance below
+11. **Commit:** `docs: update project context for <context>`
 
 ## Output Format
 
@@ -111,3 +114,80 @@ Return a structured report:
 - Always use `date +%Y-%m-%d` for freshness dates (never hallucinate)
 - If uncertain whether a change affects contracts, flag for human review
 - Commit documentation changes separately from code changes
+
+## Test Pseudocode Maintenance
+
+When test files change during a branch, update `tests/test-pseudocode.md`. This document translates test code into human-readable logic — what each test actually does step by step, not just its name.
+
+**Organised by domain, not by file.** Domain grouping reveals overlaps between tests and gaps in coverage. Each test entry references its source file.
+
+### Format
+
+```markdown
+# Test Pseudocode
+
+## Authentication
+
+### Login with valid credentials
+**File:** tests/test_auth.py::test_login_valid_credentials
+1. Create user with email and password
+2. POST /api/login with credentials
+3. Assert 200 response with JWT token
+4. Decode token, verify it contains user ID and correct permissions
+
+**Verifies:** Valid credentials produce a usable, correctly-scoped token
+
+### Login with expired account
+**File:** tests/test_auth.py::test_login_expired_account
+1. Create user, set account expiry to yesterday
+2. POST /api/login with valid credentials
+3. Assert 403 response with expiry message
+
+**Verifies:** Expired accounts are rejected even with correct password
+
+## Checkout (E2E)
+
+### Complete purchase flow
+**File:** tests/e2e/test_checkout.py::test_full_purchase
+1. Navigate to /products
+2. Click "Add to Cart" on first product
+3. Open cart, fill shipping form
+4. Click "Pay Now"
+5. Wait for confirmation page
+6. Assert order number displayed
+7. Assert confirmation email sent
+
+**Verifies:** User can browse, add to cart, pay, and receive confirmation
+```
+
+### What to Write
+
+For each test, capture:
+- **The domain it belongs to** (authentication, checkout, data import, etc.)
+- **The step-by-step logic** — what the test actually does, in plain language. For E2E tests, describe the user actions. For unit tests, describe the setup-act-assert.
+- **What it verifies** — the one-sentence summary of why this test exists
+
+### When Updating
+
+- Read each changed test file in the diff
+- For new tests: add entries under the appropriate domain heading
+- For modified tests: update the pseudocode to match new logic
+- For deleted tests: remove the entry
+- If a test doesn't fit an existing domain: create a new domain heading
+- If tests overlap significantly: note the overlap (this is valuable information)
+
+### Creating the File
+
+If `tests/test-pseudocode.md` doesn't exist, create it with:
+
+```markdown
+# Test Pseudocode
+
+Human-readable description of what each test does, organised by domain.
+Maintained by project-claude-librarian at branch completion.
+
+Overlapping tests and coverage gaps are documented intentionally —
+they reveal where the test suite is redundant or incomplete.
+```
+
+Then read all existing test files and populate it.
