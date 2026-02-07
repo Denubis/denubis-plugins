@@ -18,8 +18,8 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 
 Before responding to ANY user message, you MUST complete this checklist:
 
-1. ☐ List to yourself all skills from `<available_skills>`
-2. ☐ Ask yourself: "Does ANY skill in `<available_skills>` match this request?"
+1. ☐ List to yourself ALL available skills (shown in your system context)
+2. ☐ Ask yourself: "Does ANY available skill match this request?"
 3. ☐ If yes: use the `Skill` tool to invoke the skill and follow the skill exactly.
 
 **Responding WITHOUT completing this checklist = automatic failure.**

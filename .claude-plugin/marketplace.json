@@ -30,7 +30,7 @@
             },
             "license": "CC-BY-SA-4.0"
         },
-                {
+        {
             "name": "denubis-basic-agents",
             "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
             "version": "2.0.1",
