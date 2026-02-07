@@ -31,11 +31,11 @@ HIGH_SIGNAL_PHRASES = [
     r"on second thought",
     r"actually,? let me",
     r"streamlined",
+    r"directly rather than",
 ]
 
 # Medium-signal phrases - context-dependent but worth flagging
 MEDIUM_SIGNAL_PHRASES = [
-    r"instead of",
     r"easier to",
     r"more efficient",
     r"more straightforward",
