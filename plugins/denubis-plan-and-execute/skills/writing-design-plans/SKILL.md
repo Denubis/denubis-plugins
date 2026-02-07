@@ -581,6 +581,37 @@ Replace the Summary and Glossary placeholder comments with the subagent's output
 
 Briefly review the generated sections for accuracy. The subagent may miss nuance from the conversation — adjust if needed, but prefer the subagent's version when it's accurate (it reflects what the document actually says, not what you remember).
 
+## Before Commit: Dependency Rationale
+
+If this design introduces **any new dependencies** (packages, libraries, frameworks, tools), document each in `docs/dependency-rationale.md`. This file is the persistent, cross-project record of why each dependency exists.
+
+**Check the design's Architecture section and Implementation Phases for new packages.** If none are introduced, skip this step.
+
+**For each new dependency, append an entry:**
+
+```markdown
+## <package-name>
+**Added:** YYYY-MM-DD
+**Design plan:** docs/design-plans/YYYY-MM-DD-<topic>.md
+**Claim:** <falsifiable statement of why we need this package>
+**Evidence:** <file paths where it will be used>
+**Serves:** <who benefits — runtime users, developers, CI, type checking>
+```
+
+**The claim must be falsifiable.** "We use requests for HTTP calls" can be verified by searching for imports. "It's a good library" cannot. Write claims that a future audit (controlled-dependency-upgrade skill) can test against the codebase.
+
+**If `docs/dependency-rationale.md` doesn't exist yet,** create it with a header:
+
+```markdown
+# Dependency Rationale
+
+Falsifiable justifications for every direct dependency. Each entry records why the package was added, what evidence supports its use, and who it serves.
+
+Maintained by design plans (when adding deps) and controlled-dependency-upgrade (when auditing). Reviewed by restate-our-assumptions (periodic philosophical audit).
+```
+
+**If updating an existing dependency's rationale** (e.g., a redesign changes why we use a package), update the existing entry rather than appending a duplicate. Add a `**Revised:** YYYY-MM-DD` line and update the claim/evidence.
+
 ## Before Commit: Proleptic Challenge
 
 **REQUIRED:** Before committing the design, invoke proleptic challenge.
@@ -628,7 +659,7 @@ This design will guide implementation. Once committed, changes require revisitin
 **Commit the design document:**
 
 ```bash
-git add docs/design-plans/YYYY-MM-DD-<topic>.md
+git add docs/design-plans/YYYY-MM-DD-<topic>.md docs/dependency-rationale.md
 git commit -m "$(cat <<'EOF'
 docs: add [feature name] design plan
 

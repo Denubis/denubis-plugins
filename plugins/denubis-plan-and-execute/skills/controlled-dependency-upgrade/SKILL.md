@@ -43,6 +43,8 @@ Cross-reference against `pyproject.toml` to separate:
 
 #### Step 2: Justify Each Direct Dependency
 
+**First, check for `docs/dependency-rationale.md`.** If it exists, read it — previous design plans may have already documented why each package exists. Use existing rationale as your starting hypothesis, then try to falsify it against the current codebase state (rationale may be stale if code has changed since the design was written).
+
 For each direct dependency, produce a falsifiable claim:
 
 | Package | Claim | Evidence | Falsification Attempt | Verdict |
@@ -69,6 +71,13 @@ Create a task list of unjustified packages. For each, present:
 - Proposed action (remove from pyproject.toml)
 - Any risks of removal
 
+**Update `docs/dependency-rationale.md`** with audit findings:
+- For justified packages without an existing entry: add one (with today's date and evidence found)
+- For justified packages with a stale entry: update the claim/evidence and add `**Last reviewed:** YYYY-MM-DD`
+- For unjustified packages: note removal in the entry (or remove the entry entirely after the package is removed)
+
+This keeps the rationale file current. Future audits and the restate-our-assumptions skill depend on it.
+
 **Wait for user approval before removing anything.** Then remove unjustified packages, run the test suite, and commit:
 
 ```bash
@@ -76,7 +85,7 @@ Create a task list of unjustified packages. For each, present:
 uv remove <package>
 uv sync
 # Run test suite from CLAUDE.md
-git add pyproject.toml uv.lock
+git add pyproject.toml uv.lock docs/dependency-rationale.md
 git commit -m "chore: remove unused dependency <package>
 
 Justification chain failed: <brief explanation>"
@@ -152,7 +161,7 @@ Run the test command documented in CLAUDE.md. The full suite, not a subset.
 
 If tests **pass**:
 ```bash
-git add uv.lock
+git add uv.lock docs/dependency-rationale.md
 git commit -m "chore: upgrade <package> <old> → <new>
 
 <classification>: <one-line summary of what changed>
