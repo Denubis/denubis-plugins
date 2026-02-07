@@ -58,6 +58,7 @@ Question: "How would you like to review the implementation plan phases?"
 Options:
   - "Write all phases to disk, I'll review afterwards"
   - "Review each phase interactively before writing"
+  - "Review design decisions per phase (three-lens analysis)"
 ```
 
 **Track this choice - it affects the per-phase workflow below.**
@@ -583,6 +584,119 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 ---
 
+### If user chose "Review design decisions per phase (three-lens analysis)":
+
+**This mode separates WHAT (design decisions for human judgement) from HOW (implementation details for subagents).** You present design decisions with philosophical lens analysis for approval. The implementation tasks get written to disk after approval — the lens analysis is ephemeral and does not appear in the phase file.
+
+**Three lenses applied to each design decision:**
+
+| Lens | Question | When to include |
+|------|----------|----------------|
+| **Popper (falsification)** | What would prove this decision wrong? → This IS the human-testable UAT | **Always.** Every decision gets a falsification test the human can perform. |
+| **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
+| **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Always.** Every decision has a perspective worth naming. |
+
+**Lakatos discipline:**
+- The hard core = design plan's architectural commitments (inherited, not questioned here)
+- The protective belt = implementation decisions being made NOW (under review)
+- **DEGENERATING** = decision requires workarounds, modifies code outside this phase's scope, conflicts with later phases, duplicates existing capability because the existing one doesn't quite fit
+- **PROGRESSIVE** = decision makes a downstream phase simpler (cite which), removes special cases from existing code, extends an existing pattern rather than creating a parallel one — **must cite specific evidence**
+- If you cannot cite evidence of progression or degeneration, **omit Lakatos entirely.** Do not invent a "stable" or "neutral" classification. The absence of the lens IS the signal that the decision is routine.
+- If the agent rates most decisions PROGRESSIVE without specific evidence, the analysis is performative. Most decisions are routine protective belt adjustments.
+
+**Workflow for EACH phase (using granular task tracking):**
+
+1. **Task NA: Read design phase**
+   - Mark task NA as in_progress
+   - Extract the `<!-- START_PHASE_N -->` section from design plan
+   - Mark task NA as completed
+
+2. **Task NB: Verify codebase state**
+   - Mark task NB as in_progress
+   - Dispatch codebase-investigator with design assumptions for this phase
+   - Review investigator findings for discrepancies
+   - **Activate relevant skills** based on findings (if not already active):
+     - TypeScript code? Activate TypeScript/coding style skills
+     - React components? Activate React skills
+     - Database work? Activate database skills
+     - Match skills to the technologies this phase involves
+   - Mark task NB as completed
+
+3. **Task NC: Research external dependencies** (if phase involves them)
+   - Mark task NC as in_progress
+   - Dispatch internet-researcher for docs/standards/API patterns
+   - Escalate to remote-code-researcher if docs are insufficient
+   - Document findings for inclusion in phase output
+   - Mark task NC as completed
+   - (Skip if no external deps - still mark completed with note "N/A")
+
+4. **Write implementation tasks** for this phase (in memory, not to file):
+   - Identify which ACs this phase covers based on design phase's scope
+   - Include the "Acceptance Criteria Coverage" section with literal AC copies
+   - Write tasks that implement and test each listed AC case
+
+5. **Identify design decisions** from the implementation tasks you just wrote:
+   - A design decision is a choice where alternatives existed. If there was only one reasonable approach, it's not a decision worth reviewing.
+   - Look for: pattern choices, library selections, structural decisions, error handling strategies, trade-offs between approaches, architecture choices that affect downstream phases.
+   - Ignore: routine boilerplate, obvious implementations, choices dictated by the design plan's hard core commitments.
+
+6. **Present to user** - Output the design decisions with lens analysis:
+
+```markdown
+**Phase [N]: [Phase Name]**
+
+**Codebase verification findings:**
+- ✓ Design assumption confirmed: [what matched]
+- ✗ Design assumption incorrect: [what design said] - ACTUALLY: [reality]
+- + Found additional: [unexpected things discovered]
+- ✓ Dependency confirmed: [library@version]
+
+**External dependency findings:** (if applicable)
+- ✓ [Library] API: [what docs/source revealed]
+- ✗ Design assumption incorrect: [what design said] - ACTUALLY: [reality per docs/source]
+- 📖 Source: [Official docs | RFC spec | Source code @ commit]
+
+**Design decisions in this phase:**
+
+### Decision 1: [Concise description of the choice]
+**Popper (your UAT):** If this decision is right, you should be able to:
+[concrete interaction the human can perform — CLI command, URL to visit,
+observable output, UI state to inspect]. You should see [expected outcome].
+If instead you see [unexpected outcome], [what that means about the decision].
+**Haraway:** Shaped by [perspective]. Benefits: [who]. Cost borne by: [who].
+Absent: [whose perspective wasn't consulted].
+
+### Decision 2: [Choice with a degenerating signal]
+**Popper (your UAT):** [falsification test]
+**Lakatos: DEGENERATING** — [specific evidence: what workaround is required,
+which code outside this phase's scope needs modification, which later phase
+is made harder, or what existing capability is being duplicated and why].
+**Haraway:** [perspective analysis]
+
+### Decision 3: [Routine choice — no Lakatos needed]
+**Popper (your UAT):** [falsification test]
+**Haraway:** [perspective analysis]
+
+[Continue for all non-trivial decisions in this phase...]
+```
+
+7. **Use AskUserQuestion:**
+
+**Options:**
+- "Approved - proceed to write phase and continue"
+- "Needs revision - [describe changes]"
+- "Other"
+
+8. **Task ND: Write phase file (if approved)**
+   - Mark task ND as in_progress
+   - Write to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
+   - Plan document contains ONLY the implementation tasks (no lens analysis, no verification findings)
+   - Mark task ND as completed, continue to next phase
+
+9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
+
+---
+
 ## Task Structure
 
 **Use the appropriate template based on task type (see Task Types section above).**
@@ -712,6 +826,10 @@ These are violations of the skill requirements:
 | "Acceptance Criteria are clear, don't need test requirements" | Test requirements map criteria to specific tests. Execution needs this mapping. |
 | "I'll skip test requirements, user chose batch mode" | Batch mode skips interactive approval. Test requirements are still generated and written. |
 | "Test requirements task is optional" | No. It's a tracked task with dependencies. Must complete before execution handoff. |
+| "All decisions in this phase are PROGRESSIVE" | Unlikely. Most decisions are routine. PROGRESSIVE requires citing a specific downstream phase that gets simpler. Omit Lakatos for routine choices. |
+| "Lakatos doesn't apply to any decisions here" | Possible for simple phases. But if you're adding workarounds, shims, or code that a later phase will undo — that's degeneration. Flag it. |
+| "Design decisions mode but I'll show implementation tasks too" | No. Show decisions and lens analysis only. Implementation tasks go to disk for subagents, not to the human. |
+| "This decision has no perspective worth naming" | Every choice has a perspective. Name who made it and who bears the cost. Haraway is always present. |
 
 **All of these mean: STOP. Follow the requirements exactly.**
 
@@ -762,7 +880,7 @@ Which approach should I take?
 
 **Before starting:**
 - [ ] Count phases - refuse if >8
-- [ ] Ask user for review mode (batch vs interactive)
+- [ ] Ask user for review mode (batch vs interactive vs design decisions)
 - [ ] Capture absolute paths: DESIGN_PATH and PLAN_DIR
 - [ ] Read Acceptance Criteria section from design plan
 - [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Finalization + Test Requirements)
@@ -775,6 +893,7 @@ Which approach should I take?
 - [ ] **Task NC:** Mark in_progress, research external deps if needed (or mark completed with "N/A"), mark completed
 - [ ] Write complete tasks with exact paths and code based on investigator and research findings
 - [ ] **If interactive mode:** Output complete phase plan, use AskUserQuestion for approval
+- [ ] **If design decisions mode:** Identify decisions, apply three lenses (Popper always, Lakatos only when interesting, Haraway always), present for approval
 - [ ] **Task ND:** Mark in_progress, write to absolute path in task description, mark completed
 
 **For each task in the plan:**
@@ -929,7 +1048,7 @@ Rationalize against implementation decisions made during planning. Every accepta
 
 **Step 2: Handle based on review mode**
 
-- **Interactive mode:** Present to user, AskUserQuestion for approval. This is the LAST interactive item.
+- **Interactive mode or design decisions mode:** Present to user, AskUserQuestion for approval. This is the LAST interactive item.
 - **Batch mode:** Write directly, announce completion.
 
 **If user requests revisions in interactive mode:**

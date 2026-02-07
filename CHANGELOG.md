@@ -1,5 +1,19 @@
 # Changelog
 
+## denubis-plan-and-execute 2.5.0
+
+Three-lens design review mode for implementation planning.
+
+**New:**
+- `writing-implementation-plans` gains a third review mode: "Review design decisions per phase (three-lens analysis)"
+- Applies Popper (falsification → human-testable UAT), Lakatos (only when degenerating or genuinely progressive), and Haraway (perspective, benefit, cost) to each design decision
+- Separates WHAT (decisions for human judgement) from HOW (implementation tasks for subagents)
+- Lens analysis is ephemeral (conversation only) — phase files remain subagent-ready
+
+**Changed:**
+- Lakatos lens fires selectively: omitted for routine choices, present only when there's evidence of degeneration or progression worth flagging
+- Requirements checklist and test requirements updated for the new mode
+
 ## denubis-hook-shortcut-detection 2.0.1
 
 Data-driven phrase tuning from transcript mining across 708 saved sessions.
