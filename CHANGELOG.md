@@ -1,5 +1,24 @@
 # Changelog
 
+## denubis-plan-and-execute 2.4.0
+
+Dependency management skills and rationale documentation.
+
+**New:**
+- `controlled-dependency-upgrade` skill — methodical one-at-a-time upgrade cycle with changelog review, falsifiable package audit, and per-package commits using uv
+- `restate-our-assumptions` skill — periodic philosophical audit of dependency rationale through Popper (falsification), Lakatos (research programmes), and Haraway (situated knowledge)
+
+**Changed:**
+- `writing-design-plans` now documents new dependencies in `docs/dependency-rationale.md` with falsifiable claims before committing designs
+
+## denubis-extending-claude 1.4.0
+
+Librarian gains dependency and test documentation responsibilities.
+
+**Changed:**
+- `project-claude-librarian` now updates `docs/dependency-rationale.md` when dependency files change during a branch
+- `project-claude-librarian` now maintains `tests/test-pseudocode.md` — human-readable test logic organised by domain, updated when test files change
+
 ## denubis-hook-shortcut-detection 2.0.0
 
 E-STOP behavior and reliable loop prevention.
