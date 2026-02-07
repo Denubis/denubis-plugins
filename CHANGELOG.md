@@ -1,5 +1,16 @@
 # Changelog
 
+## denubis-hook-shortcut-detection 2.0.1
+
+Data-driven phrase tuning from transcript mining across 708 saved sessions.
+
+**Changed:**
+- Removed "instead of" from medium-signal phrases (310 hits, ~99% false positives — overwhelmingly legitimate technical explanations)
+- Added "directly rather than" as high-signal phrase (2/3 real hits were genuine process-bypassing)
+
+**Fixed:**
+- Synced local plugin.json version with marketplace (was 1.1.0, should have been 2.0.0 from E-STOP rewrite)
+
 ## denubis-plan-and-execute 2.4.0
 
 Dependency management skills and rationale documentation.

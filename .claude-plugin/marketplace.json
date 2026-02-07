@@ -96,7 +96,7 @@
         {
             "name": "denubis-hook-shortcut-detection",
             "description": "Stop hook that detects shortcut phrases and blocks with E-STOP for user go/no-go decision.",
-            "version": "2.0.0",
+            "version": "2.0.1",
             "source": "./plugins/denubis-hook-shortcut-detection",
             "author": {
                 "name": "Brian Ballsun-Stanton",
