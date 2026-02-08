@@ -1,0 +1,15 @@
+{
+    "name": "denubis-git-commit",
+    "description": "Git commit skill for Claude Code. Handles /commit as a proper skill instead of failing as a non-existent built-in.",
+    "version": "1.0.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "git",
+        "commit",
+        "workflow"
+    ]
+}

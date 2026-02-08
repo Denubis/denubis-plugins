@@ -1,5 +1,12 @@
 # Changelog
 
+## denubis-git-commit 1.0.0
+
+Git commit as a proper skill, so `/commit` actually works.
+
+**New:**
+- `commit` skill — analyses changes, drafts messages, splits commits by concern, matches repo style conventions
+
 ## denubis-plan-and-execute 2.6.1
 
 **Removed:**
