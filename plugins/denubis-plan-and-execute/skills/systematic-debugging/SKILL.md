@@ -22,6 +22,18 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 If you haven't completed Phase 1, you cannot propose fixes.
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry | `Debugging` | `null` |
+| 3+ failed fixes (escalate to human) | | `engage` |
+| After human provides direction | | `null` |
+
 ## When to Use
 
 Use for ANY technical issue:

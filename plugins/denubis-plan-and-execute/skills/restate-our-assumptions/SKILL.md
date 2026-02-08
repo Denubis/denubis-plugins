@@ -14,6 +14,18 @@ Periodically audit the project's dependency assumptions by applying three philos
 
 Every claim in `docs/dependency-rationale.md` was true when written. This skill tests whether it's still true today.
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry | `Dep Review` | `null` |
+| Full report presented (waiting for direction) | | `review` |
+| After human directs changes | | `null` |
+
 ## Theoretical Framework
 
 Three lenses, each asking a different question:

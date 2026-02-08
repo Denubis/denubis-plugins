@@ -14,6 +14,21 @@ Bridge the gap between raw user input and structured brainstorming by understand
 
 **Announce at start:** "I'm using the asking-clarifying-questions skill to make sure I understand your requirements correctly."
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry | `Clarification` | `null` (investigating first) |
+| Contradiction question to user | | `think` |
+| Technical/scope question (AskUserQuestion) | | `approve` |
+| Open-ended assumption question | | `respond` |
+| DoD confirmation (AskUserQuestion) | | `approve` |
+| Between questions (Claude researching) | | `null` |
+
 ## When to Use
 
 Use this skill:

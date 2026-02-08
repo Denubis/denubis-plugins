@@ -10,6 +10,19 @@ user-invocable: true
 
 Upgrade dependencies one at a time, reading the changelog before each. Never upgrade blind. Never batch. Every package gets its own test cycle and its own commit.
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry | `Dep Review` | `null` |
+| Unjustified package removal approval | | `approve` |
+| Missing changelog — proceed? | | `approve` |
+| Between packages (Claude working) | | `null` |
+
 ## When to Use
 
 - Routine dependency maintenance

@@ -14,6 +14,20 @@ Transform rough ideas into fully-formed designs through structured questioning a
 
 **Announce at start:** "I'm using the brainstorming skill to refine your idea into a design."
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry (investigating codebase) | `Brainstorming` | `null` |
+| Phase 1 question to user | | `respond` or `approve` |
+| Phase 2 approach selection | | `think` |
+| Phase 3 design section validation | | `review` |
+| Between steps (Claude working) | | `null` |
+
 ## Quick Reference
 
 | Phase | Key Activities | Tool Usage | Output |

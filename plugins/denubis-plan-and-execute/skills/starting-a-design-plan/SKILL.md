@@ -14,6 +14,23 @@ Orchestrate the complete design workflow from initial idea to implementation-rea
 
 **Announce at start:** "I'm using the starting-a-design-plan skill to guide us through the design process."
 
+## Workflow Status Line
+
+Update the breadcrumb status line at phase transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+| Transition | Command |
+|------------|---------|
+| Phase 1 starts | `--step "Design" --human "respond"` |
+| Phase 1 complete (Claude working) | `--human null` |
+| Phase 2 starts | Sub-skill (asking-clarifying-questions) handles state |
+| Phase 3 starts (confirming DoD) | `--step "Design" --human "approve"` |
+| Phase 3: slug chosen, set feature | `--feature "<slug>" --human null` |
+| Phase 4 starts | Sub-skill (brainstorming) handles state |
+| Phase 5 starts | Sub-skill (writing-design-plans) handles state |
+| Phase 6 handoff | `--step "Design" --human "respond"` |
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
 ## Quick Reference
 
 | Phase | Key Activities | Output |

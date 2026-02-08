@@ -13,6 +13,20 @@ Present acceptance criteria to the human and wait for explicit verification befo
 
 **Announce at start:** "I'm using the human-uat-gate skill to verify the implementation meets your requirements."
 
+## Workflow Status Line
+
+**On entry** (before presenting UAT):
+```bash
+[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human "engage"
+```
+
+**After human confirms** (UAT passed):
+```bash
+[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human null
+```
+
+This sets the status line to red "ENGAGE" — the strongest signal that the human must leave the terminal and test the implementation themselves.
+
 ## When to Invoke
 
 Invoke the UAT gate:

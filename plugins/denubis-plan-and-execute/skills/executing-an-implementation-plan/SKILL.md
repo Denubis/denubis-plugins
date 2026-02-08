@@ -18,6 +18,32 @@ Execute plan phase-by-phase, loading each phase just-in-time to minimize context
 - No implementation plan exists yet (use writing-implementation-plans first)
 - Plan needs revision (brainstorm first)
 
+## Workflow Status Line
+
+Update the breadcrumb status line at phase transitions so the human knows what's happening when they tab back to this session. If `~/.claude/bin/workflow-state` is not installed, skip these silently.
+
+**On entry** (after discovering phases, extract slug from plan directory name):
+```bash
+[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --feature "<slug>" --step "Implementing" --human null
+```
+
+**When reading each phase** (extract phase name from title, e.g. "CRDT Cloning" from "Phase 4: CRDT Cloning"):
+```bash
+[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --phase "<Phase Name>"
+```
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Executing tasks | `Implementing` | `null` |
+| Code review running | `Code Review` | `null` |
+| Three-strike help needed | `Code Review` | `engage` |
+| Proleptic challenge presented | `Implementing` | `think` |
+| After human evaluates proleptic | `Implementing` | `null` |
+| UAT gate presented | `Implementing` | `engage` |
+| After UAT confirmed | `Implementing` | `null` |
+| Final code review | `Code Review` | `null` |
+| Finishing branch | `Finishing` | `approve` |
+
 ## MANDATORY: Human Transparency
 
 **The human cannot see what subagents return. You are their window into the work.**

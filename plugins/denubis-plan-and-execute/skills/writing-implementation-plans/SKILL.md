@@ -16,6 +16,22 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry (starting work) | `Impl Planning` | `null` |
+| Review mode selection | | `approve` |
+| Interactive phase approval | | `review` |
+| Design decisions phase approval | | `review` |
+| Blocking implementation question | | `think` |
+| Test requirements approval | | `review` |
+| Between phases (Claude working) | | `null` |
+
 ## Critical: Design Plans Provide Direction, Not Code
 
 **Design plans are intentionally high-level.** They describe components, modules, and contracts — not implementation code. This is by design.

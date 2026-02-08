@@ -16,6 +16,20 @@ Complete the design document by appending validated design from brainstorming to
 
 **Context:** Design document already exists with Title, Summary placeholder, confirmed Definition of Done, and Glossary placeholder. This skill appends the body and fills in placeholders.
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | `--step` | `--human` |
+|------------|----------|-----------|
+| Entry (writing body) | `Design` | `null` |
+| Presenting AC for validation | | `review` |
+| After AC approved (generating summary) | | `null` |
+| Proleptic challenge | Sub-skill handles | |
+| After commit | | `null` |
+
 ## Level of Detail: Design vs Implementation
 
 **Design plans are directional and archival.** They can be checked into git and referenced months later. Other design plans may depend on contracts specified here.

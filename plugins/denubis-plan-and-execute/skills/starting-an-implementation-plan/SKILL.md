@@ -14,6 +14,20 @@ Orchestrate the transition from design document to executable implementation thr
 
 **Announce at start:** "I'm using the starting-an-implementation-plan skill to create the implementation plan from your design."
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | Command args |
+|------------|-------------|
+| Entry (set feature from slug) | `--feature "<slug>" --phase "" --step "Impl Planning" --human null` |
+| Design plan selection (if no path) | `--human "approve"` |
+| Worktree/branch questions | `--human "approve"` |
+| Planning (Claude + sub-skill working) | `--human null` |
+| Execution handoff | `--step "Impl Planning" --human "respond"` |
+
 ## REQUIRED: Design Plan Path
 
 **DO NOT GUESS.** If the user has not provided a path to a design plan, you MUST ask for it.

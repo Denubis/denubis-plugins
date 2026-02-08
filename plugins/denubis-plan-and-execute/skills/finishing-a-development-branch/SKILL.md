@@ -14,6 +14,19 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
+## Workflow Status Line
+
+Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+
+All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+
+| Transition | Command args |
+|------------|-------------|
+| Entry (presenting options) | `--step "Finishing" --human "approve"` |
+| Discard confirmation | `--human "approve"` |
+| After choice executed | `--human null` |
+| All done | `--clear` |
+
 ## The Process
 
 ### Step 1: Verify Tests
