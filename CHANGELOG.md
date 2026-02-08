@@ -1,5 +1,21 @@
 # Changelog
 
+## denubis-plan-and-execute 2.6.0
+
+Workflow status line for multi-tab awareness.
+
+**New:**
+- `scripts/workflow-state.sh` — state writer that skills call at workflow transitions, keyed by working directory
+- `scripts/workflow-statusline.sh` — ANSI-coloured breadcrumb renderer for Claude Code's status line
+- `docs/workflow-status-line.md` — setup documentation
+- 14 skill files gain `## Workflow Status Line` sections documenting their transition points
+
+**How it works:**
+- Skills write JSON state to `~/.claude/workflow-state/<hash>.json` at each transition
+- Status line renders: `feature ❯ phase ❯ step ❯ human action`
+- Level 4 (human action) only appears when Claude is waiting; colours escalate with effort: dim white (Approve) → cyan (Review) → yellow (Respond) → bold magenta (Think) → red bg (ENGAGE)
+- Guard pattern (`[ -x ~/.claude/bin/workflow-state ] && ...`) makes it opt-in — workflows unchanged without install
+
 ## denubis-plan-and-execute 2.5.0
 
 Three-lens design review mode for implementation planning.

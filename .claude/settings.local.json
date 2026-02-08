@@ -39,7 +39,12 @@
       "Bash(git checkout:*)",
       "Bash(git rm:*)",
       "Bash(xargs -I{} sh -c 'echo \"\"=== {} ===\"\" && head -10 {}')",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(xargs python3 -c \" import json, re, sys phrases = { ''instead of'': r''[^.!?\\\\n]{0,80}instead of[^.!?\\\\n]{0,80}'', ''overkill'': r''[^.!?\\\\n]{0,80}overkill[^.!?\\\\n]{0,80}'', ''good enough'': r''[^.!?\\\\n]{0,80}good enough[^.!?\\\\n]{0,80}'', ''skip this'': r''[^.!?\\\\n]{0,80}skip this[^.!?\\\\n]{0,80}'', ''let me just'': r''[^.!?\\\\n]{0,60}let me just[^.!?\\\\n]{0,80}'', ''rather than'': r''[^.!?\\\\n]{0,80}rather than[^.!?\\\\n]{0,80}'', } results = {p: [] for p in phrases} for fpath in sys.argv[1:]: try: with open\\(fpath\\) as f: for line in f: try: e = json.loads\\(line.strip\\(\\)\\) if e.get\\(''type''\\) != ''assistant'': continue for p in e.get\\(''message'',{}\\).get\\(''content'',[]\\): if isinstance\\(p, dict\\) and p.get\\(''type''\\) == ''text'': text = p[''text''] for phrase, pattern in phrases.items\\(\\): for m in re.finditer\\(pattern, text, re.IGNORECASE\\): results[phrase].append\\(m.group\\(0\\).strip\\(\\)[:200]\\) except: pass except: pass for phrase, matches in results.items\\(\\): print\\(f''=== {phrase} \\({len\\(matches\\)} hits\\) ===''\\) for m in matches[:8]: print\\(f'' {m}''\\) print\\(\\) \")",
+      "Bash(git push:*)",
+      "Bash(git show:*)",
+      "Bash(git merge:*)",
+      "Bash(bash:*)"
     ]
   }
 }
