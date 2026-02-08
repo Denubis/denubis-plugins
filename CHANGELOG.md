@@ -1,5 +1,10 @@
 # Changelog
 
+## denubis-plan-and-execute 2.6.1
+
+**Removed:**
+- `commands/commit.md` — alias to `commit-commands:commit`, which is no longer installed
+
 ## denubis-plan-and-execute 2.6.0
 
 Workflow status line for multi-tab awareness.
