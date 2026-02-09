@@ -68,13 +68,12 @@ Read the task specification. Identify:
 
 **YOU MUST run verification commands:**
 
+Find the test and lint commands in CLAUDE.md (or project config) and run them. For Python projects, always use `uv run` to invoke tools (e.g. `uv run pytest`, `uv run ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
+
 Run and examine output:
 ```bash
-# Test suite
-pytest  # or appropriate test runner
-
-# Linter
-ruff check .  # or appropriate linter
+# Find test command in CLAUDE.md and run it
+# Find lint command in CLAUDE.md and run it
 ```
 
 **If anything fails:**

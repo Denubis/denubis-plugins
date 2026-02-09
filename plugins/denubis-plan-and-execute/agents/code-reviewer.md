@@ -38,10 +38,12 @@ Code Review Progress:
 
 **YOU MUST verify the code actually works:**
 
+Find the test, build, and lint commands in CLAUDE.md (or project config) and run them. For Python projects, always use `uv run` to invoke tools (e.g. `uv run pytest`, `uv run ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
+
 Run these commands and examine output:
-- Test suite (e.g., `npm test`, `pytest`, `cargo test`)
-- Build command (e.g., `npm run build`, `cargo build`)
-- Linter (e.g., `eslint`, `clippy`, `mypy`)
+- Test suite (find command in CLAUDE.md)
+- Build command (find command in CLAUDE.md, if applicable)
+- Linter (find command in CLAUDE.md)
 
 **If tests fail or build breaks:**
 - STOP review immediately
@@ -84,7 +86,7 @@ For language-specific skills:
 
 | Standard | Requirement | Violation = Critical |
 |----------|-------------|---------------------|
-| Type safety | No `# type: ignore` without justification + TODO | ✓ |
+| Type safety | No type suppression (`# type: ignore`, `typing.cast` without justification) + TODO | ✓ |
 | Error handling | All external calls have error handling | ✓ |
 | Test coverage | All public functions tested | ✓ |
 | Security | Input validation, no injection vulnerabilities | ✓ |
