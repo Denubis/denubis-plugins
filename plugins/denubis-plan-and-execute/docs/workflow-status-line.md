@@ -1,17 +1,29 @@
 # Workflow Status Line
 
-Show where you are in the plan-and-execute workflow as a breadcrumb in Claude Code's status line. When you're running 4 tabs on different features, this tells you at a glance which one needs you and what kind of engagement it wants.
+Two-line status bar for Claude Code. Line 1 shows project context (model, directory, git, workflow breadcrumb). Line 2 shows resource usage (context window, cost, duration). When running multiple tabs on different features, tells you at a glance which one needs you and what kind of engagement it wants.
 
 ## What It Looks Like
 
 ```
-94 ❯ CRDT Cloning ❯ Implementing
-94 ❯ CRDT Cloning ❯ Implementing ❯ ENGAGE
-94 ❯ CRDT Cloning ❯ Code Review
-94 ❯ Auth ❯ Brainstorming ❯ Think
+[Opus] denubis-plugins | main ~3 | CRDT Cloning ❯ Implementing ❯ ENGAGE
+████████░░ 85% (15% left) | $4.56 | 12m 0s
 ```
 
-Four levels:
+### Line 1: Project Context
+
+- **Model** — which Claude model is active
+- **Directory** — basename of working directory
+- **Git** — branch name, staged (+N) and modified (~N) file counts (cached, refreshes every 5s)
+- **Workflow breadcrumb** — only appears when a plan-and-execute skill is active
+
+### Line 2: Resource Usage
+
+- **Context bar** — 10-char progress bar, green < 70%, yellow 70-89%, red 90%+
+- **Remaining %** — how much context window is left
+- **Cost** — session API cost in USD
+- **Duration** — wall-clock time since session start
+
+### Workflow Breadcrumb Levels
 
 1. **Feature** — short project/branch name
 2. **Phase** — current implementation phase name (from design doc)
@@ -44,22 +56,7 @@ Level 3 colours distinguish workflow steps:
 
 ## Setup
 
-### 1. Install the state writer
-
-```bash
-mkdir -p ~/.claude/bin
-cp plugins/denubis-plan-and-execute/scripts/workflow-state.sh ~/.claude/bin/workflow-state
-chmod +x ~/.claude/bin/workflow-state
-```
-
-Or symlink if you prefer to track updates:
-
-```bash
-mkdir -p ~/.claude/bin
-ln -sf "$(pwd)/plugins/denubis-plan-and-execute/scripts/workflow-state.sh" ~/.claude/bin/workflow-state
-```
-
-### 2. Configure the status line
+### Configure the status line
 
 Add to `~/.claude/settings.json`:
 
@@ -67,52 +64,52 @@ Add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "/path/to/plugins/denubis-plan-and-execute/scripts/workflow-statusline.sh"
+    "command": "~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-statusline.py"
   }
 }
 ```
 
-Or copy/symlink to a stable location first:
+That's it. The script lives in the plugin directory and references are direct — no symlinks, no copies, no `~/.claude/bin`.
+
+### Verify
+
+Test with mock input:
 
 ```bash
-ln -sf "$(pwd)/plugins/denubis-plan-and-execute/scripts/workflow-statusline.sh" ~/.claude/bin/workflow-statusline
+echo '{"cwd":"'$PWD'","model":{"display_name":"Opus"},"context_window":{"used_percentage":42,"remaining_percentage":58},"cost":{"total_cost_usd":1.23,"total_duration_ms":185000}}' | python3 ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-statusline.py
 ```
 
-Then in settings:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/bin/workflow-statusline"
-  }
-}
-```
-
-### 3. Verify
-
-Start a Claude Code session and check that the status line appears at the bottom. It will be empty until a plan-and-execute skill writes state.
-
-Test manually:
+Test with workflow state:
 
 ```bash
-~/.claude/bin/workflow-state --feature "test" --phase "Setup" --step "Design" --human "engage"
-echo '{"cwd":"'$PWD'"}' | ~/.claude/bin/workflow-statusline
-# Should show: test ❯ Setup ❯ Design ❯ ENGAGE (with colours)
-~/.claude/bin/workflow-state --clear
+python3 -c "
+import hashlib, json, os
+cwd = os.getcwd()
+h = hashlib.md5(cwd.encode()).hexdigest()
+d = os.path.expanduser('~/.claude/workflow-state')
+os.makedirs(d, exist_ok=True)
+with open(f'{d}/{h}.json', 'w') as f:
+    json.dump({'feature': 'test', 'phase': 'Setup', 'step': 'Design', 'human': 'engage'}, f)
+"
+echo '{"cwd":"'$PWD'","model":{"display_name":"Opus"},"context_window":{"used_percentage":85,"remaining_percentage":15},"cost":{"total_cost_usd":4.56,"total_duration_ms":720000}}' | python3 ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-statusline.py
+# Should show: [Opus] dir | branch | test ❯ Setup ❯ Design ❯ ENGAGE
+# Clean up:
+python3 -c "import hashlib, os; os.remove(os.path.expanduser(f'~/.claude/workflow-state/{hashlib.md5(os.getcwd().encode()).hexdigest()}.json'))"
 ```
 
 ## How It Works
 
-Skills write a JSON state file to `~/.claude/workflow-state/<hash>.json` (keyed by working directory) at each workflow transition. The status line script reads this file and renders the breadcrumb with ANSI colours.
+**Status line** (`workflow-statusline.py`): Python script that reads Claude Code's session JSON from stdin. Extracts model, directory, and cost info directly from the JSON. Looks up git branch/status (cached to `/tmp/` for 5s). Reads workflow state from `~/.claude/workflow-state/<md5-of-cwd>.json`. Renders two lines with ANSI colours.
 
-Each skill has a "Workflow Status Line" section documenting its transitions. If `~/.claude/bin/workflow-state` isn't installed, the updates are silently skipped — the workflow works identically either way.
+**State writer** (`workflow-state.sh`): Bash script called by plan-and-execute skills at workflow transitions. Writes JSON state keyed by working directory hash. If not installed, updates are silently skipped — the workflow works identically, you just don't see the breadcrumb.
+
+Each skill has a "Workflow Status Line" section documenting its transitions.
 
 ## Requires
 
-- `jq` (for the status line renderer)
-- `md5sum` (for directory hashing — standard on Linux, use `md5` on macOS)
+- Python 3 (for the status line renderer — stdlib only, no dependencies)
+- `git` (for branch/status display)
 
-### macOS Note
+### Optional
 
-If using macOS, the `md5sum` command may not exist. Replace `md5sum` with `md5 -q` in both scripts, or install `coreutils` via Homebrew.
+- `workflow-state.sh` installed for breadcrumb display. Without it, line 1 still shows model, directory, and git info. Line 2 still shows context/cost/duration. Only the workflow breadcrumb is absent.
