@@ -44,7 +44,10 @@
       "Bash(git push:*)",
       "Bash(git show:*)",
       "Bash(git merge:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(chmod:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
