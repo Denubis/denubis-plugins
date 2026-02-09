@@ -66,7 +66,7 @@
         {
             "name": "denubis-hook-skill-reinforcement",
             "description": "UserPromptSubmit hook that directs the model to consider and activate useful skills.",
-            "version": "1.1.1",
+            "version": "1.1.0",
             "source": "./plugins/denubis-hook-skill-reinforcement",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -80,7 +80,7 @@
         {
             "name": "denubis-hook-claudemd-reminder",
             "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-            "version": "1.1.1",
+            "version": "1.1.0",
             "source": "./plugins/denubis-hook-claudemd-reminder",
             "author": {
                 "name": "Brian Ballsun-Stanton",
