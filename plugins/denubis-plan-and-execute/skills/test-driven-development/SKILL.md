@@ -74,34 +74,31 @@ digraph tdd_cycle {
 Write one minimal test showing what should happen.
 
 <Good>
-```typescript
-test('retries failed operations 3 times', async () => {
-  let attempts = 0;
-  const operation = () => {
-    attempts++;
-    if (attempts < 3) throw new Error('fail');
-    return 'success';
-  };
+```python
+def test_retries_failed_operations_3_times():
+    attempts = 0
 
-  const result = await retryOperation(operation);
+    def operation():
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise RuntimeError("fail")
+        return "success"
 
-  expect(result).toBe('success');
-  expect(attempts).toBe(3);
-});
+    result = retry_operation(operation)
+
+    assert result == "success"
+    assert attempts == 3
 ```
-Clear name, tests real behavior, one thing
+Clear name, tests real behaviour, one thing
 </Good>
 
 <Bad>
-```typescript
-test('retry works', async () => {
-  const mock = jest.fn()
-    .mockRejectedValueOnce(new Error())
-    .mockRejectedValueOnce(new Error())
-    .mockResolvedValueOnce('success');
-  await retryOperation(mock);
-  expect(mock).toHaveBeenCalledTimes(3);
-});
+```python
+def test_retry_works(mocker):
+    mock = mocker.Mock(side_effect=[RuntimeError(), RuntimeError(), "success"])
+    retry_operation(mock)
+    assert mock.call_count == 3
 ```
 Vague name, tests mock not code
 </Bad>
@@ -116,7 +113,7 @@ Vague name, tests mock not code
 **MANDATORY. Never skip.**
 
 ```bash
-npm test path/to/test.test.ts
+Find the test command in CLAUDE.md and run it
 ```
 
 Confirm:
@@ -133,33 +130,29 @@ Confirm:
 Write simplest code to pass the test.
 
 <Good>
-```typescript
-async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
-  for (let i = 0; i < 3; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (i === 2) throw e;
-    }
-  }
-  throw new Error('unreachable');
-}
+```python
+def retry_operation[T](fn: Callable[[], T]) -> T:
+    for i in range(3):
+        try:
+            return fn()
+        except Exception:
+            if i == 2:
+                raise
+    raise RuntimeError("unreachable")
 ```
 Just enough to pass
 </Good>
 
 <Bad>
-```typescript
-async function retryOperation<T>(
-  fn: () => Promise<T>,
-  options?: {
-    maxRetries?: number;
-    backoff?: 'linear' | 'exponential';
-    onRetry?: (attempt: number) => void;
-  }
-): Promise<T> {
-  // YAGNI
-}
+```python
+def retry_operation[T](
+    fn: Callable[[], T],
+    *,
+    max_retries: int = 3,
+    backoff: Literal["linear", "exponential"] = "linear",
+    on_retry: Callable[[int], None] | None = None,
+) -> T:
+    ...  # YAGNI
 ```
 Over-engineered
 </Bad>
@@ -171,7 +164,7 @@ Don't add features, refactor other code, or "improve" beyond the test.
 **MANDATORY.**
 
 ```bash
-npm test path/to/test.test.ts
+Find the test command in CLAUDE.md and run it
 ```
 
 Confirm:
@@ -293,33 +286,30 @@ Tests-first force edge case discovery before implementing. Tests-after verify yo
 **Bug:** Empty email accepted
 
 **RED**
-```typescript
-test('rejects empty email', async () => {
-  const result = await submitForm({ email: '' });
-  expect(result.error).toBe('Email required');
-});
+```python
+def test_rejects_empty_email():
+    result = submit_form(email="")
+    assert result.error == "Email required"
 ```
 
 **Verify RED**
 ```bash
-$ npm test
-FAIL: expected 'Email required', got undefined
+$ [project test command]
+FAILED: AssertionError: assert None == 'Email required'
 ```
 
 **GREEN**
-```typescript
-function submitForm(data: FormData) {
-  if (!data.email?.trim()) {
-    return { error: 'Email required' };
-  }
-  // ...
-}
+```python
+def submit_form(*, email: str) -> FormResult:
+    if not email.strip():
+        return FormResult(error="Email required")
+    ...
 ```
 
 **Verify GREEN**
 ```bash
-$ npm test
-PASS
+$ [project test command]
+PASSED
 ```
 
 **REFACTOR**

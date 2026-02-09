@@ -104,28 +104,28 @@ Dispatch a second subagent codebase-investigator (simultaneously) with:
 **Example query to agent:**
 ```
 Design assumptions from docs/plans/YYYY-MM-DD-feature-design.md:
-- Auth service in src/services/auth.ts with login() and logout() functions
-- User model in src/models/user.ts with email and password fields
-- Test file at tests/services/auth.test.ts
-- Uses bcrypt dependency for password hashing
+- Auth service in src/services/auth.py with login() and logout() functions
+- User model in src/models/user.py with email and password fields
+- Test file at tests/services/test_auth.py
+- Uses argon2-cffi dependency for password hashing
 
 Verify these assumptions and report:
 1. What exists vs what design expects
-2. Any structural differences (different paths, functions, exports)
+2. Any structural differences (different paths, functions, signatures)
 3. Any missing or additional components
-4. Current dependency versions
+4. Current dependency versions (check pyproject.toml / uv.lock)
 ```
 
 Review investigator findings and note any differences from design assumptions.
 
 **Based on investigator report, NEVER write:**
-- "Update `index.js` if exists"
+- "Update `main.py` if exists"
 - "Modify `config.py` (if present)"
-- "Create or update `types.ts`"
+- "Create or update `types.py`"
 
 **Based on investigator report, ALWAYS write:**
-- "Create `src/auth.ts`" (investigator confirmed doesn't exist)
-- "Modify `src/index.ts:45-67`" (investigator confirmed exists, checked line numbers)
+- "Create `src/auth.py`" (investigator confirmed doesn't exist)
+- "Modify `src/main.py:45-67`" (investigator confirmed exists, checked line numbers)
 - "No changes needed to `config.py`" (investigator confirmed already correct)
 
 **If codebase state differs from design assumptions:** Document the difference and adjust the implementation plan accordingly.
@@ -229,8 +229,7 @@ The design plan distinguishes between infrastructure phases (verified operationa
 
 **Infrastructure tasks** (project setup, config files, dependencies):
 - Don't force TDD on scaffolding
-- Verification = operational success
-- "npm install succeeds" is valid verification
+- Verification = operational success (`uv sync`, `uv run ruff check`)
 - **Verifies: None** — explicitly state this, don't invent ACs for setup phases
 
 **Functionality tasks** (code that does something):
@@ -241,11 +240,11 @@ The design plan distinguishes between infrastructure phases (verified operationa
 
 **Test behavior, not implementation.**
 - Test that your function produces the right output, not that it called dependencies a certain way
-- If you refactored internals but behavior stayed the same, would the test still pass? If no, you're testing implementation details.
-- The AC is the spec: "Invalid password returns 401" means test the response, not verify that `bcrypt.compare()` was called
+- If you refactored internals but behaviour stayed the same, would the test still pass? If no, you're testing implementation details.
+- The AC is the spec: "Invalid password returns 401" means test the response, not verify that `argon2.verify()` was called
 
 **What doesn't need tests:**
-- Types (TypeScript compiler verifies these)
+- Type annotations (type checker verifies these — use `ty` or `mypy`)
 - Dependencies that have their own tests (don't re-test them through your code)
 - How you call things (test the result, not the wiring)
 - Infrastructure/setup (verify operationally)
@@ -255,7 +254,7 @@ The design plan distinguishes between infrastructure phases (verified operationa
 ```markdown
 <!-- START_SUBCOMPONENT_A (tasks 1-3) -->
 <!-- START_TASK_1 -->
-### Task 1: TokenPayload type and TokenConfig
+### Task 1: TokenPayload model and TokenConfig
 ...
 <!-- END_TASK_1 -->
 
@@ -382,8 +381,8 @@ After verifying scope (≤8 phases), use TaskCreate to create granular sub-tasks
 **CRITICAL: Include absolute paths and set up dependencies.**
 
 Before creating tasks, capture absolute paths:
-- `DESIGN_PATH`: Absolute path to design plan (e.g., `/Users/ed/project/docs/design-plans/2025-01-24-feature.md`)
-- `PLAN_DIR`: Absolute path to implementation plan directory (e.g., `/Users/ed/project/docs/implementation-plans/2025-01-24-feature/`)
+- `DESIGN_PATH`: Absolute path to design plan (e.g., `/home/user/project/docs/design-plans/2025-01-24-feature.md`)
+- `PLAN_DIR`: Absolute path to implementation plan directory (e.g., `/home/user/project/docs/implementation-plans/2025-01-24-feature/`)
 
 **Read the Acceptance Criteria section from the design plan.** Acceptance criteria are numbered (AC1, AC1.1, AC1.2, etc.) and define what "done" means. When writing each phase:
 1. Identify which ACs this phase implements (look at design phase's "Done when" + component responsibilities)
@@ -407,45 +406,45 @@ Before creating tasks, capture absolute paths:
 
 **After all phase tasks, create finalization task:**
 
-Before creating the Finalization task, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
+Before creating the Finalization task, check if `.denubis/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
 
 ```markdown
-# If .ed3d/implementation-plan-guidance.md exists:
-- [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .ed3d/implementation-plan-guidance.md]), fix ALL issues including minor ones
+# If .denubis/implementation-plan-guidance.md exists:
+- [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .denubis/implementation-plan-guidance.md]), fix ALL issues including minor ones
       → blocked by: all Phase *D tasks
 
-# If .ed3d/implementation-plan-guidance.md does NOT exist:
+# If .denubis/implementation-plan-guidance.md does NOT exist:
 - [ ] Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones
       → blocked by: all Phase *D tasks
 ```
 
-**Example for a 3-phase design at `/Users/ed/project/docs/design-plans/2025-01-24-oauth.md`:**
+**Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth.md`:**
 
 ```
-TaskCreate: "Phase 1A: Read Token Types from /Users/ed/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 1A: Read Token Types from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
 TaskCreate: "Phase 1B: Investigate codebase for Phase 1 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [1A]
 TaskCreate: "Phase 1C: Research external deps (Phase 1)"
   → TaskUpdate: addBlockedBy: [1B]
-TaskCreate: "Phase 1D: Write /Users/ed/project/docs/implementation-plans/2025-01-24-oauth/phase_01.md"
+TaskCreate: "Phase 1D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_01.md"
   → TaskUpdate: addBlockedBy: [1C]
 
-TaskCreate: "Phase 2A: Read Token Service from /Users/ed/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 2A: Read Token Service from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
   → TaskUpdate: addBlockedBy: [1D]
 TaskCreate: "Phase 2B: Investigate codebase for Phase 2 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [2A]
 TaskCreate: "Phase 2C: Research external deps (Phase 2)"
   → TaskUpdate: addBlockedBy: [2B]
-TaskCreate: "Phase 2D: Write /Users/ed/project/docs/implementation-plans/2025-01-24-oauth/phase_02.md"
+TaskCreate: "Phase 2D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_02.md"
   → TaskUpdate: addBlockedBy: [2C]
 
-TaskCreate: "Phase 3A: Read Session Manager from /Users/ed/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 3A: Read Session Manager from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
   → TaskUpdate: addBlockedBy: [2D]
 TaskCreate: "Phase 3B: Investigate codebase for Phase 3 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [3A]
 TaskCreate: "Phase 3C: Research external deps (Phase 3)"
   → TaskUpdate: addBlockedBy: [3B]
-TaskCreate: "Phase 3D: Write /Users/ed/project/docs/implementation-plans/2025-01-24-oauth/phase_03.md"
+TaskCreate: "Phase 3D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_03.md"
   → TaskUpdate: addBlockedBy: [3C]
 
 TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"
@@ -477,9 +476,8 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - TypeScript code? Activate TypeScript/coding style skills
-     - React components? Activate React skills
-     - Database work? Activate database skills
+     - Python code? Activate python-idioms/coding-effectively skills
+     - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - Mark task NB as completed
 
@@ -518,15 +516,15 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 ### Task 1: [Component Name]
 
 **Files:**
-- Create: `exact/path/to/file.py`
-- Modify: `exact/path/to/existing.py:123-145`
-- Test: `tests/exact/path/to/test.py`
+- Create: `src/services/auth.py`
+- Modify: `src/services/existing.py:123-145`
+- Test: `tests/services/test_auth.py`
 
 **Step 1: Write the failing test**
 [Complete code example]
 
 **Step 2: Run test to verify it fails**
-[Exact command and expected output]
+[Exact command — find test command in CLAUDE.md]
 
 **Step 3: Write minimal implementation**
 [Complete code example]
@@ -571,9 +569,8 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - TypeScript code? Activate TypeScript/coding style skills
-     - React components? Activate React skills
-     - Database work? Activate database skills
+     - Python code? Activate python-idioms/coding-effectively skills
+     - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - Mark task NB as completed
 
@@ -632,9 +629,8 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - TypeScript code? Activate TypeScript/coding style skills
-     - React components? Activate React skills
-     - Database work? Activate database skills
+     - Python code? Activate python-idioms/coding-effectively skills
+     - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - Mark task NB as completed
 
@@ -724,8 +720,8 @@ is made harder, or what existing capability is being duplicated and why].
 ### Task N: [Infrastructure Component]
 
 **Files:**
-- Create: `package.json`
-- Create: `tsconfig.json`
+- Create: `pyproject.toml`
+- Create: `src/__init__.py`
 
 **Step 1: Create the files**
 
@@ -733,16 +729,16 @@ is made harder, or what existing capability is being duplicated and why].
 
 **Step 2: Verify operationally**
 
-Run: `npm install`
-Expected: Installs without errors
+Run: `uv sync`
+Expected: Dependencies install without errors
 
-Run: `npm run build`
-Expected: Builds without errors
+Run: `uv run ruff check .`
+Expected: No lint errors
 
 **Step 3: Commit**
 
 ```bash
-git add package.json tsconfig.json
+git add pyproject.toml src/__init__.py
 git commit -m "chore: initialize project structure"
 ```
 <!-- END_TASK_N -->
@@ -757,9 +753,9 @@ git commit -m "chore: initialize project structure"
 **Verifies:** {slug}.AC1.1, {slug}.AC1.3 (list specific AC cases this task tests)
 
 **Files:**
-- Create: `exact/path/to/file.py`
-- Modify: `exact/path/to/existing.py:123-145`
-- Test: `tests/exact/path/to/test.py` (unit|integration|e2e)
+- Create: `src/services/feature.py`
+- Modify: `src/services/existing.py:123-145`
+- Test: `tests/services/test_feature.py` (unit|integration|e2e)
 
 **Implementation:**
 [Describe what to implement - contracts, behavior, key logic. Include code for complex/non-obvious implementations.]
@@ -834,7 +830,7 @@ These are violations of the skill requirements:
 | "I'll clone the repo to check the docs" | No. Use internet-researcher for docs. Only clone (remote-code-researcher) for source code investigation. |
 | "Phase has external deps but I'll skip research" | Research is mandatory when phase involves external dependencies. Surface unknowns now. |
 | "Test requirements can be generated during execution" | No. Test requirements must exist before execution starts. Code reviewer uses them. |
-| "This type needs unit tests" | No. TypeScript compiler verifies types. Don't test what the compiler checks. |
+| "This type needs unit tests" | No. The type checker (`ty`/`mypy`) verifies types. Don't test what the checker catches. |
 | "Should test that this calls the dependency correctly" | No. Test behavior (the result), not wiring (how you called things). |
 | "Dependency is used here, should verify it works" | No. Dependencies have their own tests. Test YOUR code's behavior. |
 | "More tests = better coverage" | Wrong tests = noise. Test the ACs, nothing more. |
@@ -954,7 +950,7 @@ After all phase D tasks are completed, mark the Finalization task as in_progress
 
   DESIGN_PLAN: [path to design plan, e.g., docs/design-plans/YYYY-MM-DD-feature.md]
 
-  IMPLEMENTATION_GUIDANCE: [absolute path to .ed3d/implementation-plan-guidance.md, or "None" if file does not exist]
+  IMPLEMENTATION_GUIDANCE: [absolute path to .denubis/implementation-plan-guidance.md, or "None" if file does not exist]
 
   IMPLEMENTATION_PHASES:
   - [path to phase_01.md]
@@ -1048,7 +1044,7 @@ Test requirements map acceptance criteria to specific automated tests, and ident
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-basic-agents:opus-general-purpose</parameter>
+<parameter name="subagent_type">denubis-basic-agents:opus-general-purpose</parameter>
 <parameter name="description">Generating test requirements from Acceptance Criteria</parameter>
 <parameter name="prompt">
 Read the design at [DESIGN_PATH] and implementation phases in [PLAN_DIR].

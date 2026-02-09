@@ -266,7 +266,7 @@ When you need to verify something factual:
 
 - Dispatch codebase-investigator: "Is library X already in use?"
 - Quick web search: "What's the current version of API Y?"
-- File read: "Check package.json for existing auth dependencies"
+- File read: "Check pyproject.toml for existing auth dependencies"
 
 **Don't get distracted** - these are quick checks, not research projects.
 

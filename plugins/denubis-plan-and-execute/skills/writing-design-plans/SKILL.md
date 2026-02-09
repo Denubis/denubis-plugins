@@ -56,25 +56,25 @@ All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bi
 Contracts can include code blocks showing types and interfaces. This is different from implementation code — contracts define boundaries, not behavior.
 
 **Example — Contract specification (OK):**
-```typescript
-interface TokenService {
-  generate(claims: TokenClaims): Promise<string>;
-  validate(token: string): Promise<TokenClaims | null>;
-}
+```python
+from typing import Protocol
 
-interface TokenClaims {
-  sub: string;      // service identifier
-  aud: string[];    // allowed audiences
-  exp: number;      // expiration timestamp
-}
+class TokenService(Protocol):
+    def generate(self, claims: TokenClaims) -> str: ...
+    def validate(self, token: str) -> TokenClaims | None: ...
+
+@dataclass(frozen=True)
+class TokenClaims:
+    sub: str        # service identifier
+    aud: list[str]  # allowed audiences
+    exp: int        # expiration timestamp
 ```
 
 **Example — Implementation code (NOT OK for design plans):**
-```typescript
-async function generate(claims: TokenClaims): Promise<string> {
-  const payload = { ...claims, iat: Date.now() };
-  return jwt.sign(payload, config.secret, { algorithm: 'RS256' });
-}
+```python
+def generate(self, claims: TokenClaims) -> str:
+    payload = {"sub": claims.sub, "aud": claims.aud, "exp": claims.exp, "iat": time.time()}
+    return jwt.encode(payload, config.secret, algorithm="RS256")
 ```
 
 The first defines what the boundary looks like. The second implements behavior — that belongs in implementation plans.
@@ -197,7 +197,7 @@ See "After Writing: Generating Summary and Glossary" below for the extraction pr
 
 **Tying tests to ACs:** A functionality phase lists which ACs it covers (e.g., `oauth2-svc-authn.AC1.1`, `oauth2-svc-authn.AC1.3`). The phase is not "done" until tests exist that verify each of those specific cases. This creates traceability: AC → phase → test.
 
-**Don't over-engineer infrastructure verification.** You don't need unit tests for package.json. "npm install succeeds" is sufficient verification for a dependency setup phase. Infrastructure phases typically don't list ACs—their verification is operational.
+**Don't over-engineer infrastructure verification.** You don't need unit tests for pyproject.toml. "uv sync succeeds" is sufficient verification for a dependency setup phase. Infrastructure phases typically don't list ACs—their verification is operational.
 
 **Do require tests for functionality.** Any code that does something needs tests that prove it does that thing. These tests must map to specific ACs, not just "test the code." If a phase covers `oauth2-svc-authn.AC1.3` ("Invalid password returns 401"), a test must verify exactly that.
 
@@ -214,7 +214,7 @@ Good structure (component-level):
 **Components:**
 - TokenService in `src/services/auth/` — generates and validates JWT tokens
 - SessionManager in `src/services/auth/` — creates, validates, and invalidates sessions
-- Types in `src/types/auth.ts` — TokenClaims, SessionData interfaces
+- Models in `src/models/auth.py` — TokenClaims, SessionData dataclasses
 
 **Dependencies:** Phase 1 (project setup)
 
@@ -269,13 +269,13 @@ Good Phase definitions:
 **Goal:** Initialize project structure and dependencies
 
 **Components:**
-- `package.json` with auth dependencies (jsonwebtoken, bcrypt)
-- `tsconfig.json` with strict mode
-- `src/index.ts` entry point
+- `pyproject.toml` with auth dependencies (pyjwt, argon2-cffi)
+- `src/__init__.py` entry point
+- Ruff and ty configuration
 
 **Dependencies:** None (first phase)
 
-**Done when:** `npm install` succeeds, `npm run build` succeeds
+**Done when:** `uv sync` succeeds, `uv run ruff check .` clean
 <!-- END_PHASE_1 -->
 ```
 
@@ -287,7 +287,7 @@ Good Phase definitions:
 
 **Components:**
 - TokenService in `src/services/auth/` — generates signed JWTs, validates signatures and expiration
-- TokenValidator in `src/services/auth/` — middleware-friendly validation that returns claims or rejects
+- TokenValidator in `src/services/auth/` — middleware-friendly validation that returns claims or raises
 
 **Dependencies:** Phase 1 (project setup)
 
@@ -309,9 +309,9 @@ Bad Phase definitions:
 ```markdown
 ### Phase 2: Token Service
 **Components:**
-- Create `src/types/token.ts` with TokenClaims interface
-- Create `src/services/auth/token-service.ts` with generate() and validate()
-- Create `tests/services/auth/token-service.test.ts`
+- Create `src/models/token.py` with TokenClaims dataclass
+- Create `src/services/auth/token_service.py` with generate() and validate()
+- Create `tests/services/auth/test_token_service.py`
 - Step 1: Write failing test for generate()
 - Step 2: Implement generate()
 - Step 3: Write failing test for validate()
@@ -347,7 +347,7 @@ Otherwise follow these guidelines:
 
 Service-to-service authentication using OAuth2 client credentials flow.
 
-Auth service (`src/services/auth/`) generates and validates JWT tokens. API middleware (`src/api/middleware/auth.ts`) validates tokens on incoming requests. Token store (`src/data/token-store.ts`) maintains revocation list in PostgreSQL.
+Auth service (`src/services/auth/`) generates and validates JWT tokens. API middleware (`src/api/middleware/auth.py`) validates tokens on incoming requests. Token store (`src/data/token_store.py`) maintains revocation list in PostgreSQL.
 
 Tokens expire after 1 hour. Refresh not needed for service accounts (can request new token).
 ```
@@ -373,11 +373,11 @@ In this exciting new architecture, we'll be implementing a robust and scalable a
 ## Existing Patterns
 
 Investigation found existing authentication in `src/services/legacy-auth/`. This design follows the same service structure:
-- Service classes in `src/services/<domain>/`
+- Service modules in `src/services/<domain>/`
 - Middleware in `src/api/middleware/`
 - Data access in `src/data/`
 
-Token storage follows pattern from `src/data/session-store.ts` (PostgreSQL with TTL).
+Token storage follows pattern from `src/data/session_store.py` (PostgreSQL with TTL).
 ```
 
 **If no existing patterns:**
@@ -396,8 +396,8 @@ These patterns align with functional core, imperative shell separation.
 ## Existing Patterns
 
 Investigation found legacy authentication in `src/auth/`. This design diverges:
-- OLD: Monolithic `src/auth/auth.js` (600 lines, mixed concerns)
-- NEW: Separate services (`token-service.ts`, `validator.ts`) following FCIS
+- OLD: Monolithic `src/auth/auth.py` (600 lines, mixed concerns)
+- NEW: Separate services (`token_service.py`, `validator.py`) following FCIS
 
 Divergence justified by: Legacy code violates FCIS pattern, difficult to test, high coupling.
 ```
@@ -548,7 +548,7 @@ Use the Task tool to generate Summary and Glossary:
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-basic-agents:sonnet-general-purpose</parameter>
+<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
 <parameter name="description">Generating Summary and Glossary for design document</parameter>
 <parameter name="prompt">
 Read the design document at [file path].
@@ -700,6 +700,7 @@ EOF
 | "Phases are obvious, don't need detail" | writing-plans needs component descriptions. Provide them. |
 | "Can have 10 phases if needed" | Hard limit is 8. Scope or split. |
 | "I'll include the code so implementation is easier" | No. Implementation plans generate code fresh from codebase state. Design provides direction only. |
+| "npm install succeeds is good enough" | Use `uv sync` — this is a Python-first toolchain. |
 | "Breaking into tasks helps the reader" | Task breakdown is implementation planning's job. Design stays at component level. |
 | "I'll just show how the function works" | Implementation code doesn't belong in design. Show contracts/interfaces if needed, not function bodies. |
 | "Additional considerations should be comprehensive" | Only include if relevant. YAGNI applies. |

@@ -135,7 +135,7 @@ If the file exists, note its **absolute path** for use during final review. The 
 
 ### 2. Create Phase-Level Task List
 
-Use TaskCreate to create **three task entries per phase** (or TodoWrite in older Claude Code versions). Include the title from the header:
+Use TaskCreate to create **three task entries per phase**. Include the title from the header:
 
 ```
 - [ ] Phase 1a: Read /absolute/path/to/phase_01.md — Document Infrastructure Implementation Plan
@@ -442,11 +442,11 @@ Proceed to the next phase's "Read" step. Repeat 3a-3c for each phase.
 
 ### 4. Update Project Context
 
-After all phases complete, invoke the `ed3d-extending-claude:project-claude-librarian` subagent (when available) to review changes and update CLAUDE.md files if needed.
+After all phases complete, invoke the `denubis-extending-claude:project-claude-librarian` subagent (when available) to review changes and update CLAUDE.md files if needed.
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-extending-claude:project-claude-librarian</parameter>
+<parameter name="subagent_type">denubis-extending-claude:project-claude-librarian</parameter>
 <parameter name="description">Updating project context after implementation</parameter>
 <parameter name="prompt">
   Review what changed during this implementation and update CLAUDE.md files if contracts or structure changed.
@@ -455,7 +455,7 @@ After all phases complete, invoke the `ed3d-extending-claude:project-claude-libr
   Current HEAD: <current commit>
   Working directory: <directory>
 
-  Follow the ed3d-extending-claude:maintaining-project-context skill to:
+  Follow the denubis-extending-claude:maintaining-project-context skill to:
   1. Diff against base to see what changed
   2. Identify contract/API/structure changes
   3. Update affected CLAUDE.md files
@@ -468,7 +468,7 @@ After all phases complete, invoke the `ed3d-extending-claude:project-claude-libr
 
 **If librarian reports updates:** Review the changes, then proceed to final review.
 **If librarian reports no updates needed:** Proceed to final review.
-**If librarian subagent is unavailable:** skip this entire step. Say aloud that you're skipping it because the `ed3d-extending-claude` plugin is not available.
+**If librarian subagent is unavailable:** skip this entire step. Say aloud that you're skipping it because the `denubis-extending-claude` plugin is not available.
 
 ### 5. Final Review Sequence
 
@@ -506,7 +506,7 @@ Dispatch the test-analyst agent:
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">ed3d-plan-and-execute:test-analyst</parameter>
+<parameter name="subagent_type">denubis-plan-and-execute:test-analyst</parameter>
 <parameter name="description">Analyzing test coverage and generating test plan</parameter>
 <parameter name="prompt">
 Analyze test implementation against acceptance criteria.
@@ -529,7 +529,7 @@ Return coverage validation result. If PASS, include the human test plan.
 1. Dispatch bug-fixer to add missing tests:
    ```
    <invoke name="Task">
-   <parameter name="subagent_type">ed3d-plan-and-execute:task-bug-fixer</parameter>
+   <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
    <parameter name="description">Adding missing test coverage</parameter>
    <parameter name="prompt">
    Add missing tests identified by the test analyst.
@@ -619,7 +619,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Mark 1a complete, 1b in_progress]
 
 [Dispatch task-implementor for Task 1]
-→ Created package.json, tsconfig.json.
+→ Created pyproject.toml, ruff.toml.
 
 [Dispatch task-implementor for Task 2]
 → Created config files. Build succeeds.

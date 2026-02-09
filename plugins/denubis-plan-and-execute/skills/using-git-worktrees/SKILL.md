@@ -101,18 +101,17 @@ cd "$path"
 
 ### 3. Run Project Setup
 
-Auto-detect and run appropriate setup:
+**Check CLAUDE.md** for project-specific setup instructions first. If none found, auto-detect:
 
 ```bash
+# Python (preferred)
+if [ -f pyproject.toml ]; then uv sync; fi
+
 # Node.js
 if [ -f package.json ]; then npm install; fi
 
 # Rust
 if [ -f Cargo.toml ]; then cargo build; fi
-
-# Python
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-if [ -f pyproject.toml ]; then poetry install; fi
 
 # Go
 if [ -f go.mod ]; then go mod download; fi
@@ -120,15 +119,7 @@ if [ -f go.mod ]; then go mod download; fi
 
 ### 4. Verify Clean Baseline
 
-Run tests to ensure worktree starts clean:
-
-```bash
-# Examples - use project-appropriate command
-npm test
-cargo test
-pytest
-go test ./...
-```
+**Find the test command in CLAUDE.md** (or project config). Run it to ensure worktree starts clean.
 
 **If tests fail:** Report failures, ask whether to proceed or investigate.
 
@@ -152,7 +143,7 @@ Ready to implement <feature-name>
 | Neither exists | Check CLAUDE.md → Ask user |
 | Directory not in .gitignore | Add it immediately + commit |
 | Tests fail during baseline | Report failures + ask |
-| No package.json/Cargo.toml | Skip dependency install |
+| No pyproject.toml/package.json | Skip dependency install |
 
 ## Common Mistakes
 
@@ -180,10 +171,11 @@ You: I'm using the using-git-worktrees skill to set up an isolated workspace.
 [Check .worktrees/ - exists]
 [Verify .gitignore - contains .worktrees/]
 [Create worktree: git worktree add .worktrees/auth -b feature/auth]
-[Run npm install]
-[Run npm test - 47 passing]
+[Run uv sync]
+[Find test command in CLAUDE.md → uv run pytest]
+[Run uv run pytest - 47 passing]
 
-Worktree ready at /Users/jesse/myproject/.worktrees/auth
+Worktree ready at /home/user/myproject/.worktrees/auth
 Tests passing (47 tests, 0 failures)
 Ready to implement auth feature
 ```
