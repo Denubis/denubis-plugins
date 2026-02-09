@@ -8,7 +8,7 @@ user-invocable: true
 
 Execute plan phase-by-phase, loading each phase just-in-time to minimize context usage.
 
-**Core principle:** Read one phase → execute all tasks → review → move to next phase. Never load all phases upfront.
+**Core principle:** Red-Green-Refactor at the macro level. Read one phase → execute all tasks → review + UAT (Green) → refactor → move to next phase. Never load all phases upfront.
 
 **REQUIRED SKILL:** `requesting-code-review` - The review loop (dispatch, fix, re-review until zero issues)
 
@@ -41,6 +41,10 @@ Update the breadcrumb status line at phase transitions so the human knows what's
 | After human evaluates proleptic | `Implementing` | `null` |
 | UAT gate presented | `Implementing` | `engage` |
 | After UAT confirmed | `Implementing` | `null` |
+| Phase refactor running | `Refactoring` | `null` |
+| Phase refactor review | `Code Review` | `null` |
+| Cross-cutting refactor running | `Refactoring` | `null` |
+| Cross-cutting refactor review | `Code Review` | `null` |
 | Final code review | `Code Review` | `null` |
 | Finishing branch | `Finishing` | `approve` |
 
@@ -419,7 +423,57 @@ UAT rejected
     → Repeat until confirmed
 ```
 
-**Only after UAT confirmed:** Mark phase tasks complete. Proceed to next phase.
+**Only after UAT confirmed:** Proceed to phase refactor.
+
+#### 3d. Phase Refactor (Red-Green-**Refactor**)
+
+**This is the macro-level Refactor step of Red-Green-Refactor.** The phase is Green — tests pass, UAT confirmed. Now clean up before building the next phase on top.
+
+**Scope:** Only files touched by this phase. Do not reorganise code from other phases.
+
+**What to refactor:**
+- Reduce duplication within phase files
+- Improve naming (variables, functions, modules)
+- Extract helpers where patterns repeat
+- Simplify overly complex logic
+- Fix code smells introduced by minimal-to-pass implementations
+
+**What NOT to do:**
+- Add features or change behaviour
+- Reorganise across module boundaries (save for cross-cutting refactor)
+- Break tests — if any test fails, revert the refactor change
+
+**Dispatch code-simplifier:**
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
+<parameter name="description">Phase [N] refactor — simplify and clean up</parameter>
+<parameter name="prompt">
+Simplify and refine the code changed in this phase for clarity, consistency, and maintainability.
+
+Focus on recently modified files only:
+[list files changed in this phase]
+
+Working directory: [directory]
+
+Rules:
+- Preserve ALL functionality and test behaviour
+- Do not add features or change public APIs
+- Do not touch files outside this phase's scope
+- Run tests after changes to confirm green
+- Commit refactoring changes separately from implementation
+</parameter>
+</invoke>
+```
+
+**After code-simplifier completes:**
+1. Print the subagent's response to the human
+2. Run tests to verify still green
+3. If tests fail: revert refactor, report to human, proceed without refactoring
+4. If tests pass: commit refactoring, mark phase complete
+
+**If code-simplifier finds nothing to improve:** That's fine. Move on.
 
 **Phase completion flow:**
 ```
@@ -433,12 +487,16 @@ UAT gate (human-uat-gate skill)
     ↓
 Human confirms phase complete
     ↓
+Phase refactor (code-simplifier)
+    ↓
+Verify tests still green
+    ↓
 Proceed to next phase
 ```
 
-#### 3d. Move to Next Phase
+#### 3e. Move to Next Phase
 
-Proceed to the next phase's "Read" step. Repeat 3a-3c for each phase.
+Proceed to the next phase's "Read" step. Repeat 3a-3d for each phase.
 
 ### 4. Update Project Context
 
@@ -576,9 +634,66 @@ git commit -m "docs: add test plan for [feature name]"
 
 Announce: "Human test plan written to `docs/test-plans/[impl-plan-dir-name].md`"
 
-### 6. Complete Development
+### 6. Cross-Cutting Refactor
 
-After final review passes:
+**This is the macro Red-Green-Refactor step for the entire implementation.** All phases are Green — tests pass, UAT confirmed, final review clean. Now refactor across the whole codebase.
+
+**Why here and not earlier:** Per-phase refactoring (step 3d) handles within-phase cleanup. This step handles cross-cutting concerns that only become visible once all phases are complete: duplication across modules, inconsistent patterns between phases, file organisation that made sense incrementally but not holistically.
+
+**What to refactor:**
+- Reorganise files and directories for clarity
+- Extract shared utilities from duplicated cross-module code
+- Align naming conventions across all phases
+- Simplify public interfaces where implementation revealed simpler abstractions
+- Remove scaffolding or temporary patterns introduced during phased implementation
+
+**What NOT to do:**
+- Add features or change behaviour
+- Break tests — every refactor must keep tests green
+- Refactor beyond the implementation's scope (don't touch unrelated code)
+
+**Dispatch code-simplifier:**
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
+<parameter name="description">Cross-cutting refactor — reorganise and simplify</parameter>
+<parameter name="prompt">
+Simplify and refine the code from this implementation for clarity, consistency, and maintainability.
+
+Base commit: [commit SHA at start of first phase]
+Current HEAD: [current commit]
+Working directory: [directory]
+
+Focus on all files changed since the base commit. Look for:
+- Duplication across modules that can be extracted
+- Inconsistent patterns between implementation phases
+- Files or directories that should be reorganised
+- Public interfaces that can be simplified
+- Scaffolding or temporary patterns to remove
+
+Rules:
+- Preserve ALL functionality and test behaviour
+- Do not add features or change public APIs beyond simplification
+- Run tests after each logical change to confirm green
+- Commit each refactoring change separately with descriptive messages
+- If a refactor breaks tests, revert it immediately
+</parameter>
+</invoke>
+```
+
+**After code-simplifier completes:**
+1. Print the subagent's response to the human
+2. Run full test suite to verify still green
+3. If tests fail: revert all refactoring, report to human
+4. If tests pass and changes were made: run code review via `requesting-code-review` skill
+5. If code-simplifier found nothing to improve: move on
+
+**If code review finds issues with refactoring:** Fix via bug-fixer → re-review loop, same as implementation phases.
+
+### 7. Complete Development
+
+After refactoring (or after final review if no refactoring needed):
 
 - Provide a report to the human operator
   - For each phase:
@@ -603,13 +718,16 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Create tasks with TaskCreate:]
 - [ ] Phase 1a: Read /path/to/phase_01.md — Project Setup
 - [ ] Phase 1b: Execute tasks
-- [ ] Phase 1c: Code review
+- [ ] Phase 1c: Code review + UAT
+- [ ] Phase 1d: Refactor
 - [ ] Phase 2a: Read /path/to/phase_02.md — Token Service
 - [ ] Phase 2b: Execute tasks
-- [ ] Phase 2c: Code review
+- [ ] Phase 2c: Code review + UAT
+- [ ] Phase 2d: Refactor
 - [ ] Phase 3a: Read /path/to/phase_03.md — API Middleware
 - [ ] Phase 3b: Execute tasks
-- [ ] Phase 3c: Code review
+- [ ] Phase 3c: Code review + UAT
+- [ ] Phase 3d: Refactor
 
 --- Phase 1 ---
 
@@ -629,7 +747,12 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Use requesting-code-review skill for phase 1]
 → Zero issues.
 
-[Mark 1c complete]
+[Mark 1c complete, 1d in_progress]
+
+[Dispatch code-simplifier for phase 1]
+→ Minor naming improvements, committed.
+
+[Mark 1d complete]
 
 --- Phase 2 ---
 
@@ -647,7 +770,12 @@ You: I'm using the `executing-an-implementation-plan` skill.
 → Dispatch bug-fixer, re-review
 → Zero issues.
 
-[Mark 2c complete]
+[Mark 2c complete, 2d in_progress]
+
+[Dispatch code-simplifier for phase 2]
+→ Extracted shared validator, committed.
+
+[Mark 2d complete]
 
 --- Phase 3 ---
 
@@ -661,6 +789,10 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Use requesting-code-review skill for final review]
 → All requirements met.
 
+[Dispatch code-simplifier for cross-cutting refactor]
+→ Consolidated duplicate helpers across modules, reorganised utils/.
+→ Code review on refactoring: zero issues.
+
 [Transitioning to finishing-a-development-branch]
 ```
 
@@ -673,3 +805,5 @@ You: I'm using the `executing-an-implementation-plan` skill.
 | "I'll review after each task to catch issues early" | No. Review once per phase. Task-level review wastes context. |
 | "Context error on review, I'll skip the review" | No. Chunk the review into halves. Never skip review. |
 | "Minor issues can wait" | No. Fix ALL issues including Minor. |
+| "Code is clean enough, skip refactoring" | No. Green means it works; Refactor means it's maintainable. TDD without Refactor accumulates debt. |
+| "Refactoring is risky this late" | No. Tests exist. If refactoring breaks tests, revert. That's what tests are for. |
