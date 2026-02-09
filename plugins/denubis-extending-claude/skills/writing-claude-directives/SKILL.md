@@ -87,7 +87,7 @@ Use structure to make compliance the path of least resistance:
 | Pattern | Example |
 |---------|---------|
 | Workflow steps | Numbered steps with verification gates |
-| Task tracking (TaskCreate/TaskUpdate) | Checklists without tracking = skipped steps (TodoWrite in older versions) |
+| Task tracking (TaskCreate/TaskUpdate) | Checklists without tracking = skipped steps |
 | Forced commitment | "Announce: I'm using [skill]" |
 | Explicit blocking | "If X happens, stop and do Y instead" |
 

@@ -139,7 +139,7 @@ Run pressure scenario WITHOUT skill:
 
 ## Skill Creation Checklist
 
-**IMPORTANT:** Use TaskCreate to track each item (or TodoWrite in older Claude Code versions).
+**IMPORTANT:** Use TaskCreate to track each item.
 
 **RED Phase:**
 - [ ] Create pressure scenarios (3+ combined pressures for discipline skills)

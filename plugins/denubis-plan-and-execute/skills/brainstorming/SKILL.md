@@ -40,13 +40,13 @@ All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bi
 
 **REQUIRED: Create task tracker at start**
 
-Use TaskCreate to create todos for each phase (or TodoWrite in older Claude Code versions):
+Use TaskCreate to create todos for each phase:
 
 - Phase 1: Understanding (purpose, constraints, criteria gathered)
 - Phase 2: Exploration (2-3 approaches proposed and evaluated)
 - Phase 3: Design Presentation (design validated in sections)
 
-Use TaskUpdate to mark each phase as in_progress when working on it, completed when finished (or TodoWrite in older versions).
+Use TaskUpdate to mark each phase as in_progress when working on it, completed when finished.
 
 ## Research Agents
 
@@ -69,7 +69,7 @@ Action: Dispatch codebase-investigator with: "Find authentication implementation
 
 ### When to Use internet-researcher
 
-**Use @agent-ed3d-research-agents:internet-researcher when available. Otherwise use WebSearch/WebFetch aggressively.**
+**Use @agent-denubis-research-agents:internet-researcher when available. Otherwise use WebSearch/WebFetch aggressively.**
 
 **Use internet research when you need to:**
 - Find current API documentation for external services
@@ -357,7 +357,7 @@ These are violations of the skill requirements:
 | **YAGNI ruthlessly** | Remove unnecessary features from all designs |
 | **Explore alternatives** | YOU MUST propose 2-3 approaches before settling |
 | **Incremental validation** | Present design in sections, validate each - never all at once |
-| **Task tracking** | YOU MUST create task todos at start with TaskCreate, update with TaskUpdate as you progress (or TodoWrite in older versions) |
+| **Task tracking** | YOU MUST create task todos at start with TaskCreate, update with TaskUpdate as you progress |
 | **Flexible progression** | Go backward when needed - flexibility > rigidity |
 | **Internet research matters** | Use research agents or web tools for external knowledge and current information |
 

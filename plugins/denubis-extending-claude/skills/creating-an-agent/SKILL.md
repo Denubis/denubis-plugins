@@ -100,7 +100,7 @@ Choose tools based on agent responsibilities:
 | Edit | Modifying existing files |
 | Write | Creating new files |
 | Bash | Running commands, git, tests |
-| TaskCreate/TaskUpdate | Tracking multi-step workflows (TodoWrite in older versions) |
+| TaskCreate/TaskUpdate | Tracking multi-step workflows |
 | Task | Spawning sub-agents |
 | WebFetch/WebSearch | Research tasks |
 
