@@ -4,7 +4,7 @@ Design decisions for the `coding-effectively` skill and its sub-skills.
 
 ## Background
 
-The upstream `ed3d-house-style` plugin contains a `coding-effectively` skill that our `code-reviewer` agent references. We removed that plugin (TypeScript/React focused) but need to fulfill the contract with Python-focused alternatives.
+The upstream `denubis-house-style` plugin contains a `coding-effectively` skill that our `code-reviewer` agent references. We removed that plugin (TypeScript/React focused) but need to fulfill the contract with Python-focused alternatives.
 
 ## Skill Structure
 

@@ -46,7 +46,7 @@ All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bi
 
 **REQUIRED: Create task tracker at start**
 
-Use TaskCreate to create todos for each phase (or TodoWrite in older Claude Code versions):
+Use TaskCreate to create todos for each phase:
 
 - Phase 1: Context Gathering (initial information collected)
 - (conditional) Read project design guidance (if `.ed3d/design-plan-guidance.md` exists)
@@ -56,7 +56,7 @@ Use TaskCreate to create todos for each phase (or TodoWrite in older Claude Code
 - Phase 5: Design Documentation (design written to docs/design-plans/)
 - Phase 6: Planning Handoff (implementation plan offered/created)
 
-Use TaskUpdate to mark each phase as in_progress when working on it, completed when finished (or TodoWrite in older versions).
+Use TaskUpdate to mark each phase as in_progress when working on it, completed when finished.
 
 ### Phase 1: Context Gathering
 
@@ -322,7 +322,7 @@ Ready to create the implementation plan? This requires fresh context to work eff
 
 (1) Copy this command now:
 ```
-/ed3d-denubis-plan-and-execute:start-implementation-plan @docs/design-plans/[full-filename].md .
+/denubis-plan-and-execute:start-implementation-plan @docs/design-plans/[full-filename].md .
 ```
 (the `.` at the end is necessary or else Claude Code will eat the command and do the wrong thing.)
 
@@ -379,5 +379,5 @@ You can and should go backward when:
 | **Clarify before ideating** | Phase 2 prevents building the wrong thing |
 | **Lock in the goal before exploring** | Phase 3 confirms what "done" means before brainstorming the how |
 | **All brains in skills** | This skill orchestrates; sub-skills contain domain expertise |
-| **Task tracking** | YOU MUST create todos with TaskCreate and update with TaskUpdate for all phases (or TodoWrite in older versions) |
+| **Task tracking** | YOU MUST create todos with TaskCreate and update with TaskUpdate for all phases |
 | **Flexible progression** | Go backward when needed to fill gaps |

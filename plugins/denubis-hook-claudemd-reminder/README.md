@@ -1,4 +1,4 @@
-# ed3d-hook-claudemd-reminder
+# denubis-hook-claudemd-reminder
 
 A Claude Code hook plugin that reminds to update CLAUDE.md files when committing changes.
 
@@ -9,9 +9,9 @@ When you run `git status` or `git log`, this hook adds a gentle reminder to cons
 ## Integration
 
 This hook works with:
-- **ed3d-extending-claude:project-claude-librarian** - The agent that reviews changes and updates CLAUDE.md files
-- **ed3d-extending-claude:maintaining-project-context** - The skill that defines when and how to update documentation
+- **denubis-extending-claude:project-claude-librarian** - The agent that reviews changes and updates CLAUDE.md files
+- **denubis-extending-claude:maintaining-project-context** - The skill that defines when and how to update documentation
 
 ## Installation
 
-Install via ed3d-plugins.
+Install via denubis-plugins.

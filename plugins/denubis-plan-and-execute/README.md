@@ -188,13 +188,13 @@ The plugin uses specialized subagents for different roles:
 
 | Agent | Plugin | Role |
 |-------|--------|------|
-| **codebase-investigator** | ed3d-research-agents | Verifies file paths, finds patterns, confirms assumptions |
-| **internet-researcher** | ed3d-research-agents | Finds current API docs, library patterns, best practices |
+| **codebase-investigator** | denubis-research-agents | Verifies file paths, finds patterns, confirms assumptions |
+| **internet-researcher** | denubis-research-agents | Finds current API docs, library patterns, best practices |
 | **task-implementor** | denubis-plan-and-execute | Implements tasks with TDD, runs verification, commits |
 | **code-reviewer** | denubis-plan-and-execute | Enforces quality standards, blocks on issues |
 | **task-bug-fixer** | denubis-plan-and-execute | Fixes issues identified by code reviewer |
 | **proleptic-challenger** | denubis-plan-and-execute | Generates counterarguments at phase transitions |
-| **project-claude-librarian** | ed3d-extending-claude | Updates CLAUDE.md files when contracts change |
+| **project-claude-librarian** | denubis-extending-claude | Updates CLAUDE.md files when contracts change |
 
 You interact with the main orchestrating agent. It dispatches subagents and shows you their full responses.
 
