@@ -9,7 +9,7 @@ description: Use after code review passes to present acceptance criteria and wai
 
 Present acceptance criteria to the human and wait for explicit verification before proceeding. No automatic continuation.
 
-**Core principle:** UAT is Popper falsification — probing the epistemological boundaries of the implementation. The human doesn't confirm the happy path works (automated tests already do that). The human tests WHERE the implementation's claims about reality stop holding: boundary conditions, edge cases, graceful degradation. "This works" is confirmation. "This is where it stops working, and it fails safely" is falsification.
+**Core principle:** UAT is human-falsifiable verification. Simple claims get simple confirmation. Claims with real implications — auth, validation, data integrity, external integration — get boundary probing: where does the implementation's model of reality stop holding? The human doesn't re-run automated tests. The human engages with what only a human can judge.
 
 **Announce at start:** "I'm using the human-uat-gate skill to verify the implementation meets your requirements."
 
@@ -52,53 +52,43 @@ Find the Popper falsification tests from the implementation plan — these are t
 - For design work: Phase 3 of starting-a-design-plan
 - For features: Requirements from the original request
 
-If no formal falsification tests exist, construct them. For each acceptance criterion, identify:
-1. **The claim** — what the implementation says it handles
-2. **The boundary** — where the claim stops holding (edge of valid input, resource limits, error conditions)
-3. **The test** — what the human does AT and BEYOND the boundary to see if the implementation fails gracefully
+If no formal falsification tests exist, construct them. For each acceptance criterion, decide:
+- **Simple claim** (CRUD, configuration, display): state what to verify and how
+- **Boundary-rich claim** (auth, validation, data integrity, concurrency, external integration): identify where the claim stops holding and what to test at the edges
 
 ### Step 2: Present UAT to Human
 
 Use this exact format:
 
 ```markdown
-## User Acceptance Testing (Popper Falsification)
+## User Acceptance Testing
 
-Code review passed. Automated tests confirm the happy paths work. Your job is different: **probe the boundaries.** Where does the implementation's model of reality stop matching actual reality?
+Code review passed. Automated tests cover the happy paths. Below: simple items to confirm, then boundary-rich items to probe.
 
-For each claim below, the implementation asserts it handles the main case AND fails gracefully at the borders. Try to prove it wrong.
+### Confirm These
 
-### Boundary Tests
+[Straightforward claims — CRUD, config, display. Quick verification.]
 
-[For each Popper test, show the claim AND its borders]
+- [ ] [Claim]: [How to verify — command, UI action, expected result]
+- [ ] [Claim]: [How to verify]
+...
+
+### Probe These Boundaries
+
+[Claims with real implications — auth, validation, data integrity, external integration. Where does it stop working?]
 
 - [ ] **Claim:** [What the implementation handles]
-  **Border:** [Where the claim stops — edge of valid input, resource limit, error condition]
-  **Test at border:** [What to do AT the boundary]
-  **Expected at border:** [Graceful behaviour — error message, rejection, fallback]
-  **Test beyond border:** [What to do PAST the boundary — malformed input, missing data, impossible state]
-  **Expected beyond:** [Safe failure — no crash, no data leak, no silent corruption]
-
+  **Border:** [Where valid input/state ends]
+  **Probe:** [What to try at and beyond the edge — empty input, malformed data, expired state, concurrent access]
+  **Should see:** [Graceful failure — error message, rejection, safe fallback. NOT crash, data leak, silent corruption]
 - [ ] **Claim:** [...]
-  **Border:** [...]
   ...
-
-### Probing Steps
-
-[Concrete actions. Not "test login" but "enter empty password, enter SQL in username field, submit with expired session token"]
-
-1. **[Claim 1 — main case]**: [Quick confirmation it works at all]
-2. **[Claim 1 — boundary]**: [Steps to push to the edge]
-3. **[Claim 1 — beyond]**: [Steps to push past the edge]
-4. **[Claim 2 — main case]**: [...]
-...
 
 ### Your Verification Required
 
-Please probe each boundary and respond:
-- **"Confirmed"** - All claims survived falsification at and beyond borders
+Please confirm the simple items and probe the boundaries. Respond:
+- **"Confirmed"** - Everything holds
 - **"[Claim] broke at [boundary]: [what you observed]"** - Will fix and re-verify
-- **"Need clarification: [question]"** - Unclear on what a boundary should be
 
 I'll wait for your response before proceeding.
 ```
@@ -144,31 +134,33 @@ UAT rejected
 | Feature completion | Original user request + any clarifications |
 | Bug fix | "Bug is fixed when [specific behavior] works — verify by [action]" |
 
-## Constructing Falsification Tests
+## Constructing Tests
 
 If no formal Popper tests exist in the implementation plan:
 
-1. Review the original request and design decisions
-2. For each acceptance criterion, identify:
-   - **The claim**: what the implementation handles
-   - **The boundary**: where valid input/state ends — empty strings, zero values, max lengths, missing fields, expired tokens, concurrent access, permission edges
-   - **Beyond the boundary**: malformed data, injection attempts, impossible states, resource exhaustion
-3. Write tests that probe AT and BEYOND each boundary, not just the main case
-4. Present to human: "I've identified these boundaries for testing. Are there borders I'm missing?"
-5. Wait for confirmation before proceeding with UAT
+1. Review the acceptance criteria
+2. **Triage each claim:**
 
-**The human should find the borders, not confirm the centre.**
+| Claim involves... | Tier | Format |
+|-------------------|------|--------|
+| CRUD, config, display, scaffolding | Simple | Confirm: [action] → [expected] |
+| Auth, permissions, access control | Boundary | Probe edges: wrong credentials, expired tokens, privilege escalation |
+| Validation, data integrity | Boundary | Probe edges: empty input, malformed data, boundary values, injection |
+| External integration, concurrency | Boundary | Probe edges: service down, timeout, race conditions, partial failure |
+| Error handling, recovery | Boundary | Probe edges: cascading failures, corrupt state, retry behaviour |
+
+3. Present to human: "I've split these into simple confirmations and boundary probes. Are there borders I'm missing?"
+4. Wait for confirmation before proceeding
 
 ## Common Rationalizations - STOP
 
 | Excuse | Reality |
 |--------|---------|
-| "Tests pass, UAT is redundant" | Tests confirm the centre. UAT probes the borders. Automated tests verify the happy path; the human finds where the model breaks. Different epistemics. |
-| "User already knows it works" | Knowing it works is not knowing WHERE it stops working. Boundaries are invisible until probed. |
+| "Tests pass, UAT is redundant" | Tests verify code. Humans verify fitness and find borders automated tests can't reach. |
+| "User already knows it works" | Working ≠ knowing where it stops working. Boundaries are invisible until probed. |
 | "We're running late" | Skipped UAT = shipped bugs |
 | "Code review was thorough" | Code review checks quality, UAT checks fitness |
-| "User can test later" | UAT now catches issues before they compound |
-| "Criteria seem obvious" | The centre seems obvious. The borders never are. That's why you test them. |
+| "All claims are simple, no boundaries" | If nothing has auth, validation, or data integrity implications, fine — but verify that's actually true. |
 
 ## Integration with Workflow
 
@@ -190,4 +182,4 @@ Human verifies acceptance criteria
 
 **The human is the final arbiter of whether work is complete.**
 
-Automated tests verify the code is correct (does it work?). UAT falsifies claims about fitness for purpose (does it solve the problem?). Both are required. Popper: a claim that survives honest attempts at falsification is one you can trust.
+Automated tests verify correctness. UAT verifies fitness — and for boundary-rich claims, probes where the implementation stops holding. A claim that survives honest attempts at falsification is one you can trust.

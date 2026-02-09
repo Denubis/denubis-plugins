@@ -42,9 +42,6 @@ Update the breadcrumb status line at phase transitions so the human knows what's
 | UAT gate presented | `Implementing` | `engage` |
 | After UAT confirmed | `Implementing` | `null` |
 | Phase refactor running | `Refactoring` | `null` |
-| Phase refactor review | `Code Review` | `null` |
-| Cross-cutting refactor running | `Refactoring` | `null` |
-| Cross-cutting refactor review | `Code Review` | `null` |
 | Final code review | `Code Review` | `null` |
 | Finishing branch | `Finishing` | `approve` |
 
@@ -374,36 +371,12 @@ After human has evaluated proleptic counterarguments, present UAT:
 
 Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
 
-**Locate Popper falsification tests:**
+**Locate acceptance criteria:**
 - Primary: **"Popper (your UAT):"** entries from the implementation plan's design decisions
-- Fallback: Phase acceptance criteria from the implementation plan's phase description
+- Fallback: Phase acceptance criteria from the phase description
 - Overall: Definition of Done from the design document
 
-For each claim, identify not just the main case but the **boundaries** — where does the claim stop holding? The human probes edges, not centres.
-
-**Present UAT (boundary probing):**
-
-Use the `human-uat-gate` skill's full boundary test format. The key structure for each claim:
-
-```markdown
-## User Acceptance Testing: Phase [N]
-
-Automated tests confirm the main cases. Probe the **boundaries** — where does this phase's implementation stop holding?
-
-### Boundary Tests
-
-- [ ] **Claim:** [What the implementation handles]
-  **Border:** [Where valid input/state ends]
-  **Test at border:** [What to do AT the edge]
-  **Test beyond:** [What to do PAST the edge]
-  **Expected:** [Graceful failure, not crash/leak/corruption]
-...
-
-### Probing Steps
-
-[Concrete boundary-probing actions]
-...
-```
+**Triage claims:** Simple items (CRUD, config, display) get quick confirmation. Boundary-rich items (auth, validation, data integrity, external integration) get edge probing. Use the `human-uat-gate` skill's tiered format.
 
 **Handle UAT Response:**
 
@@ -426,71 +399,38 @@ UAT rejected
 
 #### 3d. Phase Refactor (Red-Green-**Refactor**)
 
-**This is the macro-level Refactor step of Red-Green-Refactor.** The phase is Green — tests pass, UAT confirmed. Now clean up before building the next phase on top.
+The phase is Green — tests pass, UAT confirmed. Now clean up before building the next phase on top.
 
-**Scope:** Only files touched by this phase. Do not reorganise code from other phases.
+**Scope:** Only files touched by this phase. No cross-module reorganisation.
 
 **What to refactor:**
-- Reduce duplication within phase files
-- Improve naming (variables, functions, modules)
-- Extract helpers where patterns repeat
-- Simplify overly complex logic
-- Fix code smells introduced by minimal-to-pass implementations
+- Reduce duplication, improve naming, extract helpers
+- Simplify overly complex logic from minimal-to-pass implementations
+- Fix code smells
 
-**What NOT to do:**
-- Add features or change behaviour
-- Reorganise across module boundaries (save for cross-cutting refactor)
-- Break tests — if any test fails, revert the refactor change
+**Rules:** No features, no behaviour changes. If tests break, revert.
 
-**Dispatch code-simplifier:**
+**If `code-simplifier:code-simplifier` is available**, dispatch it:
 
 ```
 <invoke name="Task">
 <parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
-<parameter name="description">Phase [N] refactor — simplify and clean up</parameter>
+<parameter name="description">Phase [N] refactor</parameter>
 <parameter name="prompt">
-Simplify and refine the code changed in this phase for clarity, consistency, and maintainability.
-
-Focus on recently modified files only:
-[list files changed in this phase]
-
-Working directory: [directory]
-
-Rules:
-- Preserve ALL functionality and test behaviour
-- Do not add features or change public APIs
-- Do not touch files outside this phase's scope
-- Find the test command in CLAUDE.md and run it after changes to confirm green
-- Commit refactoring changes separately from implementation
+Simplify code changed in this phase. Files: [list]. Working directory: [dir].
+Preserve all functionality. Find the test command in CLAUDE.md and run after changes.
+Commit refactoring separately from implementation.
 </parameter>
 </invoke>
 ```
 
-**After code-simplifier completes:**
-1. Print the subagent's response to the human
-2. Run tests to verify still green
-3. If tests fail: revert refactor, report to human, proceed without refactoring
-4. If tests pass: commit refactoring, mark phase complete
+**If code-simplifier is not available**, refactor directly — review the phase's files yourself, apply the same criteria, keep tests green, commit separately.
 
-**If code-simplifier finds nothing to improve:** That's fine. Move on.
+**After refactoring:** Run tests. If green, mark phase complete. If tests fail, revert and proceed without.
 
 **Phase completion flow:**
 ```
-Phase code review passes
-    ↓
-Proleptic challenge
-    ↓
-Human evaluates counterarguments
-    ↓
-UAT gate (human-uat-gate skill)
-    ↓
-Human confirms phase complete
-    ↓
-Phase refactor (code-simplifier)
-    ↓
-Verify tests still green
-    ↓
-Proceed to next phase
+Code review → Proleptic → UAT → Refactor → Verify green → Next phase
 ```
 
 #### 3e. Move to Next Phase
@@ -633,66 +573,9 @@ git commit -m "docs: add test plan for [feature name]"
 
 Announce: "Human test plan written to `docs/test-plans/[impl-plan-dir-name].md`"
 
-### 6. Cross-Cutting Refactor
+### 6. Complete Development
 
-**This is the macro Red-Green-Refactor step for the entire implementation.** All phases are Green — tests pass, UAT confirmed, final review clean. Now refactor across the whole codebase.
-
-**Why here and not earlier:** Per-phase refactoring (step 3d) handles within-phase cleanup. This step handles cross-cutting concerns that only become visible once all phases are complete: duplication across modules, inconsistent patterns between phases, file organisation that made sense incrementally but not holistically.
-
-**What to refactor:**
-- Reorganise files and directories for clarity
-- Extract shared utilities from duplicated cross-module code
-- Align naming conventions across all phases
-- Simplify public interfaces where implementation revealed simpler abstractions
-- Remove scaffolding or temporary patterns introduced during phased implementation
-
-**What NOT to do:**
-- Add features or change behaviour
-- Break tests — every refactor must keep tests green
-- Refactor beyond the implementation's scope (don't touch unrelated code)
-
-**Dispatch code-simplifier:**
-
-```
-<invoke name="Task">
-<parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
-<parameter name="description">Cross-cutting refactor — reorganise and simplify</parameter>
-<parameter name="prompt">
-Simplify and refine the code from this implementation for clarity, consistency, and maintainability.
-
-Base commit: [commit SHA at start of first phase]
-Current HEAD: [current commit]
-Working directory: [directory]
-
-Focus on all files changed since the base commit. Look for:
-- Duplication across modules that can be extracted
-- Inconsistent patterns between implementation phases
-- Files or directories that should be reorganised
-- Public interfaces that can be simplified
-- Scaffolding or temporary patterns to remove
-
-Rules:
-- Preserve ALL functionality and test behaviour
-- Do not add features or change public APIs beyond simplification
-- Find the test command in CLAUDE.md and run it after each logical change to confirm green
-- Commit each refactoring change separately with descriptive messages
-- If a refactor breaks tests, revert it immediately
-</parameter>
-</invoke>
-```
-
-**After code-simplifier completes:**
-1. Print the subagent's response to the human
-2. Run full test suite to verify still green
-3. If tests fail: revert all refactoring, report to human
-4. If tests pass and changes were made: run code review via `requesting-code-review` skill
-5. If code-simplifier found nothing to improve: move on
-
-**If code review finds issues with refactoring:** Fix via bug-fixer → re-review loop, same as implementation phases.
-
-### 7. Complete Development
-
-After refactoring (or after final review if no refactoring needed):
+After final review passes:
 
 - Provide a report to the human operator
   - For each phase:
@@ -748,8 +631,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Mark 1c complete, 1d in_progress]
 
-[Dispatch code-simplifier for phase 1]
-→ Minor naming improvements, committed.
+[Refactor phase 1: minor naming improvements, committed]
 
 [Mark 1d complete]
 
@@ -771,8 +653,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Mark 2c complete, 2d in_progress]
 
-[Dispatch code-simplifier for phase 2]
-→ Extracted shared validator, committed.
+[Refactor phase 2: extracted shared validator, committed]
 
 [Mark 2d complete]
 
@@ -788,10 +669,6 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Use requesting-code-review skill for final review]
 → All requirements met.
 
-[Dispatch code-simplifier for cross-cutting refactor]
-→ Consolidated duplicate helpers across modules, reorganised utils/.
-→ Code review on refactoring: zero issues.
-
 [Transitioning to finishing-a-development-branch]
 ```
 
@@ -805,4 +682,3 @@ You: I'm using the `executing-an-implementation-plan` skill.
 | "Context error on review, I'll skip the review" | No. Chunk the review into halves. Never skip review. |
 | "Minor issues can wait" | No. Fix ALL issues including Minor. |
 | "Code is clean enough, skip refactoring" | No. Green means it works; Refactor means it's maintainable. TDD without Refactor accumulates debt. |
-| "Refactoring is risky this late" | No. Tests exist. If refactoring breaks tests, revert. That's what tests are for. |
