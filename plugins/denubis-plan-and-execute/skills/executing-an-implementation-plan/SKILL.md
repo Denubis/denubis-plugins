@@ -374,36 +374,35 @@ After human has evaluated proleptic counterarguments, present UAT:
 
 Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
 
-**Locate Definition of Done:**
-- For this phase: from the implementation plan's phase description
-- For overall implementation: from the design document's Definition of Done
+**Locate Popper falsification tests:**
+- Primary: **"Popper (your UAT):"** entries from the implementation plan's design decisions
+- Fallback: Phase acceptance criteria from the implementation plan's phase description
+- Overall: Definition of Done from the design document
 
-**Present UAT:**
+For each claim, identify not just the main case but the **boundaries** — where does the claim stop holding? The human probes edges, not centres.
+
+**Present UAT (boundary probing):**
+
+Use the `human-uat-gate` skill's full boundary test format. The key structure for each claim:
 
 ```markdown
 ## User Acceptance Testing: Phase [N]
 
-Code review passed. Proleptic counterarguments evaluated. Please verify this phase meets requirements.
+Automated tests confirm the main cases. Probe the **boundaries** — where does this phase's implementation stop holding?
 
-### Phase [N] Definition of Done
+### Boundary Tests
 
-- [ ] [Criterion from phase description]
-- [ ] [Criterion from phase description]
+- [ ] **Claim:** [What the implementation handles]
+  **Border:** [Where valid input/state ends]
+  **Test at border:** [What to do AT the edge]
+  **Test beyond:** [What to do PAST the edge]
+  **Expected:** [Graceful failure, not crash/leak/corruption]
 ...
 
-### How to Verify
+### Probing Steps
 
-1. [Specific verification step]
-2. [Specific verification step]
+[Concrete boundary-probing actions]
 ...
-
-### Your Verification Required
-
-Please verify and respond:
-- **"Confirmed"** - Phase complete, proceed to next phase
-- **"[Criterion] not met: [reason]"** - Will fix and re-verify
-
-I'll wait for your response.
 ```
 
 **Handle UAT Response:**
@@ -461,7 +460,7 @@ Rules:
 - Preserve ALL functionality and test behaviour
 - Do not add features or change public APIs
 - Do not touch files outside this phase's scope
-- Run tests after changes to confirm green
+- Find the test command in CLAUDE.md and run it after changes to confirm green
 - Commit refactoring changes separately from implementation
 </parameter>
 </invoke>
@@ -599,7 +598,7 @@ Return coverage validation result. If PASS, include the human test plan.
    1. Read the acceptance criterion carefully
    2. Create the test file at the expected location
    3. Write tests that verify the criterion's actual behavior—not just code that passes, but code that would fail if the criterion weren't met
-   4. Run tests to confirm they pass
+   4. Find the test command in CLAUDE.md and run it to confirm they pass
    5. Commit the new tests
 
    Work from: [directory]
@@ -675,7 +674,7 @@ Focus on all files changed since the base commit. Look for:
 Rules:
 - Preserve ALL functionality and test behaviour
 - Do not add features or change public APIs beyond simplification
-- Run tests after each logical change to confirm green
+- Find the test command in CLAUDE.md and run it after each logical change to confirm green
 - Commit each refactoring change separately with descriptive messages
 - If a refactor breaks tests, revert it immediately
 </parameter>
