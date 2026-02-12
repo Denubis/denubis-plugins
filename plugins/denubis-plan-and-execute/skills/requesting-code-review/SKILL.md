@@ -14,17 +14,20 @@ Dispatch denubis-plan-and-execute:code-reviewer subagent to catch issues before 
 
 **On entry** (review dispatched):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --step "Code Review" --human null
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --step "Code Review" --human null
 ```
 
 **Operational error or 3 failures** (need human help):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human "engage"
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --human "engage"
 ```
 
 **After review passes** (before proleptic/UAT — those skills set their own state):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --step "Implementing" --human null
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --step "Implementing" --human null
 ```
 
 ## When to Request Review

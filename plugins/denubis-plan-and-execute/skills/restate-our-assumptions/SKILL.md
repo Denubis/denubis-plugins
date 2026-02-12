@@ -16,9 +16,9 @@ Every claim in `docs/dependency-rationale.md` was true when written. This skill 
 
 ## Workflow Status Line
 
-Update the breadcrumb at transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+Update the breadcrumb at transitions. If the state script is not installed, skip silently.
 
-All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
 | Transition | `--step` | `--human` |
 |------------|----------|-----------|

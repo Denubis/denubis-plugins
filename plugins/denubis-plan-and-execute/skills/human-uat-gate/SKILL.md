@@ -17,12 +17,14 @@ Present acceptance criteria to the human and wait for explicit verification befo
 
 **On entry** (before presenting UAT):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human "engage"
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --human "engage"
 ```
 
 **After human confirms** (UAT passed):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human null
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --human null
 ```
 
 This sets the status line to red "ENGAGE" — the strongest signal that the human must leave the terminal and test the implementation themselves.

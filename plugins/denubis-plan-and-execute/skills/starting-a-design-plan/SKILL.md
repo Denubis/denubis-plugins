@@ -16,7 +16,7 @@ Orchestrate the complete design workflow from initial idea to implementation-rea
 
 ## Workflow Status Line
 
-Update the breadcrumb status line at phase transitions. If `~/.claude/bin/workflow-state` is not installed, skip silently.
+Update the breadcrumb status line at phase transitions. If the state script is not installed, skip silently.
 
 | Transition | Command |
 |------------|---------|
@@ -29,7 +29,7 @@ Update the breadcrumb status line at phase transitions. If `~/.claude/bin/workfl
 | Phase 5 starts | Sub-skill (writing-design-plans) handles state |
 | Phase 6 handoff | `--step "Design" --human "respond"` |
 
-All commands prefixed with: `[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state`
+All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
 ## Quick Reference
 

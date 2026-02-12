@@ -23,12 +23,14 @@ Based on proleptic reasoning from argumentation theory—anticipating objections
 
 **Before presenting counterarguments to human:**
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human "think"
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --human "think"
 ```
 
 **After human responds** (and you proceed):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --human null
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --human null
 ```
 
 This sets the status line to bold magenta "Think" — signalling the human needs to evaluate critically, not just approve.

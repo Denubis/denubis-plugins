@@ -20,16 +20,18 @@ Execute plan phase-by-phase, loading each phase just-in-time to minimize context
 
 ## Workflow Status Line
 
-Update the breadcrumb status line at phase transitions so the human knows what's happening when they tab back to this session. If `~/.claude/bin/workflow-state` is not installed, skip these silently.
+Update the breadcrumb status line at phase transitions so the human knows what's happening when they tab back to this session. If the state script is not installed, skip these silently.
 
 **On entry** (after discovering phases, extract slug from plan directory name):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --feature "<slug>" --step "Implementing" --human null
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --feature "<slug>" --step "Implementing" --human null
 ```
 
 **When reading each phase** (extract phase name from title, e.g. "CRDT Cloning" from "Phase 4: CRDT Cloning"):
 ```bash
-[ -x ~/.claude/bin/workflow-state ] && ~/.claude/bin/workflow-state --phase "<Phase Name>"
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --phase "<Phase Name>"
 ```
 
 | Transition | `--step` | `--human` |
