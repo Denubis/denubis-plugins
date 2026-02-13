@@ -1,5 +1,14 @@
 # Changelog
 
+## denubis-plan-and-execute 2.7.0
+
+Code quality guards as a PreToolUse hook.
+
+**New:**
+- `code-quality-guard.py` — PreToolUse hook that checks Write/Edit operations against 6 code quality rules
+- Blocking checks: E2E JavaScript injection (use Playwright APIs), `metadata.create_all()` outside Alembic
+- Warning checks: Alembic migration edits, debug statements in production code, shortcut/deferral patterns, test weakening (skip/xfail)
+
 ## denubis-git-commit 1.0.0
 
 Git commit as a proper skill, so `/commit` actually works.
