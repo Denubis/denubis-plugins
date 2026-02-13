@@ -31,6 +31,70 @@ All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/p
 | Phase 5 starts | Sub-skill (writing-design-plans) handles state |
 | Phase 6 handoff | `--skill "starting-a-design-plan" --context "handoff: proceed to implementation?"` |
 
+## Data Flow: Context Diagram (Level 0)
+
+```mermaid
+flowchart LR
+    User([User])
+    CB[(Codebase)]
+    Web([Internet])
+    Git[(Git)]
+
+    User -->|"idea, constraints,<br>feedback, approval"| DP(("Design<br>Pipeline"))
+    DP -->|"questions, options,<br>design sections"| User
+    CB -->|"patterns,<br>existing code"| DP
+    Web -->|"API docs,<br>best practices"| DP
+    DP -->|"design document,<br>implementation plan"| Git
+```
+
+## Data Flow: Pipeline Decomposition (Level 1)
+
+```mermaid
+flowchart TD
+    User([User])
+    CB[(Codebase)]
+    Web([Internet])
+    Git[(Git)]
+    DD[(Design Document)]
+
+    P1["1.0 Context Gathering"]
+    G1{"GATE:<br>context collected?"}
+    P2["2.0 Clarification"]
+    G2{"GATE:<br>requirements<br>disambiguated?"}
+    P3["3.0 Definition of Done"]
+    G3{"GATE:<br>DoD confirmed<br>by user?"}
+    P4["4.0 Brainstorming"]
+    G4{"GATE:<br>design approved<br>by user?"}
+    P5["5.0 Design Documentation"]
+    P6["6.0 Planning Handoff"]
+
+    User -->|"idea, constraints, URLs"| P1
+    CB -->|"project state"| P1
+    P1 --> G1 --> P2
+
+    User -->|answers| P2
+    P2 -->|"clarifying questions"| User
+    P2 --> G2 --> P3
+
+    User -->|confirmation| P3
+    P3 -->|"DoD for confirmation"| User
+    P3 -->|"DoD stub"| DD
+    P3 --> G3 --> P4
+
+    CB -->|patterns| P4
+    Web -->|"docs, practices"| P4
+    User -->|"feedback, approval"| P4
+    P4 -->|"options, design sections"| User
+    P4 --> G4 --> P5
+
+    P5 -->|"completed design"| DD
+    DD -->|commit| Git
+    P5 --> P6
+    P6 -->|"next steps"| User
+```
+
+Each gate is a hard checkpoint — the process cannot advance until the gate condition is met. See the brainstorming skill for further decomposition of Process 4.0.
+
 ## Quick Reference
 
 | Phase | Key Activities | Output |

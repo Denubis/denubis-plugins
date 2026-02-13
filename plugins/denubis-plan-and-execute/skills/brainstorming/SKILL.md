@@ -14,6 +14,14 @@ Transform rough ideas into fully-formed designs through structured questioning a
 
 **Announce at start:** "I'm using the brainstorming skill to refine your idea into a design."
 
+<HARD-GATE>
+Do NOT invoke any implementation skill, write any code, scaffold any project, call EnterPlanMode, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
+</HARD-GATE>
+
+## Anti-Pattern: "This Is Too Simple To Need A Design"
+
+Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
+
 ## Workflow Status Line
 
 Update the breadcrumb at transitions. If the state script is not installed, skip silently.
@@ -35,6 +43,47 @@ All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/p
 | **1. Understanding** | Ask questions (one at a time) | AskUserQuestion for choices, agents for research | Purpose, constraints, criteria |
 | **2. Exploration** | Propose 2-3 approaches | AskUserQuestion for approach selection, agents for patterns | Architecture options with trade-offs |
 | **3. Design Presentation** | Present in 200-300 word sections | Open-ended questions | Complete design with validation |
+
+## Data Flow: Brainstorming Decomposition (Process 4.0)
+
+Decomposes Process 4.0 from the starting-a-design-plan pipeline.
+
+```mermaid
+flowchart TD
+    CB[(Codebase)]
+    Web([Internet])
+    User([User])
+
+    P41["4.1 Codebase Investigation"]
+    G41{"GATE:<br>project state<br>understood?"}
+    P42["4.2 Understanding"]
+    G42{"GATE:<br>purpose, constraints,<br>criteria gathered?"}
+    P43["4.3 Exploration"]
+    G43{"GATE:<br>approach selected<br>by user?"}
+    P44["4.4 Design Presentation"]
+    G44{"GATE:<br>all sections<br>approved by user?"}
+
+    CB -->|"patterns, existing code"| P41
+    P41 --> G41 --> P42
+
+    User -->|answers| P42
+    P42 -->|"one question at a time"| User
+    P42 --> G42 --> P43
+
+    CB -->|patterns| P43
+    Web -->|"docs, practices"| P43
+    P43 -->|"2-3 approaches<br>with trade-offs"| User
+    User -->|selection| P43
+    P43 --> G43 --> P44
+
+    P44 -->|"sections, 200-300w each"| User
+    User -->|"approval or revision"| P44
+    P44 --> G44
+    G44 -->|revise| P44
+    G44 -->|"all approved"| Out(["Validated design →<br>5.0 Design Documentation"])
+```
+
+**The terminal state is a validated design.** The ONLY next step after brainstorming is design documentation (Process 5.0). Do NOT invoke implementation skills, frontend-design, or EnterPlanMode from brainstorming.
 
 ## The Process
 

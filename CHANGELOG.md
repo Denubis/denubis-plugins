@@ -1,5 +1,19 @@
 # Changelog
 
+## denubis-plan-and-execute 2.9.0
+
+Hard gates and data flow diagrams for the design pipeline.
+
+**New:**
+- HARD-GATE in brainstorming: no implementation until design is approved
+- Anti-pattern callout: "This Is Too Simple To Need A Design"
+- DFD Level 0 (context diagram) and Level 1 (pipeline decomposition) in starting-a-design-plan
+- DFD Process 4.0 decomposition in brainstorming skill
+- EnterPlanMode interception in using-plan-and-execute: routes through starting-a-design-plan if brainstorming hasn't happened
+
+**Changed:**
+- Mermaid diagrams use `<br>` for line breaks (VSCode compatibility)
+
 ## denubis-plan-and-execute 2.8.0
 
 Redesigned workflow status line breadcrumbs and added experimental discipline.

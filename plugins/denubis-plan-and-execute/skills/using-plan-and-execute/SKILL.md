@@ -30,6 +30,8 @@ Before responding to ANY user message, you MUST complete this checklist:
 
 2. Execute skills with the Skill tool
 
+3. **EnterPlanMode requires brainstorming first.** If you are about to call EnterPlanMode and you have NOT completed brainstorming in this session, STOP. Invoke `starting-a-design-plan` instead — it will orchestrate context gathering, clarification, brainstorming, and design documentation before implementation planning begins. EnterPlanMode is only valid AFTER a design has been brainstormed and approved.
+
 ## Common Rationalizations That Mean You're About To Fail
 
 If you catch yourself thinking ANY of these thoughts, STOP. You are rationalizing. Check for and use the skill.
