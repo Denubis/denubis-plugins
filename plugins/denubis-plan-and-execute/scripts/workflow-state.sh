@@ -18,6 +18,7 @@
 #   --context TEXT    Free-text description of current position in process
 #                     (e.g. "Phase 2 Step 3: auth middleware", "hypothesis: race condition")
 #                     Use "" to clear (Claude working autonomously)
+#   --issue   REF     GitHub issue reference (e.g. "#123", "org/repo#123")
 #   --clear           Remove the state file entirely
 
 set -euo pipefail
@@ -34,6 +35,7 @@ FEATURE=""
 SKILL=""
 CONTEXT=""
 CONTEXT_SET=false
+ISSUE=""
 CLEAR=false
 
 while [[ $# -gt 0 ]]; do
@@ -41,6 +43,7 @@ while [[ $# -gt 0 ]]; do
         --feature) FEATURE="$2"; shift 2 ;;
         --skill)   SKILL="$2";   shift 2 ;;
         --context) CONTEXT="$2"; CONTEXT_SET=true; shift 2 ;;
+        --issue)   ISSUE="$2";   shift 2 ;;
         --clear)   CLEAR=true;   shift ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
@@ -55,7 +58,7 @@ fi
 if [[ -f "$STATE_FILE" ]]; then
     EXISTING=$(cat "$STATE_FILE")
 else
-    EXISTING='{"feature":"","skill":"","context":"","pwd":"","updated":""}'
+    EXISTING='{"feature":"","skill":"","context":"","issue":"","pwd":"","updated":""}'
 fi
 
 # Helper: extract a JSON string value (basic, no jq dependency)
@@ -67,9 +70,11 @@ json_get() {
 OLD_FEATURE=$(json_get feature)
 OLD_SKILL=$(json_get skill)
 OLD_CONTEXT=$(json_get context)
+OLD_ISSUE=$(json_get issue)
 
 NEW_FEATURE="${FEATURE:-$OLD_FEATURE}"
 NEW_SKILL="${SKILL:-$OLD_SKILL}"
+NEW_ISSUE="${ISSUE:-$OLD_ISSUE}"
 
 if $CONTEXT_SET; then
     NEW_CONTEXT="$CONTEXT"
@@ -82,6 +87,6 @@ UPDATED=$(date -Iseconds)
 # Write atomically (temp file + rename)
 TMP_FILE=$(mktemp "$STATE_DIR/.tmp.XXXXXX")
 cat > "$TMP_FILE" <<EOF
-{"feature":"$NEW_FEATURE","skill":"$NEW_SKILL","context":"$NEW_CONTEXT","pwd":"$PWD","updated":"$UPDATED"}
+{"feature":"$NEW_FEATURE","skill":"$NEW_SKILL","context":"$NEW_CONTEXT","issue":"$NEW_ISSUE","pwd":"$PWD","updated":"$UPDATED"}
 EOF
 mv "$TMP_FILE" "$STATE_FILE"

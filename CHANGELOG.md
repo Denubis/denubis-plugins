@@ -1,5 +1,23 @@
 # Changelog
 
+## denubis-plan-and-execute 2.11.0
+
+GitHub issue lifecycle tracking across the plan-and-execute workflow.
+
+**New:**
+- Design plans gain a `**GitHub Issue:**` field linking to a GitHub issue (`#123`, `org/repo#123`, or URL)
+- `design-planned` label (yellow) applied when a design plan is committed
+- `implementation-planned` label (blue) replaces `design-planned` when an implementation plan is created
+- Labels removed when a PR is created or branch is merged
+- `workflow-state.sh` gains `--issue` flag to carry the issue reference across skills
+- Labels are auto-created on the repo if they don't exist
+
+**Changed:**
+- `starting-a-design-plan` Phase 1 asks for GitHub issue reference
+- `writing-design-plans` applies label after commit
+- `starting-an-implementation-plan` transitions label after branch setup
+- `finishing-a-development-branch` removes label on merge/PR (new Step 4b)
+
 ## denubis-plan-and-execute 2.10.0
 
 Anti-patterns, worktree enforcement, performance fix, and fence fix.
