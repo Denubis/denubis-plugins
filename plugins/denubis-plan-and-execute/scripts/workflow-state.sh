@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # workflow-state.sh — Update workflow state for the current Claude session.
 #
-# Used by plan-and-execute skills to signal the current workflow phase
+# Used by plan-and-execute skills to signal the current workflow position
 # to the status line. Each working directory gets its own state file
 # under ~/.claude/workflow-state/ (keyed by md5 of $PWD).
 #
 # Usage:
-#   workflow-state.sh --step "Implementing" --human "engage"
-#   workflow-state.sh --feature "94" --phase "CRDT" --step "Design"
-#   workflow-state.sh --human null          # clear the human action (Claude is working)
-#   workflow-state.sh --clear               # remove state entirely
+#   workflow-state.sh --skill "brainstorming" --context "exploring OAuth vs JWT"
+#   workflow-state.sh --feature "94" --skill "executing-impl" --context "Phase 2 Step 3: auth middleware"
+#   workflow-state.sh --context ""           # clear context (Claude is working autonomously)
+#   workflow-state.sh --clear                # remove state entirely
 #
 # Arguments (all optional, only provided args are updated):
 #   --feature NAME    Short project/feature name (e.g. "94", "milkdown-crdt")
-#   --phase   NAME    Current design phase name (e.g. "CRDT Cloning", "Auth")
-#   --step    NAME    Workflow step: Design, Clarification, Brainstorming,
-#                     Impl Planning, Implementing, Code Review, Finishing,
-#                     Debugging, Dep Review
-#   --human   ACTION  Human action required: approve, review, respond, think,
-#                     engage, or "null" to clear
+#   --skill   NAME    Active skill name (e.g. "brainstorming", "systematic-debugging",
+#                     "executing-impl", "writing-design-plans", "code-review")
+#   --context TEXT    Free-text description of current position in process
+#                     (e.g. "Phase 2 Step 3: auth middleware", "hypothesis: race condition")
+#                     Use "" to clear (Claude working autonomously)
 #   --clear           Remove the state file entirely
 
 set -euo pipefail
@@ -32,17 +31,16 @@ STATE_FILE="$STATE_DIR/$DIR_HASH.json"
 
 # Parse arguments
 FEATURE=""
-PHASE=""
-STEP=""
-HUMAN=""
+SKILL=""
+CONTEXT=""
+CONTEXT_SET=false
 CLEAR=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --feature) FEATURE="$2"; shift 2 ;;
-        --phase)   PHASE="$2";   shift 2 ;;
-        --step)    STEP="$2";    shift 2 ;;
-        --human)   HUMAN="$2";   shift 2 ;;
+        --skill)   SKILL="$2";   shift 2 ;;
+        --context) CONTEXT="$2"; CONTEXT_SET=true; shift 2 ;;
         --clear)   CLEAR=true;   shift ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
@@ -57,7 +55,7 @@ fi
 if [[ -f "$STATE_FILE" ]]; then
     EXISTING=$(cat "$STATE_FILE")
 else
-    EXISTING='{"feature":"","phase":"","step":"","human":null,"pwd":"","updated":""}'
+    EXISTING='{"feature":"","skill":"","context":"","pwd":"","updated":""}'
 fi
 
 # Helper: extract a JSON string value (basic, no jq dependency)
@@ -67,27 +65,16 @@ json_get() {
 
 # Merge: only update fields that were provided
 OLD_FEATURE=$(json_get feature)
-OLD_PHASE=$(json_get phase)
-OLD_STEP=$(json_get step)
-# human needs special handling for null
-OLD_HUMAN=$(echo "$EXISTING" | grep -oP '"human"\s*:\s*\K[^,}]*' | tr -d ' "' || echo "null")
+OLD_SKILL=$(json_get skill)
+OLD_CONTEXT=$(json_get context)
 
 NEW_FEATURE="${FEATURE:-$OLD_FEATURE}"
-NEW_PHASE="${PHASE:-$OLD_PHASE}"
-NEW_STEP="${STEP:-$OLD_STEP}"
+NEW_SKILL="${SKILL:-$OLD_SKILL}"
 
-if [[ -n "$HUMAN" ]]; then
-    if [[ "$HUMAN" == "null" ]]; then
-        NEW_HUMAN="null"
-    else
-        NEW_HUMAN="\"$HUMAN\""
-    fi
+if $CONTEXT_SET; then
+    NEW_CONTEXT="$CONTEXT"
 else
-    if [[ "$OLD_HUMAN" == "null" ]]; then
-        NEW_HUMAN="null"
-    else
-        NEW_HUMAN="\"$OLD_HUMAN\""
-    fi
+    NEW_CONTEXT="$OLD_CONTEXT"
 fi
 
 UPDATED=$(date -Iseconds)
@@ -95,6 +82,6 @@ UPDATED=$(date -Iseconds)
 # Write atomically (temp file + rename)
 TMP_FILE=$(mktemp "$STATE_DIR/.tmp.XXXXXX")
 cat > "$TMP_FILE" <<EOF
-{"feature":"$NEW_FEATURE","phase":"$NEW_PHASE","step":"$NEW_STEP","human":$NEW_HUMAN,"pwd":"$PWD","updated":"$UPDATED"}
+{"feature":"$NEW_FEATURE","skill":"$NEW_SKILL","context":"$NEW_CONTEXT","pwd":"$PWD","updated":"$UPDATED"}
 EOF
 mv "$TMP_FILE" "$STATE_FILE"

@@ -2,11 +2,13 @@
 # workflow-statusline.sh — Claude Code status line renderer.
 #
 # Two-line display:
-#   Line 1: [Model] dir | git branch +staged ~modified | workflow breadcrumb
+#   Line 1: [Model] location | skill ❯ context
 #   Line 2: context bar pct% | $cost | duration
 #
-# Workflow breadcrumb (when active):
-#   feature ❯ phase ❯ step ❯ human action
+# Location logic:
+#   - Worktree: show worktree dir name
+#   - Normal repo: show repo basename
+#   - Append @branch if branch differs from displayed name
 #
 # Configure in ~/.claude/settings.json:
 #   "statusLine": {
@@ -44,28 +46,58 @@ BLUE='\033[34m'
 MAGENTA='\033[35m'
 WHITE='\033[37m'
 
-# ── Git info (cached) ────────────────────────────────────────────────
+# ── Smart location (worktree-aware) ──────────────────────────────────
 
-GIT_CACHE="/tmp/claude-statusline-git-cache-$(echo -n "$CWD" | md5sum | cut -d' ' -f1)"
-GIT_CACHE_MAX_AGE=5
+LOCATION="${CWD##*/}"
+GIT_STAGED=0
+GIT_MODIFIED=0
 
-git_cache_stale() {
-    [[ ! -f "$GIT_CACHE" ]] || \
-    [[ $(($(date +%s) - $(stat -c %Y "$GIT_CACHE" 2>/dev/null || echo 0))) -gt $GIT_CACHE_MAX_AGE ]]
-}
+if git -C "$CWD" rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git -C "$CWD" branch --show-current 2>/dev/null || echo "")
 
-if git_cache_stale; then
-    if git -C "$CWD" rev-parse --git-dir > /dev/null 2>&1; then
-        BRANCH=$(git -C "$CWD" branch --show-current 2>/dev/null || echo "")
+    # Detect worktree
+    TOPLEVEL=$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null || echo "$CWD")
+    COMMON_DIR=$(git -C "$CWD" rev-parse --git-common-dir 2>/dev/null || echo "")
+    DISPLAY_NAME="${TOPLEVEL##*/}"
+
+    IS_WORKTREE=false
+    if [[ -n "$COMMON_DIR" ]]; then
+        REAL_COMMON=$(realpath "$COMMON_DIR" 2>/dev/null || echo "$COMMON_DIR")
+        REAL_GITDIR=$(realpath "$TOPLEVEL/.git" 2>/dev/null || echo "$TOPLEVEL/.git")
+        if [[ "$REAL_COMMON" != "$REAL_GITDIR" && -d "$REAL_COMMON" ]]; then
+            IS_WORKTREE=true
+        fi
+    fi
+
+    if $IS_WORKTREE; then
+        LOCATION="$DISPLAY_NAME"
+        if [[ -n "$BRANCH" && "$BRANCH" != "$DISPLAY_NAME" ]]; then
+            LOCATION="${DISPLAY_NAME}@${BRANCH}"
+        fi
+    else
+        LOCATION="$DISPLAY_NAME"
+        if [[ -n "$BRANCH" && "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+            LOCATION="${DISPLAY_NAME}@${BRANCH}"
+        fi
+    fi
+
+    # Git changes (cached)
+    GIT_CACHE="/tmp/claude-statusline-git-cache-$(echo -n "$CWD" | md5sum | cut -d' ' -f1)"
+    GIT_CACHE_MAX_AGE=5
+
+    git_cache_stale() {
+        [[ ! -f "$GIT_CACHE" ]] || \
+        [[ $(($(date +%s) - $(stat -c %Y "$GIT_CACHE" 2>/dev/null || echo 0))) -gt $GIT_CACHE_MAX_AGE ]]
+    }
+
+    if git_cache_stale; then
         STAGED=$(git -C "$CWD" diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
         MODIFIED=$(git -C "$CWD" diff --numstat 2>/dev/null | wc -l | tr -d ' ')
-        echo "$BRANCH|$STAGED|$MODIFIED" > "$GIT_CACHE"
-    else
-        echo "||" > "$GIT_CACHE"
+        echo "$STAGED|$MODIFIED" > "$GIT_CACHE"
     fi
-fi
 
-IFS='|' read -r GIT_BRANCH GIT_STAGED GIT_MODIFIED < "$GIT_CACHE"
+    IFS='|' read -r GIT_STAGED GIT_MODIFIED < "$GIT_CACHE"
+fi
 
 # ── Workflow state ───────────────────────────────────────────────────
 
@@ -77,70 +109,59 @@ CRUMB=""
 if [[ -f "$STATE_FILE" ]]; then
     STATE=$(cat "$STATE_FILE")
     FEATURE=$(echo "$STATE" | jq -r '.feature // ""')
-    PHASE=$(echo "$STATE" | jq -r '.phase // ""')
-    STEP=$(echo "$STATE" | jq -r '.step // ""')
-    HUMAN=$(echo "$STATE" | jq -r '.human // empty')
+    SKILL_NAME=$(echo "$STATE" | jq -r '.skill // ""')
+    CONTEXT=$(echo "$STATE" | jq -r '.context // ""')
 
-    # Step colours
-    declare -A STEP_COLOUR
-    STEP_COLOUR[Design]="$BLUE"
-    STEP_COLOUR[Clarification]="$CYAN"
-    STEP_COLOUR[Brainstorming]="$BLUE"
-    STEP_COLOUR[Impl\ Planning]="$MAGENTA"
-    STEP_COLOUR[Implementing]="$GREEN"
-    STEP_COLOUR[Code\ Review]="$CYAN"
-    STEP_COLOUR[Finishing]="$WHITE"
-    STEP_COLOUR[Debugging]="$YELLOW"
-    STEP_COLOUR[Dep\ Review]="$WHITE"
-
-    # Human action styles (escalating intensity)
-    declare -A HUMAN_STYLE
-    HUMAN_STYLE[approve]="${DIM}${WHITE}"
-    HUMAN_STYLE[review]="$CYAN"
-    HUMAN_STYLE[respond]="$YELLOW"
-    HUMAN_STYLE[think]="${BOLD}${MAGENTA}"
-    HUMAN_STYLE[engage]="${BOLD}\033[41;37m"
-
-    declare -A HUMAN_LABEL
-    HUMAN_LABEL[approve]='Approve'
-    HUMAN_LABEL[review]='Review'
-    HUMAN_LABEL[respond]='Respond'
-    HUMAN_LABEL[think]='Think'
-    HUMAN_LABEL[engage]='ENGAGE'
+    # Skill colours by category
+    declare -A SKILL_COLOUR
+    # Design — blue
+    SKILL_COLOUR[brainstorming]="$BLUE"
+    SKILL_COLOUR[asking-clarifying-questions]="$BLUE"
+    SKILL_COLOUR[writing-design-plans]="$BLUE"
+    SKILL_COLOUR[starting-a-design-plan]="$BLUE"
+    SKILL_COLOUR[flesh-it-out]="$BLUE"
+    # Planning — magenta
+    SKILL_COLOUR[starting-an-implementation-plan]="$MAGENTA"
+    SKILL_COLOUR[writing-implementation-plans]="$MAGENTA"
+    # Execution — green
+    SKILL_COLOUR[executing-impl]="$GREEN"
+    SKILL_COLOUR[executing-an-implementation-plan]="$GREEN"
+    SKILL_COLOUR[code-review]="$CYAN"
+    SKILL_COLOUR[requesting-code-review]="$CYAN"
+    # Defensive — yellow
+    SKILL_COLOUR[systematic-debugging]="$YELLOW"
+    SKILL_COLOUR[controlled-dependency-upgrade]="$YELLOW"
+    SKILL_COLOUR[restate-our-assumptions]="$YELLOW"
+    SKILL_COLOUR[proleptic-challenge]="$YELLOW"
+    # Gates — cyan
+    SKILL_COLOUR[human-uat-gate]="$CYAN"
+    SKILL_COLOUR[finishing-a-development-branch]="$CYAN"
+    SKILL_COLOUR[finishing]="$CYAN"
 
     SEP="${DIM} ❯ ${RST}"
 
-    if [[ -n "$FEATURE" || -n "$PHASE" || -n "$STEP" ]]; then
+    if [[ -n "$FEATURE" || -n "$SKILL_NAME" || -n "$CONTEXT" ]]; then
         [[ -n "$FEATURE" ]] && CRUMB="${BOLD}${WHITE}${FEATURE}${RST}"
-        if [[ -n "$PHASE" ]]; then
+        if [[ -n "$SKILL_NAME" ]]; then
             [[ -n "$CRUMB" ]] && CRUMB="${CRUMB}${SEP}"
-            CRUMB="${CRUMB}${WHITE}${PHASE}${RST}"
+            COLOUR="${SKILL_COLOUR[$SKILL_NAME]:-$WHITE}"
+            CRUMB="${CRUMB}${COLOUR}${SKILL_NAME}${RST}"
         fi
-        if [[ -n "$STEP" ]]; then
+        if [[ -n "$CONTEXT" ]]; then
             [[ -n "$CRUMB" ]] && CRUMB="${CRUMB}${SEP}"
-            COLOUR="${STEP_COLOUR[$STEP]:-$WHITE}"
-            CRUMB="${CRUMB}${COLOUR}${STEP}${RST}"
-        fi
-        if [[ -n "$HUMAN" && "$HUMAN" != "null" ]]; then
-            [[ -n "$CRUMB" ]] && CRUMB="${CRUMB}${SEP}"
-            STYLE="${HUMAN_STYLE[$HUMAN]:-$WHITE}"
-            LABEL="${HUMAN_LABEL[$HUMAN]:-$HUMAN}"
-            CRUMB="${CRUMB}${STYLE} ${LABEL} ${RST}"
+            CRUMB="${CRUMB}${DIM}${CONTEXT}${RST}"
         fi
     fi
 fi
 
-# ── Line 1: model, dir, git, workflow ────────────────────────────────
+# ── Line 1: model, location, git changes, workflow ────────────────────
 
-DIR_NAME="${CWD##*/}"
-LINE1="${CYAN}[${MODEL}]${RST} ${BLUE}${DIR_NAME}${RST}"
+LINE1="${CYAN}[${MODEL}]${RST} ${BLUE}${LOCATION}${RST}"
 
-if [[ -n "$GIT_BRANCH" ]]; then
-    GIT_EXTRA=""
-    [[ "$GIT_STAGED" -gt 0 ]] 2>/dev/null && GIT_EXTRA="${GREEN}+${GIT_STAGED}${RST}"
-    [[ "$GIT_MODIFIED" -gt 0 ]] 2>/dev/null && GIT_EXTRA="${GIT_EXTRA}${YELLOW}~${GIT_MODIFIED}${RST}"
-    LINE1="${LINE1} ${DIM}|${RST} ${WHITE}${GIT_BRANCH}${RST} ${GIT_EXTRA}"
-fi
+GIT_EXTRA=""
+[[ "$GIT_STAGED" -gt 0 ]] 2>/dev/null && GIT_EXTRA="${GREEN}+${GIT_STAGED}${RST}"
+[[ "$GIT_MODIFIED" -gt 0 ]] 2>/dev/null && GIT_EXTRA="${GIT_EXTRA}${YELLOW}~${GIT_MODIFIED}${RST}"
+[[ -n "$GIT_EXTRA" ]] && LINE1="${LINE1} ${GIT_EXTRA}"
 
 if [[ -n "$CRUMB" ]]; then
     LINE1="${LINE1} ${DIM}|${RST} ${CRUMB}"

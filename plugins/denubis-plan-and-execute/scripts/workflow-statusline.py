@@ -2,11 +2,16 @@
 """Claude Code status line renderer.
 
 Two-line display:
-  Line 1: [Model] dir | git branch +staged ~modified | workflow breadcrumb
+  Line 1: [Model] location | skill | context
   Line 2: context bar pct% | $cost | duration
 
-Workflow breadcrumb (when active):
-  feature > phase > step > human action
+Location logic (L1):
+  - Worktree: show worktree dir name
+  - Normal repo: show repo basename
+  - Append @branch if branch differs from displayed name
+
+Skill (L2): active skill name, coloured by category.
+Context (L3): free-text description of where in the process.
 
 Configure in ~/.claude/settings.json:
   "statusLine": {
@@ -35,37 +40,94 @@ BLUE = "\033[34m"
 MAGENTA = "\033[35m"
 WHITE = "\033[37m"
 
-STEP_COLOUR = {
-    "Design": BLUE,
-    "Clarification": CYAN,
-    "Brainstorming": BLUE,
-    "Impl Planning": MAGENTA,
-    "Implementing": GREEN,
-    "Code Review": CYAN,
-    "Finishing": WHITE,
-    "Debugging": YELLOW,
-    "Dep Review": WHITE,
+# Skill colours by category
+SKILL_COLOUR = {
+    # Design skills — blue
+    "brainstorming": BLUE,
+    "asking-clarifying-questions": BLUE,
+    "writing-design-plans": BLUE,
+    "starting-a-design-plan": BLUE,
+    "flesh-it-out": BLUE,
+    # Planning skills — magenta
+    "starting-an-implementation-plan": MAGENTA,
+    "writing-implementation-plans": MAGENTA,
+    # Execution skills — green
+    "executing-impl": GREEN,
+    "executing-an-implementation-plan": GREEN,
+    "code-review": CYAN,
+    "requesting-code-review": CYAN,
+    # Defensive skills — yellow
+    "systematic-debugging": YELLOW,
+    "controlled-dependency-upgrade": YELLOW,
+    "restate-our-assumptions": YELLOW,
+    "proleptic-challenge": YELLOW,
+    # Gates — cyan
+    "human-uat-gate": CYAN,
+    "finishing-a-development-branch": CYAN,
+    "finishing": CYAN,
 }
 
-HUMAN_STYLE = {
-    "approve": f"{DIM}{WHITE}",
-    "review": CYAN,
-    "respond": YELLOW,
-    "think": f"{BOLD}{MAGENTA}",
-    "engage": f"{BOLD}\033[41;37m",
-}
 
-HUMAN_LABEL = {
-    "approve": "Approve",
-    "review": "Review",
-    "respond": "Respond",
-    "think": "Think",
-    "engage": "ENGAGE",
-}
+def git_location(cwd: str) -> str:
+    """Determine smart location string: worktree name, repo@branch, or dir."""
+    try:
+        subprocess.check_output(
+            ["git", "-C", cwd, "rev-parse", "--git-dir"],
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return os.path.basename(cwd)
+
+    # Get branch
+    try:
+        branch = subprocess.check_output(
+            ["git", "-C", cwd, "branch", "--show-current"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        branch = ""
+
+    # Detect worktree: compare toplevel to common dir
+    try:
+        toplevel = subprocess.check_output(
+            ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        common_dir = subprocess.check_output(
+            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        # Resolve to absolute for comparison
+        common_dir = os.path.realpath(common_dir)
+        git_dir_in_toplevel = os.path.join(toplevel, ".git")
+
+        is_worktree = os.path.realpath(common_dir) != os.path.realpath(
+            os.path.join(toplevel, ".git")
+        ) and os.path.isdir(common_dir)
+    except Exception:
+        is_worktree = False
+        toplevel = cwd
+
+    display_name = os.path.basename(toplevel)
+
+    if is_worktree:
+        # In a worktree — show worktree dir name
+        # Append @branch only if branch differs from dir name
+        if branch and branch != display_name:
+            return f"{display_name}@{branch}"
+        return display_name
+    else:
+        # Normal repo — show repo name, append @branch if not main/master
+        if branch and branch not in ("main", "master"):
+            return f"{display_name}@{branch}"
+        return display_name
 
 
-def git_info(cwd: str) -> tuple[str, int, int]:
-    """Get git branch, staged count, modified count. Cached to /tmp."""
+def git_changes(cwd: str) -> tuple[int, int]:
+    """Get staged count and modified count. Cached to /tmp."""
     dir_hash = hashlib.md5(cwd.encode()).hexdigest()
     cache_file = f"/tmp/claude-statusline-git-cache-{dir_hash}"
     cache_max_age = 5
@@ -76,15 +138,6 @@ def git_info(cwd: str) -> tuple[str, int, int]:
 
     if stale:
         try:
-            subprocess.check_output(
-                ["git", "-C", cwd, "rev-parse", "--git-dir"],
-                stderr=subprocess.DEVNULL,
-            )
-            branch = subprocess.check_output(
-                ["git", "-C", cwd, "branch", "--show-current"],
-                text=True,
-                stderr=subprocess.DEVNULL,
-            ).strip()
             staged_out = subprocess.check_output(
                 ["git", "-C", cwd, "diff", "--cached", "--numstat"],
                 text=True,
@@ -98,22 +151,21 @@ def git_info(cwd: str) -> tuple[str, int, int]:
             staged = len(staged_out.split("\n")) if staged_out else 0
             modified = len(modified_out.split("\n")) if modified_out else 0
             with open(cache_file, "w") as f:
-                f.write(f"{branch}|{staged}|{modified}")
+                f.write(f"{staged}|{modified}")
         except Exception:
             with open(cache_file, "w") as f:
-                f.write("||")
+                f.write("0|0")
 
     with open(cache_file) as f:
         parts = f.read().strip().split("|")
 
-    branch = parts[0] if len(parts) > 0 else ""
-    staged = int(parts[1]) if len(parts) > 1 and parts[1] else 0
-    modified = int(parts[2]) if len(parts) > 2 and parts[2] else 0
-    return branch, staged, modified
+    staged = int(parts[0]) if len(parts) > 0 and parts[0] else 0
+    modified = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+    return staged, modified
 
 
 def workflow_crumb(cwd: str) -> str:
-    """Read workflow state and render breadcrumb."""
+    """Read workflow state and render breadcrumb: skill | context."""
     dir_hash = hashlib.md5(cwd.encode()).hexdigest()
     state_file = os.path.expanduser(f"~/.claude/workflow-state/{dir_hash}.json")
 
@@ -124,11 +176,10 @@ def workflow_crumb(cwd: str) -> str:
         state = json.load(f)
 
     feature = state.get("feature", "")
-    phase = state.get("phase", "")
-    step = state.get("step", "")
-    human = state.get("human")
+    skill = state.get("skill", "")
+    context = state.get("context", "")
 
-    if not feature and not phase and not step:
+    if not skill and not context and not feature:
         return ""
 
     sep = f"{DIM} \u276f {RST}"
@@ -136,15 +187,11 @@ def workflow_crumb(cwd: str) -> str:
 
     if feature:
         parts.append(f"{BOLD}{WHITE}{feature}{RST}")
-    if phase:
-        parts.append(f"{WHITE}{phase}{RST}")
-    if step:
-        colour = STEP_COLOUR.get(step, WHITE)
-        parts.append(f"{colour}{step}{RST}")
-    if human and human != "null":
-        style = HUMAN_STYLE.get(human, WHITE)
-        label = HUMAN_LABEL.get(human, human)
-        parts.append(f"{style} {label} {RST}")
+    if skill:
+        colour = SKILL_COLOUR.get(skill, WHITE)
+        parts.append(f"{colour}{skill}{RST}")
+    if context:
+        parts.append(f"{DIM}{context}{RST}")
 
     return sep.join(parts)
 
@@ -166,28 +213,28 @@ def main():
     cost = cost_data.get("total_cost_usd") or 0
     duration_ms = cost_data.get("total_duration_ms") or 0
 
-    # ── Git ───────────────────────────────────────────────────────────
-    branch, staged, modified = git_info(cwd)
+    # ── Location ────────────────────────────────────────────────────────
+    location = git_location(cwd)
+    staged, modified = git_changes(cwd)
 
-    # ── Workflow ──────────────────────────────────────────────────────
+    # ── Workflow ────────────────────────────────────────────────────────
     crumb = workflow_crumb(cwd)
 
-    # ── Line 1: model, dir, git, workflow ─────────────────────────────
-    dir_name = os.path.basename(cwd)
-    line1 = f"{CYAN}[{model}]{RST} {BLUE}{dir_name}{RST}"
+    # ── Line 1: model, location, git changes, workflow ──────────────────
+    line1 = f"{CYAN}[{model}]{RST} {BLUE}{location}{RST}"
 
-    if branch:
-        git_extra = ""
-        if staged > 0:
-            git_extra += f"{GREEN}+{staged}{RST}"
-        if modified > 0:
-            git_extra += f"{YELLOW}~{modified}{RST}"
-        line1 += f" {DIM}|{RST} {WHITE}{branch}{RST} {git_extra}"
+    git_extra = ""
+    if staged > 0:
+        git_extra += f"{GREEN}+{staged}{RST}"
+    if modified > 0:
+        git_extra += f"{YELLOW}~{modified}{RST}"
+    if git_extra:
+        line1 += f" {git_extra}"
 
     if crumb:
         line1 += f" {DIM}|{RST} {crumb}"
 
-    # ── Line 2: context bar, cost, duration ───────────────────────────
+    # ── Line 2: context bar, cost, duration ──────────────────────────────
     if pct >= 90:
         bar_color = RED
     elif pct >= 70:
