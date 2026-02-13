@@ -147,6 +147,9 @@ Use TaskUpdate to mark Phase 1 as in_progress.
 - Are there existing patterns in the codebase I should follow?
 - Any architectural decisions already made?
 
+**GitHub issue (optional):**
+- If this is linked to a GitHub issue, provide the reference (`#123`, `org/repo#123`, or full URL)
+
 Share whatever details you have. We'll clarify anything unclear in the next step."
 
 **Progressive prompting:** If user already provided some of this information, acknowledge what you have and ask only for what's missing.
@@ -290,6 +293,8 @@ Use today's date and the user-chosen slug.
 ```markdown
 # [Feature Name] Design
 
+**GitHub Issue:** [#123 | org/repo#123 | None]
+
 ## Summary
 <!-- TO BE GENERATED after body is written -->
 
@@ -302,6 +307,8 @@ Use today's date and the user-chosen slug.
 ## Glossary
 <!-- TO BE GENERATED after body is written -->
 ```
+
+The `GitHub Issue` field records the linked issue reference from Phase 1. Use `None` if no issue was provided. This field is read by downstream skills to track plan lifecycle labels on the issue.
 
 **Why write immediately:**
 - Captures Definition of Done at peak resolution (right after user confirmation)

@@ -98,6 +98,8 @@ The file is created by starting-a-design-plan Phase 3. This skill appends to tha
 ```markdown
 # [Feature Name] Design
 
+**GitHub Issue:** [#123 | org/repo#123 | None]
+
 ## Summary
 <!-- TO BE GENERATED after body is written -->
 
@@ -517,6 +519,8 @@ The body has been appended and Acceptance Criteria validated:
 ```markdown
 # [Feature Name] Design
 
+**GitHub Issue:** [#123 | org/repo#123 | None]
+
 ## Summary
 <!-- TO BE GENERATED after body is written -->
 
@@ -688,6 +692,46 @@ EOF
 **Announce completion:**
 
 "Design plan documented in `docs/design-plans/YYYY-MM-DD-<topic>.md` and committed."
+
+## After Commit: Label GitHub Issue
+
+If the design document has a `GitHub Issue:` field with a value other than `None`, apply the `design-planned` label to the issue.
+
+**Step 1: Parse the issue reference**
+
+Read the `**GitHub Issue:**` line from the design document. Parse the reference:
+
+| Format | `gh` command |
+|--------|-------------|
+| `#123` or `123` | `gh issue edit 123 --add-label design-planned` |
+| `org/repo#123` | `gh issue edit 123 --repo org/repo --add-label design-planned` |
+| `https://github.com/org/repo/issues/123` | Extract org, repo, number → `gh issue edit 123 --repo org/repo --add-label design-planned` |
+| `None` or empty | Skip — no issue linked |
+
+**Step 2: Ensure label exists, then apply**
+
+```bash
+# Create label if it doesn't exist (--force updates if it does)
+gh label create "design-planned" --description "Design plan exists for this issue" --color "FBCA04" --force 2>/dev/null || true
+
+# Apply label to issue
+gh issue edit <number> [--repo org/repo] --add-label "design-planned"
+```
+
+**Best-effort:** If `gh` is not available, not authenticated, or the command fails (e.g., no write access), warn the user and continue. Do not block the workflow.
+
+Example warning: "Could not apply `design-planned` label to #123 — `gh` returned an error. You may want to label it manually."
+
+**Step 3: Update workflow state**
+
+Store the issue reference in the workflow state for downstream skills:
+
+```bash
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --issue "<raw-issue-reference>"
+```
+
+Where `<raw-issue-reference>` is the value from the `GitHub Issue:` field (e.g., `#123`, `org/repo#123`).
 
 ## Common Rationalizations - STOP
 
