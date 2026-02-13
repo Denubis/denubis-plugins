@@ -139,7 +139,43 @@ Options:
    - Announce: "Created and checked out branch `[branch-name]` from `origin/[main-or-master]`"
 4. **If branch creation fails:** Report error to user and ask if they want to use current branch instead
 
-Mark "Branch setup" task as completed. **THEN proceed to Planning.**
+Mark "Branch setup" task as completed. **THEN proceed to GitHub Issue labelling.**
+
+### Label GitHub Issue
+
+After branch setup, check the design plan for a linked GitHub issue and transition the label.
+
+**Step 1: Extract the `GitHub Issue:` field** from the design plan document (the `**GitHub Issue:**` line near the top of the file).
+
+If the value is `None` or empty, skip this section entirely.
+
+**Step 2: Transition labels**
+
+```bash
+# Ensure labels exist
+gh label create "design-planned" --description "Design plan exists for this issue" --color "FBCA04" --force 2>/dev/null || true
+gh label create "implementation-planned" --description "Implementation plan exists for this issue" --color "0075CA" --force 2>/dev/null || true
+
+# Transition: add implementation-planned, remove design-planned
+gh issue edit <number> [--repo org/repo] --add-label "implementation-planned" --remove-label "design-planned"
+```
+
+Parse the issue reference the same way as writing-design-plans:
+
+| Format | `--repo` flag |
+|--------|--------------|
+| `#123` or `123` | omit (current repo) |
+| `org/repo#123` | `--repo org/repo` |
+| `https://github.com/org/repo/issues/123` | `--repo org/repo` |
+
+**Best-effort:** If `gh` fails, warn and continue. Do not block planning.
+
+**Step 3: Store in workflow state**
+
+```bash
+WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
+[ -x "$WS" ] && "$WS" --issue "<raw-issue-reference>"
+```
 
 ### Check for Implementation Guidance
 

@@ -95,7 +95,7 @@ git merge <feature-branch>
 git branch -d <feature-branch>
 ```
 
-Then: Update project context (Step 5), then cleanup worktree (Step 6)
+Then: Remove issue label (Step 4b), update project context (Step 5), then cleanup worktree (Step 6)
 
 #### Option 2: Push and Create PR
 
@@ -114,7 +114,7 @@ EOF
 )"
 ```
 
-Then: Update project context (Step 5), then cleanup worktree (Step 6)
+Then: Remove issue label (Step 4b), update project context (Step 5), then cleanup worktree (Step 6)
 
 #### Option 3: Keep As-Is
 
@@ -143,6 +143,34 @@ git branch -D <feature-branch>
 ```
 
 Then: Cleanup worktree (Step 6)
+
+### Step 4b: Remove Issue Label
+
+**For Options 1 and 2 only.** After merge or PR creation succeeds, remove the `implementation-planned` label from the linked GitHub issue.
+
+**Step 1: Find the issue reference**
+
+Check the workflow state for the `issue` field:
+
+```bash
+WS_DIR="$HOME/.claude/workflow-state"
+DIR_HASH=$(echo -n "$PWD" | md5sum | cut -d' ' -f1)
+STATE_FILE="$WS_DIR/$DIR_HASH.json"
+```
+
+Read `STATE_FILE` and extract the `issue` value. If empty, check the design plan file (look in `docs/design-plans/` for the `**GitHub Issue:**` field matching the current feature slug).
+
+If no issue reference is found, skip this step.
+
+**Step 2: Remove label**
+
+```bash
+gh issue edit <number> [--repo org/repo] --remove-label "implementation-planned"
+```
+
+Parse the issue reference the same way as other skills (see starting-an-implementation-plan for the format table).
+
+**Best-effort:** If `gh` fails, warn and continue. The work is already merged/PR'd — label cleanup is not critical.
 
 ### Step 5: Update Project Context
 
@@ -213,12 +241,12 @@ Review before considering this work fully complete.
 
 ## Quick Reference
 
-| Option | Merge | Push | Update Context | Keep Worktree | Cleanup Branch | Test Plan Reminder |
-|--------|-------|------|----------------|---------------|----------------|-------------------|
-| 1. Merge locally | ✓ | - | ✓ | - | ✓ | ✓ |
-| 2. Create PR | - | ✓ | ✓ | ✓ | - | ✓ |
-| 3. Keep as-is | - | - | - | ✓ | - | ✓ |
-| 4. Discard | - | - | - | - | ✓ (force) | - |
+| Option | Merge | Push | Remove Issue Label | Update Context | Keep Worktree | Cleanup Branch | Test Plan Reminder |
+|--------|-------|------|--------------------|----------------|---------------|----------------|-------------------|
+| 1. Merge locally | ✓ | - | ✓ | ✓ | - | ✓ | ✓ |
+| 2. Create PR | - | ✓ | ✓ | ✓ | ✓ | - | ✓ |
+| 3. Keep as-is | - | - | - | - | ✓ | - | ✓ |
+| 4. Discard | - | - | - | - | - | ✓ (force) | - |
 
 ## Common Mistakes
 
