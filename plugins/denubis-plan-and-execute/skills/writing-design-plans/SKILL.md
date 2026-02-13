@@ -22,13 +22,13 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry (writing body) | `Design` | `null` |
-| Presenting AC for validation | | `review` |
-| After AC approved (generating summary) | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry (writing body) | `writing-design-plans` | `writing design body` |
+| Presenting AC for validation | | `review: acceptance criteria` |
+| After AC approved (generating summary) | | `generating summary + glossary` |
 | Proleptic challenge | Sub-skill handles | |
-| After commit | | `null` |
+| After commit | | `""` |
 
 ## Level of Detail: Design vs Implementation
 

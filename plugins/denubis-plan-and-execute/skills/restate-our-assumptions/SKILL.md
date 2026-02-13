@@ -20,11 +20,11 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry | `Dep Review` | `null` |
-| Full report presented (waiting for direction) | | `review` |
-| After human directs changes | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry | `restate-our-assumptions` | `auditing dependency rationale` |
+| Full report presented (waiting for direction) | | `review: assumption audit report` |
+| After human directs changes | | `""` |
 
 ## Theoretical Framework
 

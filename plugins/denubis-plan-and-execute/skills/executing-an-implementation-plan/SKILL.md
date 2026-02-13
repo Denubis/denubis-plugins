@@ -25,27 +25,27 @@ Update the breadcrumb status line at phase transitions so the human knows what's
 **On entry** (after discovering phases, extract slug from plan directory name):
 ```bash
 WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --feature "<slug>" --step "Implementing" --human null
+[ -x "$WS" ] && "$WS" --feature "<slug>" --skill "executing-impl" --context ""
 ```
 
 **When reading each phase** (extract phase name from title, e.g. "CRDT Cloning" from "Phase 4: CRDT Cloning"):
 ```bash
 WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --phase "<Phase Name>"
+[ -x "$WS" ] && "$WS" --context "Phase N: <Phase Name>"
 ```
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Executing tasks | `Implementing` | `null` |
-| Code review running | `Code Review` | `null` |
-| Three-strike help needed | `Code Review` | `engage` |
-| Proleptic challenge presented | `Implementing` | `think` |
-| After human evaluates proleptic | `Implementing` | `null` |
-| UAT gate presented | `Implementing` | `engage` |
-| After UAT confirmed | `Implementing` | `null` |
-| Phase refactor running | `Refactoring` | `null` |
-| Final code review | `Code Review` | `null` |
-| Finishing branch | `Finishing` | `approve` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Executing tasks | `executing-impl` | `Phase N: <name> — Task M` |
+| Code review running | `code-review` | `reviewing Phase N` |
+| Three-strike help needed | | `BLOCKED: 3 failures — need direction` |
+| Proleptic challenge presented | `proleptic-challenge` | sub-skill handles |
+| After human evaluates proleptic | `executing-impl` | `Phase N: <name>` |
+| UAT gate presented | `human-uat-gate` | sub-skill handles |
+| After UAT confirmed | `executing-impl` | `Phase N: <name>` |
+| Phase refactor running | `executing-impl` | `refactoring Phase N` |
+| Final code review | `code-review` | `final review` |
+| Finishing branch | `finishing` | sub-skill handles |
 
 ## MANDATORY: Human Transparency
 
@@ -64,6 +64,20 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 **Why this matters:** When you silently process subagent output without showing the user, they lose visibility into their own codebase. They can't catch errors, learn from the process, or intervene when needed. Transparency is not optional.
 
 **Red flag:** If you find yourself thinking "I'll just move on to the next step" without printing the subagent's response, STOP. Print it first.
+
+## No Cut-and-Try
+
+When encountering failures during implementation — build errors, test failures, unexpected behaviour:
+
+**Do not** try random fixes hoping something sticks. Every attempted fix must follow experimental discipline:
+
+1. **Read first:** Understand the error. Read the relevant source, docs, or prior art in the codebase.
+2. **State your prediction:** "I believe X is wrong because Y. If I change Z, I expect to see W."
+3. **State the falsification:** "If I see V instead of W, this hypothesis is wrong and I need to investigate further."
+4. **Make the single change.** Observe the result against your prediction.
+5. **Pause for feedback** if the result contradicts your prediction. Report what you predicted, what happened, and what that means — before attempting another fix.
+
+This applies to you AND to subagents. When dispatching task-implementor or bug-fixer, they inherit this discipline through their own skill references.
 
 ## REQUIRED: Implementation Plan Path
 

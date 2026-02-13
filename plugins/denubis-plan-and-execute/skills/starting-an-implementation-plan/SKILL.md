@@ -22,11 +22,11 @@ All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/p
 
 | Transition | Command args |
 |------------|-------------|
-| Entry (set feature from slug) | `--feature "<slug>" --phase "" --step "Impl Planning" --human null` |
-| Design plan selection (if no path) | `--human "approve"` |
-| Worktree/branch questions | `--human "approve"` |
-| Planning (Claude + sub-skill working) | `--human null` |
-| Execution handoff | `--step "Impl Planning" --human "respond"` |
+| Entry (set feature from slug) | `--feature "<slug>" --skill "starting-an-implementation-plan" --context ""` |
+| Design plan selection (if no path) | `--context "select design plan"` |
+| Worktree/branch questions | `--context "choose branch/worktree"` |
+| Planning (Claude + sub-skill working) | `--context ""` |
+| Execution handoff | `--context "handoff: ready to execute?"` |
 
 ## REQUIRED: Design Plan Path
 

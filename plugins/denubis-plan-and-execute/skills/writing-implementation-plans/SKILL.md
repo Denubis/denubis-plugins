@@ -22,15 +22,15 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry (starting work) | `Impl Planning` | `null` |
-| Review mode selection | | `approve` |
-| Interactive phase approval | | `review` |
-| Design decisions phase approval | | `review` |
-| Blocking implementation question | | `think` |
-| Test requirements approval | | `review` |
-| Between phases (Claude working) | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry (starting work) | `writing-implementation-plans` | `planning phase structure` |
+| Review mode selection | | `choose: interactive or batch?` |
+| Interactive phase approval | | `review: Phase N plan` |
+| Design decisions phase approval | | `review: design decisions for Phase N` |
+| Blocking implementation question | | `question: <decision needed>` |
+| Test requirements approval | | `review: test requirements` |
+| Between phases (Claude working) | | `""` |
 
 ## Critical: Design Plans Provide Direction, Not Code
 

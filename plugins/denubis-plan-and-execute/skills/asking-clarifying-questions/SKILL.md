@@ -20,14 +20,14 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry | `Clarification` | `null` (investigating first) |
-| Contradiction question to user | | `think` |
-| Technical/scope question (AskUserQuestion) | | `approve` |
-| Open-ended assumption question | | `respond` |
-| DoD confirmation (AskUserQuestion) | | `approve` |
-| Between questions (Claude researching) | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry | `asking-clarifying-questions` | `investigating requirements` |
+| Contradiction question to user | | `resolve: <contradiction summary>` |
+| Technical/scope question | | `clarify: <term or boundary>` |
+| Open-ended assumption question | | `verify: <assumption>` |
+| DoD confirmation | | `confirm definition of done` |
+| Between questions (Claude researching) | | `""` |
 
 ## When to Use
 

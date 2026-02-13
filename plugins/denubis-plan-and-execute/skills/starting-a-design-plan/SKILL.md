@@ -18,18 +18,18 @@ Orchestrate the complete design workflow from initial idea to implementation-rea
 
 Update the breadcrumb status line at phase transitions. If the state script is not installed, skip silently.
 
-| Transition | Command |
-|------------|---------|
-| Phase 1 starts | `--step "Design" --human "respond"` |
-| Phase 1 complete (Claude working) | `--human null` |
+All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
+
+| Transition | Command args |
+|------------|-------------|
+| Phase 1 starts | `--skill "starting-a-design-plan" --context "gather: describe goals + constraints"` |
+| Phase 1 complete (Claude working) | `--context ""` |
 | Phase 2 starts | Sub-skill (asking-clarifying-questions) handles state |
-| Phase 3 starts (confirming DoD) | `--step "Design" --human "approve"` |
-| Phase 3: slug chosen, set feature | `--feature "<slug>" --human null` |
+| Phase 3 starts (confirming DoD) | `--skill "starting-a-design-plan" --context "confirm definition of done"` |
+| Phase 3: slug chosen, set feature | `--feature "<slug>" --context ""` |
 | Phase 4 starts | Sub-skill (brainstorming) handles state |
 | Phase 5 starts | Sub-skill (writing-design-plans) handles state |
-| Phase 6 handoff | `--step "Design" --human "respond"` |
-
-All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
+| Phase 6 handoff | `--skill "starting-a-design-plan" --context "handoff: proceed to implementation?"` |
 
 ## Quick Reference
 

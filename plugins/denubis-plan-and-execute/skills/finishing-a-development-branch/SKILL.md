@@ -22,9 +22,9 @@ All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/p
 
 | Transition | Command args |
 |------------|-------------|
-| Entry (presenting options) | `--step "Finishing" --human "approve"` |
-| Discard confirmation | `--human "approve"` |
-| After choice executed | `--human null` |
+| Entry (presenting options) | `--skill "finishing" --context "choose: merge, PR, or discard?"` |
+| Discard confirmation | `--context "confirm discard?"` |
+| After choice executed | `--context ""` |
 | All done | `--clear` |
 
 ## The Process

@@ -28,11 +28,13 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry | `Debugging` | `null` |
-| 3+ failed fixes (escalate to human) | | `engage` |
-| After human provides direction | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry | `systematic-debugging` | `investigating root cause` |
+| Phase 1 complete, hypothesis formed | | `hypothesis: <summary>` |
+| Testing hypothesis | | `testing: <what being tested>` |
+| 3+ failed fixes (escalate to human) | | `BLOCKED: 3 failures — need direction` |
+| After human provides direction | | `""` |
 
 ## When to Use
 
@@ -153,24 +155,34 @@ You MUST complete each phase before proceeding to the next.
 
 ### Phase 3: Hypothesis and Testing
 
-**Scientific method:**
+**No cut-and-try.** Experiments without predictions are just flailing. Every experiment must have a falsifiable prediction stated BEFORE you run it.
 
-1. **Form Single Hypothesis**
-   - State clearly: "I think X is the root cause because Y"
-   - Write it down
+**The protocol:**
+
+1. **Do the Reading First**
+   - Read error messages, docs, source code for the relevant component
+   - Check similar issues in the codebase (git log, grep for past fixes)
+   - Understand the system's intended behaviour before hypothesising about its failure
+   - This is the "lit review" — what does the system claim to do?
+
+2. **Form Single Falsifiable Hypothesis**
+   - State clearly: "I predict that X is the root cause because Y"
+   - State the falsification: "If I do Z, I expect to see W. If I see V instead, this hypothesis is wrong."
+   - Write both down before touching any code
    - Be specific, not vague
 
-2. **Test Minimally**
+3. **Test Minimally**
    - Make the SMALLEST possible change to test hypothesis
    - One variable at a time
    - Don't fix multiple things at once
 
-3. **Verify Before Continuing**
-   - Did it work? Yes → Phase 4
-   - Didn't work? Form NEW hypothesis
-   - DON'T add more fixes on top
+4. **Evaluate Against Prediction**
+   - Did the result match your prediction? Yes → Phase 4
+   - Did it contradict your prediction? Hypothesis falsified — form NEW hypothesis based on what you learned
+   - DON'T add more fixes on top of a falsified hypothesis
+   - **Pause and report:** Tell the human what you predicted, what you observed, and what that means
 
-4. **When You Don't Know**
+5. **When You Don't Know**
    - Say "I don't understand X"
    - Don't pretend to know
    - Ask for help

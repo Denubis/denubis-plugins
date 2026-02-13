@@ -20,13 +20,13 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry (investigating codebase) | `Brainstorming` | `null` |
-| Phase 1 question to user | | `respond` or `approve` |
-| Phase 2 approach selection | | `think` |
-| Phase 3 design section validation | | `review` |
-| Between steps (Claude working) | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry (investigating codebase) | `brainstorming` | `investigating codebase` |
+| Phase 1 question to user | | `asking: <topic of question>` |
+| Phase 2 approach selection | | `choose approach: <options summary>` |
+| Phase 3 design section validation | | `review: <section name>` |
+| Between steps (Claude working) | | `""` |
 
 ## Quick Reference
 

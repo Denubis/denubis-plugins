@@ -16,12 +16,13 @@ Update the breadcrumb at transitions. If the state script is not installed, skip
 
 All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
 
-| Transition | `--step` | `--human` |
-|------------|----------|-----------|
-| Entry | `Dep Review` | `null` |
-| Unjustified package removal approval | | `approve` |
-| Missing changelog — proceed? | | `approve` |
-| Between packages (Claude working) | | `null` |
+| Transition | `--skill` | `--context` |
+|------------|-----------|-------------|
+| Entry | `controlled-dependency-upgrade` | `auditing dependencies` |
+| Upgrading specific package | | `upgrading: <package-name>` |
+| Unjustified package removal approval | | `approve removal: <package>` |
+| Missing changelog — proceed? | | `no changelog for <package> — proceed?` |
+| Between packages (Claude working) | | `""` |
 
 ## When to Use
 
