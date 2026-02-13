@@ -1,5 +1,19 @@
 # Changelog
 
+## denubis-plan-and-execute 2.10.0
+
+Anti-patterns, worktree enforcement, performance fix, and fence fix.
+
+**New:**
+- "I Think This Should Work" anti-pattern in systematic-debugging and executing-an-implementation-plan
+- Worktree requirement precondition in executing-an-implementation-plan
+- Integration section in executing-an-implementation-plan (required workflow skills)
+- cc-search-chats reference in debugging Phase 1 for searching past sessions
+
+**Fixed:**
+- Session-start hook: replaced sed/awk pipeline with bash parameter substitution (no subprocess spawns)
+- Writing-implementation-plans: 4-backtick fence for infrastructure task template with nested code blocks
+
 ## denubis-plan-and-execute 2.9.0
 
 Hard gates and data flow diagrams for the design pipeline.
