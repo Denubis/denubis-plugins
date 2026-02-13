@@ -49,14 +49,12 @@ Update the breadcrumb status line at phase transitions so the human knows what's
 
 **On entry** (after discovering phases, extract slug from plan directory name):
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --feature "<slug>" --skill "executing-impl" --context ""
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --feature "<slug>" --skill "executing-impl" --context ""
 ```
 
 **When reading each phase** (extract phase name from title, e.g. "CRDT Cloning" from "Phase 4: CRDT Cloning"):
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --context "Phase N: <Phase Name>"
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context "Phase N: <Phase Name>"
 ```
 
 | Transition | `--skill` | `--context` |

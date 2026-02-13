@@ -17,14 +17,12 @@ Present acceptance criteria to the human and wait for explicit verification befo
 
 **On entry** (before presenting UAT):
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --skill "human-uat-gate" --context "TEST: verify acceptance criteria"
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "human-uat-gate" --context "TEST: verify acceptance criteria"
 ```
 
 **After human confirms** (UAT passed):
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --context ""
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context ""
 ```
 
 This tells the human they need to leave the terminal and test the implementation themselves.

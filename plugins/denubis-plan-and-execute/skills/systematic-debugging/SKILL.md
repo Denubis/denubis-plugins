@@ -40,7 +40,7 @@ You try a fix. It fails. You try another. It fails. You try a third. Each attemp
 
 Update the breadcrumb at transitions. If the state script is not installed, skip silently.
 
-All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
+All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
 
 | Transition | `--skill` | `--context` |
 |------------|-----------|-------------|

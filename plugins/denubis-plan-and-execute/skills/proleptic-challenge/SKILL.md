@@ -23,14 +23,12 @@ Based on proleptic reasoning from argumentation theory—anticipating objections
 
 **Before presenting counterarguments to human:**
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --skill "proleptic-challenge" --context "evaluate: counterarguments presented"
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "proleptic-challenge" --context "evaluate: counterarguments presented"
 ```
 
 **After human responds** (and you proceed):
 ```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --context ""
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context ""
 ```
 
 ## When to Invoke

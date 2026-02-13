@@ -18,7 +18,7 @@ Orchestrate the complete design workflow from initial idea to implementation-rea
 
 Update the breadcrumb status line at phase transitions. If the state script is not installed, skip silently.
 
-All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh; [ -x "$WS" ] && "$WS"`
+All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
 
 | Transition | Command args |
 |------------|-------------|
