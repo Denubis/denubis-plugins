@@ -33,6 +33,16 @@ A build fails. You change something without reading the error properly. It fails
 - No implementation plan exists yet (use writing-implementation-plans first)
 - Plan needs revision (brainstorm first)
 
+## Precondition: Worktree Required
+
+**NEVER start implementation on the main/master branch.** Before executing any plan, verify you are in a git worktree (or at minimum a feature branch). If you are on main/master:
+
+1. STOP. Do not proceed.
+2. Use `denubis-plan-and-execute:using-git-worktrees` to create an isolated workspace.
+3. Resume execution in the worktree.
+
+**Check:** `git branch --show-current` — if it returns `main` or `master`, you are in the wrong place.
+
 ## Workflow Status Line
 
 Update the breadcrumb status line at phase transitions so the human knows what's happening when they tab back to this session. If the state script is not installed, skip these silently.
@@ -703,6 +713,13 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Transitioning to finishing-a-development-branch]
 ```
 
+## Integration
+
+**Required workflow skills:**
+- **denubis-plan-and-execute:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
+- **denubis-plan-and-execute:writing-implementation-plans** - Creates the plan this skill executes
+- **denubis-plan-and-execute:finishing-a-development-branch** - Complete development after all tasks
+
 ## Common Rationalizations - STOP
 
 | Excuse | Reality |
@@ -713,3 +730,4 @@ You: I'm using the `executing-an-implementation-plan` skill.
 | "Context error on review, I'll skip the review" | No. Chunk the review into halves. Never skip review. |
 | "Minor issues can wait" | No. Fix ALL issues including Minor. |
 | "Code is clean enough, skip refactoring" | No. Green means it works; Refactor means it's maintainable. TDD without Refactor accumulates debt. |
+| "I'll set up the worktree later" | No. Never execute on main/master. Worktree first, always. |
