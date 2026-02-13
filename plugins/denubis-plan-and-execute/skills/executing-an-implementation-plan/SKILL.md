@@ -12,6 +12,21 @@ Execute plan phase-by-phase, loading each phase just-in-time to minimize context
 
 **REQUIRED SKILL:** `requesting-code-review` - The review loop (dispatch, fix, re-review until zero issues)
 
+## Anti-Pattern: "I Think This Should Work"
+
+A build fails. You change something without reading the error properly. It fails again. You change something else. Three attempts later you've introduced new problems on top of the original one. Each attempt started with "I think this should work" but you never investigated *why the previous attempt failed*.
+
+**When something breaks during implementation:**
+1. STOP. Read the error message completely.
+2. Read the relevant source code, docs, or prior art in the codebase.
+3. State your hypothesis: "I believe X is wrong because Y."
+4. State your falsification: "If I change Z, I expect W. If I see V instead, this hypothesis is wrong."
+5. Make the single change. Observe against your prediction.
+
+**If your fix fails:** Do NOT try another fix. Investigate why it failed. The failed fix gave you new information — use it. If you skip investigation and jump to attempt #2, you are cut-and-trying.
+
+**If 3 fixes fail:** STOP and invoke `systematic-debugging`. The problem is deeper than you thought.
+
 ## Overview
 
 **When NOT to use:**

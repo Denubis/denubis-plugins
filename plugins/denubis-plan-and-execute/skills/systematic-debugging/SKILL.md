@@ -22,6 +22,20 @@ NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 
 If you haven't completed Phase 1, you cannot propose fixes.
 
+## Anti-Pattern: "I Think This Should Work"
+
+You try a fix. It fails. You try another. It fails. You try a third. Each attempt starts with "I think this should work" but you never investigated *why the previous attempt failed*. This is cut-and-try — experiments without predictions, without reading, without understanding. It wastes time, introduces new bugs, and digs the hole deeper.
+
+**The pattern:**
+1. Something breaks
+2. "I think X should fix it" → change X → still broken
+3. "OK, maybe Y" → change Y → still broken
+4. "Let me also try Z" → change Z → now broken differently
+
+**What went wrong:** You never stopped to read the error, check the docs, or form a falsifiable hypothesis. Each "fix" was a guess. After the first failure, the correct action is: STOP. Read the error. Read the source. Understand *why* it failed. Then form a hypothesis with a prediction you can test.
+
+**If you catch yourself on attempt #2 without having investigated attempt #1's failure: you are doing this anti-pattern. Return to Phase 1.**
+
 ## Workflow Status Line
 
 Update the breadcrumb at transitions. If the state script is not installed, skip silently.
@@ -85,6 +99,7 @@ You MUST complete each phase before proceeding to the next.
    - Git diff, recent commits
    - New dependencies, config changes
    - Environmental differences
+   - **Search past sessions:** Use `cc-search-chats search "error message or topic"` to find if this issue was encountered and resolved before
 
 4. **Gather Evidence in Multi-Component Systems**
 
