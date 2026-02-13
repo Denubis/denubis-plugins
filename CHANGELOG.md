@@ -1,5 +1,20 @@
 # Changelog
 
+## denubis-plan-and-execute 2.8.0
+
+Redesigned workflow status line breadcrumbs and added experimental discipline.
+
+**Changed:**
+- Status line breadcrumb: `feature ❯ step ❯ human_verb` → `feature ❯ skill_name ❯ context_phrase`
+- Smart location: worktree-aware display with `@branch` when it adds information
+- `workflow-state.sh`: `--step`/`--human` replaced by `--skill`/`--context`
+- Skill colours by category (design=blue, planning=magenta, execution=green, defensive=yellow, gates=cyan)
+- All 14 skill files updated with new `--skill`/`--context` transition tables
+
+**New:**
+- No cut-and-try discipline in systematic-debugging and executing-an-implementation-plan: state falsifiable predictions before experiments, do the reading first, pause for feedback on contradiction
+- Worktree detection in statusline (compares git-common-dir to git-dir)
+
 ## denubis-plan-and-execute 2.7.0
 
 Code quality guards as a PreToolUse hook.
