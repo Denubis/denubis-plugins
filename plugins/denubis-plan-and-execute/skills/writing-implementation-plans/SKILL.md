@@ -715,7 +715,7 @@ is made harder, or what existing capability is being duplicated and why].
 
 ### Infrastructure Task Template
 
-```markdown
+````markdown
 <!-- START_TASK_N -->
 ### Task N: [Infrastructure Component]
 
@@ -742,7 +742,7 @@ git add pyproject.toml src/__init__.py
 git commit -m "chore: initialize project structure"
 ```
 <!-- END_TASK_N -->
-```
+````
 
 ### Functionality Task Template
 
