@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - four-phase framework (root cause investigation, pattern analysis, hypothesis testing, implementation) that ensures understanding before attempting solutions
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - five-phase framework (root cause investigation, pattern analysis, hypothesis testing, full execution path audit, implementation with hardening) that ensures understanding before attempting solutions
 user-invocable: true
 ---
 
@@ -33,6 +33,8 @@ All commands prefixed with: `WS=~/.claude/plugins/marketplaces/denubis-plugins/p
 | Entry | `systematic-debugging` | `investigating root cause` |
 | Phase 1 complete, hypothesis formed | | `hypothesis: <summary>` |
 | Testing hypothesis | | `testing: <what being tested>` |
+| Hypothesis confirmed, auditing path | | `auditing execution path` |
+| Path audit complete, implementing | | `implementing fix` |
 | 3+ failed fixes (escalate to human) | | `BLOCKED: 3 failures — need direction` |
 | After human provides direction | | `""` |
 
@@ -188,6 +190,37 @@ You MUST complete each phase before proceeding to the next.
    - Ask for help
    - Research more
 
+### Phase 3b: FULL EXECUTION PATH AUDIT
+
+**Your hypothesis survived testing. Now PROVE you understand the full picture.**
+
+FULL, COMPREHENSIVE, GRANULAR code audit of the ENTIRE EXECUTION PATH — not just the function where the bug lives, but everything it calls, everything that calls IT, every branch, every edge case, to the boundaries of the project. You are not done until you can account for every line of code the data touches.
+
+**The protocol:**
+
+1. **Trace the call graph OUT from the bug site**
+   - Start at the line where the bug manifests
+   - Read EVERY function it calls. Read EVERY function THOSE call. Follow the chain to the edges — framework boundaries, I/O, external APIs
+   - Then trace BACK: what calls the buggy function? What calls THAT? Trace callers up to the entry point
+
+2. **READ EACH LINE. Not skim. READ.**
+   - For every function in the execution path: read it line by line
+   - Check: does this line do what you think it does?
+   - Check: does your hypothesis account for this line's behaviour?
+   - Check: are there other callers of this function that your fix might break?
+
+3. **Verify ALL intended functionality along the path**
+   - Not just the failing case. EVERY case that traverses this code path
+   - What happens with null? With empty? With maximum? With concurrent access?
+   - Does your hypothesis explain ALL observed behaviour, or just the triggering case?
+
+4. **If the audit reveals your hypothesis is INCOMPLETE**
+   - STOP. Do not implement a partial fix
+   - Return to Phase 3 with the new information
+   - A fix that doesn't account for the full path is a fix that creates new bugs
+
+**Loop until the execution path would satisfy a skeptical reviewer who thinks it's impossible to debug with prompting. That reviewer is your human partner. Don't disappoint them.**
+
 ### Phase 4: Implementation
 
 **Fix the root cause, not the symptom:**
@@ -205,10 +238,11 @@ You MUST complete each phase before proceeding to the next.
    - No "while I'm here" improvements
    - No bundled refactoring
 
-3. **Verify Fix**
+3. **Verify Fix — POST-FIX AUDIT**
    - Test passes now?
    - No other tests broken?
    - Issue actually resolved?
+   - **RE-READ your changes AND the surrounding execution path line by line.** Does the fix handle every case you found in Phase 3b? Did you introduce new assumptions? Would a skeptical reviewer accept this as COMPLETE?
 
 4. **If Fix Doesn't Work**
    - STOP
@@ -232,6 +266,27 @@ You MUST complete each phase before proceeding to the next.
    **Discuss with your human partner before attempting more fixes**
 
    This is NOT a failed hypothesis - this is a wrong architecture.
+
+### Phase 5: Hardening Suggestion
+
+**The bug is fixed. The tests pass. You audited the execution path. Now make the code RESIST bugs of this nature.**
+
+You have full context from the path audit — you know the execution path, the callers, the edge cases. Use that knowledge.
+
+**Suggest ONE small, focused refactor** that would make this class of bug structurally harder to introduce. Present it to the user for approval. Do NOT implement without asking.
+
+Examples:
+- Extract a validation at the boundary that would catch bad data before it propagates
+- Add a type constraint that makes the invalid state unrepresentable
+- Rename a misleading variable that contributed to the confusion
+- Add an assertion that would have caught this immediately
+
+**Rules:**
+- ONE suggestion. Not a wishlist. Not "while we're here"
+- It must be SMALL — a single function, a type change, a guard clause
+- It must be directly motivated by THIS bug and THIS execution path
+- The working tests from Phase 4 are your safety net — use them
+- If the user says no, move on. This is a suggestion, not a mandate
 
 ## Red Flags - STOP and Follow Process
 
@@ -283,7 +338,9 @@ If you catch yourself thinking:
 | **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
 | **2. Pattern** | Find working examples, compare | Identify differences |
 | **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
-| **4. Implementation** | Create test, fix, verify | Bug resolved, tests pass |
+| **3b. Path Audit** | FULL execution path audit, line by line, to project edges | Every line accounted for |
+| **4. Implementation** | Create test, fix, post-fix audit, verify | Bug resolved, tests pass, path clean |
+| **5. Hardening** | Suggest ONE small refactor to resist this bug class | User-approved or declined |
 
 ## When Process Reveals "No Root Cause"
 
