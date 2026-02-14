@@ -78,6 +78,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Reviewing [what was implemented]</parameter>
+<parameter name="max_turns">25</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -169,6 +170,7 @@ After fixes, proceed to Step 3.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Re-reviewing after fixes (cycle N)</parameter>
+<parameter name="max_turns">25</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 

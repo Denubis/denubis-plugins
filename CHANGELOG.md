@@ -1,5 +1,18 @@
 # Changelog
 
+## denubis-plan-and-execute 2.11.1
+
+Fix code-reviewer subagent returning empty output to parent.
+
+**Fixed:**
+- Code-reviewer agent exhausting turns on mandatory skill loading before producing review output
+- Missing `max_turns` on code-reviewer Task invocations (now set to 25)
+
+**Changed:**
+- Skill loading in code-reviewer is now optional (max 1 turn) — key review criteria are inlined in the prompt
+- Added "Output Priority" section: structured review is the primary deliverable, agent must produce it even if investigation is incomplete
+- Added `uvx bandit -r .` security scan to Python project verification commands
+
 ## denubis-plan-and-execute 2.11.0
 
 GitHub issue lifecycle tracking across the plan-and-execute workflow.
