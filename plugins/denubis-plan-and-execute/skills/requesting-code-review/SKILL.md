@@ -93,6 +93,54 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment
 
+## Step 1b: Parallel DBA Review (Conditional)
+
+**If the changes include database schema work** (model definitions, migrations, seed data, foreign key changes), dispatch the DBA reviewer **in parallel with the code reviewer** in Step 1.
+
+**Detection heuristic:** Check if any of these are in the changeset:
+- Files matching `models.py`, `**/models/*.py`, `schema.py`
+- Migration files (`alembic/versions/`, `migrations/`)
+- Files containing `SQLModel`, `Base`, `mapped_column`, `ForeignKey`, `PrimaryKeyConstraint`
+- Seed data or reference table definitions
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:dba-reviewer</parameter>
+<parameter name="description">DBA review: [what schema changes were made]</parameter>
+<parameter name="max_turns">15</parameter>
+<parameter name="prompt">
+Review the database schema changes in this implementation.
+
+WHAT_CHANGED: [summary of schema changes — new tables, modified columns, new relationships]
+FILES_TO_REVIEW: [list model/migration files]
+WORKING_DIRECTORY: [directory]
+
+Read each file and review for:
+1. Normalisation (1NF through BCNF)
+2. Key selection (natural vs surrogate, appropriate for data type)
+3. Constraint completeness (NOT NULL, UNIQUE, CHECK, FK)
+4. Relationship correctness
+5. PostgreSQL anti-patterns
+
+HALT and ask the human if anything is uncertain.
+</parameter>
+</invoke>
+```
+
+**Dispatch both reviewers in parallel** (single message with two Task calls) to minimise wall-clock time.
+
+**Handling DBA review results:**
+
+| DBA Result | Action |
+|-----------|--------|
+| APPROVED | Proceed (combine with code review result) |
+| CHANGES REQUIRED | Treat same as code review issues — dispatch bug-fixer, re-review |
+| HALTED — DECISION NEEDED | **STOP everything.** Present the halt to the human. Do not proceed with code review fixes until the DBA halt is resolved. |
+
+**DBA HALTs take priority over code review issues.** Schema design decisions must be resolved before fixing code-level issues, because schema changes may invalidate code fixes.
+
+**If no database changes detected:** Skip this step entirely. Do not dispatch the DBA reviewer for non-database work.
+
 ## Step 2: Handle Reviewer Response
 
 ### If Zero Issues
@@ -107,6 +155,7 @@ Before proceeding to UAT or next task:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
 <parameter name="description">Proleptic challenge: code review passed</parameter>
+<parameter name="max_turns">15</parameter>
 <parameter name="prompt">
 PROPOSAL:
 Code review passed with zero issues for:
@@ -139,6 +188,7 @@ Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues</parameter>
+<parameter name="max_turns">30</parameter>
 <parameter name="prompt">
   Fix issues from code review.
 
@@ -208,8 +258,22 @@ If reviewer reports operational errors (can't run tests, missing scripts):
 2. Report to human
 3. When told to continue, re-execute same review
 
-### Timeouts / Empty Response
-Usually means context limits. Retry with focused scope:
+### Null / Empty Response (Turn Exhaustion)
+
+**A null or empty response from any subagent means it ran out of turns (max_turns was too low).**
+
+This is NOT a transient error. Do NOT retry with the same max_turns — the agent will exhaust again.
+
+**Action:** HALT and tell the human:
+```
+"[Agent name] returned an empty response — it exhausted its max_turns budget (currently N).
+We need to revise max_turns for this agent. What value should we try?"
+```
+
+**Do not** silently retry, skip the review, or proceed without the review result.
+
+### Context Limit / Timeout
+Usually means the changeset is too large for a single review. Retry with focused scope:
 
 **First retry:** Narrow to changed files only:
 ```
