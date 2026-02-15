@@ -1,6 +1,6 @@
 ---
 name: howto-develop-with-postgres
-description: Use when writing database access code, creating schemas, or managing transactions with PostgreSQL - enforces transaction safety, ACID compliance, type safety, and naming conventions
+description: Use when writing database access code, creating schemas, designing tables, or managing transactions with PostgreSQL - enforces schema design principles, normalisation, key selection, transaction safety, ACID compliance, type safety, and naming conventions
 ---
 
 # PostgreSQL Development Patterns
@@ -10,10 +10,159 @@ description: Use when writing database access code, creating schemas, or managin
 The database is the source of truth. Treat it with respect.
 
 **Core principles:**
+- Schema design comes first — get the structure right before writing access code
+- Normalisation prevents data anomalies; denormalise only with measured evidence
 - Transactions prevent partial updates (data corruption)
 - ACID compliance is non-negotiable
 - Type safety catches errors early
 - Naming conventions ensure consistency
+
+## Schema Design
+
+### Normalisation
+
+Apply normal forms in order. Stop at BCNF unless you have measured evidence that denormalisation improves performance.
+
+| Form | Rule | Violation Example |
+|------|------|-------------------|
+| **1NF** | Every column holds one atomic value | `tags TEXT` storing comma-separated values |
+| **2NF** | Non-key columns depend on the *whole* key | Composite PK `(order_id, product_id)` with `customer_name` depending only on `order_id` |
+| **3NF** | No transitive dependencies | `user` table with `department_id` AND `department_name` |
+| **BCNF** | Every determinant is a candidate key | Rare in practice — 3NF usually sufficient |
+
+**When to denormalise:**
+- After profiling shows a specific query is too slow
+- The denormalised column is derived/cached, not the source of truth
+- Document why and how the cached value stays in sync
+
+**Never denormalise because:**
+- "It's simpler" — normalised schemas are simpler to reason about
+- "Joins are slow" — they aren't, with proper indexes
+- "We might need it later" — premature optimisation
+
+### Key Selection
+
+**Decision rule:**
+
+| Data Type | Key Strategy | Example |
+|-----------|-------------|---------|
+| **Reference data** (permissions, roles, statuses) | Natural string PK | `name TEXT PRIMARY KEY` |
+| **Entity data** (users, orders, resources) | Surrogate ULID/UUID PK | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| **Join tables** | Composite FK PK | `PRIMARY KEY (user_id, role_name)` |
+
+**Reference tables** are constrained vocabularies — small, fixed sets where the name IS the identity:
+
+```python
+# Reference table: natural string PK
+class Permission(SQLModel, table=True):
+    name: str = Field(primary_key=True, max_length=50)  # "owner", "editor", "viewer"
+    level: int
+    description: str = ""
+
+# Self-documenting FK
+class ACLEntry(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    resource_id: UUID = Field(foreign_key="resource.id")
+    user_id: UUID = Field(foreign_key="user.id")
+    permission_name: str = Field(foreign_key="permission.name")  # obvious what this means
+```
+
+**Entity tables** get surrogate keys — see [Primary Keys: ULID](#primary-keys-ulid) below.
+
+**Hard rules:**
+- Never hardcode specific UUID values in source code as constants
+- Never add surrogate UUIDs to reference tables — it's pointless indirection
+- `default_factory=uuid4` (dynamic generation) is NOT the same as hardcoded UUIDs (static values)
+
+### Constraint Strategy
+
+**NOT NULL by default.** Every column should be NOT NULL unless you have a specific reason for allowing NULL. NULL means "unknown" — if the value isn't unknown, it shouldn't be nullable.
+
+```python
+# Good: explicit about nullability
+class User(SQLModel, table=True):
+    email: str = Field(nullable=False)          # Required — always known
+    deleted_at: datetime | None = Field(None)   # Nullable — absence is meaningful
+```
+
+**Use CHECK constraints for domain rules:**
+
+```sql
+-- Length constraints (not varchar(n))
+ALTER TABLE users ADD CONSTRAINT ck_users_email_length CHECK (length(email) <= 254);
+
+-- Value constraints
+ALTER TABLE orders ADD CONSTRAINT ck_orders_positive_total CHECK (total > 0);
+
+-- Enum-like constraints (when a reference table is overkill)
+ALTER TABLE tasks ADD CONSTRAINT ck_tasks_priority CHECK (priority IN ('low', 'medium', 'high'));
+```
+
+**Use UNIQUE constraints for business rules:**
+
+```sql
+-- Single column
+ALTER TABLE users ADD CONSTRAINT uq_users_email UNIQUE (email);
+
+-- Composite (one active subscription per user per plan)
+ALTER TABLE subscriptions ADD CONSTRAINT uq_subscriptions_active
+    UNIQUE (user_id, plan_id) WHERE (cancelled_at IS NULL);
+```
+
+**Use EXCLUDE constraints for range/temporal rules:**
+
+```sql
+-- No overlapping bookings for the same room
+ALTER TABLE bookings ADD CONSTRAINT excl_bookings_no_overlap
+    EXCLUDE USING gist (room_id WITH =, tstzrange(start_at, end_at) WITH &&);
+```
+
+### Relationship Modelling
+
+| Relationship | Implementation | Key Rule |
+|-------------|----------------|----------|
+| **One-to-many** | FK on the "many" side | `orders.user_id → users.id` |
+| **Many-to-many** | Association table with composite PK | `user_roles(user_id, role_name)` |
+| **One-to-one** | FK with UNIQUE constraint | `profile.user_id → users.id` + UNIQUE |
+
+**Association tables for many-to-many:**
+
+```python
+# Pure join table — composite PK, no surrogate key
+class UserRole(SQLModel, table=True):
+    user_id: UUID = Field(foreign_key="user.id", primary_key=True)
+    role_name: str = Field(foreign_key="role.name", primary_key=True)
+    granted_at: datetime = Field(default_factory=datetime.now)
+```
+
+**Association tables with extra data** get their own surrogate PK:
+
+```python
+class Enrollment(SQLModel, table=True):
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    student_id: UUID = Field(foreign_key="student.id")
+    course_id: UUID = Field(foreign_key="course.id")
+    grade: str | None = None
+    enrolled_at: datetime = Field(default_factory=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "course_id", name="uq_enrollment_student_course"),
+    )
+```
+
+### PostgreSQL Type Anti-Patterns
+
+From the [PostgreSQL "Don't Do This" wiki](https://wiki.postgresql.org/wiki/Don't_Do_This):
+
+| Don't Use | Use Instead | Why |
+|-----------|-------------|-----|
+| `char(n)` | `text` with CHECK constraint | Space-padding wastes storage, breaks comparisons |
+| `varchar(n)` with arbitrary limits | `text` or `varchar` (unlimited) | Arbitrary limits cause production errors |
+| `serial` | `IDENTITY` column (PG 10+) | Cleaner schema dependencies |
+| `money` | `numeric` + separate currency column | Assumes single currency, locale-dependent |
+| `timestamp` (without tz) | `timestamptz` | Loses timezone information |
+| `timetz` | `timestamptz` | SQL compliance artifact, not useful |
+| `float`/`double` for money | `numeric(19, 4)` | Rounding errors compound |
 
 ## Transaction Management
 
@@ -140,7 +289,8 @@ class User(Base):
 - Time-sortable for indexing efficiency
 - "Most things can leak in some way"
 
-**Exceptions:**
+**Exceptions — see [Schema Design](#schema-design) above:**
+- Reference tables (natural string PK)
 - Pure join tables (composite PK)
 - Internal-only tables (serial acceptable)
 
@@ -293,6 +443,12 @@ alembic upgrade head
 | "I'll add indexes later" | Slow queries from day one | Index FKs proactively |
 | "This won't be user-visible" | Requirements change, IDs leak | ULID by default |
 | "JSONB doesn't need schema" | Runtime errors | Validate structure |
+| "Reference tables need UUIDs too" | Name IS the identity | Natural string PK |
+| "Hardcoded UUIDs are fine for seeds" | Opaque, fragile, two sources of truth | Natural keys or name-based lookup |
+| "Joins are slow" | Not with proper indexes | Normalise first, measure later |
+| "NULL means empty string" | NULL means unknown | NOT NULL + default, or meaningful NULL |
+| "varchar(255) is safe enough" | Arbitrary limits cause production errors | `text` with CHECK constraint |
+| "char(n) for fixed-width codes" | Space-padding breaks comparisons | `text` with `CHECK(length(x)=n)` |
 
 ## Red Flags
 
@@ -306,7 +462,13 @@ alembic upgrade head
 - UUID stored as string
 - Float for monetary values
 
-**Schema:**
+**Schema design:**
+- Surrogate UUID on a reference table (should be natural string PK)
+- Hardcoded UUID values in Python source code
+- Column storing comma-separated values (1NF violation)
+- Transitive dependency (column depends on non-key column, 3NF violation)
+- NULL-able column without clear semantic reason
+- `char(n)`, `serial`, `money`, or `timestamp without time zone`
 - Missing indexes on foreign keys
 - No timestamps
 - camelCase in database identifiers
@@ -317,8 +479,13 @@ alembic upgrade head
 |---------|------------|
 | Table names | `snake_case`, plural |
 | Column names | `snake_case` |
-| Primary keys | ULID as UUID |
+| Entity PKs | ULID as UUID |
+| Reference PKs | Natural string (`name TEXT PRIMARY KEY`) |
+| Join table PKs | Composite FK (`PRIMARY KEY (a_id, b_id)`) |
 | Money | `Numeric(19, 4)` |
-| Timestamps | `TIMESTAMP WITH TIME ZONE` |
+| Timestamps | `TIMESTAMP WITH TIME ZONE` (`timestamptz`) |
+| Text | `text` (not `char(n)` or `varchar(n)`) |
+| Nullability | NOT NULL by default |
+| Constraints | `ck_table_description`, `uq_table_columns`, `excl_table_description` |
 | Indexes | `idx_table_columns` |
 | Foreign keys | `fk_table_reftable` |
