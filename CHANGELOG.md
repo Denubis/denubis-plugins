@@ -1,5 +1,17 @@
 # Changelog
 
+## denubis-plan-and-execute 2.13.0
+
+First-class database documentation as a living project document.
+
+**New:**
+- `docs/database.md` convention — universe of discourse, Mermaid ERDs, data flow diagrams, data dictionary with business definitions, design decisions with rationale, denormalisation register
+- `writing-design-plans` creates or updates `docs/database.md` when designs involve schema work
+- `dba-reviewer` validates `docs/database.md` exists and is current during reviews; gains Edit/Write tools to update it
+
+**Changed:**
+- Missing or stale `docs/database.md` is now a HALT condition in DBA review
+
 ## denubis-plan-and-execute 2.12.0
 
 Database schema design review and subagent turn budget management.
