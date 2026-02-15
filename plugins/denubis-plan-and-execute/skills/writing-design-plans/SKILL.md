@@ -630,6 +630,50 @@ Maintained by design plans (when adding deps) and controlled-dependency-upgrade 
 
 **If updating an existing dependency's rationale** (e.g., a redesign changes why we use a package), update the existing entry rather than appending a duplicate. Add a `**Revised:** YYYY-MM-DD` line and update the claim/evidence.
 
+## Before Commit: Database Documentation
+
+**If this design includes database schema work** (new tables, modified tables, new relationships, new reference data), create or update `docs/database.md`.
+
+**This is a first-class project document, not a design plan appendix.** Someone should be able to open `docs/database.md` and understand the entire database without reading code or design plans.
+
+**Detection:** Check if the Architecture or Implementation Phases sections mention any of: tables, models, schema, migrations, entities, foreign keys, relationships, SQLModel, SQLAlchemy.
+
+### If `docs/database.md` doesn't exist yet
+
+Create it with the full template from the `howto-develop-with-postgres` skill's "Database Documentation" section. Populate:
+
+1. **Universe of Discourse** — what this database models, domain boundaries, core entities with business definitions, key business rules. This comes directly from the brainstorming session.
+2. **Entity-Relationship Model** — Mermaid erDiagram for all tables in this design.
+3. **Data Flow Diagrams** — Mermaid flowchart showing how data moves between system components, external actors, and data stores. Show the flows that this design introduces or modifies.
+4. **Data Dictionary** — every table this design introduces, with columns, types, constraints, and business definitions.
+5. **Design Decisions** — key schema decisions from this brainstorming session, with rationale and rejected alternatives.
+6. **Denormalisation Register** — empty if no denormalisation, otherwise document the justification.
+
+### If `docs/database.md` already exists
+
+Update the affected sections:
+
+1. **Universe of Discourse** — add new entities, update domain boundaries if scope changed, add new business rules.
+2. **ERD** — add new entities and relationships to the existing Mermaid diagram.
+3. **DFDs** — add or update data flows for new features. Add new DFDs for new subsystems.
+4. **Data Dictionary** — add new tables, update existing tables if columns changed.
+5. **Design Decisions** — append new decisions from this design session.
+6. **Denormalisation Register** — update if denormalisation was added or removed.
+
+**Do NOT remove existing content** unless it's been superseded by this design. Append, don't replace.
+
+### Commit with design plan
+
+Include `docs/database.md` in the same commit as the design plan:
+
+```bash
+git add docs/design-plans/YYYY-MM-DD-<topic>.md docs/database.md docs/dependency-rationale.md
+```
+
+### If no database work
+
+Skip this section entirely. Not every design needs database documentation.
+
 ## Before Commit: Proleptic Challenge
 
 **REQUIRED:** Before committing the design, invoke proleptic challenge.
