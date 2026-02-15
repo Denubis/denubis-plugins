@@ -78,7 +78,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Reviewing [what was implemented]</parameter>
-<parameter name="max_turns">25</parameter>
+<parameter name="max_turns">60</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -220,7 +220,7 @@ After fixes, proceed to Step 3.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Re-reviewing after fixes (cycle N)</parameter>
-<parameter name="max_turns">25</parameter>
+<parameter name="max_turns">60</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -257,6 +257,19 @@ If reviewer reports operational errors (can't run tests, missing scripts):
 1. **STOP** - do not continue
 2. Report to human
 3. When told to continue, re-execute same review
+
+### Turn Budgets
+
+**The `max_turns` values in the invocation templates above are calibrated minimums. Use them exactly as written. Do NOT reduce them.**
+
+| Agent | max_turns | Used for |
+|-------|-----------|----------|
+| code-reviewer | 60 | Initial review and re-reviews |
+| dba-reviewer | 15 | Parallel database review |
+| proleptic-challenger | 15 | Post-review challenge |
+| task-bug-fixer | 30 | Fixing review issues |
+
+**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set based on observed usage. Do not "optimise" by lowering them.
 
 ### Null / Empty Response (Turn Exhaustion)
 

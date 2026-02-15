@@ -88,6 +88,22 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 **Red flag:** If you find yourself thinking "I'll just move on to the next step" without printing the subagent's response, STOP. Print it first.
 
+## Turn Budgets
+
+**The `max_turns` values in the invocation templates below are calibrated minimums. Use them exactly as written. Do NOT reduce them.**
+
+| Agent | max_turns | Used for |
+|-------|-----------|----------|
+| task-implementor | 45 | Implementing tasks/subcomponents |
+| task-bug-fixer | 30 | Fixing review issues |
+| code-reviewer | 60 | Phase code review (via requesting-code-review skill) |
+| proleptic-challenger | 15 | Phase transition challenge |
+| code-simplifier | 20 | Post-phase refactoring |
+| project-claude-librarian | 15 | Updating project context |
+| test-analyst | 20 | Test coverage analysis |
+
+**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set based on observed usage. Do not "optimise" by lowering them.
+
 ## Null / Empty Subagent Response (Turn Exhaustion)
 
 **A null or empty response from any subagent (task-implementor, bug-fixer, code-simplifier, etc.) means it ran out of turns.**
