@@ -473,6 +473,128 @@ alembic upgrade head
 - No timestamps
 - camelCase in database identifiers
 
+## Database Documentation (`docs/database.md`)
+
+Every project with a database MUST have a `docs/database.md` — a first-class living document that is THE reference for understanding the database. Not buried in design plan subdirectories. Not scattered across model files. One document you can open and understand the entire database from.
+
+### Required Sections
+
+```markdown
+# Database Documentation
+
+## Universe of Discourse
+
+### What This Database Models
+[What the system represents. Domain boundaries. What's in scope, what's out.]
+
+### Core Entities
+[Business definitions — what is a "User"? What is an "Order"? Not column lists —
+business meaning. What does each entity represent in the real world?]
+
+### Key Business Rules
+[Domain constraints the schema enforces. "A user can have at most one active
+subscription per plan." "Orders cannot be modified after confirmation."]
+
+## Entity-Relationship Model
+
+` ` `mermaid
+erDiagram
+    USER ||--o{ ORDER : places
+    ORDER ||--|{ ORDER_LINE : contains
+    PRODUCT ||--o{ ORDER_LINE : "included in"
+
+    USER {
+        uuid id PK "ULID"
+        text email UK "RFC 5322"
+        timestamptz created_at
+    }
+` ` `
+
+## Data Flow Diagrams
+
+` ` `mermaid
+flowchart LR
+    User -->|submits| API
+    API -->|validates| AuthService
+    AuthService -->|checks| sessions[(sessions)]
+    API -->|writes| orders[(orders)]
+    API -->|publishes| EventBus
+    EventBus -->|notifies| EmailService
+` ` `
+
+[Show how data moves through the system. External actors, processes, data stores,
+data flows. Multiple DFDs for different subsystems if needed.]
+
+## Data Dictionary
+
+### users
+**Purpose:** Registered accounts that can authenticate and own resources.
+**Type:** Entity
+
+| Column | Type | Nullable | Constraints | Business Definition |
+|--------|------|----------|-------------|---------------------|
+| id | UUID | NO | PK (ULID) | Unique user identity |
+| email | text | NO | UNIQUE | Primary login identifier. RFC 5322 compliant. |
+| created_at | timestamptz | NO | DEFAULT now() | Account creation time |
+| deleted_at | timestamptz | YES | | Soft deletion. NULL = active. |
+
+**Relationships:**
+- Referenced by: `orders.user_id`, `workspace_members.user_id`
+
+### permissions
+**Purpose:** Constrained vocabulary of permission levels.
+**Type:** Reference
+
+| Column | Type | Nullable | Constraints | Business Definition |
+|--------|------|----------|-------------|---------------------|
+| name | text | NO | PK | Permission identity: "owner", "editor", "viewer" |
+| level | integer | NO | | Numeric ordering for comparison |
+
+[Continue for every table...]
+
+## Design Decisions
+
+### [Decision: Natural String PKs for Reference Tables]
+**Date:** YYYY-MM-DD
+**Design plan:** docs/design-plans/YYYY-MM-DD-feature.md
+**Decision:** Reference tables use natural string PKs, entity tables use ULID/UUID.
+**Rationale:** Reference data's name IS its identity. Surrogate keys add pointless
+indirection and produce opaque FKs.
+**Alternatives rejected:** UUID PKs with name-based lookups (extra SELECT per
+operation), hardcoded UUID constants (fragile, two sources of truth).
+
+[One entry per significant schema decision. Linked to design plan that made it.]
+
+## Denormalisation Register
+
+| Table.Column | Justification | Measured Evidence | Sync Strategy |
+|-------------|---------------|-------------------|---------------|
+| (none currently) | | | |
+
+[If any denormalisation exists, document the measured query performance that
+justified it and how the cached/derived value stays in sync with the source.]
+```
+
+### Lifecycle
+
+| Event | Action on `docs/database.md` |
+|-------|------------------------------|
+| First design plan with DB work | Create `docs/database.md` with initial sections |
+| Subsequent design plans with DB work | Update affected sections (new entities, new decisions) |
+| DBA review during code review | Validate document is current; update if stale |
+| Schema migration | Update data dictionary and ERD to match |
+
+### What Goes Where
+
+| Content | Location | Why |
+|---------|----------|-----|
+| "What does this entity mean?" | `docs/database.md` | First-class, findable |
+| "Why did we choose this key strategy?" | `docs/database.md` Design Decisions | Accumulated rationale |
+| "What schema changes does this feature need?" | Design plan | Per-feature context |
+| Column types, constraints, FKs | `docs/database.md` Data Dictionary | Single source of truth |
+| Denormalisation justifications | `docs/database.md` Denormalisation Register | Auditable |
+| Data flows between components | `docs/database.md` DFDs | System-level view |
+
 ## Quick Reference
 
 | Element | Convention |
