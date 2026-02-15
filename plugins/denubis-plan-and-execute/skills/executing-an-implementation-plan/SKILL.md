@@ -88,6 +88,20 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 **Red flag:** If you find yourself thinking "I'll just move on to the next step" without printing the subagent's response, STOP. Print it first.
 
+## Null / Empty Subagent Response (Turn Exhaustion)
+
+**A null or empty response from any subagent (task-implementor, bug-fixer, code-simplifier, etc.) means it ran out of turns.**
+
+This is NOT a transient error and retrying with the same budget will produce the same result.
+
+**Action:** HALT and tell the human:
+```
+"[Agent name] returned an empty response — it exhausted its max_turns budget (currently N).
+We need to revise max_turns for this agent before continuing."
+```
+
+Do not silently retry, skip the task, or proceed without the result.
+
 ## No Cut-and-Try
 
 When encountering failures during implementation — build errors, test failures, unexpected behaviour:
@@ -225,6 +239,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Task Y: [description]</parameter>
+<parameter name="max_turns">45</parameter>
 <parameter name="prompt">
   Implement Task N from the phase file.
 
@@ -254,6 +269,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Subcomponent A (Tasks 3-5): [description]</parameter>
+<parameter name="max_turns">45</parameter>
 <parameter name="prompt">
   Implement Subcomponent A (Tasks 3, 4, 5) from the phase file.
 
@@ -330,6 +346,7 @@ The phase changed too much for a single review. Chunk the review:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues for Phase X</parameter>
+<parameter name="max_turns">30</parameter>
 <parameter name="prompt">
   Fix issues from code review for Phase X.
 
@@ -380,6 +397,7 @@ Mark "Phase Nc: Code review" as complete.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
 <parameter name="description">Proleptic challenge: Phase N complete</parameter>
+<parameter name="max_turns">15</parameter>
 <parameter name="prompt">
 PROPOSAL:
 Phase [N]: [Phase Name] is complete.
@@ -455,6 +473,7 @@ The phase is Green — tests pass, UAT confirmed. Now clean up before building t
 <invoke name="Task">
 <parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
 <parameter name="description">Phase [N] refactor</parameter>
+<parameter name="max_turns">20</parameter>
 <parameter name="prompt">
 Simplify code changed in this phase. Files: [list]. Working directory: [dir].
 Preserve all functionality. Find the test command in CLAUDE.md and run after changes.
@@ -484,6 +503,7 @@ After all phases complete, invoke the `denubis-extending-claude:project-claude-l
 <invoke name="Task">
 <parameter name="subagent_type">denubis-extending-claude:project-claude-librarian</parameter>
 <parameter name="description">Updating project context after implementation</parameter>
+<parameter name="max_turns">15</parameter>
 <parameter name="prompt">
   Review what changed during this implementation and update CLAUDE.md files if contracts or structure changed.
 
@@ -544,6 +564,7 @@ Dispatch the test-analyst agent:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:test-analyst</parameter>
 <parameter name="description">Analyzing test coverage and generating test plan</parameter>
+<parameter name="max_turns">20</parameter>
 <parameter name="prompt">
 Analyze test implementation against acceptance criteria.
 
@@ -567,6 +588,7 @@ Return coverage validation result. If PASS, include the human test plan.
    <invoke name="Task">
    <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
    <parameter name="description">Adding missing test coverage</parameter>
+   <parameter name="max_turns">30</parameter>
    <parameter name="prompt">
    Add missing tests identified by the test analyst.
 
