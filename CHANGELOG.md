@@ -1,5 +1,19 @@
 # Changelog
 
+## denubis-plan-and-execute 2.12.0
+
+Database schema design review and subagent turn budget management.
+
+**New:**
+- `dba-reviewer` agent — opus-model schema reviewer that halts for human decisions on normalisation, key selection, constraint completeness, and PostgreSQL anti-patterns
+- Parallel DBA review in `requesting-code-review` — fires alongside code-reviewer when database changes are detected; DBA HALTs take priority
+- Schema Design section in `howto-develop-with-postgres` — normalisation forms (1NF-BCNF), natural vs surrogate key decision rules, constraint strategy, relationship modelling, PG type anti-patterns
+- Null/empty response detection — halts and tells the human when a subagent exhausts its turn budget
+
+**Changed:**
+- All subagent invocations now have explicit `max_turns`: task-implementor (45), bug-fixer (30), code-reviewer (25), test-analyst (20), code-simplifier (20), proleptic-challenger (15), project-claude-librarian (15), dba-reviewer (15)
+- "Flaky tests" treated as halt condition — the DBA agent investigates root causes rather than accepting "flaky" as an explanation
+
 ## denubis-plan-and-execute 2.11.1
 
 Fix code-reviewer subagent returning empty output to parent.
