@@ -6,8 +6,10 @@ Prevents Claude from accidentally creating issues, PRs, or other actions on
 upstream repositories when working in a forked codebase.
 
 Policy: DENY any gh command that explicitly or implicitly targets a repo
-other than the allowed fork. The allowed repo is read from the ALLOWED_GH_REPO
-environment variable, falling back to Denubis/denubis-plugins.
+other than the allowed one. The allowed repo is determined by:
+1. ALLOWED_GH_REPO environment variable (if set), otherwise
+2. git remote get-url origin (parsed to owner/repo form)
+If neither is available, the hook does nothing.
 
 Detection covers:
 - --repo / -R flags with a non-fork owner/repo
@@ -17,11 +19,35 @@ Detection covers:
 import json
 import os
 import re
-
+import subprocess
 import sys
 
-ALLOWED_REPO = os.environ.get("ALLOWED_GH_REPO", "Denubis/denubis-plugins")
-ALLOWED_OWNER = ALLOWED_REPO.split("/")[0].lower()
+
+def get_allowed_repo() -> str | None:
+    """Get the allowed repo from env var or git remote origin."""
+    env_repo = os.environ.get("ALLOWED_GH_REPO")
+    if env_repo:
+        return env_repo
+
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            url = re.sub(r"\.git$", "", url)
+            url = re.sub(r"^https?://github\.com/", "", url)
+            url = re.sub(r"^git@github\.com:", "", url)
+            if "/" in url:
+                return url
+    except Exception:
+        pass
+
+    return None
+
+
+ALLOWED_REPO = get_allowed_repo()
 
 # gh subcommands that interact with a specific repo
 REPO_SUBCOMMANDS = {
@@ -119,6 +145,10 @@ def main():
 
     tool_name = input_data.get("tool_name", "")
     if tool_name != "Bash":
+        sys.exit(0)
+
+    if ALLOWED_REPO is None:
+        # No env var and not in a git repo with a remote — nothing to protect.
         sys.exit(0)
 
     tool_input = input_data.get("tool_input", {})
