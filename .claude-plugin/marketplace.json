@@ -121,6 +121,22 @@
                 "git",
                 "commit"
             ]
+        },
+        {
+            "name": "denubis-hook-gh-fork-guard",
+            "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork.",
+            "version": "1.0.0",
+            "source": "./plugins/denubis-hook-gh-fork-guard",
+            "author": {
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
+            },
+            "license": "CC-BY-SA-4.0",
+            "keywords": [
+                "hooks",
+                "github",
+                "safety"
+            ]
         }
     ]
 }

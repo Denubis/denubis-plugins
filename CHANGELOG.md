@@ -1,5 +1,16 @@
 # Changelog
 
+## denubis-hook-gh-fork-guard 1.0.0
+
+PreToolUse hook that prevents Claude from interacting with any GitHub repo other than the user's fork.
+
+**New:**
+- Hard DENY on `gh` commands with `--repo`/`-R` targeting non-fork repos
+- Hard DENY on `gh api` paths referencing non-fork repos
+- Hard DENY on `gh repo` subcommands with explicit non-fork targets
+- Advisory context injection on repo-interacting commands without explicit `--repo`
+- Configurable via `ALLOWED_GH_REPO` environment variable (defaults to `Denubis/denubis-plugins`)
+
 ## denubis-plan-and-execute 2.13.0
 
 First-class database documentation as a living project document.
