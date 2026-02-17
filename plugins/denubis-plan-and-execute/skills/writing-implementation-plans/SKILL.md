@@ -309,7 +309,7 @@ This phase implements and tests:
 
 **AC Coverage rules:**
 - Copy AC text literally from the design plan—do not paraphrase
-- Use the full scoped AC identifier (e.g., `oauth2-svc-authn.AC1.1`), not bare `AC1.1`
+- Use the full scoped AC identifier (e.g., `oauth2-svc-authn-42.AC1.1`), not bare `AC1.1`
 - Include ONLY the ACs this phase implements and tests
 - Include both the criterion heading (`{slug}.AC1`) and the specific cases (`{slug}.AC1.1`, `{slug}.AC1.3`)
 - Tasks in this phase must produce tests that verify these specific cases
@@ -418,33 +418,33 @@ Before creating the Finalization task, check if `.denubis/implementation-plan-gu
       → blocked by: all Phase *D tasks
 ```
 
-**Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth.md`:**
+**Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth-99.md`:**
 
 ```
-TaskCreate: "Phase 1A: Read Token Types from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 1A: Read Token Types from /home/user/project/docs/design-plans/2025-01-24-oauth-99.md"
 TaskCreate: "Phase 1B: Investigate codebase for Phase 1 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [1A]
 TaskCreate: "Phase 1C: Research external deps (Phase 1)"
   → TaskUpdate: addBlockedBy: [1B]
-TaskCreate: "Phase 1D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_01.md"
+TaskCreate: "Phase 1D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth-99/phase_01.md"
   → TaskUpdate: addBlockedBy: [1C]
 
-TaskCreate: "Phase 2A: Read Token Service from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 2A: Read Token Service from /home/user/project/docs/design-plans/2025-01-24-oauth-99.md"
   → TaskUpdate: addBlockedBy: [1D]
 TaskCreate: "Phase 2B: Investigate codebase for Phase 2 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [2A]
 TaskCreate: "Phase 2C: Research external deps (Phase 2)"
   → TaskUpdate: addBlockedBy: [2B]
-TaskCreate: "Phase 2D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_02.md"
+TaskCreate: "Phase 2D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth-99/phase_02.md"
   → TaskUpdate: addBlockedBy: [2C]
 
-TaskCreate: "Phase 3A: Read Session Manager from /home/user/project/docs/design-plans/2025-01-24-oauth.md"
+TaskCreate: "Phase 3A: Read Session Manager from /home/user/project/docs/design-plans/2025-01-24-oauth-99.md"
   → TaskUpdate: addBlockedBy: [2D]
 TaskCreate: "Phase 3B: Investigate codebase for Phase 3 and activate relevant skills"
   → TaskUpdate: addBlockedBy: [3A]
 TaskCreate: "Phase 3C: Research external deps (Phase 3)"
   → TaskUpdate: addBlockedBy: [3B]
-TaskCreate: "Phase 3D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth/phase_03.md"
+TaskCreate: "Phase 3D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth-99/phase_03.md"
   → TaskUpdate: addBlockedBy: [3C]
 
 TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"

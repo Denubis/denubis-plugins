@@ -264,6 +264,7 @@ The slug becomes part of all acceptance criteria identifiers (e.g., `my-feature.
 - Lowercase with hyphens (no spaces, underscores, or special characters)
 - **Terse but unambiguous** — prefer short forms that don't create confusion (e.g., `authn` not `authentication`, but not `auth` since that's ambiguous with `authz`)
 - Recognizable months later
+- **If a GitHub issue is linked:** append the issue number at the end (e.g., `oauth2-svc-authn-42`, not `42-oauth2-svc-authn`)
 
 **Use AskUserQuestion:**
 
@@ -273,8 +274,8 @@ Question: "What should we call this design plan? The name becomes the prefix for
 If you have a ticketing system, you can use the ticket name (e.g., PROJ-1234)."
 
 Options:
-  - "[auto-generated-slug-1]" (e.g., "oauth2-svc-authn")
-  - "[auto-generated-slug-2]" (e.g., "svc-authn")
+  - "[auto-generated-slug-1]" (e.g., "oauth2-svc-authn-42")
+  - "[auto-generated-slug-2]" (e.g., "svc-authn-42")
   - "[auto-generated-slug-3]" (if meaningfully different)
 ```
 

@@ -79,7 +79,7 @@ Mark "Branch setup" task as in_progress.
 
 Before planning, set up the branch and workspace for implementation work.
 
-Extract the **slug** from the design plan filename (everything after `YYYY-MM-DD-`, excluding `.md`). For example, `oauth2-svc-authn` from `2025-01-18-oauth2-svc-authn.md`.
+Extract the **slug** from the design plan filename (everything after `YYYY-MM-DD-`, excluding `.md`). For example, `oauth2-svc-authn-42` from `2025-01-18-oauth2-svc-authn-42.md`.
 
 This slug is used for:
 1. Implementation plan directory name (`docs/implementation-plans/YYYY-MM-DD-{slug}/`)
@@ -111,8 +111,8 @@ Options:
    ```
    Question: "Which branch should I use for this worktree?"
    Options:
-     - "[friendly-name]" (e.g., oauth2-svc-authn)
-     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn)
+     - "[friendly-name]" (e.g., oauth2-svc-authn-42)
+     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn-42)
    ```
 5. Create worktree:
    - Default location (unless directed otherwise): `$repoRoot/.worktrees/[friendly-name]`
@@ -128,8 +128,8 @@ Options:
    Question: "Which branch should I use for this implementation?"
    Options:
      - "Use current branch" (stay on current branch, no branch creation)
-     - "[friendly-name]" (e.g., oauth2-svc-authn)
-     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn)
+     - "[friendly-name]" (e.g., oauth2-svc-authn-42)
+     - "$(whoami)/[friendly-name]" (e.g., ed/oauth2-svc-authn-42)
    ```
 2. **If "Use current branch":** Continue with current branch (no git commands)
 3. **If branch name provided:**
@@ -308,7 +308,7 @@ Ready to execute? This requires fresh context to work effectively.
 
 (1) Copy this command now:
 
-/denubis-plan-and-execute:execute-implementation-plan /Users/ed/project/.worktrees/oauth2-feature/docs/implementation-plans/2025-01-17-oauth2-feature/ /Users/ed/project/.worktrees/oauth2-feature/
+/denubis-plan-and-execute:execute-implementation-plan /Users/ed/project/.worktrees/oauth2-feature-42/docs/implementation-plans/2025-01-17-oauth2-feature-42/ /Users/ed/project/.worktrees/oauth2-feature-42/
 
 (2) Clear your context:
 

@@ -637,8 +637,8 @@ The response will include the human test plan. Extract the "Human Test Plan" sec
 mkdir -p docs/test-plans
 
 # The filename uses the implementation plan directory name
-# e.g., impl plan dir: docs/implementation-plans/2025-01-24-oauth/
-#       test plan:     docs/test-plans/2025-01-24-oauth.md
+# e.g., impl plan dir: docs/implementation-plans/2025-01-24-oauth-99/
+#       test plan:     docs/test-plans/2025-01-24-oauth-99.md
 ```
 
 Write the test plan content to `docs/test-plans/[impl-plan-dir-name].md`, then commit:
