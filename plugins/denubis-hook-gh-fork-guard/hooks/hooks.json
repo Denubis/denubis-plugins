@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/gh-fork-guard.py\"",
+            "command": "uv run python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/gh-fork-guard.py\"",
             "timeout": 5,
             "suppressOutput": true
           }
