@@ -1,0 +1,13 @@
+{
+    "name": "denubis-hook-pretooluse-dispatcher",
+    "description": "Single PreToolUse:Bash dispatcher that runs hooks from ~/.claude/hooks/pretooluse-bash.d/ sequentially and merges outputs.",
+    "version": "1.0.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "homepage": "https://github.com/denubis/denubis-plugins",
+    "repository": "https://github.com/denubis/denubis-plugins",
+    "license": "CC-BY-SA-4.0",
+    "keywords": ["hooks", "dispatcher", "infrastructure"]
+}
