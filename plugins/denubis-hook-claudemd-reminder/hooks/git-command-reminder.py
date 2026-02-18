@@ -23,7 +23,8 @@ command = tool_input.get("command", "")
 
 # Match git status or git log (but not quick one-liners like git log --oneline -3)
 # We want to trigger on substantive git status/log commands
-if re.match(r"^git\s+(status|log(?!\s+--oneline\s+-\d+$))", command):
+# Also match rtk-rewritten commands (rtk git status, rtk git log)
+if re.match(r"^(rtk\s+)?git\s+(status|log(?!\s+--oneline\s+-\d+$))", command):
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
