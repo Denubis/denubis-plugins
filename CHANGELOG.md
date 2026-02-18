@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.14.0
+
+Architecture documentation maintenance system.
+
+**New:**
+- `update-architecture-docs` inner skill for detecting contradictions and proposing architecture doc changes
+- `maintain-architecture` wrapper skill and `/maintain-architecture` command for standalone maintenance sessions
+- Architecture doc templates (DFD context, DFD process, database, personae, glossary, constraints, state)
+- `docs/architecture/` directory convention with hierarchical DFD numbering
+
+**Changed:**
+- `writing-design-plans` now invokes `update-architecture-docs` after proleptic challenge
+- `dba-reviewer` and `howto-develop-with-postgres` reference `docs/architecture/database.md` instead of `docs/database.md`
+- Removed "Before Commit: Database Documentation" section from `writing-design-plans` (superseded by architecture docs step)
+
 ## denubis-hook-gh-fork-guard 1.0.0
 
 PreToolUse hook that prevents Claude from interacting with any GitHub repo other than the user's fork.
