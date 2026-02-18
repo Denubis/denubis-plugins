@@ -268,12 +268,26 @@ Reading code and making claims about what it does are two different cognitive ac
 
    **Every claim gets tested.** No exceptions. No "this one is obvious." Obvious claims are the ones most likely to be wrong because you didn't bother checking.
 
-5. **Record results.** For each claim:
-   - **Confirmed:** Data matches, experiment passed. State what you observed.
-   - **Falsified:** Claim is wrong. State what you found instead. Return to Phase 3 with corrected understanding.
-   - **Indeterminate:** Couldn't conclusively test. Downgrade qualifier to "Possibly" and flag for the user.
+5. **Interrogate the experiment (Quine-Duhem).** A falsification experiment never tests a claim in isolation. It tests the claim AND every auxiliary hypothesis the experiment depends on: your test setup, your input data, your measurement method, your environment. When results contradict your prediction, the claim might be wrong — or the experiment might be. (Quine-Duhem problem; cf. Ben Recht, "Devezer's Urn".)
 
-6. **Find the epistemic boundary.** After all claims are tested, explicitly state:
+   **Before concluding from ANY experiment result, ask:**
+   - **Did I test what I think I tested?** Am I running the actual code from the codebase, or a copy I transcribed into a REPL? Did I import the right module? Am I testing the right code path?
+   - **Is my test input what the system actually receives?** Did I verify the real input, or am I guessing what it looks like?
+   - **Is my measurement correct?** Am I checking the right output? Could there be a stdout/stderr confusion, a format difference, or a timing issue?
+
+   **Corroborate.** No claim is settled by one experiment from one method. If you tested in a REPL, also verify in situ. If you read a config file, also check what the runtime actually loaded. Two independent paths to the same conclusion.
+
+   **When results surprise you:** Your first move is to question the experiment, not the hypothesis. Identify the weakest auxiliary (the assumption you're least certain about) and test IT before updating your beliefs about the claim.
+
+   **When you can't resolve ambiguity:** If experiment and corroboration disagree, or you've tested auxiliaries and still can't determine which is wrong — STOP. Present both results to the human with your analysis of what might explain the disagreement. This is a mandatory human checkpoint: genuine Quine-Duhem ambiguity requires human judgment, not more autonomous guessing.
+
+6. **Record results.** For each claim:
+   - **Confirmed:** Data matches, experiment corroborated via second method. State what you observed and how you corroborated.
+   - **Falsified:** Claim is wrong AND you verified the experiment itself was sound. State what you found instead. Return to Phase 3 with corrected understanding.
+   - **Indeterminate:** Couldn't conclusively test, or experiment and corroboration disagree. Downgrade qualifier to "Possibly" and flag for the user.
+   - **Auxiliary failure:** Experiment was unsound — the test itself was wrong. Discard result, fix the test, re-run. Do NOT count this as evidence for or against the claim.
+
+7. **Find the epistemic boundary.** After all claims are tested, explicitly state:
    - What you know with high confidence (confirmed claims)
    - What you believe but haven't fully verified (indeterminate claims)
    - What you initially believed but found to be wrong (falsified claims)
@@ -299,6 +313,24 @@ Reading code and making claims about what it does are two different cognitive ac
 - **Moderate confidence:** [claim 4 — couldn't test X]
 - **Corrected:** [claim 2 — initially thought X, actually Y]
 ```
+
+**Delegating experiments to subagents:** Subagents don't have this skill loaded. When delegating a falsification experiment, you MUST include the interrogation protocol in the prompt:
+
+```
+Run this experiment: [describe experiment]
+I predict: [expected result]
+
+AFTER getting results, BEFORE reporting back:
+1. Verify you tested the actual production code, not a transcription or mock
+2. Verify your test input matches what the system really receives (check, don't assume)
+3. Verify your measurement — right output stream, right format, right assertion
+4. Corroborate via one different method (if you grepped, also run the code; if you ran a test, also read the source)
+5. If experiment and corroboration disagree, report BOTH — do not pick one
+
+Report: what you observed, how you corroborated, and any auxiliary assumption you're uncertain about.
+```
+
+**The main agent must still verify subagent reports.** Subagent says "confirmed"? Spot-check the corroboration. Subagent says "falsified"? Verify the experiment was sound before updating your beliefs. Delegation does not transfer epistemic responsibility.
 
 **If ANY claim is falsified:** STOP. Do not proceed to Phase 4. Your analysis contains at least one error. Return to Phase 3 with the corrected understanding and re-derive your analysis.
 
