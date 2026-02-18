@@ -167,7 +167,7 @@ Before asking for approval, output the complete proposal:
 [Continue for each affected doc type...]
 ```
 
-Then ask for approval:
+Then ask for approval using AskUserQuestion:
 
 ```
 Question: "Review proposed architecture documentation changes:"
