@@ -46,37 +46,33 @@ Verify the Python script exists and is executable (`chmod +x` if needed).
 
 ### 5. Configure PreToolUse:Bash dispatcher
 
-The dispatcher plugin runs all PreToolUse:Bash hooks sequentially from a drop directory, solving Claude Code's parallel hook execution conflict.
+The dispatcher plugin auto-discovers plugin hooks and runs hooks from a drop directory, solving Claude Code's parallel hook execution conflict.
 
-**5a. Create the drop directory:**
+**5a. Verify the dispatcher plugin is enabled:**
+
+The `denubis-hook-pretooluse-dispatcher` plugin registers itself via its own `hooks.json`. Verify it's enabled in settings.json. If not, enable it.
+
+**5b. Verify plugin convention files:**
+
+Plugin hooks are auto-discovered. The dispatcher finds any enabled plugin with an executable `hooks/pretooluse-bash.sh`. Check that the fork-guard plugin has this file and it's executable (`chmod +x` if needed).
+
+**5c. Create the drop directory for non-plugin hooks:**
 ```bash
 mkdir -p ~/.claude/hooks/pretooluse-bash.d
 ```
 
-**5b. Set up the fork-guard hook:**
-
-Find the fork-guard wrapper script. It will be at one of:
-- `<marketplace-path>/plugins/denubis-hook-gh-fork-guard/hooks/gh-fork-guard-wrapper.sh`
-
-Create a symlink:
-```bash
-ln -sf <path-to-wrapper>/gh-fork-guard-wrapper.sh ~/.claude/hooks/pretooluse-bash.d/10-fork-guard
-```
-
-Verify the wrapper and Python script are both executable (`chmod +x` if needed).
-
-**5c. Set up RTK (if installed):**
+**5d. Set up RTK (if installed):**
 
 Check if `rtk` is installed by running `rtk --version` via Bash. If not found, warn:
 
 > RTK is not installed. RTK (Rust Token Killer) reduces token usage by 60-90% on dev tool output. Install from https://github.com/rtk-ai/rtk
 
-If installed, verify `~/.claude/hooks/rtk-rewrite.sh` exists, then symlink it:
+If installed, verify `~/.claude/hooks/rtk-rewrite.sh` exists, then symlink it into the drop directory:
 ```bash
 ln -sf ~/.claude/hooks/rtk-rewrite.sh ~/.claude/hooks/pretooluse-bash.d/50-rtk-rewrite
 ```
 
-**5d. Remove standalone PreToolUse:Bash hooks from settings.json:**
+**5e. Remove standalone PreToolUse:Bash hooks from settings.json:**
 
 Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash`. The dispatcher replaces these — they must be removed or they will conflict. Specifically look for:
 - `rtk-rewrite.sh` registered directly in settings.json hooks
@@ -84,9 +80,12 @@ Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash`. 
 
 Remove them from settings.json (the dispatcher calls them via the drop directory instead).
 
-**5e. Verify the dispatcher is registered:**
+**5f. Verify with diagnostics:**
 
-The `denubis-hook-pretooluse-dispatcher` plugin registers itself via its own `hooks.json`. Verify the plugin is enabled in settings.json. If not, enable it.
+Run the dispatcher's `--list` flag to verify all hooks are discovered correctly:
+```bash
+<dispatcher-path>/pretooluse-bash-dispatcher.sh --list
+```
 
 ### 6. Verify cc-search-chats (if present)
 

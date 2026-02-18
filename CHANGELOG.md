@@ -1,5 +1,31 @@
 # Changelog
 
+## [denubis-hook-pretooluse-dispatcher] 1.1.0
+
+**New:**
+- Auto-discovery of plugin hooks via `hooks/pretooluse-bash.sh` convention file
+- Plugins declare priority with `# dispatcher-priority: N` comment (default 50)
+- Cache with hash-based invalidation (marketplace changes, settings changes, drop dir changes)
+- `--list` diagnostics flag showing discovered hooks, sources, and cache state
+- Environment variable overrides for all paths (testability)
+
+**Changed:**
+- Drop directory kept for non-plugin hooks (e.g., rtk-rewrite.sh); plugin hooks no longer need symlinks
+
+## [denubis-hook-gh-fork-guard] 1.2.0
+
+**Changed:**
+- Replaced `gh-fork-guard-wrapper.sh` with `pretooluse-bash.sh` convention file for auto-discovery
+- No manual symlink required — dispatcher discovers it from the marketplace
+
+## [denubis-plan-and-execute] 2.15.1
+
+**Changed:**
+- Phase 3c now includes Quine-Duhem awareness: falsification experiments must interrogate their own auxiliary hypotheses before concluding, and require corroboration via a different method
+- Added mandatory human checkpoint when experiment and corroboration disagree
+- Added subagent delegation protocol for falsification experiments
+- Credit: Ben Recht, ["Devezer's Urn"](https://www.argmin.net/p/devezers-urn) for the Quine-Duhem framing
+
 ## [denubis-hook-pretooluse-dispatcher] 1.0.0
 
 Single PreToolUse:Bash dispatcher solving Claude Code's parallel hook execution conflict.
