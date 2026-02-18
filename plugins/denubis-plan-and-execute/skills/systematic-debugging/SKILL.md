@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - five-phase framework (root cause investigation, pattern analysis, hypothesis testing, full execution path audit, implementation with hardening) that ensures understanding before attempting solutions
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - six-phase framework (root cause investigation, pattern analysis, hypothesis testing, full execution path audit, Toulmin claim verification with falsification, implementation with hardening) that ensures understanding before attempting solutions
 user-invocable: true
 ---
 
@@ -236,6 +236,76 @@ FULL, COMPREHENSIVE, GRANULAR code audit of the ENTIRE EXECUTION PATH — not ju
 
 **Loop until the execution path would satisfy a skeptical reviewer who thinks it's impossible to debug with prompting. That reviewer is your human partner. Don't disappoint them.**
 
+### Phase 3c: CLAIM VERIFICATION (Toulmin Analysis)
+
+**You've read the code. You've formed your analysis. Now PROVE every sentence of it.**
+
+Reading code and making claims about what it does are two different cognitive acts. Phase 3b ensures you read the code. Phase 3c ensures the claims you derive from that reading are individually verified, not confabulated.
+
+**The failure mode this prevents:** You read 200 lines of code. You write a bug report with 8 factual claims. 6 are correct. 2 are subtly wrong — you misread a condition, assumed a default, or conflated two similar-looking code paths. Those 2 wrong claims lead to a wrong fix. Your human partner catches it and rightly loses confidence.
+
+**The protocol:**
+
+1. **Write your analysis BEFORE this step** — whatever you would have reported to the user about the root cause, write it out in full.
+
+2. **Decompose into atomic claims.** Go through your analysis sentence by sentence. Every factual assertion is a claim. Extract each one. Be ruthless — "the function returns early when X" is a claim. "The config defaults to Y" is a claim. "Z is called before W" is a claim. If a sentence contains two facts, that's two claims.
+
+3. **For each claim, complete the Toulmin structure:**
+
+   | Field | What it is | Example |
+   |-------|-----------|---------|
+   | **Claim** | The assertion | "Session token expires because middleware calls `invalidateToken()` on line 147" |
+   | **Data** | Specific evidence you can point to | "Line 147 of `auth_middleware.py` reads `token_store.invalidate(request.token)`" |
+   | **Warrant** | Why the data supports the claim | "The `invalidate` method marks the token as expired in the store, per its docstring on line 23 of `token_store.py`" |
+   | **Qualifier** | Confidence level | "Certainly" / "Probably" / "Possibly — haven't verified X" |
+   | **Rebuttal** | What would make this claim false | "If `invalidate()` is a no-op in test mode, or if a different code path re-validates before this runs" |
+
+4. **For each claim: design and run a falsification experiment.** The experiment must be the fastest possible test that could disprove the claim. Priorities:
+   - Grep/read to verify the specific line says what you claim it says
+   - Run a targeted test with a diagnostic assertion
+   - Add a temporary log line and trigger the code path
+   - Check configuration/environment values
+
+   **Every claim gets tested.** No exceptions. No "this one is obvious." Obvious claims are the ones most likely to be wrong because you didn't bother checking.
+
+5. **Record results.** For each claim:
+   - **Confirmed:** Data matches, experiment passed. State what you observed.
+   - **Falsified:** Claim is wrong. State what you found instead. Return to Phase 3 with corrected understanding.
+   - **Indeterminate:** Couldn't conclusively test. Downgrade qualifier to "Possibly" and flag for the user.
+
+6. **Find the epistemic boundary.** After all claims are tested, explicitly state:
+   - What you know with high confidence (confirmed claims)
+   - What you believe but haven't fully verified (indeterminate claims)
+   - What you initially believed but found to be wrong (falsified claims)
+
+   **Present this boundary to the user.** "I'm confident about X and Y. I believe but haven't fully verified Z. I initially thought W but found it's actually V."
+
+**Output format when reporting to the user:**
+
+```
+## Root Cause Analysis
+
+[Your narrative analysis here]
+
+### Claim Verification
+
+| # | Claim | Evidence | Falsification | Result |
+|---|-------|----------|---------------|--------|
+| 1 | [claim] | [file:line] | [experiment] | Confirmed/Falsified/Indeterminate |
+| 2 | ... | ... | ... | ... |
+
+### Epistemic Boundary
+- **High confidence:** [claims 1, 3, 5]
+- **Moderate confidence:** [claim 4 — couldn't test X]
+- **Corrected:** [claim 2 — initially thought X, actually Y]
+```
+
+**If ANY claim is falsified:** STOP. Do not proceed to Phase 4. Your analysis contains at least one error. Return to Phase 3 with the corrected understanding and re-derive your analysis.
+
+**If claims are indeterminate:** Flag them prominently for the user. They may accept the risk or ask for deeper investigation.
+
+**Why every sentence matters:** A bug report that's 75% correct is worse than no report at all — it gives false confidence. The wrong 25% poisons the fix. You must know exactly which parts of your analysis are proven and which are assumptions.
+
 ### Phase 4: Implementation
 
 **Fix the root cause, not the symptom:**
@@ -317,6 +387,9 @@ If you catch yourself thinking:
 - Proposing solutions before tracing data flow
 - **"One more fix attempt" (when already tried 2+)**
 - **Each fix reveals new problem in different place**
+- **"This claim is obvious, I don't need to verify it"** — obvious claims are the ones most likely to be wrong
+- **"I read the code, so my analysis is correct"** — reading and correctly interpreting are different acts
+- **Writing a bug report without running falsification experiments on each claim**
 
 **ALL of these mean: STOP. Return to Phase 1.**
 
@@ -345,6 +418,8 @@ If you catch yourself thinking:
 | "Reference too long, I'll adapt the pattern" | Partial understanding guarantees bugs. Read it completely. |
 | "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause. |
 | "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem. Question pattern, don't fix again. |
+| "I read the code, my analysis is correct" | Reading ≠ correctly interpreting. Verify each claim independently. |
+| "This claim doesn't need verification" | The claim you skip verifying is the one that's wrong. Every claim. |
 
 ## Quick Reference
 
@@ -354,6 +429,7 @@ If you catch yourself thinking:
 | **2. Pattern** | Find working examples, compare | Identify differences |
 | **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
 | **3b. Path Audit** | FULL execution path audit, line by line, to project edges | Every line accounted for |
+| **3c. Claim Verification** | Toulmin analysis of every claim, falsification experiments | Every claim confirmed or flagged |
 | **4. Implementation** | Create test, fix, post-fix audit, verify | Bug resolved, tests pass, path clean |
 | **5. Hardening** | Suggest ONE small refactor to resist this bug class | User-approved or declined |
 
