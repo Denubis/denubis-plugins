@@ -44,17 +44,49 @@ Where `<marketplace-path>` is the **absolute path** to the denubis-plugins marke
 
 Verify the Python script exists and is executable (`chmod +x` if needed).
 
-### 5. Verify RTK (token minimisation)
+### 5. Configure PreToolUse:Bash dispatcher
 
-Check if `rtk` is installed by running `rtk --version` via Bash. If it's not found, warn the user:
+The dispatcher plugin runs all PreToolUse:Bash hooks sequentially from a drop directory, solving Claude Code's parallel hook execution conflict.
+
+**5a. Create the drop directory:**
+```bash
+mkdir -p ~/.claude/hooks/pretooluse-bash.d
+```
+
+**5b. Set up the fork-guard hook:**
+
+Find the fork-guard wrapper script. It will be at one of:
+- `<marketplace-path>/plugins/denubis-hook-gh-fork-guard/hooks/gh-fork-guard-wrapper.sh`
+
+Create a symlink:
+```bash
+ln -sf <path-to-wrapper>/gh-fork-guard-wrapper.sh ~/.claude/hooks/pretooluse-bash.d/10-fork-guard
+```
+
+Verify the wrapper and Python script are both executable (`chmod +x` if needed).
+
+**5c. Set up RTK (if installed):**
+
+Check if `rtk` is installed by running `rtk --version` via Bash. If not found, warn:
 
 > RTK is not installed. RTK (Rust Token Killer) reduces token usage by 60-90% on dev tool output. Install from https://github.com/rtk-ai/rtk
 
-If `rtk` is installed, verify the rewrite hook exists at `~/.claude/hooks/rtk-rewrite.sh`. If the hook file is missing, warn the user:
+If installed, verify `~/.claude/hooks/rtk-rewrite.sh` exists, then symlink it:
+```bash
+ln -sf ~/.claude/hooks/rtk-rewrite.sh ~/.claude/hooks/pretooluse-bash.d/50-rtk-rewrite
+```
 
-> RTK is installed but the auto-rewrite hook is missing at `~/.claude/hooks/rtk-rewrite.sh`. Without this hook, commands won't be automatically rewritten to use RTK.
+**5d. Remove standalone PreToolUse:Bash hooks from settings.json:**
 
-Then check `~/.claude/settings.json` has a PreToolUse hook entry for the rtk-rewrite script. Look for a hook with command matching `rtk-rewrite.sh`. If missing, warn the user that the hook needs to be registered.
+Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash`. The dispatcher replaces these — they must be removed or they will conflict. Specifically look for:
+- `rtk-rewrite.sh` registered directly in settings.json hooks
+- Any other PreToolUse:Bash entries
+
+Remove them from settings.json (the dispatcher calls them via the drop directory instead).
+
+**5e. Verify the dispatcher is registered:**
+
+The `denubis-hook-pretooluse-dispatcher` plugin registers itself via its own `hooks.json`. Verify the plugin is enabled in settings.json. If not, enable it.
 
 ### 6. Verify cc-search-chats (if present)
 

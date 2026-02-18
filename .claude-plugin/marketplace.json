@@ -11,7 +11,7 @@
         {
             "name": "denubis-00-getting-started",
             "description": "Getting started guide and onboarding for denubis-plugins",
-            "version": "1.2.0",
+            "version": "1.3.0",
             "source": "./plugins/denubis-00-getting-started",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -22,7 +22,7 @@
         {
             "name": "denubis-plan-and-execute",
             "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-            "version": "2.14.1",
+            "version": "2.15.0",
             "source": "./plugins/denubis-plan-and-execute",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -124,8 +124,8 @@
         },
         {
             "name": "denubis-hook-gh-fork-guard",
-            "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork.",
-            "version": "1.0.1",
+            "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork. Called via the pretooluse-bash dispatcher.",
+            "version": "1.1.0",
             "source": "./plugins/denubis-hook-gh-fork-guard",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -136,6 +136,22 @@
                 "hooks",
                 "github",
                 "safety"
+            ]
+        },
+        {
+            "name": "denubis-hook-pretooluse-dispatcher",
+            "description": "Single PreToolUse:Bash dispatcher that runs hooks from ~/.claude/hooks/pretooluse-bash.d/ sequentially and merges outputs.",
+            "version": "1.0.0",
+            "source": "./plugins/denubis-hook-pretooluse-dispatcher",
+            "author": {
+                "name": "Brian Ballsun-Stanton",
+                "github": "denubis"
+            },
+            "license": "CC-BY-SA-4.0",
+            "keywords": [
+                "hooks",
+                "dispatcher",
+                "infrastructure"
             ]
         }
     ]

@@ -1,5 +1,30 @@
 # Changelog
 
+## [denubis-hook-pretooluse-dispatcher] 1.0.0
+
+Single PreToolUse:Bash dispatcher solving Claude Code's parallel hook execution conflict.
+
+**New:**
+- Drop directory `~/.claude/hooks/pretooluse-bash.d/` for numbered hook scripts
+- Sequential execution with deterministic merge: deny > updatedInput > additionalContext
+- README documenting the drop directory convention and merge rules
+
+## [denubis-plan-and-execute] 2.15.0
+
+**New:**
+- Phase 3c (Toulmin Claim Verification) in systematic-debugging skill — every factual claim in a bug analysis must be individually verified via falsification experiments before proceeding to implementation
+
+## [denubis-hook-gh-fork-guard] 1.1.0
+
+**Changed:**
+- Removed self-registration as PreToolUse:Bash hook — now called via the pretooluse-bash dispatcher
+- Added wrapper shell script for dispatcher integration
+
+## [denubis-00-getting-started] 1.3.0
+
+**Changed:**
+- Setup now configures the PreToolUse:Bash dispatcher, drop directory, and symlinks instead of registering standalone hooks
+
 ## [denubis-00-getting-started] 1.2.0
 
 **New:**
