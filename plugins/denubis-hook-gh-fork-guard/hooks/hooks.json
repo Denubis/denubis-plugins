@@ -1,17 +1,3 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/gh-fork-guard.py\"",
-            "timeout": 5,
-            "suppressOutput": true
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }
