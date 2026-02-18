@@ -44,11 +44,23 @@ Where `<marketplace-path>` is the **absolute path** to the denubis-plugins marke
 
 Verify the Python script exists and is executable (`chmod +x` if needed).
 
-### 5. Verify cc-search-chats (if present)
+### 5. Verify RTK (token minimisation)
+
+Check if `rtk` is installed by running `rtk --version` via Bash. If it's not found, warn the user:
+
+> RTK is not installed. RTK (Rust Token Killer) reduces token usage by 60-90% on dev tool output. Install from https://github.com/rtk-ai/rtk
+
+If `rtk` is installed, verify the rewrite hook exists at `~/.claude/hooks/rtk-rewrite.sh`. If the hook file is missing, warn the user:
+
+> RTK is installed but the auto-rewrite hook is missing at `~/.claude/hooks/rtk-rewrite.sh`. Without this hook, commands won't be automatically rewritten to use RTK.
+
+Then check `~/.claude/settings.json` has a PreToolUse hook entry for the rtk-rewrite script. Look for a hook with command matching `rtk-rewrite.sh`. If missing, warn the user that the hook needs to be registered.
+
+### 6. Verify cc-search-chats (if present)
 
 If `~/.claude/plugins/marketplaces/cc-search-chats-marketplace/` exists, check that `cc-search-chats@cc-search-chats-marketplace` is enabled in settings.json.
 
-### 6. Report
+### 7. Report
 
 Summarize what was verified and what was changed. Include:
 - Plugin enablement status
