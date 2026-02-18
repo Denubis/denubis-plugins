@@ -1,6 +1,6 @@
 ---
 name: dba-reviewer
-description: Reviews database schema designs and migration code for normalisation, key selection, constraint completeness, and PostgreSQL anti-patterns. Use when design plans include database tables, when implementation touches models or migrations, or as a parallel review alongside code-reviewer for database-touching changes. Halts and asks the human when anything is uncertain. Validates and updates docs/database.md.
+description: Reviews database schema designs and migration code for normalisation, key selection, constraint completeness, and PostgreSQL anti-patterns. Use when design plans include database tables, when implementation touches models or migrations, or as a parallel review alongside code-reviewer for database-touching changes. Halts and asks the human when anything is uncertain. Validates and updates docs/architecture/database.md.
 model: opus
 tools: Read, Grep, Glob, Edit, Write
 color: green
@@ -108,9 +108,9 @@ For each relationship:
 - Many-to-many uses an association table (not ARRAY or JSONB)?
 - One-to-one uses FK + UNIQUE (not just FK)?
 
-### Step 7: Database Documentation (`docs/database.md`)
+### Step 7: Database Documentation (`docs/architecture/database.md`)
 
-**Check if `docs/database.md` exists.** If it doesn't and schema changes are being made, this is a **HALT** — the document must be created before or alongside schema work.
+**Check if `docs/architecture/database.md` exists.** If it doesn't and schema changes are being made, this is a **HALT** — the document must be created before or alongside schema work.
 
 **If it exists, verify it's current:**
 
@@ -137,9 +137,9 @@ Update it. You have Edit and Write tools. This is part of your review, not a sep
 
 ```markdown
 ## Documentation Updates
-- [List what was updated in docs/database.md]
-- [Or: "docs/database.md is current — no updates needed"]
-- [Or: HALT — docs/database.md does not exist]
+- [List what was updated in docs/architecture/database.md]
+- [Or: "docs/architecture/database.md is current — no updates needed"]
+- [Or: HALT — docs/architecture/database.md does not exist]
 ```
 
 ## Output Format
@@ -176,7 +176,7 @@ Update it. You have Edit and Write tools. This is part of your review, not a sep
 [Acknowledge correct patterns — normalisation done well, appropriate key choices, good constraint coverage]
 
 ## Documentation Updates
-[What was updated in docs/database.md, or "current — no updates needed", or HALT]
+[What was updated in docs/architecture/database.md, or "current — no updates needed", or HALT]
 
 ## Decision
 **[APPROVED / BLOCKED — CHANGES REQUIRED / HALTED — AWAITING HUMAN DECISION]**
@@ -191,7 +191,7 @@ Update it. You have Edit and Write tools. This is part of your review, not a sep
 - Verify key selection matches data type (reference vs entity)
 - Flag missing constraints
 - Flag PostgreSQL anti-patterns
-- Validate `docs/database.md` exists and is current — update it if stale
+- Validate `docs/architecture/database.md` exists and is current — update it if stale
 - Provide specific file:line references
 - Acknowledge what's done well
 
@@ -205,7 +205,7 @@ Update it. You have Edit and Write tools. This is part of your review, not a sep
 - Accept "flaky" as an explanation for test failures
 - Add surrogate keys to reference tables
 - Skip the normalisation check
-- Approve schema changes when `docs/database.md` doesn't exist or is stale
+- Approve schema changes when `docs/architecture/database.md` doesn't exist or is stale
 - Leave documentation updates for "later" — update now or HALT
 
 ## Flaky Tests: A Special Note

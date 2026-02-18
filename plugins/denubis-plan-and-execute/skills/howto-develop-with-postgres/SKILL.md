@@ -473,9 +473,9 @@ alembic upgrade head
 - No timestamps
 - camelCase in database identifiers
 
-## Database Documentation (`docs/database.md`)
+## Database Documentation (`docs/architecture/database.md`)
 
-Every project with a database MUST have a `docs/database.md` — a first-class living document that is THE reference for understanding the database. Not buried in design plan subdirectories. Not scattered across model files. One document you can open and understand the entire database from.
+Every project with a database MUST have a `docs/architecture/database.md` — a first-class living document that is THE reference for understanding the database. Not buried in design plan subdirectories. Not scattered across model files. One document you can open and understand the entire database from.
 
 ### Required Sections
 
@@ -577,9 +577,9 @@ justified it and how the cached/derived value stays in sync with the source.]
 
 ### Lifecycle
 
-| Event | Action on `docs/database.md` |
+| Event | Action on `docs/architecture/database.md` |
 |-------|------------------------------|
-| First design plan with DB work | Create `docs/database.md` with initial sections |
+| First design plan with DB work | Create `docs/architecture/database.md` with initial sections |
 | Subsequent design plans with DB work | Update affected sections (new entities, new decisions) |
 | DBA review during code review | Validate document is current; update if stale |
 | Schema migration | Update data dictionary and ERD to match |
@@ -588,12 +588,12 @@ justified it and how the cached/derived value stays in sync with the source.]
 
 | Content | Location | Why |
 |---------|----------|-----|
-| "What does this entity mean?" | `docs/database.md` | First-class, findable |
-| "Why did we choose this key strategy?" | `docs/database.md` Design Decisions | Accumulated rationale |
+| "What does this entity mean?" | `docs/architecture/database.md` | First-class, findable |
+| "Why did we choose this key strategy?" | `docs/architecture/database.md` Design Decisions | Accumulated rationale |
 | "What schema changes does this feature need?" | Design plan | Per-feature context |
-| Column types, constraints, FKs | `docs/database.md` Data Dictionary | Single source of truth |
-| Denormalisation justifications | `docs/database.md` Denormalisation Register | Auditable |
-| Data flows between components | `docs/database.md` DFDs | System-level view |
+| Column types, constraints, FKs | `docs/architecture/database.md` Data Dictionary | Single source of truth |
+| Denormalisation justifications | `docs/architecture/database.md` Denormalisation Register | Auditable |
+| Data flows between components | `docs/architecture/database.md` DFDs | System-level view |
 
 ## Quick Reference
 
