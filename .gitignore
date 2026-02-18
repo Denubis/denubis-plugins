@@ -1,3 +1,6 @@
 .worktrees/
 .claude/settings.local.json
 .serena/
+.venv/
+__pycache__/
+*.pyc

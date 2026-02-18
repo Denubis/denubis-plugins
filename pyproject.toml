@@ -1,0 +1,11 @@
+[project]
+name = "denubis-plugins"
+version = "0.0.0"
+description = "Claude Code plugins — tests only"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
