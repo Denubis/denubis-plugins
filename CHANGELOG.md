@@ -1,5 +1,31 @@
 # Changelog
 
+## [denubis-00-getting-started] 1.2.0
+
+**New:**
+- RTK (Rust Token Killer) verification step in setup — checks binary, rewrite hook, and settings registration
+
+## [denubis-hook-claudemd-reminder] 1.1.1
+
+**Fixed:**
+- Regex now matches rtk-rewritten commands (`rtk git status`, `rtk git log`)
+- Use `uv run python3` for reliable Python resolution in hook context
+
+## [denubis-hook-gh-fork-guard] 1.0.1
+
+**Fixed:**
+- Use `uv run python3` for reliable Python resolution in hook context
+
+## [denubis-hook-shortcut-detection] 2.0.2
+
+**Fixed:**
+- Use `uv run python3` for reliable Python resolution in hook context
+
+## [denubis-plan-and-execute] 2.14.1
+
+**Fixed:**
+- Use `uv run python3` for code-quality-guard hook invocation
+
 ## [denubis-plan-and-execute] 2.14.0
 
 Architecture documentation maintenance system.

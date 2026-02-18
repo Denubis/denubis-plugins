@@ -11,7 +11,7 @@
         {
             "name": "denubis-00-getting-started",
             "description": "Getting started guide and onboarding for denubis-plugins",
-            "version": "1.1.0",
+            "version": "1.2.0",
             "source": "./plugins/denubis-00-getting-started",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -22,7 +22,7 @@
         {
             "name": "denubis-plan-and-execute",
             "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-            "version": "2.14.0",
+            "version": "2.14.1",
             "source": "./plugins/denubis-plan-and-execute",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -80,7 +80,7 @@
         {
             "name": "denubis-hook-claudemd-reminder",
             "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-            "version": "1.1.0",
+            "version": "1.1.1",
             "source": "./plugins/denubis-hook-claudemd-reminder",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -96,7 +96,7 @@
         {
             "name": "denubis-hook-shortcut-detection",
             "description": "Stop hook that detects shortcut phrases and blocks with E-STOP for user go/no-go decision.",
-            "version": "2.0.1",
+            "version": "2.0.2",
             "source": "./plugins/denubis-hook-shortcut-detection",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -125,7 +125,7 @@
         {
             "name": "denubis-hook-gh-fork-guard",
             "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork.",
-            "version": "1.0.0",
+            "version": "1.0.1",
             "source": "./plugins/denubis-hook-gh-fork-guard",
             "author": {
                 "name": "Brian Ballsun-Stanton",
