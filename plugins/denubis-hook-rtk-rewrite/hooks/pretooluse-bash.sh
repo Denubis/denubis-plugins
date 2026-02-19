@@ -75,6 +75,10 @@ if echo "$MATCH_CMD" | grep -qE '^git[[:space:]]'; then
 
 # --- GitHub CLI (added: api, release) ---
 elif echo "$MATCH_CMD" | grep -qE '^gh[[:space:]]+(pr|issue|run|api|release)([[:space:]]|$)'; then
+  # Skip when --json flag is present — rtk reformats output, breaking JSON parsing
+  if echo "$MATCH_CMD" | grep -qE '(^|[[:space:]])--json([[:space:]]|$)'; then
+    exit 0
+  fi
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^gh /rtk gh /')"
 
 # --- Cargo ---

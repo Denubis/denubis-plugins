@@ -210,6 +210,18 @@ EOF
     [ "$result" = "rtk gh pr view 123" ]
 }
 
+@test "gh: --json flag skipped (rtk reformats output)" {
+    run bash "$HOOK" <<< "$(make_input 'gh issue list --json number,title,state')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "gh: pr list --json skipped" {
+    run bash "$HOOK" <<< "$(make_input 'gh pr list --json number,title --limit 10')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
 @test "gh: non-matching subcommand passes through" {
     run bash "$HOOK" <<< "$(make_input 'gh auth login')"
     [ "$status" -eq 0 ]
