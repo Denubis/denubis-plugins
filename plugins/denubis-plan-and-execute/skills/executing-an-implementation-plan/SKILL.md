@@ -521,12 +521,27 @@ Code review → Proleptic → UAT → Refactor → Verify green → Next phase
 
 **When suggesting `/clear`:**
 
+Construct a resume prompt the user can paste after `/clear`. It must be self-contained — after `/clear`, the model has zero prior context.
+
 ```
 Phase N complete and committed. Context is heavy from subagent output and review cycles.
 
 All remaining work is tracked in the task list with absolute paths. The git history has everything.
 
-Suggest: /clear then resume with "Continue executing the implementation plan"
+Suggest: /clear then paste this to resume:
+
+---
+/executing-an-implementation-plan
+
+Plan directory: [absolute path to implementation plan directory]
+Completed phases: 1 through N
+Next phase: N+1 of M
+Working directory: [absolute worktree path]
+Implementation guidance: [absolute path, or "none"]
+Test requirements: [absolute path, or "none"]
+
+The task list has remaining phases with absolute paths. Check it with TaskList.
+---
 
 This gives a fresh context window. The SessionStart hook will re-inject skill context,
 and the task list persists across /clear.
