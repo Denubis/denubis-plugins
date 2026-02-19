@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-hook-rtk-rewrite] 1.0.0
+
+Initial release as a tracked plugin (previously an unversioned file at `~/.claude/hooks/`).
+
+**New:**
+- Convention file for dispatcher auto-discovery (priority 50)
+- bats test suite (33 tests)
+- README with rewrite rule documentation and maintenance instructions
+
+**Fixed:**
+- `uv run pytest/ruff/playwright` no longer strips the `uv run` wrapper (was invoking system tool instead of venv tool)
+- `uv pip list/install/...` now rewrites to `rtk uv pip ...` (preserves uv's pip wrapper)
+
+**New patterns:**
+- `uv run ty check` / `uvx ty check`
+- `bandit` / `uv run bandit` / `uvx bandit`
+
 ## [denubis-hook-pretooluse-dispatcher] 1.1.0
 
 **New:**
