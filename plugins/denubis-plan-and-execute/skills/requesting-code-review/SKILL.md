@@ -188,7 +188,7 @@ Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues</parameter>
-<parameter name="max_turns">30</parameter>
+<parameter name="max_turns">45</parameter>
 <parameter name="prompt">
   Fix issues from code review.
 
@@ -220,7 +220,7 @@ After fixes, proceed to Step 3.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Re-reviewing after fixes (cycle N)</parameter>
-<parameter name="max_turns">15</parameter>
+<parameter name="max_turns">30</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -265,10 +265,10 @@ If reviewer reports operational errors (can't run tests, missing scripts):
 | Agent | max_turns | Used for |
 |-------|-----------|----------|
 | code-reviewer (initial) | 25 | Initial diff-focused review |
-| code-reviewer (re-review) | 15 | Verifying fixes against prior issues |
+| code-reviewer (re-review) | 30 | Verifying fixes against prior issues |
 | dba-reviewer | 15 | Parallel database review |
 | proleptic-challenger | 15 | Post-review challenge |
-| task-bug-fixer | 30 | Fixing review issues |
+| task-bug-fixer | 45 | Fixing review issues |
 
 **Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set based on observed usage. Do not "optimise" by lowering them.
 
