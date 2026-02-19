@@ -72,6 +72,29 @@ EOF
     [ -z "$output" ]
 }
 
+@test "git: -C flag skipped (rtk doesn't support it)" {
+    run bash "$HOOK" <<< "$(make_input 'git -C /some/path branch --show-current')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "git: commit --amend skipped (rtk doesn't support it)" {
+    run bash "$HOOK" <<< "$(make_input 'git commit --amend -F /tmp/.commit-msg.txt')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "git: commit --no-edit skipped" {
+    run bash "$HOOK" <<< "$(make_input 'git commit --amend --no-edit')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "git: simple commit -m still rewrites" {
+    result=$(make_input 'git commit -m "fix: something"' | bash "$HOOK" | get_rewritten)
+    [ "$result" = 'rtk git commit -m "fix: something"' ]
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # Python tooling — uv run preservation (regression tests for the venv bug)
 # ═══════════════════════════════════════════════════════════════════════

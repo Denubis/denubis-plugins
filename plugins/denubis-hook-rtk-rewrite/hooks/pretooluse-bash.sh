@@ -52,12 +52,21 @@ REWRITTEN=""
 
 # --- Git commands ---
 if echo "$MATCH_CMD" | grep -qE '^git[[:space:]]'; then
+  # Skip git -C <path> — rtk git doesn't support it
+  if echo "$MATCH_CMD" | grep -qE '^git[[:space:]]+-C[[:space:]]'; then
+    exit 0
+  fi
   GIT_SUBCMD=$(echo "$MATCH_CMD" | sed -E \
     -e 's/^git[[:space:]]+//' \
     -e 's/(-C|-c)[[:space:]]+[^[:space:]]+[[:space:]]*//g' \
     -e 's/--[a-z-]+=[^[:space:]]+[[:space:]]*//g' \
     -e 's/--(no-pager|no-optional-locks|bare|literal-pathspecs)[[:space:]]*//g' \
     -e 's/^[[:space:]]+//')
+  # Skip git commit with flags rtk doesn't support
+  if echo "$GIT_SUBCMD" | grep -qE '^commit[[:space:]]' && \
+     echo "$MATCH_CMD" | grep -qE '(--amend|--no-edit|--fixup|--squash|--allow-empty|-F[[:space:]])'; then
+    exit 0
+  fi
   case "$GIT_SUBCMD" in
     status|status\ *|diff|diff\ *|log|log\ *|add|add\ *|commit|commit\ *|push|push\ *|pull|pull\ *|branch|branch\ *|fetch|fetch\ *|stash|stash\ *|show|show\ *|checkout|checkout\ *)
       REWRITTEN="${ENV_PREFIX}rtk $CMD_BODY"
