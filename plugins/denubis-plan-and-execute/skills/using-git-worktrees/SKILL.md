@@ -144,6 +144,29 @@ Ready to implement <feature-name>
 | Directory not in .gitignore | Add it immediately + commit |
 | Tests fail during baseline | Report failures + ask |
 | No pyproject.toml/package.json | Skip dependency install |
+| Removing a worktree | `cd` to main repo first, then `git worktree remove` |
+
+## Removing Worktrees Safely
+
+When removing a worktree, **you MUST ensure your CWD is outside the worktree first.** This is a POSIX limitation: the kernel cannot remove a directory that is any process's CWD. Claude Code's Bash tool persists CWD between calls, so after working in a worktree your CWD is almost certainly inside it.
+
+```bash
+# Get the main repo path
+main_repo=$(git worktree list | head -1 | awk '{print $1}')
+
+# Navigate out FIRST
+cd "$main_repo"
+
+# THEN remove
+git worktree remove <worktree-path>
+```
+
+**Failure modes if you skip `cd`:**
+- Modern git: `fatal: cannot remove worktree '<path>': '<path>' is the current working directory`
+- Older git: `pwd: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory`
+- Both are unrecoverable without navigating to a valid directory first
+
+**Note:** The `finishing-a-development-branch` skill handles this automatically. This section documents the principle for any other context where worktree removal is needed.
 
 ## Common Mistakes
 
@@ -158,6 +181,10 @@ Ready to implement <feature-name>
 **Proceeding with failing tests**
 - **Problem:** Can't distinguish new bugs from pre-existing issues
 - **Fix:** Report failures, get explicit permission to proceed
+
+**Removing worktree while CWD is inside it**
+- **Problem:** Shell can't resolve `getcwd()`, git can't remove the directory, every subsequent Bash call may fail
+- **Fix:** Always `cd "$main_repo"` before `git worktree remove`. See "Removing Worktrees Safely" above.
 
 **Hardcoding setup commands**
 - **Problem:** Breaks on projects using different tools
@@ -188,12 +215,14 @@ Ready to implement auth feature
 - Proceed with failing tests without asking
 - Assume directory location when ambiguous
 - Skip CLAUDE.md check
+- Run `git worktree remove` while CWD is inside the worktree
 
 **Always:**
 - Follow directory priority: existing > CLAUDE.md > ask
 - Verify .gitignore for project-local
 - Auto-detect and run project setup
 - Verify clean test baseline
+- `cd` to main repo root before removing a worktree
 
 ## Integration
 

@@ -213,10 +213,22 @@ Check if in worktree:
 git worktree list | grep $(git branch --show-current)
 ```
 
-If yes:
+If yes, **you MUST navigate out of the worktree before removing it:**
+
 ```bash
+# Get the main repo path (first entry in worktree list)
+main_repo=$(git worktree list | head -1 | awk '{print $1}')
+
+# Navigate to main repo FIRST — removing a worktree while your CWD
+# is inside it causes "getcwd: cannot access parent directories" because
+# the kernel holds an open reference to the directory inode.
+cd "$main_repo"
+
+# NOW remove the worktree
 git worktree remove <worktree-path>
 ```
+
+**Why `cd` is mandatory here:** Claude Code's Bash tool persists CWD between calls. After working in a worktree, CWD is inside it. The kernel cannot fully remove a directory that is any process's CWD. This is a POSIX limitation, not a git bug. Modern git versions detect this and fail with `"fatal: cannot remove worktree: is the current working directory"`. Older versions produce the cryptic `"getcwd: cannot access parent directories: No such file or directory"`.
 
 **For Option 3:** Keep worktree.
 
@@ -257,6 +269,10 @@ Review before considering this work fully complete.
 **Open-ended questions**
 - **Problem:** "What should I do next?" → ambiguous
 - **Fix:** Present exactly 4 structured options
+
+**Removing worktree while CWD is inside it**
+- **Problem:** `git worktree remove` fails with `getcwd: cannot access parent directories` or `fatal: cannot remove worktree: is the current working directory`
+- **Fix:** Always `cd` to the main repo root before removing. See Step 6.
 
 **Automatic worktree cleanup**
 - **Problem:** Remove worktree when might need it (Option 2, 3)
