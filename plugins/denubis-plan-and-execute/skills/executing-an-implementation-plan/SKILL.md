@@ -94,8 +94,8 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 | Agent | max_turns | Used for |
 |-------|-----------|----------|
-| task-implementor | 45 | Implementing tasks/subcomponents |
-| task-bug-fixer | 30 | Fixing review issues |
+| task-implementor | 60 | Implementing tasks/subcomponents |
+| task-bug-fixer | 45 | Fixing review issues |
 | code-reviewer | 60 | Phase code review (via requesting-code-review skill) |
 | proleptic-challenger | 15 | Phase transition challenge |
 | code-simplifier | 20 | Post-phase refactoring |
@@ -255,7 +255,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Task Y: [description]</parameter>
-<parameter name="max_turns">45</parameter>
+<parameter name="max_turns">60</parameter>
 <parameter name="prompt">
   Implement Task N from the phase file.
 
@@ -285,7 +285,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Subcomponent A (Tasks 3-5): [description]</parameter>
-<parameter name="max_turns">45</parameter>
+<parameter name="max_turns">60</parameter>
 <parameter name="prompt">
   Implement Subcomponent A (Tasks 3, 4, 5) from the phase file.
 
@@ -362,7 +362,7 @@ The phase changed too much for a single review. Chunk the review:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues for Phase X</parameter>
-<parameter name="max_turns">30</parameter>
+<parameter name="max_turns">45</parameter>
 <parameter name="prompt">
   Fix issues from code review for Phase X.
 
@@ -657,7 +657,7 @@ Return coverage validation result. If PASS, include the human test plan.
    <invoke name="Task">
    <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
    <parameter name="description">Adding missing test coverage</parameter>
-   <parameter name="max_turns">30</parameter>
+   <parameter name="max_turns">45</parameter>
    <parameter name="prompt">
    Add missing tests identified by the test analyst.
 
