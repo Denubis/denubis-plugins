@@ -507,9 +507,47 @@ Commit refactoring separately from implementation.
 Code review → Proleptic → UAT → Refactor → Verify green → Next phase
 ```
 
-#### 3e. Move to Next Phase
+#### 3e. Context Management Between Phases
 
-Proceed to the next phase's "Read" step. Repeat 3a-3d for each phase.
+**Before loading the next phase, assess context pressure.** Phase execution accumulates subagent responses, review output, and fix cycles. This is the optimal moment to reclaim context — the work is committed, reviewed, and UAT-confirmed.
+
+**Decision logic:**
+
+| Condition | Action |
+|-----------|--------|
+| No complex cross-phase state accumulated (no mid-plan decisions, workarounds, or unresolved concerns) | Suggest `/clear` — task list has remaining phases with absolute paths, git has the work, SessionStart hook re-injects skill context |
+| Cross-phase decisions, constraints, or workarounds were discovered that aren't captured in task descriptions or commits | Suggest `/compact` with preservation instructions |
+| First phase just completed (minimal context used) | Skip — not worth the interruption yet |
+
+**When suggesting `/clear`:**
+
+```
+Phase N complete and committed. Context is heavy from subagent output and review cycles.
+
+All remaining work is tracked in the task list with absolute paths. The git history has everything.
+
+Suggest: /clear then resume with "Continue executing the implementation plan"
+
+This gives a fresh context window. The SessionStart hook will re-inject skill context,
+and the task list persists across /clear.
+```
+
+**When suggesting `/compact`:**
+
+```
+Phase N complete. Context is heavy but there's cross-phase state worth preserving:
+- [list what needs preserving: decisions, constraints, workarounds]
+
+Suggest: /compact Preserve: (1) implementation plan path: [path], (2) current phase: N of M,
+(3) [specific decisions/constraints to preserve], (4) task list has remaining phases.
+Discard: all subagent output, review details, and fix cycle content — work is committed.
+```
+
+**Wait for the user to act.** Do not proceed to the next phase until the user either runs the suggested command or explicitly says to continue without it.
+
+#### 3f. Move to Next Phase
+
+Proceed to the next phase's "Read" step. Repeat 3a-3e for each phase.
 
 ### 4. Update Project Context
 
@@ -711,6 +749,12 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Refactor phase 1: minor naming improvements, committed]
 
 [Mark 1d complete]
+
+--- Context management ---
+
+[Phase 1 complete, context heavy from subagent output]
+[No cross-phase state — suggest /clear]
+[User runs /clear, resumes with "Continue executing the implementation plan"]
 
 --- Phase 2 ---
 
