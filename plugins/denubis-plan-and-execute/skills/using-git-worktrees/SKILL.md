@@ -99,7 +99,30 @@ git worktree add "$path" -b "$BRANCH_NAME"
 cd "$path"
 ```
 
-### 3. Run Project Setup
+### 3. Copy Environment Files
+
+**Worktrees share the git repo but NOT untracked files like `.env`, database configs, or local settings.** These must be copied from the main checkout.
+
+```bash
+# Get main repo path
+main_repo=$(git worktree list | head -1 | awk '{print $1}')
+
+# Check for .env files in the main checkout and copy them
+for env_file in .env .env.local .env.test .env.development; do
+  if [ -f "$main_repo/$env_file" ] && [ ! -f "$env_file" ]; then
+    cp "$main_repo/$env_file" "$env_file"
+  fi
+done
+```
+
+**Also check CLAUDE.md** for project-specific environment setup (database creation, service configuration, etc.). Common needs:
+- **Database:** The project may need its own test database. Check if the test config references a specific database name or uses the same one as the main checkout.
+- **Docker/services:** If the project uses `docker compose`, the worktree may need its own compose override or the services may already be shared.
+- **Local config files:** Some projects have `config/local.py`, `settings.local.json`, or similar that are gitignored.
+
+**If the project uses a database:** Ask the user whether the worktree should share the main checkout's database or create a separate one. Shared databases can cause test conflicts if both checkouts run tests simultaneously.
+
+### 4. Run Project Setup
 
 **Check CLAUDE.md** for project-specific setup instructions first. If none found, auto-detect:
 
@@ -117,7 +140,7 @@ if [ -f Cargo.toml ]; then cargo build; fi
 if [ -f go.mod ]; then go mod download; fi
 ```
 
-### 4. Verify Clean Baseline
+### 5. Verify Clean Baseline
 
 **Find the test command in CLAUDE.md** (or project config). Run it to ensure worktree starts clean.
 
@@ -125,7 +148,7 @@ if [ -f go.mod ]; then go mod download; fi
 
 **If tests pass:** Report ready.
 
-### 5. Report Location
+### 6. Report Location
 
 ```
 Worktree ready at <full-path>
@@ -144,6 +167,8 @@ Ready to implement <feature-name>
 | Directory not in .gitignore | Add it immediately + commit |
 | Tests fail during baseline | Report failures + ask |
 | No pyproject.toml/package.json | Skip dependency install |
+| Project has .env files | Copy from main checkout |
+| Project uses a database | Ask user: share or create separate |
 | Removing a worktree | `cd` to main repo first, then `git worktree remove` |
 
 ## Removing Worktrees Safely
@@ -185,6 +210,10 @@ git worktree remove <worktree-path>
 **Removing worktree while CWD is inside it**
 - **Problem:** Shell can't resolve `getcwd()`, git can't remove the directory, every subsequent Bash call may fail
 - **Fix:** Always `cd "$main_repo"` before `git worktree remove`. See "Removing Worktrees Safely" above.
+
+**Skipping environment file setup**
+- **Problem:** Tests fail with missing config, wrong database, or missing secrets because `.env` files are gitignored and not present in the new worktree
+- **Fix:** Copy `.env*` files from main checkout before running setup. Check CLAUDE.md for database/service configuration needs.
 
 **Hardcoding setup commands**
 - **Problem:** Breaks on projects using different tools
