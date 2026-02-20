@@ -301,7 +301,7 @@ settings = Settings()  # validates on import, fails fast
 Standard invocation:
 
 ```bash
-uv run pytest --depper --depper-run-all-on-error -n auto --dist=loadfile -x --ff --durations=10 --tb=short
+uv run rtk pytest --depper --depper-run-all-on-error -n auto --dist=loadfile -x --ff --durations=10 --tb=short
 ```
 
 See `writing-good-tests` skill for patterns.

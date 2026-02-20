@@ -279,7 +279,7 @@ Good Phase definitions:
 
 **Dependencies:** None (first phase)
 
-**Done when:** `uv sync` succeeds, `uv run ruff check .` clean
+**Done when:** `uv sync` succeeds, `uv run rtk ruff check .` clean
 <!-- END_PHASE_1 -->
 ```
 

@@ -48,8 +48,8 @@ What each option means:
 
 | Option | Baseline | Investigation Scope |
 |--------|----------|-------------------|
-| **Branch changes** | `git diff $(git merge-base HEAD main)` — all changes since branch diverged | Only code and docs affected by the branch |
-| **Recent on main** | `git diff $(git log -1 --format=%H -- docs/architecture/)..HEAD` — changes since last architecture doc update | All code changed since last architecture update |
+| **Branch changes** | `rtk git diff $(git merge-base HEAD main)` — all changes since branch diverged | Only code and docs affected by the branch |
+| **Recent on main** | `rtk git diff $(rtk git log -1 --format=%H -- docs/architecture/)..HEAD` — changes since last architecture doc update | All code changed since last architecture update |
 | **Full sweep** | No diff — investigate everything | All architecture docs against current codebase state |
 | **Specific area** | User provides files, features, or areas to review | Targeted investigation of the described area |
 
@@ -59,8 +59,8 @@ After scope is chosen, compute the git diff baseline. Use Bash to run the approp
 
 | Scope | Command | What it produces |
 |-------|---------|-----------------|
-| Branch changes | `git diff $(git merge-base HEAD main)` | All changes since branch diverged from main |
-| Recent on main | `git diff $(git log -1 --format=%H -- docs/architecture/)..HEAD` | Changes since last architecture doc update |
+| Branch changes | `rtk git diff $(git merge-base HEAD main)` | All changes since branch diverged from main |
+| Recent on main | `rtk git diff $(rtk git log -1 --format=%H -- docs/architecture/)..HEAD` | Changes since last architecture doc update |
 | Full sweep | N/A — no diff, investigate everything | Complete review |
 | Specific area | User provides files/features | Targeted investigation |
 

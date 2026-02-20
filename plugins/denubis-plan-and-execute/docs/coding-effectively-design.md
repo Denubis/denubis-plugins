@@ -105,7 +105,7 @@ Reference Trail of Bits skills for deeper security audits.
 
 Standard pytest invocation:
 ```bash
-uv run pytest --depper --depper-run-all-on-error -n auto --dist=loadfile -x --ff --durations=10 --tb=short
+uv run rtk pytest --depper --depper-run-all-on-error -n auto --dist=loadfile -x --ff --durations=10 --tb=short
 ```
 
 Plugins: xdist, asyncio, depper (dependency tracking)
@@ -137,7 +137,7 @@ Patterns drawn from:
 ### writing-good-tests
 
 - pytest with parametrize, fixtures
-- `uv run pytest` not `python -m pytest`
+- `uv run rtk pytest` not `python -m pytest`
 - Mock strategy: don't mock what you don't own
 - Condition-based waiting, not arbitrary sleeps
 

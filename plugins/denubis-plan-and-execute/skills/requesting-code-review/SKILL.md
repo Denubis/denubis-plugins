@@ -281,7 +281,7 @@ This is NOT a transient error. Do NOT retry with the same budget — the agent w
 **Recovery — check for checkpointed state before halting:**
 
 1. **For code-reviewer**: Check for `review-wip.md` in the plan directory — if it exists, read it for partial findings
-2. **For task-bug-fixer**: Run `git log -1 --oneline` to check for a WIP commit with partial fixes
+2. **For task-bug-fixer**: Run `rtk git log -1 --oneline` to check for a WIP commit with partial fixes
 3. **For other agents**: Check for `*-wip.md` checkpoint files in the plan directory
 
 **Report to the human** with recovery information:

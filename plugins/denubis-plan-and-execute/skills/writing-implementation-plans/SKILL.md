@@ -229,7 +229,7 @@ The design plan distinguishes between infrastructure phases (verified operationa
 
 **Infrastructure tasks** (project setup, config files, dependencies):
 - Don't force TDD on scaffolding
-- Verification = operational success (`uv sync`, `uv run ruff check`)
+- Verification = operational success (`uv sync`, `uv run rtk ruff check`)
 - **Verifies: None** — explicitly state this, don't invent ACs for setup phases
 
 **Functionality tasks** (code that does something):
@@ -732,7 +732,7 @@ is made harder, or what existing capability is being duplicated and why].
 Run: `uv sync`
 Expected: Dependencies install without errors
 
-Run: `uv run ruff check .`
+Run: `uv run rtk ruff check .`
 Expected: No lint errors
 
 **Step 3: Commit**
