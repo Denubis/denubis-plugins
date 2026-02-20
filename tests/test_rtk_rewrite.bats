@@ -167,14 +167,14 @@ EOF
 # Python tooling — uv subcommands (not uv run)
 # ═══════════════════════════════════════════════════════════════════════
 
-@test "python: uv pip list preserves uv" {
+@test "python: uv pip list uses rtk summary" {
     result=$(make_input 'uv pip list' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "rtk uv pip list" ]
+    [ "$result" = "rtk summary uv pip list" ]
 }
 
-@test "python: uv pip install preserves uv" {
+@test "python: uv pip install uses rtk summary" {
     result=$(make_input 'uv pip install requests' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "rtk uv pip install requests" ]
+    [ "$result" = "rtk summary uv pip install requests" ]
 }
 
 @test "python: uv sync" {

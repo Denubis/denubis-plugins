@@ -44,7 +44,7 @@ These commands run directly through rtk's matching subcommand:
 
 | Command | Rewrite |
 |---|---|
-| `uv pip list/outdated/...` | `rtk uv pip ...` |
+| `uv pip list/outdated/...` | `rtk summary uv pip ...` |
 | `uv sync` | `rtk summary uv sync` |
 
 ### uvx wrapping: `uvx <tool>` → `rtk err uvx <tool>`
