@@ -94,15 +94,15 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 | Agent | max_turns | Used for |
 |-------|-----------|----------|
-| task-implementor | 60 | Implementing tasks/subcomponents |
-| task-bug-fixer | 45 | Fixing review issues |
-| code-reviewer | 60 | Phase code review (via requesting-code-review skill) |
-| proleptic-challenger | 15 | Phase transition challenge |
-| code-simplifier | 20 | Post-phase refactoring |
-| project-claude-librarian | 15 | Updating project context |
-| test-analyst | 20 | Test coverage analysis |
+| task-implementor | 150 | Implementing tasks/subcomponents |
+| task-bug-fixer | 150 | Fixing review issues |
+| code-reviewer | 150 | Phase code review (via requesting-code-review skill) |
+| proleptic-challenger | 150 | Phase transition challenge |
+| code-simplifier | 150 | Post-phase refactoring |
+| project-claude-librarian | 150 | Updating project context |
+| test-analyst | 150 | Test coverage analysis |
 
-**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set based on observed usage. Do not "optimise" by lowering them.
+**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set high as circuit breakers for genuinely runaway agents, not as routine constraints on normal work. Do not "optimise" by lowering them.
 
 ## Null / Empty Subagent Response (Turn Exhaustion)
 
@@ -110,11 +110,24 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 This is NOT a transient error and retrying with the same budget will produce the same result.
 
-**Action:** HALT and tell the human:
-```
-"[Agent name] returned an empty response — it exhausted its max_turns budget (currently N).
-We need to revise max_turns for this agent before continuing."
-```
+**Recovery — check for checkpointed state before halting:**
+
+1. **For code-producing agents** (task-implementor, task-bug-fixer, code-simplifier):
+   - Run `git log -1 --oneline` to check for a WIP commit
+   - Run `git diff --stat HEAD~1..HEAD` to see what work was preserved
+   - If a WIP commit exists, the agent made partial progress — report what was saved
+
+2. **For analysis agents** (code-reviewer, test-analyst):
+   - Check for `.claude/review-wip.md` or `.claude/test-analysis-wip.md`
+   - If a checkpoint file exists, read it and report the partial findings
+
+3. **Report to the human** with recovery information:
+   ```
+   "[Agent name] exhausted its turn budget (150 turns).
+   Checkpoint state: [WIP commit found with N files changed / checkpoint file found with partial findings / no checkpoint found]
+   [Summary of what was preserved]
+   How should we proceed?"
+   ```
 
 Do not silently retry, skip the task, or proceed without the result.
 
@@ -255,7 +268,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Task Y: [description]</parameter>
-<parameter name="max_turns">60</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Implement Task N from the phase file.
 
@@ -285,7 +298,7 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-implementor</parameter>
 <parameter name="description">Implementing Phase X, Subcomponent A (Tasks 3-5): [description]</parameter>
-<parameter name="max_turns">60</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Implement Subcomponent A (Tasks 3, 4, 5) from the phase file.
 
@@ -362,7 +375,7 @@ The phase changed too much for a single review. Chunk the review:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues for Phase X</parameter>
-<parameter name="max_turns">45</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Fix issues from code review for Phase X.
 
@@ -413,7 +426,7 @@ Mark "Phase Nc: Code review" as complete.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
 <parameter name="description">Proleptic challenge: Phase N complete</parameter>
-<parameter name="max_turns">15</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
 PROPOSAL:
 Phase [N]: [Phase Name] is complete.
@@ -489,7 +502,7 @@ The phase is Green — tests pass, UAT confirmed. Now clean up before building t
 <invoke name="Task">
 <parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
 <parameter name="description">Phase [N] refactor</parameter>
-<parameter name="max_turns">20</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
 Simplify code changed in this phase. Files: [list]. Working directory: [dir].
 Preserve all functionality. Find the test command in CLAUDE.md and run after changes.
@@ -572,7 +585,7 @@ After all phases complete, invoke the `denubis-extending-claude:project-claude-l
 <invoke name="Task">
 <parameter name="subagent_type">denubis-extending-claude:project-claude-librarian</parameter>
 <parameter name="description">Updating project context after implementation</parameter>
-<parameter name="max_turns">15</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Review what changed during this implementation and update CLAUDE.md files if contracts or structure changed.
 
@@ -633,7 +646,7 @@ Dispatch the test-analyst agent:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:test-analyst</parameter>
 <parameter name="description">Analyzing test coverage and generating test plan</parameter>
-<parameter name="max_turns">20</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
 Analyze test implementation against acceptance criteria.
 
@@ -657,7 +670,7 @@ Return coverage validation result. If PASS, include the human test plan.
    <invoke name="Task">
    <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
    <parameter name="description">Adding missing test coverage</parameter>
-   <parameter name="max_turns">45</parameter>
+   <parameter name="max_turns">150</parameter>
    <parameter name="prompt">
    Add missing tests identified by the test analyst.
 

@@ -78,7 +78,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Reviewing [what was implemented]</parameter>
-<parameter name="max_turns">25</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -107,7 +107,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:dba-reviewer</parameter>
 <parameter name="description">DBA review: [what schema changes were made]</parameter>
-<parameter name="max_turns">15</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
 Review the database schema changes in this implementation.
 
@@ -155,7 +155,7 @@ Before proceeding to UAT or next task:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
 <parameter name="description">Proleptic challenge: code review passed</parameter>
-<parameter name="max_turns">15</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
 PROPOSAL:
 Code review passed with zero issues for:
@@ -188,7 +188,7 @@ Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:task-bug-fixer</parameter>
 <parameter name="description">Fixing review issues</parameter>
-<parameter name="max_turns">45</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Fix issues from code review.
 
@@ -220,7 +220,7 @@ After fixes, proceed to Step 3.
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
 <parameter name="description">Re-reviewing after fixes (cycle N)</parameter>
-<parameter name="max_turns">30</parameter>
+<parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
 
@@ -264,24 +264,32 @@ If reviewer reports operational errors (can't run tests, missing scripts):
 
 | Agent | max_turns | Used for |
 |-------|-----------|----------|
-| code-reviewer (initial) | 25 | Initial diff-focused review |
-| code-reviewer (re-review) | 30 | Verifying fixes against prior issues |
-| dba-reviewer | 15 | Parallel database review |
-| proleptic-challenger | 15 | Post-review challenge |
-| task-bug-fixer | 45 | Fixing review issues |
+| code-reviewer (initial) | 150 | Initial diff-focused review |
+| code-reviewer (re-review) | 150 | Verifying fixes against prior issues |
+| dba-reviewer | 150 | Parallel database review |
+| proleptic-challenger | 150 | Post-review challenge |
+| task-bug-fixer | 150 | Fixing review issues |
 
-**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set based on observed usage. Do not "optimise" by lowering them.
+**Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set high as circuit breakers for genuinely runaway agents, not as routine constraints on normal work. Do not "optimise" by lowering them.
 
 ### Null / Empty Response (Turn Exhaustion)
 
-**A null or empty response from any subagent means it ran out of turns (max_turns was too low).**
+**A null or empty response from any subagent means it ran out of turns.**
 
-This is NOT a transient error. Do NOT retry with the same max_turns — the agent will exhaust again.
+This is NOT a transient error. Do NOT retry with the same budget — the agent will exhaust again.
 
-**Action:** HALT and tell the human:
+**Recovery — check for checkpointed state before halting:**
+
+1. **For code-reviewer**: Check for `.claude/review-wip.md` — if it exists, read it for partial findings
+2. **For task-bug-fixer**: Run `git log -1 --oneline` to check for a WIP commit with partial fixes
+3. **For other agents**: Check for `.claude/*-wip.md` checkpoint files
+
+**Report to the human** with recovery information:
 ```
-"[Agent name] returned an empty response — it exhausted its max_turns budget (currently N).
-We need to revise max_turns for this agent. What value should we try?"
+"[Agent name] exhausted its turn budget (150 turns).
+Checkpoint state: [checkpoint file found with partial findings / WIP commit found / no checkpoint found]
+[Summary of what was preserved]
+How should we proceed?"
 ```
 
 **Do not** silently retry, skip the review, or proceed without the review result.
