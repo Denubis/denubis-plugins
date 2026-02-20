@@ -58,7 +58,7 @@ Read the diff output carefully. This is what you are reviewing — nothing else 
 
 ### Step 2: Run Verification
 
-Run the project's test and lint commands (find them in CLAUDE.md or project config). For Python projects, use `uv run rtk` (e.g. `uv run rtk pytest`, `uv run rtk ruff check .`). The `rtk` wrapper filters verbose output to save context tokens.
+Run the project's test and lint commands (find them in CLAUDE.md or project config). For Python projects, use `uv run pytest` for tests and `uv run rtk ruff check .` for linting.
 
 **If tests fail or build breaks:** STOP review immediately. Return: "Tests failing / Build broken. Fix before review." Include specific failure output.
 

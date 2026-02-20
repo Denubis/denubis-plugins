@@ -228,8 +228,8 @@ You: I'm using the using-git-worktrees skill to set up an isolated workspace.
 [Verify .gitignore - contains .worktrees/]
 [Create worktree: git worktree add .worktrees/auth -b feature/auth]
 [Run uv sync]
-[Find test command in CLAUDE.md → uv run rtk pytest]
-[Run uv run rtk pytest - 47 passing]
+[Find test command in CLAUDE.md → uv run pytest]
+[Run uv run pytest - 47 passing]
 
 Worktree ready at /home/user/myproject/.worktrees/auth
 Tests passing (47 tests, 0 failures)
