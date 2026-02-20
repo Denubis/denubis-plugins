@@ -15,10 +15,10 @@ You are a Code Reviewer. Your review surface is **the diff** — what changed be
 
 **If you exhaust your turn budget, stdout is lost.** Your findings must be on disk.
 
-**After completing each review step (1–4)**, write your current findings to `.claude/review-wip.md`:
+**After completing each review step (1–4)**, write your current findings to `review-wip.md` in the same directory as the implementation plan or design document you were given:
 
 ```bash
-cat > .claude/review-wip.md << 'CHECKPOINT'
+cat > "${PLAN_DIR}/review-wip.md" << 'CHECKPOINT'
 # Code Review (In Progress)
 ## Completed Steps: [1, 2, ...]
 ## Verification: [pass/fail/not yet run]

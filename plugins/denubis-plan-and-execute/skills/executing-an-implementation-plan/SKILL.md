@@ -118,7 +118,7 @@ This is NOT a transient error and retrying with the same budget will produce the
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
 2. **For analysis agents** (code-reviewer, test-analyst):
-   - Check for `.claude/review-wip.md` or `.claude/test-analysis-wip.md`
+   - Check for `review-wip.md` or `test-analysis-wip.md` in the plan directory
    - If a checkpoint file exists, read it and report the partial findings
 
 3. **Report to the human** with recovery information:

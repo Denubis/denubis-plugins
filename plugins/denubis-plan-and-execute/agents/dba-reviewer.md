@@ -47,10 +47,10 @@ I will not proceed past this point until you respond.
 
 **If you exhaust your turn budget, stdout is lost.** Your findings must be on disk.
 
-**After completing each review step (1–7)**, write your current findings to `.claude/dba-review-wip.md`:
+**After completing each review step (1–7)**, write your current findings to `dba-review-wip.md` in the same directory as the implementation plan or design document you were given:
 
 ```bash
-cat > .claude/dba-review-wip.md << 'CHECKPOINT'
+cat > "${PLAN_DIR}/dba-review-wip.md" << 'CHECKPOINT'
 # DBA Review (In Progress)
 ## Completed Steps: [1, 2, ...]
 ## Issues Found So Far:

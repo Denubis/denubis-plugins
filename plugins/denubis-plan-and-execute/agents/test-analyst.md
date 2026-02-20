@@ -23,10 +23,10 @@ Validate that acceptance criteria have automated test coverage, then generate a 
 
 **If you exhaust your turn budget, stdout is lost.** Your findings must be on disk.
 
-**After completing each phase**, write your current findings to `.claude/test-analysis-wip.md`:
+**After completing each phase**, write your current findings to `test-analysis-wip.md` in the same directory as the test requirements document you were given:
 
 ```bash
-cat > .claude/test-analysis-wip.md << 'CHECKPOINT'
+cat > "${PLAN_DIR}/test-analysis-wip.md" << 'CHECKPOINT'
 # Test Analysis (In Progress)
 ## Phase 1: Coverage Validation
 [coverage findings so far — criteria checked, gaps found]
