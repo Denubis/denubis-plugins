@@ -94,12 +94,19 @@ You MUST complete each phase before proceeding to the next.
    - Does it happen every time?
    - If not reproducible → gather more data, don't guess
 
-3. **Check Recent Changes**
-   - What changed that could cause this?
-   - Git diff, recent commits
-   - New dependencies, config changes
-   - Environmental differences
-   - **Search past sessions:** Use `cc-search-chats search "error message or topic"` to find if this issue was encountered and resolved before
+3. **Establish Differential Baseline**
+
+   **MANDATORY.** Before any hypothesis can be formed, establish the concrete difference between the reference state and the current state. Every subsequent claim about root cause must trace back to this differential.
+
+   - **Identify the reference branch:** `main` if working directly, or the base branch if in a worktree/feature branch. Run `git merge-base HEAD <reference>` to find the divergence point.
+   - **Run the full differential:** `git diff <merge-base>...HEAD` for all changes since divergence. This is your **evidence universe**.
+   - **Review recent commits:** `git log <merge-base>..HEAD --oneline` for the change narrative.
+   - **Check non-code changes:** New dependencies, config changes, environmental differences.
+   - **Search past sessions:** Use `cc-search-chats search "error message or topic"` to find if this issue was encountered and resolved before.
+
+   **If the differential is empty** (bug exists on the reference branch too): State this explicitly. The contradiction is between the code's behaviour and its specification. Cite the specification, documentation, or test that describes expected behaviour. The evidence universe shifts from "what changed" to "what the code does vs what it should do."
+
+   **This differential gates all subsequent phases.** No claim about root cause is valid unless it references specific lines from this diff (or, for pre-existing bugs, specific lines that contradict the specification).
 
 4. **Gather Evidence in Multi-Component Systems**
 
@@ -187,6 +194,7 @@ You MUST complete each phase before proceeding to the next.
    - State the falsification: "If I do Z, I expect to see W. If I see V instead, this hypothesis is wrong."
    - Write both down before touching any code
    - Be specific, not vague
+   - **Ground in the differential.** Your hypothesis must cite specific changes from the Phase 1 differential baseline. "I predict X is the root cause because the diff shows [old code] was changed to [new code] at [file:line]." A hypothesis that cannot point to a specific diff (or specification contradiction for pre-existing bugs) is not ready for testing — return to Phase 1.
 
 3. **Test Minimally**
    - Make the SMALLEST possible change to test hypothesis
@@ -255,10 +263,12 @@ Reading code and making claims about what it does are two different cognitive ac
    | Field | What it is | Example |
    |-------|-----------|---------|
    | **Claim** | The assertion | "Session token expires because middleware calls `invalidateToken()` on line 147" |
-   | **Data** | Specific evidence you can point to | "Line 147 of `auth_middleware.py` reads `token_store.invalidate(request.token)`" |
+   | **Data** | Differential evidence — what changed or what contradicts spec | "Line 147 was changed from `token_store.refresh(request.token)` to `token_store.invalidate(request.token)` in commit abc123" or "Line 147 is unchanged from main; it contradicts the spec which states tokens should persist" |
    | **Warrant** | Why the data supports the claim | "The `invalidate` method marks the token as expired in the store, per its docstring on line 23 of `token_store.py`" |
    | **Qualifier** | Confidence level | "Certainly" / "Probably" / "Possibly — haven't verified X" |
    | **Rebuttal** | What would make this claim false | "If `invalidate()` is a no-op in test mode, or if a different code path re-validates before this runs" |
+
+   **Narrow claims only.** Each claim must be as narrow as possible — tied to a specific diff line or specification contradiction. No broad characterisations ("the module is broken"). No assertions without differential evidence ("line 50 is wrong" without showing what it was changed from or what specification it violates).
 
 4. **For each claim: design and run a falsification experiment.** The experiment must be the fastest possible test that could disprove the claim. Priorities:
    - Grep/read to verify the specific line says what you claim it says
@@ -314,9 +324,21 @@ Reading code and making claims about what it does are two different cognitive ac
 - **Corrected:** [claim 2 — initially thought X, actually Y]
 ```
 
-**Delegating experiments to subagents:** Subagents don't have this skill loaded. When delegating a falsification experiment, you MUST include the interrogation protocol in the prompt:
+**Delegating experiments to subagents:** Subagents don't have this skill loaded. When delegating a falsification experiment, you MUST include the differential protocol and the interrogation protocol in the prompt:
 
 ```
+DIFFERENTIAL BASELINE:
+Reference branch: [branch name]
+Merge base: [commit hash]
+
+You MUST ground every claim in the differential between the reference and current state.
+Run `git diff [merge-base]...HEAD -- [relevant files]` to see what changed.
+Every claim about root cause must cite a specific line from this diff.
+If the bug exists on the reference branch too, state this explicitly and cite the
+specification instead.
+No broad claims. Each assertion must be as narrow as possible and tied to a specific diff.
+
+EXPERIMENT:
 Run this experiment: [describe experiment]
 I predict: [expected result]
 
@@ -327,7 +349,8 @@ AFTER getting results, BEFORE reporting back:
 4. Corroborate via one different method (if you grepped, also run the code; if you ran a test, also read the source)
 5. If experiment and corroboration disagree, report BOTH — do not pick one
 
-Report: what you observed, how you corroborated, and any auxiliary assumption you're uncertain about.
+Report: what you observed, how you corroborated, the differential evidence you found,
+and any auxiliary assumption you're uncertain about.
 ```
 
 **The main agent must still verify subagent reports.** Subagent says "confirmed"? Spot-check the corroboration. Subagent says "falsified"? Verify the experiment was sound before updating your beliefs. Delegation does not transfer epistemic responsibility.
@@ -422,6 +445,9 @@ If you catch yourself thinking:
 - **"This claim is obvious, I don't need to verify it"** — obvious claims are the ones most likely to be wrong
 - **"I read the code, so my analysis is correct"** — reading and correctly interpreting are different acts
 - **Writing a bug report without running falsification experiments on each claim**
+- **Proposing a root cause without citing the differential** — no diff evidence, no claim
+- **Making broad assertions** ("the module is broken", "the logic is wrong") **without narrow differential evidence**
+- **"Flaky upstream, we can disregard"** — almost always a symptom of something real. Investigate it.
 
 **ALL of these mean: STOP. Return to Phase 1.**
 
@@ -452,12 +478,15 @@ If you catch yourself thinking:
 | "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem. Question pattern, don't fix again. |
 | "I read the code, my analysis is correct" | Reading ≠ correctly interpreting. Verify each claim independently. |
 | "This claim doesn't need verification" | The claim you skip verifying is the one that's wrong. Every claim. |
+| "The root cause is obvious from reading the code" | Show the diff. Point to the specific change. No diff, no claim. |
+| "The whole module/system is broken" | Too broad. Which specific line changed? What specifically contradicts what? |
+| "Flaky upstream, we can disregard" | Almost always a symptom of something real. Intermittent failures have root causes. Investigate. |
 
 ## Quick Reference
 
 | Phase | Key Activities | Success Criteria |
 |-------|---------------|------------------|
-| **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
+| **1. Root Cause** | Read errors, reproduce, establish differential baseline, gather evidence | Understand WHAT and WHY; diff gates all claims |
 | **2. Pattern** | Find working examples, compare | Identify differences |
 | **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
 | **3b. Path Audit** | FULL execution path audit, line by line, to project edges | Every line accounted for |
