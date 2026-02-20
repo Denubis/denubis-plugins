@@ -48,8 +48,8 @@ Code Review Progress:
 **This is your primary input.** Run these commands first:
 
 ```bash
-git diff --stat {BASE_SHA}..{HEAD_SHA}
-git diff {BASE_SHA}..{HEAD_SHA}
+rtk git diff --stat {BASE_SHA}..{HEAD_SHA}
+rtk git diff {BASE_SHA}..{HEAD_SHA}
 ```
 
 Read the diff output carefully. This is what you are reviewing — nothing else unless a specific hunk is ambiguous without surrounding context.
@@ -58,7 +58,7 @@ Read the diff output carefully. This is what you are reviewing — nothing else 
 
 ### Step 2: Run Verification
 
-Run the project's test and lint commands (find them in CLAUDE.md or project config). For Python projects, use `uv run` (e.g. `uv run pytest`, `uv run ruff check .`).
+Run the project's test and lint commands (find them in CLAUDE.md or project config). For Python projects, use `uv run rtk` (e.g. `uv run rtk pytest`, `uv run rtk ruff check .`). The `rtk` wrapper filters verbose output to save context tokens.
 
 **If tests fail or build breaks:** STOP review immediately. Return: "Tests failing / Build broken. Fix before review." Include specific failure output.
 

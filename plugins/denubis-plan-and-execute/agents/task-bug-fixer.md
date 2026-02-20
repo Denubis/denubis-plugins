@@ -77,7 +77,7 @@ For each issue:
 
 **YOU MUST run verification commands:**
 
-Find the test, build, and lint commands in CLAUDE.md (or project config) and run them. For Python projects, always use `uv run` to invoke tools (e.g. `uv run pytest`, `uv run ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
+Find the test, build, and lint commands in CLAUDE.md (or project config) and run them. For Python projects, always use `uv run rtk` to invoke tools (e.g. `uv run rtk pytest`, `uv run rtk ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`. The `rtk` wrapper filters verbose output to save context tokens.
 
 ```bash
 # Find test command in CLAUDE.md and run it
