@@ -183,12 +183,9 @@ elif echo "$MATCH_CMD" | grep -qE '^pnpm[[:space:]]+(list|ls|outdated)([[:space:
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^pnpm /rtk pnpm /')"
 
 # --- Python tooling ---
-elif echo "$MATCH_CMD" | grep -qE '^pytest([[:space:]]|$)'; then
-  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^pytest/rtk pytest/')"
-elif echo "$MATCH_CMD" | grep -qE '^python[[:space:]]+-m[[:space:]]+pytest([[:space:]]|$)'; then
-  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^python -m pytest/rtk pytest/')"
-elif echo "$MATCH_CMD" | grep -qE '^uv[[:space:]]+run[[:space:]]+pytest([[:space:]]|$)'; then
-  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^uv run pytest/uv run rtk pytest/')"
+# NOTE: pytest is deliberately NOT rewritten here. RTK's pytest wrapper causes
+# doubled output in Claude Code's Bash tool when exit code is non-zero (a Bash
+# tool presentation artifact, not an RTK bug). Skills/agents use bare pytest.
 elif echo "$MATCH_CMD" | grep -qE '^ruff[[:space:]]+(check|format)([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^ruff /rtk ruff /')"
 elif echo "$MATCH_CMD" | grep -qE '^uv[[:space:]]+run[[:space:]]+ruff[[:space:]]+(check|format)([[:space:]]|$)'; then

@@ -99,19 +99,16 @@ EOF
 # Python tooling — uv run preservation (regression tests for the venv bug)
 # ═══════════════════════════════════════════════════════════════════════
 
-@test "python: bare pytest" {
-    result=$(make_input 'pytest tests/ -xvs' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "rtk pytest tests/ -xvs" ]
+@test "python: bare pytest is NOT rewritten (deliberate)" {
+    run bash "$HOOK" <<< "$(make_input 'pytest tests/ -xvs')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
-@test "python: python -m pytest" {
-    result=$(make_input 'python -m pytest tests/' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "rtk pytest tests/" ]
-}
-
-@test "python: uv run pytest preserves uv run" {
-    result=$(make_input 'uv run pytest tests/test_foo.py -xvs' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "uv run rtk pytest tests/test_foo.py -xvs" ]
+@test "python: uv run pytest is NOT rewritten (deliberate)" {
+    run bash "$HOOK" <<< "$(make_input 'uv run pytest tests/test_foo.py -xvs')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "python: bare ruff check" {
@@ -192,13 +189,13 @@ EOF
 # ═══════════════════════════════════════════════════════════════════════
 
 @test "env prefix: preserved on rewrite" {
-    result=$(make_input 'TEST_SESSION_ID=2 pytest tests/' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "TEST_SESSION_ID=2 rtk pytest tests/" ]
+    result=$(make_input 'TEST_SESSION_ID=2 ruff check src/' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "TEST_SESSION_ID=2 rtk ruff check src/" ]
 }
 
 @test "env prefix: preserved with uv run" {
-    result=$(make_input 'PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/' | bash "$HOOK" | get_rewritten)
-    [ "$result" = "PYTHONDONTWRITEBYTECODE=1 uv run rtk pytest tests/" ]
+    result=$(make_input 'PYTHONDONTWRITEBYTECODE=1 uv run ruff check src/' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "PYTHONDONTWRITEBYTECODE=1 uv run rtk ruff check src/" ]
 }
 
 # ═══════════════════════════════════════════════════════════════════════

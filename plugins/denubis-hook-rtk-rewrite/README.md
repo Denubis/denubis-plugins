@@ -19,7 +19,6 @@ These commands run directly through rtk's matching subcommand:
 | `git status/diff/log/...` | `rtk git ...` |
 | `gh pr/issue/run/api/release` | `rtk gh ...` |
 | `cargo test/build/clippy/...` | `rtk cargo ...` |
-| `pytest` | `rtk pytest` |
 | `ruff check/format` | `rtk ruff ...` |
 | `docker ps/images/logs/...` | `rtk docker ...` |
 | `kubectl get/logs/describe/...` | `rtk kubectl ...` |
@@ -34,7 +33,6 @@ These commands run directly through rtk's matching subcommand:
 
 | Command | Rewrite |
 |---|---|
-| `uv run pytest ...` | `uv run rtk pytest ...` |
 | `uv run ruff check/format ...` | `uv run rtk ruff ...` |
 | `uv run playwright ...` | `uv run rtk playwright ...` |
 | `uv run ty check ...` | `uv run rtk err ty check ...` |
