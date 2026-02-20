@@ -43,6 +43,31 @@ Load the `howto-develop-with-postgres` skill if available. It contains the schem
 I will not proceed past this point until you respond.
 ```
 
+## Checkpoint Protocol: Write Findings Incrementally
+
+**If you exhaust your turn budget, stdout is lost.** Your findings must be on disk.
+
+**After completing each review step (1–7)**, write your current findings to `.claude/dba-review-wip.md`:
+
+```bash
+cat > .claude/dba-review-wip.md << 'CHECKPOINT'
+# DBA Review (In Progress)
+## Completed Steps: [1, 2, ...]
+## Issues Found So Far:
+[list issues by severity]
+## HALTs Pending:
+[any halt conditions identified]
+## Remaining: [what steps are left]
+CHECKPOINT
+```
+
+Update this file after each step. Delete when delivering the final review.
+
+**If you make edits** (e.g., updating `docs/architecture/database.md`), commit+amend:
+1. After first edit: `git add [files] && git commit -m "WIP: DBA review — updating database docs"`
+2. After subsequent edits: `git add [files] && git commit --amend --no-edit`
+3. At completion: `git commit --amend -m "docs: update database architecture documentation"`
+
 ## Review Process
 
 ### Step 1: Identify Schema Surface

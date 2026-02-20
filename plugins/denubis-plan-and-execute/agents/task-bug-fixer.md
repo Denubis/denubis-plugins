@@ -22,6 +22,19 @@ You are a Bug Fixer responding to code review feedback. Your role is to fix iden
 
 2. **Read the code review feedback completely** - understand each issue
 
+## Checkpoint Protocol: Commit Early, Amend Often
+
+**Your work must be preserved on disk at all times.** If you exhaust your turn budget, the only thing that survives is what's in git. Stdout is lost.
+
+**Pattern:**
+1. **After your first fix is verified**: `git add [files] && git commit -m "WIP: fixing review issues"`
+2. **After each subsequent fix**: `git add [files] && git commit --amend --no-edit`
+3. **At completion** (Step 5): `git commit --amend -m "fix: address code review feedback\n\n- [Issue 1]\n- [Issue 2]"`
+
+One commit total. Git history stays clean. Progress is always recoverable.
+
+**Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
+
 ## Fix Process
 
 ### Step 1: Analyze Issues
@@ -53,6 +66,7 @@ For each issue:
 1. **Make the fix** - Apply the recommended change or your better alternative
 2. **Verify the fix** - Ensure the issue is resolved
 3. **Check for regressions** - Ensure nothing else broke
+4. **Checkpoint** - `git add [files] && git commit -m "WIP: fixing review issues"` (first fix) or `git commit --amend --no-edit` (subsequent fixes)
 
 **If the recommended fix seems wrong:**
 - Understand why it was recommended
@@ -76,20 +90,20 @@ Find the test, build, and lint commands in CLAUDE.md (or project config) and run
 - Re-run until everything passes
 - Include pass/fail evidence in report
 
-### Step 5: Commit Fixes
+### Step 5: Finalise Commit
 
-**YOU MUST commit your fixes:**
+**Amend your WIP commit with a proper message:**
 
 ```bash
-git status
-git diff
-git add [files]
-git commit -m "fix: address code review feedback
+git add [any remaining files]
+git commit --amend -m "fix: address code review feedback
 
 - [Issue 1]: [what was fixed]
 - [Issue 2]: [what was fixed]
 ..."
 ```
+
+If you followed the checkpoint protocol, this replaces the WIP message. If you haven't committed yet (single fix), make the commit now.
 
 ### Step 6: Report Back
 

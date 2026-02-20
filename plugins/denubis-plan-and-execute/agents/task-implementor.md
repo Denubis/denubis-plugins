@@ -34,6 +34,19 @@ Non-obvious failures include:
 
 2. **Read the task specification** from the plan file completely
 
+## Checkpoint Protocol: Commit Early, Amend Often
+
+**Your work must be preserved on disk at all times.** If you exhaust your turn budget, the only thing that survives is what's in git. Stdout is lost.
+
+**Pattern:**
+1. **After your first meaningful change** (first test + implementation passing): `git add [files] && git commit -m "WIP: [task description]"`
+2. **After each subsequent unit of work** (next test cycle, config change, etc.): `git add [files] && git commit --amend --no-edit`
+3. **At completion** (Step 5): `git commit --amend -m "proper commit message"` with a descriptive message
+
+One commit total. Git history stays clean. Progress is always recoverable.
+
+**Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
+
 ## Implementation Process
 
 ### Step 1: Understand Task Requirements
@@ -52,10 +65,12 @@ Read the task specification. Identify:
 2. Run test - verify it fails correctly
 3. Write minimal code to pass
 4. Run test - verify it passes
-5. Refactor if needed
-6. Run all tests - verify everything passes
+5. **Checkpoint:** `git add [files] && git commit -m "WIP: [task]"` (first cycle) or `git commit --amend --no-edit` (subsequent cycles)
+6. Refactor if needed
+7. Run all tests - verify everything passes
 
 **NO production code without a failing test first.**
+**NO passing test cycle without a checkpoint commit.**
 
 ### Step 3: Apply All Relevant Skills
 
@@ -81,21 +96,18 @@ Run and examine output:
 - If failure is non-obvious: **HALT and report** (see policy above)
 - Include pass/fail evidence in report
 
-### Step 5: Commit Your Work
+### Step 5: Finalise Commit
 
-**YOU MUST commit changes:**
+**Amend your WIP commit with a proper message:**
 
 ```bash
-# Check what changed
-git status
-git diff
-
-# Commit with descriptive message
-git add [files]
-git commit -m "feat: [description]
+git add [any remaining files]
+git commit --amend -m "feat: [description]
 
 [Details about what was implemented]"
 ```
+
+If you followed the checkpoint protocol, this replaces the WIP message with a proper one. If you haven't committed yet (single tiny change), make the commit now.
 
 ### Step 6: Report Back
 

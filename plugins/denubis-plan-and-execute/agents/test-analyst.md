@@ -19,6 +19,26 @@ Validate that acceptance criteria have automated test coverage, then generate a 
 - Cover items from "Human Verification Required" plus end-to-end scenarios
 - Output a test plan document
 
+## Checkpoint Protocol: Write Findings Incrementally
+
+**If you exhaust your turn budget, stdout is lost.** Your findings must be on disk.
+
+**After completing each phase**, write your current findings to `.claude/test-analysis-wip.md`:
+
+```bash
+cat > .claude/test-analysis-wip.md << 'CHECKPOINT'
+# Test Analysis (In Progress)
+## Phase 1: Coverage Validation
+[coverage findings so far — criteria checked, gaps found]
+## Phase 2: Human Test Plan
+[test plan progress, if started]
+CHECKPOINT
+```
+
+Update this file after each criterion is checked. Delete when delivering the final report.
+
+**Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
+
 ## Inputs
 
 - **TEST_REQUIREMENTS_PATH**: test-requirements.md with acceptance criteria tables
