@@ -53,7 +53,8 @@ This ensures Claude Code sees the content while other AI agents (Codex, Copilot)
 6. For AGENTS.md repos: ensure companion CLAUDE.md files exist
 7. Verify freshness dates are current (use `date +%Y-%m-%d`)
 8. **Dependency rationale:** If `pyproject.toml` (or equivalent) changed, check `docs/dependency-rationale.md` — new dependencies need entries, removed dependencies need entries removed, changed dependencies need updated claims
-9. Commit documentation updates
+9. **Permissions hygiene:** Audit `.claude/settings.local.json` for accumulated one-off permission entries — see Permissions Cleanup below
+10. Commit documentation updates
 
 ## Expected Inputs
 
@@ -76,7 +77,8 @@ If not provided, ask for the base commit.
 8. **Companion files:** For AGENTS.md repos, ensure companion CLAUDE.md exists
 9. **Dependencies:** If dependency files changed (`pyproject.toml`, `package.json`, etc.), update `docs/dependency-rationale.md` — add entries for new deps (with falsifiable claim, evidence, who it serves), remove entries for removed deps, update entries for changed deps
 10. **Test pseudocode:** If test files changed, update `tests/test-pseudocode.md` — see Test Pseudocode Maintenance below
-11. **Commit:** `docs: update project context for <context>`
+11. **Permissions hygiene:** Audit `.claude/settings.local.json` — see Permissions Cleanup below
+12. **Commit:** `docs: update project context for <context>`
 
 ## Output Format
 
@@ -191,3 +193,37 @@ they reveal where the test suite is redundant or incomplete.
 ```
 
 Then read all existing test files and populate it.
+
+## Permissions Cleanup
+
+Claude Code accumulates one-off permission entries in `~/.claude/settings.json` (global) and `.claude/settings.local.json` (project-level) as users approve commands during sessions. Over time, these grow to hundreds of entries and waste context tokens. Clean both files.
+
+### What to Remove
+
+| Pattern | Example | Why remove |
+|---------|---------|------------|
+| Specific commit messages | `Bash(git -C /path commit -m "$(cat <<'EOF'...")` | One-off, never reused |
+| Specific file paths in git commands | `Bash(git -C /path/to/project add src/foo.py)` | Covered by generic `Bash(git add:*)` |
+| Shell fragments | `Bash(do)`, `Bash(done)`, `Bash(then)`, `Bash(else)`, `Bash(fi)` | Fragments of for-loops, not standalone commands |
+| For-loops with specific values | `Bash(for i in 15 16 17 18 19 20)` | One-off iteration |
+| Project-specific env prefixes | `Bash(TEST_DATABASE_URL="..." uv run pytest:*)` | Covered by generic `Bash(uv run pytest:*)` |
+| Dead tool references | `mcp__ast-grep__*` (if MCP removed) | Ghost entries for removed servers |
+| One-off WebFetch domains | `WebFetch(domain:some-random-blog.com)` | Accumulated from research sessions |
+
+### What to Keep
+
+- **Generic command patterns:** `Bash(git add:*)`, `Bash(uv run *)`, `Bash(gh pr create:*)`, etc.
+- **Workflow infrastructure:** Workflow state scripts, claude-sync commands, rtk commands
+- **MCP tools for active plugins:** `mcp__plugin_context7_context7__*`
+- **System tools:** `Bash(ls:*)`, `Bash(grep:*)`, `Bash(find:*)`, etc.
+- **Commonly used tool chains:** LaTeX, pandoc, libreoffice if project uses them
+
+### Procedure
+
+1. Read `~/.claude/settings.json` permissions.allow array
+2. Read `.claude/settings.local.json` permissions.allow array (if exists)
+3. Identify entries matching "What to Remove" patterns
+4. Present proposed removals to the human for approval
+5. Apply cleanup, preserving all non-permissions content
+6. Validate JSON after editing: `jq . <file> > /dev/null`
+7. Report: entries before, entries removed, entries remaining
