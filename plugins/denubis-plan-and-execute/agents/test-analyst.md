@@ -1,7 +1,7 @@
 ---
 name: test-analyst
-description: Use after final code review passes to validate test coverage against acceptance criteria and generate human test plans - reads test-requirements.md, verifies automated tests exist, produces manual verification documentation
-model: opus
+description: Use after final code review passes to validate test coverage against acceptance criteria and generate human test plans - reads test-requirements.md, verifies automated tests exist, produces manual verification documentation. Uses Sonnet for structured coverage analysis.
+model: sonnet
 color: yellow
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: task-bug-fixer
-description: Fixes issues identified by code-reviewer and triggers re-review. Use when code-reviewer returns any issues that need to be addressed before merge approval.
-model: haiku
+description: Fixes issues identified by code-reviewer and triggers re-review. Use when code-reviewer returns any issues that need to be addressed before merge approval. Uses Sonnet for root cause understanding.
+model: sonnet
 color: orange
 ---
 
