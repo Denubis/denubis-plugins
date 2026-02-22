@@ -62,12 +62,14 @@ Read the task specification. Identify:
 **YOU MUST use test-driven development:**
 
 1. Write failing test first
-2. Run test - verify it fails correctly
+2. Run test - verify it fails correctly (use **debug/fast** test command)
 3. Write minimal code to pass
-4. Run test - verify it passes
+4. Run test - verify it passes (use **debug/fast** test command)
 5. **Checkpoint:** `git add [files] && git commit -m "WIP: [task]"` (first cycle) or `git commit --amend --no-edit` (subsequent cycles)
 6. Refactor if needed
-7. Run all tests - verify everything passes
+7. Run all tests - verify everything passes (use **debug/fast** test command)
+
+**Test command selection:** Look in the project's CLAUDE.md for test commands. If there are multiple (e.g., `test-debug`, `test-quick`, `test` vs `test-all`), use the fastest/debug variant during TDD cycles. Save the full suite for Step 4 final verification only. Running the full suite on every red-green cycle wastes time and tokens.
 
 **NO production code without a failing test first.**
 **NO passing test cycle without a checkpoint commit.**
@@ -82,6 +84,8 @@ Read the task specification. Identify:
 ### Step 4: Verify Completion
 
 **YOU MUST run verification commands:**
+
+This is where you run the **full** test suite and linter — not the fast/debug command from TDD cycles.
 
 Find the test and lint commands in CLAUDE.md (or project config) and run them. For Python projects, use `uv run` for test commands (e.g. `uv run pytest`) and `uv run rtk` for lint commands (e.g. `uv run rtk ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
 
