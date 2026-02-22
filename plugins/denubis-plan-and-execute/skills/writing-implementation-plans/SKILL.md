@@ -100,6 +100,7 @@ Dispatch a second subagent codebase-investigator (simultaneously) with:
 - "Verify each file exists and report any differences from these assumptions"
 - "The design says [feature] is implemented in [location]. Verify this is accurate"
 - "Design expects [dependency] version [X]. Check actual version installed"
+- For verifying API surfaces, class hierarchies, or usage patterns, instruct the investigator to use ast-grep for structural searches (see `using-ast-grep` skill)
 
 **Example query to agent:**
 ```
