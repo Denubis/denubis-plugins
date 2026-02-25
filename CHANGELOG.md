@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-hook-branch-bg] 0.1.0
+
+SessionStart hook for visual terminal differentiation via background colour.
+
+**New:**
+- Sets terminal background colour via OSC 11 escape sequence on session start
+- Repo path controls hue (project identity), branch controls saturation (branch differentiation)
+- Fixed 10% lightness for dark terminal backgrounds
+- Process tree walk to find controlling TTY device, bypassing Claude Code's sandbox
+- Caches nothing — deterministic colour from hash, computed each time
+
 ## [denubis-hook-rtk-rewrite] 1.0.0
 
 Initial release as a tracked plugin (previously an unversioned file at `~/.claude/hooks/`).
