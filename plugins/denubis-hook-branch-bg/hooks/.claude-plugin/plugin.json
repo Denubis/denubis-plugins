@@ -1,0 +1,18 @@
+{
+    "name": "denubis-hook-branch-bg",
+    "description": "SessionStart hook that sets terminal background colour based on git repo path (hue) and branch (saturation) via OSC 11, giving each project a colour family with branch-level differentiation.",
+    "version": "0.1.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "homepage": "https://github.com/denubis/denubis-plugins",
+    "repository": "https://github.com/denubis/denubis-plugins",
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "hooks",
+        "terminal",
+        "ghostty",
+        "background-colour"
+    ]
+}
