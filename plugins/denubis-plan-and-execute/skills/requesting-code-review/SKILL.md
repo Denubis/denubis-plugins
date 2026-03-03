@@ -10,23 +10,6 @@ Dispatch denubis-plan-and-execute:code-reviewer subagent to catch issues before 
 
 **Core principle:** Review early, review often. Fix ALL issues before proceeding.
 
-## Workflow Status Line
-
-**On entry** (review dispatched):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "code-review" --context "reviewing"
-```
-
-**Operational error or 3 failures** (need human help):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context "BLOCKED: 3 failures — need direction"
-```
-
-**After review passes** (before proleptic/UAT — those skills set their own state):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "executing-impl" --context ""
-```
-
 ## When to Request Review
 
 **Mandatory:**

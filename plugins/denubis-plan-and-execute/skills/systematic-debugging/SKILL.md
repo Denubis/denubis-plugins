@@ -36,22 +36,6 @@ You try a fix. It fails. You try another. It fails. You try a third. Each attemp
 
 **If you catch yourself on attempt #2 without having investigated attempt #1's failure: you are doing this anti-pattern. Return to Phase 1.**
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry | `systematic-debugging` | `investigating root cause` |
-| Phase 1 complete, hypothesis formed | | `hypothesis: <summary>` |
-| Testing hypothesis | | `testing: <what being tested>` |
-| Hypothesis confirmed, auditing path | | `auditing execution path` |
-| Path audit complete, implementing | | `implementing fix` |
-| 3+ failed fixes (escalate to human) | | `BLOCKED: 3 failures — need direction` |
-| After human provides direction | | `""` |
-
 ## When to Use
 
 Use for ANY technical issue:

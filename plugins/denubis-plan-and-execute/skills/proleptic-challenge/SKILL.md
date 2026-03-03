@@ -19,18 +19,6 @@ Based on proleptic reasoning from argumentation theory—anticipating objections
 
 **Reference:** Kudina, O., Ballsun-Stanton, B., & Alfano, M. (2025). The use of large language models as scaffolds for proleptic reasoning. *Asian Journal of Philosophy*, 4, 24. DOI: 10.1007/s44204-025-00247-1
 
-## Workflow Status Line
-
-**Before presenting counterarguments to human:**
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "proleptic-challenge" --context "evaluate: counterarguments presented"
-```
-
-**After human responds** (and you proceed):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context ""
-```
-
 ## When to Invoke
 
 Proleptic challenges fire **before phase transitions**, not at every decision point:

@@ -2,16 +2,15 @@
 """Claude Code status line renderer.
 
 Two-line display:
-  Line 1: [Model] location | skill | context
+  Line 1: [Model] location | git-changes | code-churn
   Line 2: context bar pct% | $cost | duration
 
-Location logic (L1):
+Location logic:
   - Worktree: show worktree dir name
   - Normal repo: show repo basename
   - Append @branch if branch differs from displayed name
 
-Skill (L2): active skill name, coloured by category.
-Context (L3): free-text description of where in the process.
+All data derived from session JSON on stdin — no external state files.
 
 Configure in ~/.claude/settings.json:
   "statusLine": {
@@ -39,33 +38,6 @@ RED = "\033[31m"
 BLUE = "\033[34m"
 MAGENTA = "\033[35m"
 WHITE = "\033[37m"
-
-# Skill colours by category
-SKILL_COLOUR = {
-    # Design skills — blue
-    "brainstorming": BLUE,
-    "asking-clarifying-questions": BLUE,
-    "writing-design-plans": BLUE,
-    "starting-a-design-plan": BLUE,
-    "flesh-it-out": BLUE,
-    # Planning skills — magenta
-    "starting-an-implementation-plan": MAGENTA,
-    "writing-implementation-plans": MAGENTA,
-    # Execution skills — green
-    "executing-impl": GREEN,
-    "executing-an-implementation-plan": GREEN,
-    "code-review": CYAN,
-    "requesting-code-review": CYAN,
-    # Defensive skills — yellow
-    "systematic-debugging": YELLOW,
-    "controlled-dependency-upgrade": YELLOW,
-    "restate-our-assumptions": YELLOW,
-    "proleptic-challenge": YELLOW,
-    # Gates — cyan
-    "human-uat-gate": CYAN,
-    "finishing-a-development-branch": CYAN,
-    "finishing": CYAN,
-}
 
 
 def git_location(cwd: str) -> str:
@@ -102,7 +74,6 @@ def git_location(cwd: str) -> str:
         ).strip()
         # Resolve to absolute for comparison
         common_dir = os.path.realpath(common_dir)
-        git_dir_in_toplevel = os.path.join(toplevel, ".git")
 
         is_worktree = os.path.realpath(common_dir) != os.path.realpath(
             os.path.join(toplevel, ".git")
@@ -164,38 +135,6 @@ def git_changes(cwd: str) -> tuple[int, int]:
     return staged, modified
 
 
-def workflow_crumb(cwd: str) -> str:
-    """Read workflow state and render breadcrumb: skill | context."""
-    dir_hash = hashlib.md5(cwd.encode()).hexdigest()
-    state_file = os.path.expanduser(f"~/.claude/workflow-state/{dir_hash}.json")
-
-    if not os.path.exists(state_file):
-        return ""
-
-    with open(state_file) as f:
-        state = json.load(f)
-
-    feature = state.get("feature", "")
-    skill = state.get("skill", "")
-    context = state.get("context", "")
-
-    if not skill and not context and not feature:
-        return ""
-
-    sep = f"{DIM} \u276f {RST}"
-    parts = []
-
-    if feature:
-        parts.append(f"{BOLD}{WHITE}{feature}{RST}")
-    if skill:
-        colour = SKILL_COLOUR.get(skill, WHITE)
-        parts.append(f"{colour}{skill}{RST}")
-    if context:
-        parts.append(f"{DIM}{context}{RST}")
-
-    return sep.join(parts)
-
-
 def main():
     data = json.load(sys.stdin)
 
@@ -212,15 +151,14 @@ def main():
     cost_data = data.get("cost", {})
     cost = cost_data.get("total_cost_usd") or 0
     duration_ms = cost_data.get("total_duration_ms") or 0
+    lines_added = cost_data.get("total_lines_added") or 0
+    lines_removed = cost_data.get("total_lines_removed") or 0
 
     # ── Location ────────────────────────────────────────────────────────
     location = git_location(cwd)
     staged, modified = git_changes(cwd)
 
-    # ── Workflow ────────────────────────────────────────────────────────
-    crumb = workflow_crumb(cwd)
-
-    # ── Line 1: model, location, git changes, workflow ──────────────────
+    # ── Line 1: model, location, git changes, code churn ────────────────
     line1 = f"{CYAN}[{model}]{RST} {BLUE}{location}{RST}"
 
     git_extra = ""
@@ -231,8 +169,8 @@ def main():
     if git_extra:
         line1 += f" {git_extra}"
 
-    if crumb:
-        line1 += f" {DIM}|{RST} {crumb}"
+    if lines_added or lines_removed:
+        line1 += f" {DIM}|{RST} {GREEN}+{lines_added}{RST}/{RED}-{lines_removed}{RST}"
 
     # ── Line 2: context bar, cost, duration ──────────────────────────────
     if pct >= 90:

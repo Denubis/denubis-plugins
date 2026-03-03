@@ -14,19 +14,6 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | Command args |
-|------------|-------------|
-| Entry (presenting options) | `--skill "finishing" --context "choose: merge, PR, or discard?"` |
-| Discard confirmation | `--context "confirm discard?"` |
-| After choice executed | `--context ""` |
-| All done | `--clear` |
-
 ## The Process
 
 ### Step 1: Verify Tests
@@ -150,15 +137,7 @@ Then: Cleanup worktree (Step 6)
 
 **Step 1: Find the issue reference**
 
-Check the workflow state for the `issue` field:
-
-```bash
-WS_DIR="$HOME/.claude/workflow-state"
-DIR_HASH=$(echo -n "$PWD" | md5sum | cut -d' ' -f1)
-STATE_FILE="$WS_DIR/$DIR_HASH.json"
-```
-
-Read `STATE_FILE` and extract the `issue` value. If empty, check the design plan file (look in `docs/design-plans/` for the `**GitHub Issue:**` field matching the current feature slug).
+Check the design plan file (look in `docs/design-plans/` for the `**GitHub Issue:**` field matching the current feature slug).
 
 If no issue reference is found, skip this step.
 

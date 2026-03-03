@@ -14,20 +14,6 @@ Orchestrate the transition from design document to executable implementation thr
 
 **Announce at start:** "I'm using the starting-an-implementation-plan skill to create the implementation plan from your design."
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | Command args |
-|------------|-------------|
-| Entry (set feature from slug) | `--feature "<slug>" --skill "starting-an-implementation-plan" --context ""` |
-| Design plan selection (if no path) | `--context "select design plan"` |
-| Worktree/branch questions | `--context "choose branch/worktree"` |
-| Planning (Claude + sub-skill working) | `--context ""` |
-| Execution handoff | `--context "handoff: ready to execute?"` |
-
 ## REQUIRED: Design Plan Path
 
 **DO NOT GUESS.** If the user has not provided a path to a design plan, you MUST ask for it.
@@ -169,13 +155,6 @@ Parse the issue reference the same way as writing-design-plans:
 | `https://github.com/org/repo/issues/123` | `--repo org/repo` |
 
 **Best-effort:** If `gh` fails, warn and continue. Do not block planning.
-
-**Step 3: Store in workflow state**
-
-```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --issue "<raw-issue-reference>"
-```
 
 ### Check for Implementation Guidance
 

@@ -14,21 +14,6 @@ Bridge the gap between raw user input and structured brainstorming by understand
 
 **Announce at start:** "I'm using the asking-clarifying-questions skill to make sure I understand your requirements correctly."
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry | `asking-clarifying-questions` | `investigating requirements` |
-| Contradiction question to user | | `resolve: <contradiction summary>` |
-| Technical/scope question | | `clarify: <term or boundary>` |
-| Open-ended assumption question | | `verify: <assumption>` |
-| DoD confirmation | | `confirm definition of done` |
-| Between questions (Claude researching) | | `""` |
-
 ## When to Use
 
 Use this skill:

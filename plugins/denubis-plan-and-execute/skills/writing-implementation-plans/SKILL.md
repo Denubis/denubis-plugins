@@ -16,22 +16,6 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry (starting work) | `writing-implementation-plans` | `planning phase structure` |
-| Review mode selection | | `choose: interactive or batch?` |
-| Interactive phase approval | | `review: Phase N plan` |
-| Design decisions phase approval | | `review: design decisions for Phase N` |
-| Blocking implementation question | | `question: <decision needed>` |
-| Test requirements approval | | `review: test requirements` |
-| Between phases (Claude working) | | `""` |
-
 ## Critical: Design Plans Provide Direction, Not Code
 
 **Design plans are intentionally high-level.** They describe components, modules, and contracts — not implementation code. This is by design.

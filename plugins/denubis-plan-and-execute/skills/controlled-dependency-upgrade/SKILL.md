@@ -10,20 +10,6 @@ user-invocable: true
 
 Upgrade dependencies one at a time, reading the changelog before each. Never upgrade blind. Never batch. Every package gets its own test cycle and its own commit.
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry | `controlled-dependency-upgrade` | `auditing dependencies` |
-| Upgrading specific package | | `upgrading: <package-name>` |
-| Unjustified package removal approval | | `approve removal: <package>` |
-| Missing changelog — proceed? | | `no changelog for <package> — proceed?` |
-| Between packages (Claude working) | | `""` |
-
 ## When to Use
 
 - Routine dependency maintenance

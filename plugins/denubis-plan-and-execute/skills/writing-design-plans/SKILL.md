@@ -16,20 +16,6 @@ Complete the design document by appending validated design from brainstorming to
 
 **Context:** Design document already exists with Title, Summary placeholder, confirmed Definition of Done, and Glossary placeholder. This skill appends the body and fills in placeholders.
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry (writing body) | `writing-design-plans` | `writing design body` |
-| Presenting AC for validation | | `review: acceptance criteria` |
-| After AC approved (generating summary) | | `generating summary + glossary` |
-| Proleptic challenge | Sub-skill handles | |
-| After commit | | `""` |
-
 ## Level of Detail: Design vs Implementation
 
 **Design plans are directional and archival.** They can be checked into git and referenced months later. Other design plans may depend on contracts specified here.
@@ -750,17 +736,6 @@ gh issue edit <number> [--repo org/repo] --add-label "design-planned"
 **Best-effort:** If `gh` is not available, not authenticated, or the command fails (e.g., no write access), warn the user and continue. Do not block the workflow.
 
 Example warning: "Could not apply `design-planned` label to #123 — `gh` returned an error. You may want to label it manually."
-
-**Step 3: Update workflow state**
-
-Store the issue reference in the workflow state for downstream skills:
-
-```bash
-WS=~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state.sh
-[ -x "$WS" ] && "$WS" --issue "<raw-issue-reference>"
-```
-
-Where `<raw-issue-reference>` is the value from the `GitHub Issue:` field (e.g., `#123`, `org/repo#123`).
 
 ## Common Rationalizations - STOP
 

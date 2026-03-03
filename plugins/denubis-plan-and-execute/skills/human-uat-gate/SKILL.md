@@ -13,20 +13,6 @@ Present acceptance criteria to the human and wait for explicit verification befo
 
 **Announce at start:** "I'm using the human-uat-gate skill to verify the implementation meets your requirements."
 
-## Workflow Status Line
-
-**On entry** (before presenting UAT):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --skill "human-uat-gate" --context "TEST: verify acceptance criteria"
-```
-
-**After human confirms** (UAT passed):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context ""
-```
-
-This tells the human they need to leave the terminal and test the implementation themselves.
-
 ## When to Invoke
 
 Invoke the UAT gate:

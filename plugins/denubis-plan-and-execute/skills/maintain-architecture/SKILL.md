@@ -16,21 +16,6 @@ Orchestrate standalone architecture documentation maintenance sessions through f
 
 This skill orchestrates maintenance sessions by dispatching subagents for investigation and calling the `update-architecture-docs` inner skill for proposals.
 
-## Workflow Status Line
-
-Update the breadcrumb status line at phase transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry | `maintain-architecture` | `scoping changes` |
-| Computing diff baseline | | `computing baseline` |
-| Dispatching investigators | | `investigating codebase` |
-| Question to user | | `asking: <topic>` |
-| Calling inner skill | | `updating docs` |
-| Between steps (Claude working) | | `""` |
-
 ## Scope Determination
 
 On entry, ask the user what kind of session they want. Use AskUserQuestion:

@@ -22,20 +22,6 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, ca
 
 Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry (investigating codebase) | `brainstorming` | `investigating codebase` |
-| Phase 1 question to user | | `asking: <topic of question>` |
-| Phase 2 approach selection | | `choose approach: <options summary>` |
-| Phase 3 design section validation | | `review: <section name>` |
-| Between steps (Claude working) | | `""` |
-
 ## Quick Reference
 
 | Phase | Key Activities | Tool Usage | Output |

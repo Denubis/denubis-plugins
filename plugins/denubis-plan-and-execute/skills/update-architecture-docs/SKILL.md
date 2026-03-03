@@ -14,23 +14,6 @@ This skill operates on concrete artifacts only: a design plan file path (sub-ski
 
 **Announce at start:** "I'm using the update-architecture-docs skill to assess architecture documentation."
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry (reading current docs) | `update-architecture-docs` | `reading current architecture docs` |
-| Parsing artifact | | `parsing artifact` |
-| Contradiction check | | `checking for contradictions` |
-| HALT (contradiction found) | | `HALT: contradiction detected` |
-| Proposing changes | | `proposing changes` |
-| Writing approved changes | | `writing approved changes` |
-| Bootstrap mode | | `bootstrap: scaffolding docs/architecture/` |
-| Between steps (Claude working) | | `""` |
-
 ## Input Modes
 
 | Mode | Input | Called by |

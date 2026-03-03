@@ -14,18 +14,6 @@ Periodically audit the project's dependency assumptions by applying three philos
 
 Every claim in `docs/dependency-rationale.md` was true when written. This skill tests whether it's still true today.
 
-## Workflow Status Line
-
-Update the breadcrumb at transitions. If the state script is not installed, skip silently.
-
-All commands prefixed with: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh`
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Entry | `restate-our-assumptions` | `auditing dependency rationale` |
-| Full report presented (waiting for direction) | | `review: assumption audit report` |
-| After human directs changes | | `""` |
-
 ## Theoretical Framework
 
 Three lenses, each asking a different question:

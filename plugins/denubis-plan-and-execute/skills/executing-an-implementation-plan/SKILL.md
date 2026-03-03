@@ -43,33 +43,6 @@ A build fails. You change something without reading the error properly. It fails
 
 **Check:** `git branch --show-current` — if it returns `main` or `master`, you are in the wrong place.
 
-## Workflow Status Line
-
-Update the breadcrumb status line at phase transitions so the human knows what's happening when they tab back to this session. If the state script is not installed, skip these silently.
-
-**On entry** (after discovering phases, extract slug from plan directory name):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --feature "<slug>" --skill "executing-impl" --context ""
-```
-
-**When reading each phase** (extract phase name from title, e.g. "CRDT Cloning" from "Phase 4: CRDT Cloning"):
-```bash
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh --context "Phase N: <Phase Name>"
-```
-
-| Transition | `--skill` | `--context` |
-|------------|-----------|-------------|
-| Executing tasks | `executing-impl` | `Phase N: <name> — Task M` |
-| Code review running | `code-review` | `reviewing Phase N` |
-| Three-strike help needed | | `BLOCKED: 3 failures — need direction` |
-| Proleptic challenge presented | `proleptic-challenge` | sub-skill handles |
-| After human evaluates proleptic | `executing-impl` | `Phase N: <name>` |
-| UAT gate presented | `human-uat-gate` | sub-skill handles |
-| After UAT confirmed | `executing-impl` | `Phase N: <name>` |
-| Phase refactor running | `executing-impl` | `refactoring Phase N` |
-| Final code review | `code-review` | `final review` |
-| Finishing branch | `finishing` | sub-skill handles |
-
 ## MANDATORY: Human Transparency
 
 **The human cannot see what subagents return. You are their window into the work.**
