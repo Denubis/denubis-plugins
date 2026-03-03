@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-hook-branch-bg] 0.2.1
+
+Reduce base lightness from 0.18 to 0.15 — two clicks darker per user feedback.
+
+**Changed:**
+- Base lightness 0.18 → 0.15, branch range 0.14–0.22 → 0.11–0.19
+
 ## [denubis-git-commit] 1.1.0
 
 Avoid command substitution injection warnings in commit commands.
