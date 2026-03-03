@@ -93,13 +93,9 @@ For each commit:
 # Stage specific files (never git add -A or git add .)
 git add file1.py file2.py
 
-# Commit with HEREDOC for formatting
-git commit -m "$(cat <<'EOF'
-Commit message here.
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
+# Write message to temp file, commit with -F, clean up
+# This avoids $() command substitution which triggers injection warnings.
+printf '%s\n' 'Commit message here.' '' 'Co-Authored-By: Claude <noreply@anthropic.com>' > /tmp/commit-msg.txt && git commit -F /tmp/commit-msg.txt && rm -f /tmp/commit-msg.txt
 ```
 
 After all commits:
@@ -126,7 +122,7 @@ State what was committed. If there are remaining uncommitted changes, mention th
 - Use `-i` flag (interactive mode not supported)
 
 **ALWAYS:**
-- Use HEREDOC for commit messages
+- Use `printf > /tmp/commit-msg.txt && git commit -F /tmp/commit-msg.txt && rm -f /tmp/commit-msg.txt` for commit messages (avoids `$()` injection warnings)
 - Include `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Stage files by name, not by wildcard
 - Run `git status` after committing to verify
