@@ -22,7 +22,7 @@
         {
             "name": "denubis-plan-and-execute",
             "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-            "version": "2.15.1",
+            "version": "2.16.0",
             "source": "./plugins/denubis-plan-and-execute",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -110,7 +110,7 @@
         {
             "name": "denubis-git-commit",
             "description": "Git commit skill for Claude Code. Handles /commit as a proper skill.",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "source": "./plugins/denubis-git-commit",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -172,8 +172,8 @@
         },
         {
             "name": "denubis-hook-branch-bg",
-            "description": "SessionStart hook that sets terminal background colour based on git repo path (hue) and branch (saturation) via OSC 11.",
-            "version": "0.1.0",
+            "description": "SessionStart hook that sets terminal background colour based on git repo (hue) and branch (hue/lightness/saturation offsets) via OSC 11. Uses git-common-dir so worktrees share a colour family.",
+            "version": "0.2.0",
             "source": "./plugins/denubis-hook-branch-bg",
             "author": {
                 "name": "Brian Ballsun-Stanton",

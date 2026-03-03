@@ -1,5 +1,42 @@
 # Changelog
 
+## [denubis-git-commit] 1.1.0
+
+Avoid command substitution injection warnings in commit commands.
+
+**Changed:**
+- Replace `git commit -m "$(cat <<'EOF'...)"` with `printf > /tmp/commit-msg.txt && git commit -F` approach
+- No `$()` or backticks in the commit command, so Claude Code's injection detection doesn't trigger
+
+## [denubis-plan-and-execute] 2.16.0
+
+Remove workflow state machinery from statusline and all skills.
+
+**Changed:**
+- Statusline now derives all data from session JSON — no external state files, no Bash permission prompts
+- Added session-level code churn (+lines/-lines) to statusline line 1
+- Removed workflow breadcrumb (feature/skill/context) from statusline
+
+**Removed:**
+- `workflow-state.sh` and `workflow-state-wrapper.sh` (state writer scripts)
+- `workflow-statusline.sh` (Bash duplicate of statusline renderer)
+- "Workflow Status Line" sections from all 16 skills
+- `~/.claude/workflow-state/` directory dependency
+
+## [denubis-hook-branch-bg] 0.2.0
+
+Fix colour differentiation — visible repo identity and worktree distinction.
+
+**Changed:**
+- Use `git-common-dir` instead of `--show-toplevel` so all worktrees of the same repo share a colour family
+- `main`/`master` sits at the exact base colour (H=base, L=0.18, S=0.60); branches offset from it
+- Branch hash offsets hue (±40°), lightness (±0.03), and saturation (±0.10)
+- Lightness 0.10 → 0.18 (doubles perceptible colour range while maintaining WCAG AAA contrast)
+
+**Fixed:**
+- Worktrees appeared as unrelated colours (different `--show-toplevel` paths → different hues)
+- At L=0.10 only ~3 hue groups were perceptible (brown/green/purple); now 12+ distinguishable
+
 ## [denubis-hook-branch-bg] 0.1.0
 
 SessionStart hook for visual terminal differentiation via background colour.
