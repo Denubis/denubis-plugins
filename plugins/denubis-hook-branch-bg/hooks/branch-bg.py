@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Set terminal background colour based on git repo path and branch via OSC 11.
+"""Set terminal background colour based on git repo and branch via OSC 11.
 
-Path controls hue (project identity), branch controls saturation (branch differentiation).
-Lightness is fixed dark for terminal readability.
+Repo (via git-common-dir) sets the base hue at L=0.18, S=0.60.
+Branch hash offsets hue (±40°), lightness (±0.03), and saturation (±0.10)
+to create visually related but distinct colours per worktree.
 """
 
 import colorsys
@@ -14,36 +15,53 @@ import sys
 
 
 def get_git_info() -> tuple[str | None, str | None]:
-    """Return (repo_root, branch_name) or (None, None) if not in a git repo."""
+    """Return (common_dir, branch_name) or (None, None) if not in a git repo.
+
+    Uses --git-common-dir so all worktrees of the same repo share an identity.
+    """
     try:
-        root = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
+        common = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
             capture_output=True, text=True, timeout=5,
         )
         branch = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True, text=True, timeout=5,
         )
-        if root.returncode == 0 and branch.returncode == 0:
-            return root.stdout.strip(), branch.stdout.strip()
+        if common.returncode == 0 and branch.returncode == 0:
+            # Resolve to absolute so the hash is stable regardless of cwd
+            common_dir = os.path.realpath(common.stdout.strip())
+            return common_dir, branch.stdout.strip()
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     return None, None
 
 
-def git_info_to_colour(repo_path: str, branch: str) -> str:
-    """Map repo path to hue, branch to saturation, fixed dark lightness."""
-    path_hash = hashlib.sha256(repo_path.encode()).hexdigest()
-    branch_hash = hashlib.sha256(branch.encode()).hexdigest()
+def git_info_to_colour(repo_id: str, branch: str) -> str:
+    """Map repo to base hue, branch to offsets in hue/lightness/saturation.
 
-    # Path -> hue (0.0-1.0)
-    hue = int(path_hash[:8], 16) % 360 / 360.0
+    main/master sits at the exact base colour (H=base, L=0.18, S=0.60).
+    All other branches offset from that centre point.
+    """
+    repo_hash = hashlib.sha256(repo_id.encode()).hexdigest()
 
-    # Branch -> saturation (0.20-0.70)
-    sat = 0.20 + (int(branch_hash[:8], 16) % 50) / 100.0
+    # Repo -> base hue (0-360°)
+    base_hue = int(repo_hash[:8], 16) % 360
 
-    # Fixed dark lightness for terminal backgrounds
-    lightness = 0.10
+    if branch in ("main", "master"):
+        hue = base_hue / 360.0
+        lightness = 0.18
+        sat = 0.60
+    else:
+        branch_hash = hashlib.sha256(branch.encode()).hexdigest()
+        bh = int(branch_hash[:8], 16)
+        hue_offset = (bh % 81) - 40            # -40 to +40 degrees
+        lightness_offset = ((bh >> 8) % 7 - 3) * 0.01  # -0.03 to +0.03
+        sat_offset = ((bh >> 16) % 21 - 10) * 0.01     # -0.10 to +0.10
+
+        hue = ((base_hue + hue_offset) % 360) / 360.0
+        lightness = max(0.14, min(0.22, 0.18 + lightness_offset))
+        sat = max(0.40, min(0.80, 0.60 + sat_offset))
 
     r, g, b = colorsys.hls_to_rgb(hue, lightness, sat)
     return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
@@ -81,10 +99,10 @@ def set_terminal_bg(colour: str) -> None:
 
 
 def main() -> None:
-    repo_path, branch = get_git_info()
+    repo_id, branch = get_git_info()
 
-    if repo_path and branch:
-        colour = git_info_to_colour(repo_path, branch)
+    if repo_id and branch:
+        colour = git_info_to_colour(repo_id, branch)
         set_terminal_bg(colour)
 
     # Hook JSON output
