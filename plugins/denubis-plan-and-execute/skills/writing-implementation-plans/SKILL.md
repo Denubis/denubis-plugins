@@ -525,6 +525,10 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 
 6. **Use AskUserQuestion:**
 
+**The question MUST summarise what's being approved.** Don't just say "Approved?" — state the key deliverables of this phase in the question text so the human knows what they're signing off on.
+
+Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
+
 **Options:**
 - "Approved - proceed to next phase"
 - "Needs revision - [describe changes]"
@@ -592,7 +596,7 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 |------|----------|----------------|
 | **Popper (falsification)** | What would prove this decision wrong? → This IS the human-testable UAT | **Always.** Every decision gets a falsification test the human can perform. |
 | **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
-| **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Always.** Every decision has a perspective worth naming. |
+| **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Only when interesting.** Include for: vendor/platform lock-in, data residency, accessibility, security model, cost distribution, technology that constrains future options. Omit for routine structural decisions. Its presence signals "someone bears an invisible cost." |
 
 **Lakatos discipline:**
 - The hard core = design plan's architectural commitments (inherited, not questioned here)
@@ -655,7 +659,7 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 **Design decisions in this phase:**
 
-### Decision 1: [Concise description of the choice]
+### Decision 1: [Vendor/platform choice with invisible costs]
 **Popper (your UAT):** If this decision is right, you should be able to:
 [concrete interaction the human can perform — CLI command, URL to visit,
 observable output, UI state to inspect]. You should see [expected outcome].
@@ -668,16 +672,18 @@ Absent: [whose perspective wasn't consulted].
 **Lakatos: DEGENERATING** — [specific evidence: what workaround is required,
 which code outside this phase's scope needs modification, which later phase
 is made harder, or what existing capability is being duplicated and why].
-**Haraway:** [perspective analysis]
 
-### Decision 3: [Routine choice — no Lakatos needed]
+### Decision 3: [Routine choice — no Lakatos or Haraway needed]
 **Popper (your UAT):** [falsification test]
-**Haraway:** [perspective analysis]
 
 [Continue for all non-trivial decisions in this phase...]
 ```
 
 7. **Use AskUserQuestion:**
+
+**The question MUST summarise what's being approved.** State the number of decisions reviewed, any Lakatos/Haraway flags raised, and the phase's key deliverables.
+
+Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — retry wrapper). Creates auth middleware and token service, covers AC2.1-AC2.3."
 
 **Options:**
 - "Approved - proceed to write phase and continue"
@@ -826,7 +832,7 @@ These are violations of the skill requirements:
 | "All decisions in this phase are PROGRESSIVE" | Unlikely. Most decisions are routine. PROGRESSIVE requires citing a specific downstream phase that gets simpler. Omit Lakatos for routine choices. |
 | "Lakatos doesn't apply to any decisions here" | Possible for simple phases. But if you're adding workarounds, shims, or code that a later phase will undo — that's degeneration. Flag it. |
 | "Design decisions mode but I'll show implementation tasks too" | No. Show decisions and lens analysis only. Implementation tasks go to disk for subagents, not to the human. |
-| "This decision has no perspective worth naming" | Every choice has a perspective. Name who made it and who bears the cost. Haraway is always present. |
+| "This decision has no perspective worth naming" | Most routine decisions don't. But vendor lock-in, data residency, accessibility, security, and cost distribution always have invisible costs. Include Haraway when someone bears a cost the decision-maker doesn't see. |
 
 **All of these mean: STOP. Follow the requirements exactly.**
 
@@ -890,7 +896,7 @@ Which approach should I take?
 - [ ] **Task NC:** Mark in_progress, research external deps if needed (or mark completed with "N/A"), mark completed
 - [ ] Write complete tasks with exact paths and code based on investigator and research findings
 - [ ] **If interactive mode:** Output complete phase plan, use AskUserQuestion for approval
-- [ ] **If design decisions mode:** Identify decisions, apply three lenses (Popper always, Lakatos only when interesting, Haraway always), present for approval
+- [ ] **If design decisions mode:** Identify decisions, apply lenses (Popper always, Lakatos only when interesting, Haraway only when someone bears invisible cost), present for approval
 - [ ] **Task ND:** Mark in_progress, write to absolute path in task description, mark completed
 
 **For each task in the plan:**

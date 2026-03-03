@@ -487,7 +487,9 @@ For design plan `2025-01-18-oauth2-svc-authn-42.md`, the slug is `oauth2-svc-aut
 
 ### Validation
 
-Present generated criteria to the user. Use AskUserQuestion: "Review the acceptance criteria. Approve to continue, or describe what's missing or needs revision."
+Present generated criteria to the user. **The question MUST summarise what's being approved** — state the number of criteria, which DoD items they cover, and how many success vs failure cases.
+
+Example: "Generated 8 acceptance criteria (5 success, 3 failure) covering all 3 DoD items. AC1-AC3 cover auth flow, AC4-AC5 cover token refresh, AC6-AC8 cover error cases. Approve to continue, or describe what's missing or needs revision."
 
 Loop until approved. Then replace the placeholder in the document and proceed to Summary/Glossary.
 

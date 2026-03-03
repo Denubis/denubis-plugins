@@ -16,6 +16,8 @@ Remove workflow state machinery from statusline and all skills.
 - Statusline now derives all data from session JSON — no external state files, no Bash permission prompts
 - Added session-level code churn (+lines/-lines) to statusline line 1
 - Removed workflow breadcrumb (feature/skill/context) from statusline
+- Haraway lens now conditional ("only when someone bears invisible cost") instead of mandatory on every decision
+- Approval prompts must summarise what's being approved (key deliverables, AC coverage, flags raised)
 
 **Removed:**
 - `workflow-state.sh` and `workflow-state-wrapper.sh` (state writer scripts)

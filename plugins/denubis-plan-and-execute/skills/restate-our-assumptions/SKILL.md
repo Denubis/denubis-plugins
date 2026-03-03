@@ -161,7 +161,7 @@ The user decides:
 | Principle | Rationale |
 |-----------|-----------|
 | Evidence from the codebase, not speculation | Cite files and line numbers. Philosophy without evidence is unfounded. |
-| All three lenses on every dependency | Each lens catches different problems. Popper catches stale claims. Lakatos catches degenerating commitments. Haraway catches invisible costs. |
+| Popper and Lakatos on every dependency; Haraway when someone bears invisible cost | Popper catches stale claims. Lakatos catches degenerating commitments. Haraway catches invisible costs — include it for vendor lock-in, data residency, accessibility, security, cost distribution. Omit for stdlib or single-purpose utilities where the perspective analysis adds no insight. |
 | Present findings, don't make changes | The review produces analysis for human judgement. The human decides what to act on. |
 | The human decides | Findings are inputs to judgement, not verdicts. Present and wait. |
 
@@ -170,7 +170,7 @@ The user decides:
 If you find yourself reasoning any of these, you're rationalising:
 - "The philosophy is overkill for a small project" → Small projects accumulate debt fastest. Review anyway.
 - "I already know these packages are fine" → The point is to test that assumption. Review anyway.
-- "I'll just check imports, skip the Lakatos/Haraway analysis" → Each lens catches different things. All three, every time.
+- "I'll just check imports, skip the Lakatos analysis" → Lakatos catches degenerating commitments. Always include it. Haraway when someone bears invisible cost.
 - "I can do this analysis without searching the codebase" → Philosophy without evidence is speculation. Search.
 - "The rationale file is up to date, no review needed" → Rationale files describe intent; the codebase describes reality. They drift. Review.
 - "I'll update the rationale file based on my findings" → Present findings to the user. They decide what changes.
