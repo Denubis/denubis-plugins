@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Set terminal background colour based on git repo and branch via OSC 11.
 
-Repo (via git-common-dir) sets the base hue at L=0.15, S=0.60.
+Repo (via git-common-dir) sets the base hue at L=0.12, S=0.60.
 Branch hash offsets hue (±40°), lightness (±0.03), and saturation (±0.10)
 to create visually related but distinct colours per worktree.
 """
@@ -40,7 +40,7 @@ def get_git_info() -> tuple[str | None, str | None]:
 def git_info_to_colour(repo_id: str, branch: str) -> str:
     """Map repo to base hue, branch to offsets in hue/lightness/saturation.
 
-    main/master sits at the exact base colour (H=base, L=0.15, S=0.60).
+    main/master sits at the exact base colour (H=base, L=0.12, S=0.60).
     All other branches offset from that centre point.
     """
     repo_hash = hashlib.sha256(repo_id.encode()).hexdigest()
@@ -50,7 +50,7 @@ def git_info_to_colour(repo_id: str, branch: str) -> str:
 
     if branch in ("main", "master"):
         hue = base_hue / 360.0
-        lightness = 0.15
+        lightness = 0.12
         sat = 0.60
     else:
         branch_hash = hashlib.sha256(branch.encode()).hexdigest()
@@ -60,7 +60,7 @@ def git_info_to_colour(repo_id: str, branch: str) -> str:
         sat_offset = ((bh >> 16) % 21 - 10) * 0.01     # -0.10 to +0.10
 
         hue = ((base_hue + hue_offset) % 360) / 360.0
-        lightness = max(0.11, min(0.19, 0.15 + lightness_offset))
+        lightness = max(0.08, min(0.16, 0.12 + lightness_offset))
         sat = max(0.40, min(0.80, 0.60 + sat_offset))
 
     r, g, b = colorsys.hls_to_rgb(hue, lightness, sat)

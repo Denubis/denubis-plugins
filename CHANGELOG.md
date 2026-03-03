@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-hook-branch-bg] 0.2.2
+
+Reduce base lightness to 0.12 — still too bright at 0.15.
+
+**Changed:**
+- Base lightness 0.15 → 0.12, branch range 0.11–0.19 → 0.08–0.16
+
 ## [denubis-hook-branch-bg] 0.2.1
 
 Reduce base lightness from 0.18 to 0.15 — two clicks darker per user feedback.
