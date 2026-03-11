@@ -70,6 +70,7 @@ HEAD_SHA=$(git rev-parse HEAD)
   BASE_SHA: [commit before work]
   HEAD_SHA: [current commit]
   DESCRIPTION: [brief summary]
+  SCRATCHPAD_DIR: [path from caller, if provided]
 </parameter>
 </invoke>
 ```

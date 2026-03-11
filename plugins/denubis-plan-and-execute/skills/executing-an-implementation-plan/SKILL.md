@@ -136,6 +136,21 @@ If `docs/implementation-plans/` doesn't exist or is empty, ask the user to provi
 
 ## The Process
 
+### 0. Create Session-Isolated Scratchpad
+
+```bash
+# Extract slug from plan directory name (last path component)
+SLUG=$(basename "[plan-directory]")
+# Generate unique session ID
+SESSION_ID=$(printf '%04x%04x' $RANDOM $RANDOM)
+# Create scratchpad path
+SCRATCHPAD_DIR="/tmp/exec-${SLUG}-${SESSION_ID}"
+mkdir -p "${SCRATCHPAD_DIR}"
+echo "${SCRATCHPAD_DIR}"
+```
+
+Pass `SCRATCHPAD_DIR` to all code review invocations. This prevents file collisions when multiple planning or execution sessions run in parallel.
+
 ### 1. Discover Phases
 
 **DO NOT read the full phase files yet.** List them and read only the header and task markers.
