@@ -44,6 +44,30 @@ Don't test:
 
 Same cycle as code TDD, different test format.
 
+## Choosing Models for Testing
+
+### RED Phase Model
+
+Run RED-phase tests at the model level you expect in production. If the skill will primarily be used by Sonnet agents, test with `denubis-basic-agents:sonnet-general-purpose`. If you're unsure which model users will run, use AskUserQuestion to ask — recommend Sonnet as the default.
+
+The RED phase needs realistic baseline behaviour. A stronger model might avoid pitfalls naturally; a weaker one might fail for unrelated reasons. Test at the level that represents actual usage.
+
+### GREEN Phase Model
+
+Run GREEN-phase tests one model tier below your expected production model. If you tested RED with Sonnet, test GREEN with Haiku. If you tested RED with Opus, test GREEN with Sonnet.
+
+The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough.
+
+### No Blaming the Model
+
+If the agent doesn't follow the skill, the skill is not clear enough. "Haiku is too weak for this" and "Sonnet didn't understand" are not valid conclusions — they are rationalizations for unclear instructions. If a model at your chosen test tier cannot follow the skill:
+
+1. The skill's instructions are ambiguous, incomplete, or rely on implicit knowledge
+2. The skill requires judgement the model tier cannot provide — which means the skill needs to replace that judgement with explicit rules
+3. You chose the wrong test tier — reconsider with AskUserQuestion
+
+**Never conclude "the model is the problem."** The skill is always the problem. If you genuinely cannot make the skill clear enough for a given tier, that's useful information — document it as a minimum model requirement in the skill's frontmatter, with evidence for why.
+
 ## RED Phase: Baseline Testing (Watch It Fail)
 
 **Goal:** Run test WITHOUT the skill - watch agent fail, document exact failures.
@@ -359,16 +383,27 @@ Agents resist single pressure, break under multiple.
 Tests pass once ≠ bulletproof.
 ✅ Fix: Continue REFACTOR cycle until no new rationalizations.
 
+**❌ Declaring results "flaky" without investigation**
+Test fails, you rerun, it passes. "Flaky" is not a diagnosis — it's a symptom. Something caused the failure. Nondeterminism in LLM responses is not an excuse; your test scenarios should be robust enough to produce consistent directional results.
+✅ Fix: When a test produces inconsistent results:
+1. Run it 3 times minimum. Document each result.
+2. If results are mixed: the skill is ambiguous in a way that allows the model to go either way. That's a skill clarity problem, not a flakiness problem.
+3. If you genuinely cannot resolve the inconsistency: refer it. Create an issue or offer the human a worktree + prompt for a separate session. **Never silently move on from inconsistent results.**
+
+**❌ Blaming the model tier**
+"Haiku can't handle this" is almost always "my instructions aren't clear enough for Haiku."
+✅ Fix: See "No Blaming the Model" above. The skill is always the problem first.
+
 ## Quick Reference (TDD Cycle)
 
-| TDD Phase | Skill Testing | Success Criteria |
-|-----------|---------------|------------------|
-| **RED** | Run scenario without skill | Agent fails, document rationalizations |
-| **Verify RED** | Capture exact wording | Verbatim documentation of failures |
-| **GREEN** | Write skill addressing failures | Agent now complies with skill |
-| **Verify GREEN** | Re-test scenarios | Agent follows rule under pressure |
-| **REFACTOR** | Close loopholes | Add counters for new rationalizations |
-| **Stay GREEN** | Re-verify | Agent still complies after refactoring |
+| TDD Phase | Skill Testing | Model | Success Criteria |
+|-----------|---------------|-------|------------------|
+| **RED** | Run scenario without skill | Production-level (default: Sonnet) | Agent fails, document rationalizations |
+| **Verify RED** | Capture exact wording | Same as RED | Verbatim documentation of failures |
+| **GREEN** | Write skill addressing failures | One tier down (default: Haiku) | Agent now complies with skill |
+| **Verify GREEN** | Re-test scenarios | Same as GREEN | Agent follows rule under pressure |
+| **REFACTOR** | Close loopholes | Same as GREEN | Add counters for new rationalizations |
+| **Stay GREEN** | Re-verify | Same as GREEN | Agent still complies after refactoring |
 
 ## The Bottom Line
 
