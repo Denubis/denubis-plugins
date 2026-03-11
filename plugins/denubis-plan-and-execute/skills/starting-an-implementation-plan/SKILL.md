@@ -287,7 +287,7 @@ Ready to execute? This requires fresh context to work effectively.
 
 (1) Copy this command now:
 
-/denubis-plan-and-execute:execute-implementation-plan /Users/ed/project/.worktrees/oauth2-feature-42/docs/implementation-plans/2025-01-17-oauth2-feature-42/ /Users/ed/project/.worktrees/oauth2-feature-42/
+/denubis-plan-and-execute:executing-an-implementation-plan /Users/ed/project/.worktrees/oauth2-feature-42/docs/implementation-plans/2025-01-17-oauth2-feature-42/ /Users/ed/project/.worktrees/oauth2-feature-42/
 
 (2) Clear your context:
 

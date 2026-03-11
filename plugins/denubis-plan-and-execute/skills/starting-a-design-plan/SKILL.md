@@ -377,7 +377,7 @@ Ready to create the implementation plan? This requires fresh context to work eff
 
 (1) Copy this command now:
 ```
-/denubis-plan-and-execute:start-implementation-plan @docs/design-plans/[full-filename].md .
+/denubis-plan-and-execute:starting-an-implementation-plan @docs/design-plans/[full-filename].md .
 ```
 (the `.` at the end is necessary or else Claude Code will eat the command and do the wrong thing.)
 
