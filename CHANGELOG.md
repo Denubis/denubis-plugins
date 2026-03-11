@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.17.0
+
+Epistemic discipline improvements and session isolation, inspired by upstream ed3d-plugins.
+
+**New:**
+- Systematic debugging: second Iron Law (no changes without written predictions), "Read the Documentation" phase, mandatory Bayesian update with human checkpoint, preexisting bug protocol
+- Session isolation: SCRATCHPAD_DIR for parallel planning/execution sessions
+
+**Fixed:**
+- Slash command names in handoff instructions (starting-a-design-plan, starting-an-implementation-plan)
+
+## [denubis-extending-claude] 1.5.0
+
+Model-tier testing guidance, anti-flakiness rules, and marketplace skill.
+
+**New:**
+- Testing skills with subagents: model-tier guidance (RED at production, GREEN one tier down), "No Blaming the Model" section, no-silent-flaky rule
+- Maintaining-a-marketplace skill (adapted from upstream ed3d-plugins)
+
 ## [denubis-hook-branch-bg] 0.2.2
 
 Reduce base lightness to 0.12 — still too bright at 0.15.

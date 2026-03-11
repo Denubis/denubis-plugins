@@ -22,7 +22,7 @@
         {
             "name": "denubis-plan-and-execute",
             "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-            "version": "2.16.0",
+            "version": "2.17.0",
             "source": "./plugins/denubis-plan-and-execute",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -55,7 +55,7 @@
         {
             "name": "denubis-extending-claude",
             "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, maintaining CLAUDE.md, archiving transcripts, and syncing with upstream",
-            "version": "1.4.0",
+            "version": "1.5.0",
             "source": "./plugins/denubis-extending-claude",
             "author": {
                 "name": "Brian Ballsun-Stanton",
