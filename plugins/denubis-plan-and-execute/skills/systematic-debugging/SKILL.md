@@ -14,13 +14,19 @@ Random fixes waste time and create new bugs. Quick patches mask underlying issue
 
 **Violating the letter of this process is violating the spirit of debugging.**
 
-## The Iron Law
+## The Iron Laws
 
 ```
 NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 ```
 
 If you haven't completed Phase 1, you cannot propose fixes.
+
+```
+NO CHANGES WITHOUT WRITTEN PREDICTIONS
+```
+
+Every change you make — every single one — must have a written prediction BEFORE you make it: "I expect this change to produce [specific observable result] because [specific reasoning]." If you cannot write that sentence, you do not understand the problem well enough to touch the code. And after every failed attempt: "I predicted X. I observed Y instead. This tells me Z about my model of the system." No second attempt without that written update. This is not optional reflection — it is a mandatory checkpoint.
 
 ## Anti-Pattern: "I Think This Should Work"
 
@@ -72,13 +78,20 @@ You MUST complete each phase before proceeding to the next.
    - Read stack traces completely
    - Note line numbers, file paths, error codes
 
-2. **Reproduce Consistently**
+2. **Read the Documentation**
+   - Before forming any hypothesis, read the official documentation for the component that's failing
+   - What does the API/library/tool claim to do? What are its constraints? What version are you on?
+   - Read the source as necessary — but docs first. The docs tell you what the system is *supposed* to do; the source tells you what it *actually* does. You need both, but start with intent before implementation
+   - Check changelogs and migration guides if you recently upgraded
+   - This is your "literature review" — what is already known about this system before you start experimenting?
+
+3. **Reproduce Consistently**
    - Can you trigger it reliably?
    - What are the exact steps?
    - Does it happen every time?
    - If not reproducible → gather more data, don't guess
 
-3. **Establish Differential Baseline**
+4. **Establish Differential Baseline**
 
    **MANDATORY.** Before any hypothesis can be formed, establish the concrete difference between the reference state and the current state. Every subsequent claim about root cause must trace back to this differential.
 
@@ -92,7 +105,7 @@ You MUST complete each phase before proceeding to the next.
 
    **This differential gates all subsequent phases.** No claim about root cause is valid unless it references specific lines from this diff (or, for pre-existing bugs, specific lines that contradict the specification).
 
-4. **Gather Evidence in Multi-Component Systems**
+5. **Gather Evidence in Multi-Component Systems**
 
    **WHEN system has multiple components (CI → build → signing, API → service → database):**
 
@@ -130,7 +143,7 @@ You MUST complete each phase before proceeding to the next.
 
    **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
 
-5. **Trace Data Flow**
+6. **Trace Data Flow**
 
    **WHEN error is deep in call stack**, trace backward:
    - Where does bad value originate?
@@ -186,11 +199,16 @@ You MUST complete each phase before proceeding to the next.
    - One variable at a time
    - Don't fix multiple things at once
 
-4. **Evaluate Against Prediction**
-   - Did the result match your prediction? Yes → Phase 4
-   - Did it contradict your prediction? Hypothesis falsified — form NEW hypothesis based on what you learned
-   - DON'T add more fixes on top of a falsified hypothesis
-   - **Pause and report:** Tell the human what you predicted, what you observed, and what that means
+4. **Evaluate Against Prediction (Mandatory Bayesian Update)**
+   - Did the result match your prediction? Yes → Phase 3b
+   - Did it contradict your prediction? **STOP. Do not attempt another fix. Write the update and present it to the human:**
+     - "I predicted [X]. I observed [Y]. This tells me [Z] about my model of the system."
+     - "My prior belief was [A]. Given this evidence, I now believe [B]."
+     - "This rules out [C] and makes [D] more likely because [E]."
+     - "My proposed next hypothesis is [H]. Does this reasoning make sense to you?"
+   - **Wait for human feedback before proceeding.** The human may see something you missed. They may redirect you. They may tell you to investigate a different angle entirely. The Bayesian update is a checkpoint, not a formality.
+   - DON'T form a new hypothesis and keep going autonomously. DON'T add more fixes on top of a falsified hypothesis.
+   - **If you cannot articulate what you learned from the failure, you did not learn anything.** Return to Phase 1 and read more
 
 5. **When You Don't Know**
    - Say "I don't understand X"
@@ -478,6 +496,21 @@ If you catch yourself thinking:
 | **3c. Claim Verification** | Toulmin analysis of every claim, falsification experiments | Every claim confirmed or flagged |
 | **4. Implementation** | Create test, fix, post-fix audit, verify | Bug resolved, tests pass, path clean |
 | **5. Hardening** | Suggest ONE small refactor to resist this bug class | User-approved or declined |
+
+## When Investigation Reveals a Preexisting Bug
+
+You investigated thoroughly. The bug exists on `main`. It predates your work. **This is a finding, not a dismissal.**
+
+"Preexisting" and "flaky" are never exit ramps. They are diagnoses that require action:
+
+1. **Document what you found.** Root cause, affected code paths, reproduction steps.
+2. **Offer a path to the human.** Do not silently move on. Present options:
+   - "This is preexisting. Want me to set up a worktree and give you a prompt to fix this in a separate session?"
+   - "This is intermittent. Want me to create an issue with the reproduction steps?"
+   - "This is upstream. Want me to file a bug report?"
+3. **Get explicit acknowledgement.** The human decides whether to fix now, defer, or accept. You do not get to decide that a bug is someone else's problem.
+
+**No silent flaky.** If a test passes sometimes and fails sometimes, that is a real bug with a real root cause. Intermittent failures have deterministic causes — race conditions, state leakage, ordering dependencies, resource exhaustion. "Flaky" is a description of the symptom, not a diagnosis. Investigate it like any other bug, or refer it to a separate session. Never silently ignore it.
 
 ## When Process Reveals "No Root Cause"
 
