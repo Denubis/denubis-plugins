@@ -1,7 +1,7 @@
 {
     "name": "denubis-plan-and-execute",
     "description": "Planning and execution workflows for Claude Code. Slow and steady. Based on obra/superpowers.",
-    "version": "2.17.0",
+    "version": "2.18.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"
