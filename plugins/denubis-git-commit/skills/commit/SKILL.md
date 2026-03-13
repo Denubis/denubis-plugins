@@ -125,25 +125,31 @@ For each commit:
 ```bash
 # Stage specific files (never git add -A or git add .)
 git add file1.py file2.py
+```
 
-# Step A (first Bash call): write the commit message to a fixed temp file.
-# Use a per-commit path like /tmp/commit-msg-1.txt, /tmp/commit-msg-2.txt
-# for multi-commit plans. Single-quoted heredoc delimiter disables all
-# shell expansion — immune to injection regardless of message content.
-cat > /tmp/commit-msg-1.txt <<'COMMITMSG'
+Then use the **Write tool** (not Bash) to write the commit message:
+
+```
+Write .commit-msg.tmp with content:
+
 Commit message here.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
-COMMITMSG
-
-# Step B (second Bash call): commit using the temp file, then clean up.
-# This is a SEPARATE Bash call — no $() substitution anywhere.
-git commit -F /tmp/commit-msg-1.txt && rm -f /tmp/commit-msg-1.txt
 ```
 
-**Why two separate Bash calls:** Claude Code hooks flag `$()` command substitution as a security concern. By splitting write and commit into separate calls, neither call contains `$()`. The single-quoted heredoc delimiter (`'COMMITMSG'`) disables all shell expansion — no variable substitution, no command substitution, no backslash interpretation. The message is written verbatim.
+Then commit with a **fixed** Bash command (allowable once, reusable forever):
 
-**Never use `printf` or `echo` with commit messages** — both require careful quoting that breaks on special characters (`'`, `"`, `!`, `$`, `` ` ``). Never use `$()` in the same Bash call as the commit.
+```bash
+git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp
+```
+
+**Why Write tool + fixed Bash:**
+- Write tool handles varying message content — no shell quoting, no injection, no `$()`.
+- The Bash command is identical every time regardless of message content. Users can add `Bash(git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp)` to their allow list once.
+- `.commit-msg.tmp` in the working directory is visible, auditable, and cleaned up after commit.
+- If `.commit-msg.tmp` already exists when Write is called, Write will show the user the overwrite — providing natural lockfile protection.
+
+**Never use Bash to write commit messages** — no `printf`, `echo`, `cat`, or heredoc. The Write tool is the only safe path.
 
 After all commits:
 
@@ -170,7 +176,7 @@ State what was committed. If there are remaining uncommitted changes, mention th
 - Use `printf`, `echo`, or `$()` command substitution for commit messages — shell injection risk
 
 **ALWAYS:**
-- Use two separate Bash calls: `cat > /tmp/commit-msg-N.txt <<'COMMITMSG'` then `git commit -F /tmp/commit-msg-N.txt` (no `$()` anywhere)
+- Use Write tool for `.commit-msg.tmp`, then `git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp` — no shell involvement in message content
 - Include `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Stage files by name, not by wildcard
 - Run fast tests before committing
@@ -205,5 +211,5 @@ If a commit is rejected by pre-commit hooks:
 - Fix: Never push unless explicitly asked
 
 **Shell injection in commit messages**
-- Problem: `printf` or `echo` with unescaped special characters (`$`, `` ` ``, `!`, `'`)
-- Fix: Always use heredoc with single-quoted delimiter: `<<'COMMITMSG'`
+- Problem: `printf`, `echo`, `cat`, or heredoc in Bash with unescaped special characters
+- Fix: Always use the Write tool for `.commit-msg.tmp`, never Bash
