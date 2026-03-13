@@ -8,8 +8,7 @@ Fast test gate and shell injection hardening for /commit.
 - Pre-commit fast test gate: discovers and runs `(fast)` test suites from `.ed3d/testing-guidance.md` before committing
 
 **Changed:**
-- Commit message writing switched from `printf` to heredoc with single-quoted delimiter (`<<'COMMITMSG'`) — immune to shell injection regardless of message content
-- Temp file uses random suffix (`/tmp/commit-msg-RANDOM.txt`) to avoid race conditions between parallel sessions
+- Commit messages written via Write tool to `.commit-msg.tmp`, committed with fixed `git commit -F .commit-msg.tmp` command — no shell involvement in message content, immune to injection, and the Bash command is allowable once for all future commits
 
 ## [denubis-plan-and-execute] 2.18.0
 
