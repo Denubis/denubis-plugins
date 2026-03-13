@@ -1,5 +1,28 @@
 # Changelog
 
+## [denubis-git-commit] 1.2.0
+
+Fast test gate and shell injection hardening for /commit.
+
+**New:**
+- Pre-commit fast test gate: discovers and runs `(fast)` test suites from `.ed3d/testing-guidance.md` before committing
+
+**Changed:**
+- Commit message writing switched from `printf` to heredoc with single-quoted delimiter (`<<'COMMITMSG'`) — immune to shell injection regardless of message content
+- Temp file uses random suffix (`/tmp/commit-msg-RANDOM.txt`) to avoid race conditions between parallel sessions
+
+## [denubis-plan-and-execute] 2.18.0
+
+Standalone PR and merge skills with defensive test gates.
+
+**New:**
+- `make-pr` skill (user-invocable): discovers project test commands from `.ed3d/testing-guidance.md` → CLAUDE.md → `.ed3d/implementation-plan-guidance.md` → fallback pytest; syncs with remote and rebases before testing; blocks on any test failure; pushes and creates PR via `gh`
+- `merge-to-main` skill (user-invocable): same test discovery and sync; runs gates pre-merge AND post-merge; reverts merge automatically if post-merge tests fail; cleans up branch and worktree
+- `.ed3d/testing-guidance.md` convention for project-specific test suites and gates
+
+**Changed:**
+- `finishing-a-development-branch` refactored to delegate Options 1 and 2 to `merge-to-main` and `make-pr` respectively; retains menu/orchestration role
+
 ## [denubis-plan-and-execute] 2.17.0
 
 Epistemic discipline improvements and session isolation, inspired by upstream ed3d-plugins.
