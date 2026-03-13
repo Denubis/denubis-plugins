@@ -41,7 +41,40 @@ From the gathered state:
 3. **Identify the nature of changes:** new feature, enhancement, bug fix, refactor, test, docs, etc.
 4. **Group changes by concern** for potential multi-commit splitting.
 
-### Step 3: Plan Commits
+### Step 3: Run Fast Tests
+
+Before committing, run lightweight test gates to catch obvious breakage.
+
+**Discover fast test commands** using the same priority as make-pr/merge-to-main, but only `fast`-marked suites:
+
+**Priority 1:** Read `.ed3d/testing-guidance.md` if it exists. Run only suites marked `(fast)` — e.g. `### Unit Tests (required, fast)`.
+
+**Priority 2:** Read CLAUDE.md for test commands. If found, run only unit test commands (not e2e, not integration, not docs build).
+
+**Priority 3:** Read `.ed3d/implementation-plan-guidance.md` for fast/unit test commands.
+
+**Priority 4:** Fallback: `pytest tests/unit/` if a `tests/unit/` directory exists, otherwise `pytest` with a short timeout.
+
+```
+Running fast tests before commit...
+  [command]
+  → PASSED / FAILED
+```
+
+**If fast tests fail:**
+```
+Fast tests failed. Fix before committing:
+
+[failure output]
+```
+
+Stop. Do not proceed to commit.
+
+**If no fast test suites are discovered and no test directory exists:** Skip this step. Not every project has tests.
+
+**If fast tests pass:** Continue to Step 4.
+
+### Step 4: Plan Commits
 
 Follow the project's commit splitting rules:
 
@@ -56,7 +89,7 @@ Follow the project's commit splitting rules:
 - Test files go with their implementation in the same commit
 - Never separate a test from the code it tests
 
-### Step 4: Match Commit Style
+### Step 5: Match Commit Style
 
 From `git log` output, detect the repository's convention:
 
@@ -66,9 +99,9 @@ From `git log` output, detect the repository's convention:
 
 Match whatever the repo uses.
 
-### Step 5: Draft and Confirm
+### Step 6: Draft and Confirm
 
-**If `-m` was provided:** Use that message. Skip to Step 6.
+**If `-m` was provided:** Use that message. Skip to Step 7.
 
 **Otherwise:** Draft a concise commit message (1-2 sentences) focusing on the **why** not the **what**.
 
@@ -85,7 +118,7 @@ Proceed?
 
 Wait for confirmation. If the user adjusts, incorporate their feedback.
 
-### Step 6: Execute Commits
+### Step 7: Execute Commits
 
 For each commit:
 
@@ -93,10 +126,24 @@ For each commit:
 # Stage specific files (never git add -A or git add .)
 git add file1.py file2.py
 
-# Write message to temp file, commit with -F, clean up
-# This avoids $() command substitution which triggers injection warnings.
-printf '%s\n' 'Commit message here.' '' 'Co-Authored-By: Claude <noreply@anthropic.com>' > /tmp/commit-msg.txt && git commit -F /tmp/commit-msg.txt && rm -f /tmp/commit-msg.txt
+# Step A (first Bash call): write the commit message to a fixed temp file.
+# Use a per-commit path like /tmp/commit-msg-1.txt, /tmp/commit-msg-2.txt
+# for multi-commit plans. Single-quoted heredoc delimiter disables all
+# shell expansion — immune to injection regardless of message content.
+cat > /tmp/commit-msg-1.txt <<'COMMITMSG'
+Commit message here.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+COMMITMSG
+
+# Step B (second Bash call): commit using the temp file, then clean up.
+# This is a SEPARATE Bash call — no $() substitution anywhere.
+git commit -F /tmp/commit-msg-1.txt && rm -f /tmp/commit-msg-1.txt
 ```
+
+**Why two separate Bash calls:** Claude Code hooks flag `$()` command substitution as a security concern. By splitting write and commit into separate calls, neither call contains `$()`. The single-quoted heredoc delimiter (`'COMMITMSG'`) disables all shell expansion — no variable substitution, no command substitution, no backslash interpretation. The message is written verbatim.
+
+**Never use `printf` or `echo` with commit messages** — both require careful quoting that breaks on special characters (`'`, `"`, `!`, `$`, `` ` ``). Never use `$()` in the same Bash call as the commit.
 
 After all commits:
 
@@ -106,7 +153,7 @@ git status
 
 Verify clean working tree (or expected remaining changes).
 
-### Step 7: Report
+### Step 8: Report
 
 State what was committed. If there are remaining uncommitted changes, mention them.
 
@@ -120,11 +167,13 @@ State what was committed. If there are remaining uncommitted changes, mention th
 - Force push to main/master
 - Commit files that look like secrets (.env, credentials.json, \*.key, \*.pem)
 - Use `-i` flag (interactive mode not supported)
+- Use `printf`, `echo`, or `$()` command substitution for commit messages — shell injection risk
 
 **ALWAYS:**
-- Use `printf > /tmp/commit-msg.txt && git commit -F /tmp/commit-msg.txt && rm -f /tmp/commit-msg.txt` for commit messages (avoids `$()` injection warnings)
+- Use two separate Bash calls: `cat > /tmp/commit-msg-N.txt <<'COMMITMSG'` then `git commit -F /tmp/commit-msg-N.txt` (no `$()` anywhere)
 - Include `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Stage files by name, not by wildcard
+- Run fast tests before committing
 - Run `git status` after committing to verify
 - Create NEW commits after hook failures (not amend)
 
@@ -154,3 +203,7 @@ If a commit is rejected by pre-commit hooks:
 **Pushing without asking**
 - Problem: User didn't want to push yet
 - Fix: Never push unless explicitly asked
+
+**Shell injection in commit messages**
+- Problem: `printf` or `echo` with unescaped special characters (`$`, `` ` ``, `!`, `'`)
+- Fix: Always use heredoc with single-quoted delimiter: `<<'COMMITMSG'`
