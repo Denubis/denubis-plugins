@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.19.0
+
+Epistemic discipline overhaul for systematic debugging; new critical peer review skill.
+
+**New:**
+- `critical-peer-review` skill: falsification-first audit of debugging analyses, postmortems, and incident investigations — checks evidence grades, internal consistency, scope claims, and overclaiming
+- Evidence grading framework (demonstrated/plausible/possible/speculative) with boundary requirements: "demonstrated" requires both positive and negative borders tested on production path
+- Phase 3d self-audit: dispatches clean subagent for hostile peer review before presenting analysis to human
+- Investigation write-to-file requirement: analyses written to file with structured format so peer reviewers can be pointed at the document directly
+- Ripple rule and full editing pass requirement when fixing review findings
+
+**Changed:**
+- Systematic debugging rewritten from "root cause" framing to "causal chain" framing — "root cause" is a social stopping point, not an objective fact (Dekker, Hollnagel)
+- "Root cause confirmed" language replaced with evidence-graded language: never write "confirmed" or "root cause found"
+- Third Iron Law added: "No claiming beyond your evidence"
+- Bayesian updates now use posterior credibility language, not binary confirmed/falsified
+- Toulmin qualifier field now uses evidence grades instead of free-text confidence
+- Output template restructured: Causal Analysis with Evidence Grading table, Claim Verification table, Epistemic Boundary section, Peer Review section
+- Phase numbering updated: seven phases (1, 2, 3, 3b, 3c, 3d, 4, 5)
+
 ## [denubis-git-commit] 1.2.0
 
 Fast test gate and shell injection hardening for /commit.
