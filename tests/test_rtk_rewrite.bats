@@ -160,6 +160,16 @@ EOF
     [ "$result" = "rtk err uvx bandit -r src/" ]
 }
 
+@test "python: bare mypy" {
+    result=$(make_input 'mypy src/' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk mypy src/" ]
+}
+
+@test "python: uv run mypy preserves uv run" {
+    result=$(make_input 'uv run mypy src/ --strict' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "uv run rtk mypy src/ --strict" ]
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # Python tooling — uv subcommands (not uv run)
 # ═══════════════════════════════════════════════════════════════════════
@@ -242,6 +252,54 @@ EOF
 @test "file: ls" {
     result=$(make_input 'ls -la' | bash "$HOOK" | get_rewritten)
     [ "$result" = "rtk ls -la" ]
+}
+
+@test "file: wc" {
+    result=$(make_input 'wc -l src/*.py' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk wc -l src/*.py" ]
+}
+
+# ═══════════════════════════════════════════════════════════════════════
+# Environment / system info
+# ═══════════════════════════════════════════════════════════════════════
+
+@test "env: bare env" {
+    result=$(make_input 'env' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk env" ]
+}
+
+@test "env: env with grep pipe still rewrites first command" {
+    result=$(make_input 'env | grep PATH' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk env | grep PATH" ]
+}
+
+@test "env: env VAR=val cmd passes through (variable assignment)" {
+    run bash "$HOOK" <<< "$(make_input 'env PYTHONPATH=/tmp python script.py')"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# ═══════════════════════════════════════════════════════════════════════
+# Database
+# ═══════════════════════════════════════════════════════════════════════
+
+@test "db: psql" {
+    result=$(make_input 'psql -h localhost -d mydb -c "SELECT 1"' | bash "$HOOK" | get_rewritten)
+    [ "$result" = 'rtk psql -h localhost -d mydb -c "SELECT 1"' ]
+}
+
+# ═══════════════════════════════════════════════════════════════════════
+# Cloud
+# ═══════════════════════════════════════════════════════════════════════
+
+@test "cloud: aws s3 ls" {
+    result=$(make_input 'aws s3 ls' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk aws s3 ls" ]
+}
+
+@test "cloud: aws sts get-caller-identity" {
+    result=$(make_input 'aws sts get-caller-identity' | bash "$HOOK" | get_rewritten)
+    [ "$result" = "rtk aws sts get-caller-identity" ]
 }
 
 # ═══════════════════════════════════════════════════════════════════════

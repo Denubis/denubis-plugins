@@ -209,6 +209,12 @@ elif echo "$MATCH_CMD" | grep -qE '^pip[[:space:]]+(list|outdated|install|show)(
 elif echo "$MATCH_CMD" | grep -qE '^uv[[:space:]]+pip[[:space:]]+(list|outdated|install|show)([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^uv pip /rtk summary uv pip /')"
 
+# --- Python tooling — mypy ---
+elif echo "$MATCH_CMD" | grep -qE '^mypy([[:space:]]|$)'; then
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^mypy/rtk mypy/')"
+elif echo "$MATCH_CMD" | grep -qE '^uv[[:space:]]+run[[:space:]]+mypy([[:space:]]|$)'; then
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^uv run mypy/uv run rtk mypy/')"
+
 # --- Go tooling ---
 elif echo "$MATCH_CMD" | grep -qE '^go[[:space:]]+test([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^go test/rtk go test/')"
@@ -218,6 +224,21 @@ elif echo "$MATCH_CMD" | grep -qE '^go[[:space:]]+vet([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^go vet/rtk go vet/')"
 elif echo "$MATCH_CMD" | grep -qE '^golangci-lint([[:space:]]|$)'; then
   REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^golangci-lint/rtk golangci-lint/')"
+
+# --- Environment / system info ---
+elif echo "$MATCH_CMD" | grep -qE '^env([[:space:]]|$)' && ! echo "$MATCH_CMD" | grep -qE '^env[[:space:]]+[A-Za-z_].*='; then
+  # Rewrite bare "env" or "env | grep" but NOT "env VAR=val cmd" (variable assignment)
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^env/rtk env/')"
+elif echo "$MATCH_CMD" | grep -qE '^wc([[:space:]]|$)'; then
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^wc/rtk wc/')"
+
+# --- Database ---
+elif echo "$MATCH_CMD" | grep -qE '^psql([[:space:]]|$)'; then
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^psql/rtk psql/')"
+
+# --- Cloud ---
+elif echo "$MATCH_CMD" | grep -qE '^aws[[:space:]]+'; then
+  REWRITTEN="${ENV_PREFIX}$(echo "$CMD_BODY" | sed 's/^aws /rtk aws /')"
 fi
 
 # If no rewrite needed, approve as-is
