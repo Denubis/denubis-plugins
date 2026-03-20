@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-hook-rtk-rewrite] 1.1.0
+
+Add rewrites for mypy, env, wc, psql, and aws CLI commands.
+
+**New:**
+- `mypy` and `uv run mypy` → `rtk mypy` / `uv run rtk mypy`
+- `env` → `rtk env` (bare env and env with pipes; skips `env VAR=val cmd` assignments)
+- `wc` → `rtk wc`
+- `psql` → `rtk psql`
+- `aws` → `rtk aws`
+
 ## [denubis-plan-and-execute] 2.19.0
 
 Epistemic discipline overhaul for systematic debugging; new critical peer review skill.

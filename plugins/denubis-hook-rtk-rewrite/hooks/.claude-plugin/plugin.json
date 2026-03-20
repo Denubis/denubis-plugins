@@ -1,7 +1,7 @@
 {
     "name": "denubis-hook-rtk-rewrite",
     "description": "PreToolUse hook that rewrites CLI commands to their RTK (Rust Token Killer) equivalents for token-optimized output. Auto-discovered by the pretooluse-bash dispatcher.",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"
