@@ -180,6 +180,8 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
+**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the bug investigation context.
+
 ### Phase 2: Pattern Analysis
 
 **Find the pattern before fixing:**
@@ -244,6 +246,26 @@ You MUST complete each phase before proceeding to the next.
    - Don't pretend to know
    - Ask for help
    - Research more
+
+### MANDATORY: Context Clear Before Hypothesis Testing
+
+**Why:** The same context that generated the hypothesis also tests it, creating confirmation bias. A fresh context forces hypothesis testing to start from evidence, not from the framing of the generation phase.
+
+**IMPORTANT: Copy the command below BEFORE running /clear (it will erase this conversation).**
+
+(1) Copy the hypothesis testing command now:
+
+Tell the user to copy a command that will resume systematic debugging at the hypothesis testing phase. The command should include:
+- The bug description
+- The hypotheses generated (numbered list)
+- The file paths identified as relevant
+- Instructions to proceed with Phase 3b (Execution Path Audit)
+
+(2) Run `/clear`
+
+(3) Paste and run the copied command.
+
+This follows the copy-then-clear pattern used in design-to-implementation handoffs.
 
 ### Phase 3b: FULL EXECUTION PATH AUDIT
 
