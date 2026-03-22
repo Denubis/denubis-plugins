@@ -155,3 +155,9 @@ class TestLine1AgentName:
         assert "agt:reviewer" in visible, f"agent name missing: {visible!r}"
         # Check it uses CYAN
         assert CYAN in line1, "agent name should use CYAN"
+
+    def test_agent_name_absent_when_not_set(self) -> None:
+        lines = _run_main(_base_payload())
+        line1 = lines[0]
+        visible = _strip_ansi(line1)
+        assert "agt:" not in visible, f"agt: should not appear without agent: {visible!r}"
