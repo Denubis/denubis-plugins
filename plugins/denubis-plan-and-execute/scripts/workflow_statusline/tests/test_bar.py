@@ -100,3 +100,48 @@ class TestSmallContextColours:
     def test_red_at_95(self) -> None:
         result = bar.boss_hp_bar(95, 200_000)
         assert RED in result
+
+
+# ---------------------------------------------------------------------------
+# Integration test — boss HP bar via __main__ entry point
+# ---------------------------------------------------------------------------
+class TestMainEntryPointBarIntegration:
+    def test_line2_starts_with_20_char_bar(self) -> None:
+        """Pipe JSON with 1M context through main; line 2 should start with 20-char bar."""
+        import io
+        import json
+        import sys
+        from unittest import mock
+
+        payload = {
+            "cwd": "/tmp/fake",
+            "model": {"display_name": "opus"},
+            "context_window": {
+                "used_percentage": 40,
+                "remaining_percentage": 60,
+                "context_window_size": 1_000_000,
+            },
+            "cost": {"total_cost_usd": 1.23, "total_duration_ms": 60000},
+        }
+
+        from workflow_statusline.__main__ import main
+
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        with mock.patch.object(sys, "stdin", fake_stdin), mock.patch.object(
+            sys, "stdout", buf
+        ), mock.patch("workflow_statusline.__main__.git_location", return_value="/tmp/fake"), mock.patch(
+            "workflow_statusline.__main__.git_changes", return_value=(0, 0)
+        ):
+            main()
+
+        lines = buf.getvalue().splitlines()
+        assert len(lines) == 2, f"Expected 2 lines, got {len(lines)}"
+        line2 = lines[1]
+        visible = _strip_ansi(line2)
+        bar_chars = {"\u2588", "\u2592"}  # █ and ▒
+        first_20 = visible[:20]
+        assert len(first_20) == 20, f"line2 visible too short: {visible!r}"
+        assert all(
+            c in bar_chars for c in first_20
+        ), f"First 20 visible chars should be bar chars, got: {first_20!r}"

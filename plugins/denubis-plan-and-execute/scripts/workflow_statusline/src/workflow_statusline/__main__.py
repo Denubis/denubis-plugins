@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 
+from workflow_statusline.bar import boss_hp_bar
 from workflow_statusline.colours import (
     BLUE,
     CYAN,
@@ -26,6 +27,7 @@ def main() -> None:
 
     model = data.get("model", {}).get("display_name", "?")
     ctx = data.get("context_window", {})
+    context_window_tokens = ctx.get("context_window_size", 200_000)
     pct = int(ctx.get("used_percentage") or 0)
     remaining_raw = ctx.get("remaining_percentage")
     remaining = int(remaining_raw) if remaining_raw is not None else None
@@ -54,22 +56,12 @@ def main() -> None:
         line1 += f" {DIM}|{RST} {GREEN}+{lines_added}{RST}/{RED}-{lines_removed}{RST}"
 
     # ── Line 2: context bar, cost, duration ──────────────────────────
-    if pct >= 90:
-        bar_color = RED
-    elif pct >= 70:
-        bar_color = YELLOW
-    else:
-        bar_color = GREEN
-
-    bar_width = 10
-    filled = pct * bar_width // 100
-    empty = bar_width - filled
-    bar = "\u2588" * filled + "\u2591" * empty
+    bar = boss_hp_bar(pct, context_window_tokens)
 
     mins = duration_ms // 60000
     secs = (duration_ms % 60000) // 1000
 
-    line2 = f"{bar_color}{bar}{RST} {pct}%"
+    line2 = f"{bar} {pct}%"
     if remaining is not None:
         line2 += f" {DIM}({remaining}% left){RST}"
     line2 += f" {DIM}|{RST} {YELLOW}${cost:.2f}{RST} {DIM}|{RST} {mins}m {secs}s"
