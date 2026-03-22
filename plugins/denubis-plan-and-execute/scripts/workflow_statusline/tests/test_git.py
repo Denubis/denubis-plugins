@@ -49,13 +49,17 @@ class TestGitHelper:
 class TestGitLocation:
     def test_non_git_dir_returns_basename(self, tmp_path):
         result = git.git_location(str(tmp_path))
-        assert result == tmp_path.name
+        assert result.display == tmp_path.name
+        assert result.is_on_main is False
+        assert result.is_worktree is False
 
     def test_git_repo_on_main_returns_name_only(self, git_repo):
         # Default branch is usually "main" or "master"
         result = git.git_location(str(git_repo))
         # Should just be the directory name (no @branch for main/master)
-        assert result == git_repo.name
+        assert result.display == git_repo.name
+        assert result.is_on_main is True
+        assert result.is_worktree is False
 
     def test_git_repo_on_feature_branch_includes_branch(self, git_repo):
         subprocess.run(
@@ -64,7 +68,9 @@ class TestGitLocation:
             capture_output=True,
         )
         result = git.git_location(str(git_repo))
-        assert result == f"{git_repo.name}@feature-xyz"
+        assert result.display == f"{git_repo.name}@feature-xyz"
+        assert result.is_on_main is False
+        assert result.is_worktree is False
 
 
 class TestGitChanges:

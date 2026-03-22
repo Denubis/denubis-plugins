@@ -5,8 +5,15 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+from typing import NamedTuple
 
 from workflow_statusline import cache
+
+
+class LocationInfo(NamedTuple):
+    display: str       # e.g., "ed3d@feat" or "ed3d"
+    is_on_main: bool   # True if branch is main/master
+    is_worktree: bool  # True if in a git worktree
 
 
 def _git(cwd: str, *args: str) -> str:
@@ -27,12 +34,14 @@ def _should_show_branch(branch: str, display_name: str, is_worktree: bool) -> bo
     return branch not in ("main", "master")
 
 
-def git_location(cwd: str) -> str:
+def git_location(cwd: str) -> LocationInfo:
     """Determine smart location string: worktree name, repo@branch, or dir."""
     try:
         _git(cwd, "rev-parse", "--git-dir")
     except Exception:
-        return os.path.basename(cwd)
+        return LocationInfo(
+            display=os.path.basename(cwd), is_on_main=False, is_worktree=False
+        )
 
     try:
         branch = _git(cwd, "branch", "--show-current")
@@ -53,10 +62,14 @@ def git_location(cwd: str) -> str:
         toplevel = cwd
 
     display_name = os.path.basename(toplevel)
+    is_on_main = branch in ("main", "master")
 
     if _should_show_branch(branch, display_name, is_worktree):
-        return f"{display_name}@{branch}"
-    return display_name
+        display = f"{display_name}@{branch}"
+    else:
+        display = display_name
+
+    return LocationInfo(display=display, is_on_main=is_on_main, is_worktree=is_worktree)
 
 
 def _count_lines(output: str) -> int:
