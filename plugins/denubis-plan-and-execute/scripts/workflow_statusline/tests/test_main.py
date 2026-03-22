@@ -136,7 +136,8 @@ class TestLine1MainWarning:
         assert RED in line1, "RED missing for MAIN warning"
         assert BOLD in line1, "BOLD missing for MAIN warning"
         visible = _strip_ansi(line1)
-        assert visible.startswith("\u2717MAIN"), f"Expected ✗MAIN start, got: {visible!r}"
+        assert visible.startswith("myrepo"), f"Expected location start, got: {visible!r}"
+        assert "\u2717MAIN" in visible, f"Expected ✗MAIN after location, got: {visible!r}"
 
     def test_on_main_worktree_uses_display(self) -> None:
         """Worktree on main should NOT show ✗MAIN — uses display instead."""

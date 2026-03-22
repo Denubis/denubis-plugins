@@ -49,10 +49,9 @@ def main() -> None:
     staged, modified = git_changes(cwd)
 
     # ── Line 1: location, git changes, agent or churn ─────────────────
+    line1 = f"{BLUE}{location.display}{RST}"
     if location.is_on_main and not location.is_worktree:
-        line1 = f"{RED}{BOLD}\u2717MAIN{RST}"
-    else:
-        line1 = f"{BLUE}{location.display}{RST}"
+        line1 += f" {RED}{BOLD}\u2717MAIN{RST}"
 
     git_extra = ""
     if staged > 0:
