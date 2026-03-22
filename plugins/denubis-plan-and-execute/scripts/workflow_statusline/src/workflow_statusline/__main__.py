@@ -32,6 +32,7 @@ def main() -> None:
         return
 
     agent_name = data.get("agent", {}).get("name", "")
+    model = data.get("model", {}).get("display_name", "")
     ctx = data.get("context_window", {})
     context_window_tokens = ctx.get("context_window_size", 200_000)
     pct = int(ctx.get("used_percentage") or 0)
@@ -84,9 +85,10 @@ def main() -> None:
             if display.is_exhausting:
                 rate_parts.append(f"{RED}{label}:{display.pct}%{RST} {display.time_str}")
             elif display.time_str:
-                rate_parts.append(f"{label}:{display.pct}% {display.time_str}")
+                rate_parts.append(f"{GREEN}{label}:{display.pct}%{RST} {display.time_str}")
             else:
-                rate_parts.append(f"{label}:{display.pct}%")
+                # No projection yet (single data point) — yellow/neutral
+                rate_parts.append(f"{YELLOW}{label}:{display.pct}%{RST}")
 
     # ── Line 2: context bar, rate limits, cost, duration ─────────────
     bar = boss_hp_bar(pct, context_window_tokens)
@@ -98,6 +100,8 @@ def main() -> None:
     if rate_parts:
         line2 += f" {DIM}|{RST} {' '.join(rate_parts)}"
     line2 += f" {DIM}|{RST} {YELLOW}${cost:.2f}{RST} {DIM}|{RST} {mins}m {secs}s"
+    if model:
+        line2 += f" {DIM}{model}{RST}"
 
     print(line1)
     print(line2)
