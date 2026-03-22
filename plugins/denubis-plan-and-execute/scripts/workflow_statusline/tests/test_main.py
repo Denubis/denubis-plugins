@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import sys
 from unittest import mock
@@ -220,3 +221,37 @@ class TestLine2NoRateLimits:
         line2 = _strip_ansi(lines[1])
         assert "5h:" not in line2, f"5h should not appear: {line2!r}"
         assert "7d:" not in line2, f"7d should not appear: {line2!r}"
+
+
+# ---------------------------------------------------------------------------
+# Tmux integration — maybe_rename called after render
+# ---------------------------------------------------------------------------
+class TestTmuxIntegration:
+    def test_tmux_rename_called_with_location_display(self) -> None:
+        """main() should call maybe_rename(location.display) after printing."""
+        payload = _base_payload()
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch("workflow_statusline.__main__.git_location", return_value=loc),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
+            mock.patch("workflow_statusline.__main__.time") as mock_time,
+            mock.patch("workflow_statusline.__main__.cache") as mock_cache,
+            mock.patch("workflow_statusline.tmux.subprocess") as mock_subprocess,
+            mock.patch("workflow_statusline.tmux.cache") as mock_tmux_cache,
+            mock.patch.dict(os.environ, {"TMUX": "/tmp/tmux-1000/default,12345,0", "TMUX_PANE": "%42"}),
+        ):
+            mock_time.time.return_value = 1000000.0
+            mock_cache.read_rate_samples.return_value = []
+            mock_tmux_cache.read_if_fresh.return_value = None
+            main()
+
+        mock_subprocess.run.assert_called_once_with(
+            ["tmux", "rename-window", "Cl:testrepo"],
+            check=False,
+            capture_output=True,
+        )
+        mock_tmux_cache.write.assert_called_once()

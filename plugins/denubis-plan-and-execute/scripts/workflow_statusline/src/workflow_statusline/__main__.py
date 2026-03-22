@@ -21,6 +21,7 @@ from workflow_statusline.colours import (
     YELLOW,
 )
 from workflow_statusline.git import git_changes, git_location
+from workflow_statusline.tmux import maybe_rename
 
 
 def main() -> None:
@@ -101,6 +102,9 @@ def main() -> None:
 
     print(line1)
     print(line2)
+
+    # ── Side-effects ─────────────────────────────────────────────────
+    maybe_rename(location.display)
 
 
 if __name__ == "__main__":
