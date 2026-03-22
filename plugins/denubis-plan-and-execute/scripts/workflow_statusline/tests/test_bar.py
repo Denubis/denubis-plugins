@@ -133,9 +133,11 @@ class TestMainEntryPointBarIntegration:
 
         fake_stdin = io.StringIO(json.dumps(payload))
         buf = io.StringIO()
+        from workflow_statusline.git import LocationInfo
+
         with mock.patch.object(sys, "stdin", fake_stdin), mock.patch.object(
             sys, "stdout", buf
-        ), mock.patch("workflow_statusline.__main__.git_location", return_value="/tmp/fake"), mock.patch(
+        ), mock.patch("workflow_statusline.__main__.git_location", return_value=LocationInfo(display="/tmp/fake", is_on_main=False, is_worktree=False)), mock.patch(
             "workflow_statusline.__main__.git_changes", return_value=(0, 0)
         ):
             main()

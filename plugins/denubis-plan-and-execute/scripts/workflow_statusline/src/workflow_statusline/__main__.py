@@ -8,6 +8,7 @@ import sys
 from workflow_statusline.bar import boss_hp_bar
 from workflow_statusline.colours import (
     BLUE,
+    BOLD,
     CYAN,
     DIM,
     GREEN,
@@ -25,7 +26,7 @@ def main() -> None:
     if not cwd:
         return
 
-    model = data.get("model", {}).get("display_name", "?")
+    agent_name = data.get("agent", {}).get("name", "")
     ctx = data.get("context_window", {})
     context_window_tokens = ctx.get("context_window_size", 200_000)
     pct = int(ctx.get("used_percentage") or 0)
@@ -41,8 +42,11 @@ def main() -> None:
     location = git_location(cwd)
     staged, modified = git_changes(cwd)
 
-    # ── Line 1: model, location, git changes, code churn ──────────────
-    line1 = f"{CYAN}[{model}]{RST} {BLUE}{location}{RST}"
+    # ── Line 1: location, git changes, agent or churn ─────────────────
+    if location.is_on_main and not location.is_worktree:
+        line1 = f"{RED}{BOLD}\u2717MAIN{RST}"
+    else:
+        line1 = f"{BLUE}{location.display}{RST}"
 
     git_extra = ""
     if staged > 0:
@@ -52,7 +56,9 @@ def main() -> None:
     if git_extra:
         line1 += f" {git_extra}"
 
-    if lines_added or lines_removed:
+    if agent_name:
+        line1 += f" {DIM}|{RST} {CYAN}agt:{agent_name}{RST}"
+    elif lines_added or lines_removed:
         line1 += f" {DIM}|{RST} {GREEN}+{lines_added}{RST}/{RED}-{lines_removed}{RST}"
 
     # ── Line 2: context bar, cost, duration ──────────────────────────
