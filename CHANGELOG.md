@@ -1,5 +1,10 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.20.1
+
+**Fixed:**
+- ✗MAIN warning now shows alongside location name instead of replacing it
+
 ## [denubis-plan-and-execute] 2.20.0
 
 Statusline v2: upgraded status bar with boss HP context bar, rate limit burn-rate projections, location-first line 1 with MAIN warning, and tmux window rename. New session-naming skill for domain-specific session identification.
