@@ -22,5 +22,6 @@ def read_if_fresh(cache_file: str, max_age: float) -> str | None:
 
 def write(cache_file: str, data: str) -> None:
     """Write data to cache file, creating parent dirs if needed."""
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
     with open(cache_file, "w") as f:
         f.write(data)

@@ -77,11 +77,9 @@ class TestGitChanges:
 
     def test_modified_file_detected(self, git_repo):
         (git_repo / "README.md").write_text("changed")
-        # Clear any cache
         staged, modified = git.git_changes(str(git_repo))
-        # We may get cached results, so just check types
-        assert isinstance(staged, int)
-        assert isinstance(modified, int)
+        assert staged == 0
+        assert modified == 1
 
     def test_staged_file_detected(self, git_repo):
         (git_repo / "new_file.txt").write_text("new")
@@ -91,8 +89,8 @@ class TestGitChanges:
             capture_output=True,
         )
         staged, modified = git.git_changes(str(git_repo))
-        assert isinstance(staged, int)
-        assert isinstance(modified, int)
+        assert staged == 1
+        assert modified == 0
 
     def test_non_git_dir_returns_zero(self, tmp_path):
         staged, modified = git.git_changes(str(tmp_path))
