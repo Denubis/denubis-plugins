@@ -1,4 +1,4 @@
-"""Tests for line 1 composition in __main__.main()."""
+"""Tests for __main__.main() output composition."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _run_main(
     staged: int = 0,
     modified: int = 0,
 ) -> list[str]:
-    """Run main() with mocked stdin/stdout/git, return output lines."""
+    """Run main() with mocked stdin/stdout/git and cache/time, return output lines."""
     if location is None:
         location = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
 
@@ -44,7 +44,11 @@ def _run_main(
             "workflow_statusline.__main__.git_changes",
             return_value=(staged, modified),
         ),
+        mock.patch("workflow_statusline.__main__.time") as mock_time,
+        mock.patch("workflow_statusline.__main__.cache") as mock_cache,
     ):
+        mock_time.time.return_value = 1000000.0
+        mock_cache.read_rate_samples.return_value = []
         main()
 
     return buf.getvalue().splitlines()
@@ -161,3 +165,33 @@ class TestLine1AgentName:
         line1 = lines[0]
         visible = _strip_ansi(line1)
         assert "agt:" not in visible, f"agt: should not appear without agent: {visible!r}"
+
+
+# ---------------------------------------------------------------------------
+# AC3.1 — rate limits appear in line 2 when present
+# ---------------------------------------------------------------------------
+class TestLine2RateLimits:
+    def test_rate_limits_appear_in_line2(self) -> None:
+        payload = _base_payload(
+            session_id="test123",
+            rate_limits={
+                "five_hour": {"used_percentage": 23, "resets_at": 1000000.0 + 3600},
+                "seven_day": {"used_percentage": 41, "resets_at": 1000000.0 + 86400},
+            },
+        )
+        lines = _run_main(payload)
+        line2 = _strip_ansi(lines[1])
+        assert "5h:23%" in line2, f"5h rate limit missing: {line2!r}"
+        assert "7d:41%" in line2, f"7d rate limit missing: {line2!r}"
+
+
+# ---------------------------------------------------------------------------
+# AC3.4 — no rate limits when key absent
+# ---------------------------------------------------------------------------
+class TestLine2NoRateLimits:
+    def test_no_rate_text_without_rate_limits(self) -> None:
+        payload = _base_payload()
+        lines = _run_main(payload)
+        line2 = _strip_ansi(lines[1])
+        assert "5h:" not in line2, f"5h should not appear: {line2!r}"
+        assert "7d:" not in line2, f"7d should not appear: {line2!r}"
