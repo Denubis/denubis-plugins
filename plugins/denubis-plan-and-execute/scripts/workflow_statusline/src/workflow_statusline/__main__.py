@@ -27,9 +27,8 @@ def main() -> None:
     model = data.get("model", {}).get("display_name", "?")
     ctx = data.get("context_window", {})
     pct = int(ctx.get("used_percentage") or 0)
-    remaining = ctx.get("remaining_percentage")
-    if remaining is not None:
-        remaining = int(remaining)
+    remaining_raw = ctx.get("remaining_percentage")
+    remaining = int(remaining_raw) if remaining_raw is not None else None
     cost_data = data.get("cost", {})
     cost = cost_data.get("total_cost_usd") or 0
     duration_ms = cost_data.get("total_duration_ms") or 0
