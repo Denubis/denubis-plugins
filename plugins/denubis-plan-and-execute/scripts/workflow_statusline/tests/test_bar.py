@@ -7,10 +7,13 @@ import re
 import pytest
 
 from workflow_statusline import bar
-from workflow_statusline.colours import CYAN, DIM, GREEN, MAGENTA, RED, YELLOW
+from workflow_statusline.colours import CYAN, DIM, GREEN, MAGENTA, RED, RST, YELLOW
 
 # Strip ANSI escape sequences for visible-length checks.
 _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+
+# Reset escape used to split filled from unfilled portions.
+_RST_ESC = RST
 
 
 def _strip_ansi(s: str) -> str:
@@ -56,9 +59,11 @@ class TestLargeContextSegmentColours:
     )
     def test_filled_colour(self, pct: int, expected_colour: str) -> None:
         result = bar.boss_hp_bar(pct, 1_000_000)
-        # The filled portion must contain the expected colour escape.
-        assert expected_colour in result, (
-            f"pct={pct}: expected {expected_colour!r} in bar"
+        # Isolate the filled portion (before the first RST) to verify colour.
+        first_rst = result.index(_RST_ESC)
+        filled_portion = result[:first_rst]
+        assert expected_colour in filled_portion, (
+            f"pct={pct}: expected {expected_colour!r} in filled portion {filled_portion!r}"
         )
 
 
@@ -69,20 +74,20 @@ class TestLargeContextUnfilledColour:
     def test_segment2_unfilled_is_dimmed_green(self) -> None:
         """At 30% (segment 2/CYAN), unfilled should be DIM + GREEN."""
         result = bar.boss_hp_bar(30, 1_000_000)
-        assert DIM in result
-        # The unfilled section should reference GREEN (prior segment).
-        # Find the unfilled portion: after the filled CYAN block.
-        unfilled_start = result.rfind(DIM)
-        unfilled = result[unfilled_start:]
-        assert GREEN in unfilled
+        # Unfilled portion starts after the first RST (end of filled block).
+        first_rst = result.index(_RST_ESC)
+        unfilled = result[first_rst + len(_RST_ESC) :]
+        assert DIM in unfilled, f"DIM not found in unfilled portion: {unfilled!r}"
+        assert GREEN in unfilled, f"GREEN not found in unfilled portion: {unfilled!r}"
 
     def test_segment1_unfilled_is_dimmed_green(self) -> None:
         """At 10% (segment 1), remainder is DIM + GREEN."""
         result = bar.boss_hp_bar(10, 1_000_000)
-        assert DIM in result
-        unfilled_start = result.rfind(DIM)
-        unfilled = result[unfilled_start:]
-        assert GREEN in unfilled
+        # Unfilled portion starts after the first RST (end of filled block).
+        first_rst = result.index(_RST_ESC)
+        unfilled = result[first_rst + len(_RST_ESC) :]
+        assert DIM in unfilled, f"DIM not found in unfilled portion: {unfilled!r}"
+        assert GREEN in unfilled, f"GREEN not found in unfilled portion: {unfilled!r}"
 
 
 # ---------------------------------------------------------------------------
