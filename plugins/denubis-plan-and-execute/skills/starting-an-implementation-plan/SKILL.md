@@ -190,9 +190,9 @@ Mark "Create implementation plan" task as in_progress.
 
 **REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:writing-implementation-plans
 
-**Session naming:** Before starting planning, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the design document context.
-
 Announce: "I'm using the writing-implementation-plans skill to create the detailed implementation plan."
+
+**Session naming:** Before starting planning, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the design document context.
 
 The writing-implementation-plans skill will:
 - Verify scope (<=8 phases from design plan)
