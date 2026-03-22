@@ -184,6 +184,31 @@ class TestLine2RateLimits:
         assert "5h:23%" in line2, f"5h rate limit missing: {line2!r}"
         assert "7d:41%" in line2, f"7d rate limit missing: {line2!r}"
 
+    def test_rate_samples_appended_to_cache(self) -> None:
+        """Verify append_rate_sample is called for each rate limit window."""
+        payload = _base_payload(
+            session_id="test123",
+            rate_limits={
+                "five_hour": {"used_percentage": 23, "resets_at": 1000000.0 + 3600},
+                "seven_day": {"used_percentage": 41, "resets_at": 1000000.0 + 86400},
+            },
+        )
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch("workflow_statusline.__main__.git_location", return_value=loc),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
+            mock.patch("workflow_statusline.__main__.time") as mock_time,
+            mock.patch("workflow_statusline.__main__.cache") as mock_cache,
+        ):
+            mock_time.time.return_value = 1000000.0
+            mock_cache.read_rate_samples.return_value = []
+            main()
+            assert mock_cache.append_rate_sample.call_count == 2
+
 
 # ---------------------------------------------------------------------------
 # AC3.4 — no rate limits when key absent

@@ -26,7 +26,6 @@ def _format_duration(seconds: float, exhausting: bool) -> str:
         return f"~{hours}h{minutes}m{suffix}"
     else:
         minutes = round(seconds / 60)
-        minutes = max(minutes, 1)
         return f"~{minutes}m{suffix}"
 
 

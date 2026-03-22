@@ -61,7 +61,7 @@ class TestSteadyBurn:
     def test_five_samples_steady_burn(self) -> None:
         # 60s apart, pct going 10→20→30→40→50 → slope ~0.1667 pct/s
         # At pct=50, (100-50)/0.1667 ≈ 300s to exhaust
-        # Reset in 600s → won't exhaust before reset → show reset time
+        # Reset in 600s → 300s to exhaust < 600s to reset → will exhaust
         base_t = 1000.0
         samples = [
             (base_t, 10.0),
