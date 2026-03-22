@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.20.0
+
+Statusline v2: upgraded status bar with boss HP context bar, rate limit burn-rate projections, location-first line 1 with MAIN warning, and tmux window rename. New session-naming skill for domain-specific session identification.
+
+**New:**
+- Boss HP context bar: 20-char bar with colour per 200k-token segment (green→cyan→yellow→magenta→red for 1M context)
+- Rate limit display with burn-rate projection and time-to-exhaustion warnings
+- tmux window rename as statusline side-effect with lock file deference
+- Session-naming skill: Haiku subagent generates domain-specific session slugs
+- Red `✗MAIN` warning when on main/master outside a worktree
+- Agent name display (`agt:<name>`) when agent is active
+
+**Changed:**
+- Statusline refactored from single script to uv-managed package at `scripts/workflow_statusline/`
+- Line 1 redesigned: location-first, model removed from line 1
+- Context bar expanded from 10 to 20 characters with segment-aware colouring
+- Four skills (design plan, impl plan, execution, debugging) invoke session-naming
+- Implementation skills invoke critical-peer-review at completion
+- Systematic debugging enforces context clear between hypothesis generation and testing
+
 ## [denubis-hook-rtk-rewrite] 1.1.0
 
 Add rewrites for mypy, env, wc, psql, and aws CLI commands.

@@ -145,6 +145,8 @@ Share whatever details you have. We'll clarify anything unclear in the next step
 
 Mark Phase 1 as completed when you have initial context.
 
+**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the gathered context.
+
 ### Between Phase 1 and Phase 2: Check for Project Guidance
 
 Before clarification, check for project-specific design guidance.

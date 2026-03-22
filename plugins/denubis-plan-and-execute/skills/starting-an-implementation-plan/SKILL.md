@@ -192,6 +192,8 @@ Mark "Create implementation plan" task as in_progress.
 
 Announce: "I'm using the writing-implementation-plans skill to create the detailed implementation plan."
 
+**Session naming:** Before starting planning, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the design document context.
+
 The writing-implementation-plans skill will:
 - Verify scope (<=8 phases from design plan)
 - Verify codebase state with investigator
@@ -252,6 +254,8 @@ Mark "Execution handoff" task as in_progress.
 After planning is complete, hand off to execution.
 
 **Do NOT invoke execute-plan directly.** The user needs to /clear context first.
+
+**Critical peer review:** Before handing off to execution, invoke `denubis-plan-and-execute:critical-peer-review` to subject the implementation plan to falsification-first analysis. The review should examine the plan files in `docs/implementation-plans/` for overclaiming, internal inconsistency, and evidence-grade violations.
 
 **Step 1: Capture and verify absolute paths**
 

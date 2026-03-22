@@ -1,0 +1,12 @@
+"""ANSI 16-colour constants (theme-adaptive)."""
+
+RST = "\033[0m"
+DIM = "\033[2m"
+BOLD = "\033[1m"
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+BLUE = "\033[34m"
+MAGENTA = "\033[35m"
+WHITE = "\033[37m"
