@@ -31,7 +31,7 @@ If `$TMUX` or `$TMUX_PANE` is not set, the session is not running inside tmux. I
 Substitute the gathered values into the placeholders below, then invoke:
 
 ```
-<invoke name="Agent">
+<invoke name="Task">
 <parameter name="subagent_type">denubis-basic-agents:haiku-general-purpose</parameter>
 <parameter name="description">Generate session name slug</parameter>
 <parameter name="prompt">
@@ -60,11 +60,11 @@ Capture the returned slug. Trim any whitespace.
 
 After receiving the slug from the subagent:
 
-1. **Rename tmux window** (only if `$TMUX` is set):
-   Run via Bash: `tmux rename-window "Cl:{slug}"`
+1. **Rename tmux window** (only if both `$TMUX` and `$TMUX_PANE` are set):
+   Run via Bash: `tmux rename-window "Cl:{slug}"` (substitute the actual slug)
 
-2. **Write lock file** (only if `$TMUX_PANE` is set):
-   Run via Bash: `echo "{slug}" > /tmp/claude-statusline-tmux-lock-$(echo $TMUX_PANE | tr -d '%')`
+2. **Write lock file** (only if both `$TMUX` and `$TMUX_PANE` are set):
+   Run via Bash: `echo "{slug}" > /tmp/claude-statusline-tmux-lock-$(echo $TMUX_PANE | tr -d '%')` (substitute the actual slug)
 
-3. **Tell the user:**
-   "To also rename this session, run: `/rename {slug}`"
+3. **Tell the user** (substitute the actual slug):
+   "To also rename this session, run: `/rename <slug>`"
