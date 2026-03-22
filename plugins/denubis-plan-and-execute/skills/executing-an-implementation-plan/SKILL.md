@@ -204,6 +204,8 @@ ls [plan-directory]/test-requirements.md
 
 If the file exists, note its **absolute path** for use during final review. The test requirements document specifies what automated tests must exist for each acceptance criterion.
 
+**Session naming:** After discovering phases, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the implementation plan context.
+
 ### 2. Create Phase-Level Task List
 
 Use TaskCreate to create **three task entries per phase**. Include the title from the header:
@@ -703,6 +705,8 @@ git commit -m "docs: add test plan for [feature name]"
 ```
 
 Announce: "Human test plan written to `docs/test-plans/[impl-plan-dir-name].md`"
+
+**Critical peer review:** After all phases are implemented and reviewed, invoke `denubis-plan-and-execute:critical-peer-review` to subject the completed implementation to falsification-first analysis before declaring completion.
 
 ### 6. Complete Development
 
