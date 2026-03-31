@@ -1,5 +1,23 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.21.0
+
+Added `critical-peer-review` agent definition and enhanced the critical peer review methodology with five research-backed techniques from intelligence analysis, medical systematic review, and cognitive science.
+
+**New:**
+- `critical-peer-review` agent (Opus, red): dedicated subagent for falsification-first audit of technical analyses, postmortems, and debugging reports — previously only a skill with no agent, causing dispatch failures
+- ACH matrix step (Heuer, 1999): evaluates each piece of evidence individually against all hypotheses to break narrative coherence bias
+- GRADE downgrade criteria (Guyatt et al., 2008): five-factor checklist (risk of bias, inconsistency, indirectness, imprecision, reporting bias) for evidence quality assessment
+- Assumption-Based Planning step (Dewar/RAND, 2002): extracts hidden load-bearing assumptions and flags those lacking evidence
+- Pre-mortem step (Klein, 2007): assumes the conclusion is wrong and works backward to surface alternative failure scenarios
+- Diagnostic timeout step (Croskerry, 2003): forced metacognitive reflection before finalising findings
+
+**Changed:**
+- Skill and agent now in sync with 12-step protocol (was 8 steps)
+- Output format expanded with Hidden Assumptions, ACH Matrix, GRADE factors, and Pre-Mortem sections
+- Severity criteria updated to include ACH and GRADE findings
+- Methodological references section added to both skill and agent
+
 ## [denubis-plan-and-execute] 2.20.1
 
 **Fixed:**
