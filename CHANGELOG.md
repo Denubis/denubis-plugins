@@ -2,22 +2,28 @@
 
 ## [denubis-plan-and-execute] 2.21.0
 
-Added `critical-peer-review` agent definition and enhanced the critical peer review methodology with five research-backed techniques from intelligence analysis, medical systematic review, and cognitive science.
+Enhanced critical-peer-review with research-backed methodologies (ACH, GRADE, ABP, pre-mortem) and merged Codex variant improvements for broader artifact scope, mandatory checklists, and pattern-level defect tracking.
 
 **New:**
-- `critical-peer-review` agent (Opus, red): dedicated subagent for falsification-first audit of technical analyses, postmortems, and debugging reports — previously only a skill with no agent, causing dispatch failures
-- ACH matrix step (Heuer, 1999): evaluates each piece of evidence individually against all hypotheses to break narrative coherence bias
-- GRADE downgrade criteria (Guyatt et al., 2008): five-factor checklist (risk of bias, inconsistency, indirectness, imprecision, reporting bias) for evidence quality assessment
+- `critical-peer-review` agent (Opus, red): dedicated subagent for falsification-first audit — previously only a skill with no agent, causing dispatch failures
+- ACH matrix step (Heuer, 1999): evaluates evidence individually against all hypotheses to break narrative coherence bias
+- GRADE downgrade criteria (Guyatt et al., 2008): five-factor checklist for evidence quality assessment
 - Assumption-Based Planning step (Dewar/RAND, 2002): extracts hidden load-bearing assumptions and flags those lacking evidence
 - Pre-mortem step (Klein, 2007): assumes the conclusion is wrong and works backward to surface alternative failure scenarios
 - Diagnostic timeout step (Croskerry, 2003): forced metacognitive reflection before finalising findings
+- Artifact classification step: reviewer must declare type before reviewing (debugging-analysis, incident-analysis, design-plan, implementation-plan, generated-artifact, technical-reasoning)
+- Artifact-specific mandatory checklists for all five artifact types
+- Pattern-Level Review Rule: classify defects as local-only or pattern-level, require full sweep for systemic issues
+- Per-finding fields: Type, Scope, Evidence grade, Pattern level, Next proof step
 
 **Changed:**
 - Skill and agent now in sync with 12-step protocol (was 8 steps)
-- Output format expanded with Hidden Assumptions, ACH Matrix, GRADE factors, and Pre-Mortem sections
-- Severity criteria updated to include ACH and GRADE findings
+- Output format expanded with Source Inventory, Hidden Assumptions, ACH Matrix, GRADE factors, and Pre-Mortem sections
+- Evidence grading scoped to causal/behavioural claims only; non-causal plan findings no longer forced into the grading model
+- Severity table expanded with richer descriptions (impossible step, critical omission, vague verification path, ACH/GRADE findings)
+- Citation verification extended with plan-specific checks (referenced files/modules exist, constraints represented accurately)
+- Provenance checks now include branch/commit-range verification
 - Methodological references section added to both skill and agent
-
 ## [denubis-plan-and-execute] 2.20.1
 
 **Fixed:**

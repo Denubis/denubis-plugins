@@ -1,24 +1,40 @@
 ---
 name: critical-peer-review
-description: Use when reviewing debugging analyses, postmortems, incident investigations, or another agent's technical reasoning for overclaiming, internal inconsistency, and evidence-grade violations - falsification-first audit that treats prior output as untrusted
+description: Use when reviewing debugging analyses, postmortems, incident investigations, design plans, implementation plans, generated artifacts, or another agent's technical reasoning for overclaiming, internal inconsistency, and evidence-grade violations - falsification-first audit that treats prior output as untrusted
 user-invocable: true
 ---
 
 # Critical Peer Review
 
-Evidence-led review of technical analyses, debugging reports, postmortems, and incident investigations. Treats prior reasoning as something to audit, not trust. (Adapted from Codex critical-crash-review protocol, enhanced with ACH, GRADE, ABP, and pre-mortem methodologies.)
+Evidence-led review of technical artifacts. Treats prior reasoning as something to audit, not trust. (Adapted from Codex critical-crash-review protocol, enhanced with ACH, GRADE, ABP, and pre-mortem methodologies.)
 
 ## Core Principle
 
-**The analysis you are reviewing was produced by a system that is incentivised to sound confident.** Your job is to find where that confidence outstrips the evidence. Every claim must earn its grade.
+**The artifact you are reviewing was produced by a system that is incentivised to sound confident.** Your job is to find where that confidence outstrips the evidence. Every claim must earn its grade.
 
 ## When to Use
 
 - Reviewing a debugging analysis (Phase 3d self-audit in systematic-debugging)
 - Reviewing a postmortem or incident report
+- Reviewing a design plan
+- Reviewing an implementation plan
+- Reviewing generated artifacts such as `.pdf`, `.html`, screenshots, logs, or compiled outputs
 - Reviewing another agent's technical reasoning
 - Reviewing your own prior analysis after being told you overclaimed
 - Any time a technical document makes causal claims that affect decisions
+
+## Artifact Classification
+
+Before reviewing, classify the artifact explicitly:
+
+- `debugging-analysis`
+- `incident-analysis`
+- `design-plan`
+- `implementation-plan`
+- `generated-artifact`
+- `technical-reasoning`
+
+State the artifact type in the review output. This determines which additional checks are mandatory.
 
 ## Workflow
 
@@ -26,30 +42,44 @@ Evidence-led review of technical analyses, debugging reports, postmortems, and i
 
 Read the exact artifacts first:
 
-- The analysis document being reviewed
-- Failing logs, test output, stack traces it references
-- Source files and diffs it cites
+- The document, output, or reasoning being reviewed
+- Logs, test output, stack traces, screenshots, generated artifacts, or diffs it references
+- Source files, issue threads, plan files, or design docs it cites
 - Prior reviewer notes if any exist
 
 **Call out missing evidence immediately.** If the analysis references artifacts you cannot access, flag this — you cannot verify claims about evidence you haven't seen.
 
-When the evidence includes logs, timelines, or counts:
-- Note file path, line count, timestamp range, timezone
-- Choose one reference timezone for cross-source comparison
-- Never assume all sources share the same timezone
+When the evidence includes logs, timelines, or postmortem material, inventory every source before analysing it:
 
-**Positive control:** Before trusting any filter or query result, verify it against one event you already know must appear. If a query returns zero, re-run the positive control before reporting "no evidence."
+- file path
+- line count
+- first timestamp
+- last timestamp
+- timestamp timezone or offset convention
+- file size when relevant
+
+Choose one reference timezone for cross-source comparison and state it explicitly. Never assume all sources share the same timezone.
+
+**Positive control:** Before trusting any filter or query result, verify it against one event you already know must appear in-window. If a query returns zero, re-run the positive control before reporting "no evidence."
 
 ### 2. Protect provenance
 
-Assume tmp directories, logs, and generated outputs may be contaminated.
+Assume tmp directories, logs, copied outputs, screenshots, and generated artifacts may be contaminated.
 
 Check:
 - Whether local reruns may have overwritten server artifacts
 - Whether copied files still point at the original context
 - Whether "latest" files may actually be from a different run
+- Whether cited diffs or file paths belong to the same branch, commit range, or artifact version under review
 
-Treat provenance failure as a first-class finding. A contaminated log weakens every downstream claim.
+Treat provenance failure as a first-class finding. A contaminated log or output weakens every downstream claim.
+
+When analysing multiple log sources:
+- Apply time filtering before grouping or aggregation
+- Enumerate the full category space before drilling into specific error codes or event names
+- Compare important timestamps against reference events such as deploys, restarts, migrations, or config changes
+
+Do not aggregate unfiltered data and then pretend the result belongs to the requested window.
 
 ### 3. Extract hidden assumptions (ABP)
 
@@ -84,27 +114,27 @@ Any number without a reproducible command or query is `unverified`. Any count de
 
 ### 5. Audit the reasoning
 
-Review the analysis as if it were a code review from someone whose work you do not trust.
+Review the artifact as if it were a code review from someone whose work you do not trust.
 
 **Look for:**
 
 - Unsupported jumps from symptom to mechanism
 - Multiple variables collapsed into one hypothesis
-- "Same version" claims that ignored env, permissions, or temp paths
+- "Same version" claims that ignored env, permissions, temp paths, branch state, or service user
 - Conclusions drawn from overwritten or mixed artifacts
 - Findings that mix in-window facts with out-of-window corroboration
 - Incomplete enumeration (searched for expected categories instead of listing all)
 - Counts reported without the exact command that produced them
 - Fixes proposed before causal mechanism isolation
 - **Synthetic test results extended to production paths** — the most common overclaim
-- **Universal quantifiers** ("all", "every", "only") that were not universally verified
-- **Internal inconsistency** — counts that don't sum, summaries that contradict details, scope claims that don't match evidence
+- **Universal quantifiers** ("all", "every", "only", "always", "never") that were not universally verified
+- **Internal inconsistency** — counts that don't sum, summaries that contradict details, acceptance criteria that don't match steps, scope claims that don't match evidence
 
 **State plainly which hypothesis is weakest and why.**
 
 ### 6. Check evidence grades (GRADE-enhanced)
 
-Apply the evidence grading scale to every finding in the analysis:
+Apply the evidence grading scale to every finding that makes a causal or behavioural claim:
 
 | Grade | Label | Positive border | Negative border | Production path |
 |-------|-------|----------------|-----------------|-----------------|
@@ -113,7 +143,9 @@ Apply the evidence grading scale to every finding in the analysis:
 | **Low** | **Possible** | Mechanism triggers failure in synthetic test | Production path unconfirmed | Neither border on production path |
 | **Very low** | **Speculative** | Hypothesis among several; untested | — | No border evidence |
 
-**For each finding, verify:**
+Do not force omission, sequencing, or feasibility findings in design and implementation plans into this grading model unless the finding itself is a causal claim.
+
+**For each graded finding, verify:**
 - Does the language match the grade?
 - Did the author write "demonstrated" for something that's only "plausible"?
 - Did the author write "the mechanism is X" when they mean "mechanism X is plausible"?
@@ -155,16 +187,25 @@ For every file:line reference in the analysis:
 - Does the line contain what is claimed?
 - Is the line number current (not from a stale read)?
 
-For every count or number:
+For every count, total, percentage, timeline, or "zero results" claim:
 - Can you reproduce it with the stated command?
 - If not stated: flag as unverified
+
+For plan review:
+- Verify that referenced files, modules, directories, commands, and tests actually exist when the plan depends on them
+- Verify that cited requirements, constraints, or earlier decisions are represented accurately
 
 ### 9. Re-rank hypotheses
 
 Prefer narrow, mechanistic hypotheses over broad labels.
 
-Bad: "the auth system is broken"
-Better: "the token validation at `auth.py:147` rejects valid tokens when `expires_at` falls within the refresh window"
+Bad:
+- "the auth system is broken"
+- "the plan seems risky"
+
+Better:
+- "the token validation at `auth.py:147` rejects valid tokens when `expires_at` falls within the refresh window"
+- "Step 4 assumes a backfill can run after the schema change, but the migration removes the source column in Step 3"
 
 Prefer maximally risky statements. The stronger the claim, the more useful the test. Then try to shatter the claim. If it survives a serious falsification attempt, it has earned attention.
 
@@ -205,19 +246,98 @@ If any answer unsettles you, go back and investigate before proceeding.
 
 **Reference:** Croskerry, P. (2003). The Importance of Cognitive Errors in Diagnosis. *Academic Emergency Medicine*, 10(11), 1174-1185.
 
+## Artifact-Specific Checks
+
+### Debugging Analysis
+
+Mandatory checks:
+
+- Symptom-to-mechanism jump unsupported by evidence
+- Production path claimed from synthetic test only
+- Alternative hypotheses not ruled out
+- Negative border not tested
+- Code path or stack frame cited incorrectly
+- Fix proposed before mechanism isolation
+
+### Incident Analysis
+
+Mandatory checks:
+
+- Time-window contamination
+- Timezone mismatch or silent timezone assumption
+- Aggregation before filtering
+- Contaminated provenance
+- Deploy, restart, migration, or config-change boundaries not reconciled
+- "Latest log" or "same run" claims without provenance proof
+- Counts lacking exact query or command
+
+### Design Plan
+
+Mandatory checks:
+
+- Requirement missing from the plan
+- Contradiction with existing architecture or prior design decisions
+- Unstated assumptions treated as facts
+- Acceptance criteria too vague to verify
+- Rollout, migration, or failure-mode handling omitted where required
+- Feasibility claimed without concrete evidence
+- Risks named without actionable mitigations
+
+### Implementation Plan
+
+Mandatory checks:
+
+- File ownership or write scope unclear
+- Sequence impossible or dependency order wrong
+- Verification commands missing or non-specific
+- Migration, backfill, rollback, or cleanup omitted where required
+- Tests named vaguely instead of concretely
+- Hidden blocking assumptions
+- Steps too abstract to execute
+
+### Generated Artifact
+
+Mandatory checks:
+
+- Artifact does not match its claimed generating inputs
+- Provenance of the artifact is unclear
+- Toolchain version or runtime context omitted
+- Output compared against the wrong baseline
+- Rendered or visual defect attributed to the wrong stage
+
 ## The Ripple Rule
 
 **When issues are found, trace the ripples before reporting.**
 
-A finding is rarely isolated. If a count is wrong in one place, every place that references or derives from that count may also be wrong. If a scope claim is too broad, every conclusion that depends on that scope is weakened.
+A finding is rarely isolated. If a count is wrong in one place, every place that references or derives from that count may also be wrong. If a scope claim is too broad, every conclusion that depends on that scope is weakened. If a plan step is impossible, downstream steps built on it are also suspect.
 
 **The protocol:**
 1. Find an issue
-2. **Before writing it up:** search the document for every reference to the affected claim, number, or finding
+2. **Before writing it up:** search the document for every reference to the affected claim, number, assumption, or step
 3. List all downstream statements that depend on the incorrect claim
 4. Report the issue AND its ripple effects as a single finding
 
 **Example:** "Category 3 is described as 71 error-seconds, but the classifier output shows 48. This also affects: (a) the 216/550 total in the status line, (b) the percentage calculation in the summary, (c) the priority ranking in the recommendations section."
+
+## The Pattern-Level Review Rule
+
+When you find one defect, ask whether it is local or systemic.
+
+- `local-only`: confined to one claim, one line, or one section
+- `pattern-level`: reflects a repeated reasoning habit elsewhere in the artifact
+
+If the issue is pattern-level:
+
+- Say so explicitly
+- Require a full sweep for the same defect class
+- Do not accept a single-line correction as a complete fix
+
+Examples of pattern-level defects:
+
+- Repeated overclaiming from synthetic evidence
+- Repeated missing citations
+- Repeated vague plan steps with no verification hooks
+- Repeated mismatch between detail sections and summary text
 
 ## The Editing Pass Rule
 
@@ -239,18 +359,23 @@ The failure mode: author fixes the flagged line, leaves three other places that 
 
 | Severity | Meaning | Action |
 |----------|---------|--------|
-| **High** | Evidence grade overclaimed, internal inconsistency, production path not demonstrated, load-bearing assumption unverified, ACH matrix shows favoured hypothesis is not best-supported | Must fix before presenting to human |
-| **Medium** | Missing upgrade path, weak citations, incomplete enumeration, GRADE downgrade not reflected in language, non-diagnostic evidence cited as support | Should fix; flag if not |
-| **Low** | Language could be tighter, minor style | Fix if convenient |
+| **High** | Evidence grade overclaimed, internal inconsistency, provenance failure, impossible step, critical omission, production path not demonstrated, load-bearing assumption unverified, ACH matrix shows favoured hypothesis is not best-supported | Must fix before presenting to human |
+| **Medium** | Weak citation, incomplete enumeration, vague verification path, missing upgrade path, incomplete mitigation, unsupported but non-critical claim, GRADE downgrade not reflected in language, non-diagnostic evidence cited as support | Should fix; flag if not |
+| **Low** | Language could be tighter, minor organisation issues, or small non-blocking precision problems | Fix if convenient |
 
 ### Output Format
 
 ```markdown
-# Critical Peer Review: [document name]
+# Critical Peer Review: [artifact name]
 
 Reviewer: [agent model]
 Date: [YYYY-MM-DD]
-Document reviewed: [file path]
+Artifact type: [debugging-analysis | incident-analysis | design-plan | implementation-plan | generated-artifact | technical-reasoning]
+Artifact reviewed: [file path or object reviewed]
+
+## Source Inventory
+- [artifact / log / diff / command / issue / screenshot checked]
+- [artifact / log / diff / command / issue / screenshot checked]
 
 ## Hidden Assumptions
 [Load-bearing assumptions extracted in step 3, with evidence status]
@@ -261,12 +386,17 @@ Document reviewed: [file path]
 ## Findings
 
 ### High (count: N)
-- **Issue**: [what is overclaimed or inconsistent]
-  **Evidence**: [what the analysis says vs what the evidence supports]
+- **Issue**: [what is wrong]
+  **Type**: [overclaim | contradiction | omission | unverifiable claim | provenance failure | citation failure | sequencing flaw | scope error]
+  **Scope**: [in-window confirmed | out-of-window corroboration | inference | n/a]
+  **Evidence grade**: [demonstrated | plausible | possible | speculative | n/a]
   **GRADE factors**: [which downgrade criteria triggered, if applicable]
+  **Evidence**: [what the artifact says vs what the evidence supports]
+  **Pattern level**: [local-only | pattern-level]
   **Ripple**: [downstream statements affected]
   **Corrected language**: [what it should say]
   **Location**: [file:line or section reference]
+  **Next proof step**: [single best next test or verification action]
 
 ### Medium (count: N)
 [Same format]
@@ -275,7 +405,10 @@ Document reviewed: [file path]
 [Same format, or brief list]
 
 ## Verification
-[What you checked independently — commands run, files read, citations verified]
+- Files read: [...]
+- Commands or queries checked: [...]
+- Citations verified: [...]
+- Provenance concerns: [...]
 
 ## Strongest Hypothesis
 [Which finding has the most support and why — per ACH matrix]
