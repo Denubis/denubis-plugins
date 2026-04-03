@@ -1,7 +1,7 @@
 {
     "name": "denubis-hook-shortcut-detection",
     "description": "Stop hook that detects shortcut phrases and blocks until user approves approach changes.",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

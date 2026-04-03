@@ -1,5 +1,20 @@
 # Changelog
 
+## Windows compatibility fixes
+
+Cross-cutting patch release for Windows/Git Bash support.
+
+**Fixed:**
+- `uv run python3` → `uv run python` in all hook commands (`python3` doesn't exist on Windows)
+- Hardcoded `/tmp` path in shortcut-detector.py → `tempfile.gettempdir()` for cross-platform temp dirs
+- Restored `.gitattributes` to force LF line endings on `.sh`/`.py` files (prevents broken shebangs on Windows clones)
+
+**Affected plugins:**
+- [denubis-plan-and-execute] 2.21.0 → 2.21.1
+- [denubis-hook-shortcut-detection] 2.0.2 → 2.0.3
+- [denubis-hook-claudemd-reminder] 1.1.1 → 1.1.2
+- [denubis-hook-branch-bg] 0.2.2 → 0.2.3
+
 ## [denubis-00-getting-started] 1.4.0
 
 Windows/Git Bash setup guide and full plugin catalogue.

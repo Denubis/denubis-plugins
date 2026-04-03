@@ -18,6 +18,7 @@ import hashlib
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 # High-signal phrases - almost always indicate Claude is taking a shortcut
@@ -44,7 +45,7 @@ MEDIUM_SIGNAL_PHRASES = [
 # Combine all patterns
 ALL_PHRASES = HIGH_SIGNAL_PHRASES + MEDIUM_SIGNAL_PHRASES
 
-LOCKFILE_DIR = Path("/tmp/shortcut-detector")
+LOCKFILE_DIR = Path(tempfile.gettempdir()) / "shortcut-detector"
 
 
 def lockfile_for_session(transcript_path: str) -> Path:

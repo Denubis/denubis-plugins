@@ -1,7 +1,7 @@
 {
     "name": "denubis-hook-claudemd-reminder",
     "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

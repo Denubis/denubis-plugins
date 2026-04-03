@@ -1,0 +1,10 @@
+# Force LF line endings for shell scripts (prevents "bad interpreter" on Windows Git Bash)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Python hooks also need LF
+*.py text eol=lf
+
+# Keep markdown and JSON as auto
+*.md text
+*.json text
