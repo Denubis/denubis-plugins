@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-00-getting-started] 1.4.0
+
+Windows/Git Bash support and comprehensive plugin guide.
+
+**New:**
+- `/setup` now detects Windows (Git Bash/MINGW) and skips Linux-only steps (dispatcher, RTK, status line)
+- Line ending check on Windows warns about `core.autocrlf` breaking hook scripts
+- uv prerequisite check with platform-appropriate install instructions
+
+**Changed:**
+- README rewritten with all 13 plugins (was 7), grouped into tiers: Core, Recommended, Infrastructure (Linux/macOS only), Terminal-specific
+- README now includes Windows Terminal setup guide with Git Bash profile instructions
+- README now includes alternative terminal recommendations (WezTerm, Alacritty, Tabby)
+- Installation section restructured with prerequisites, platform-specific steps, and an "Academic Python/R developer" profile
+- `.gitattributes` added to force LF line endings on `.sh` and `.py` files
+
 ## [denubis-plan-and-execute] 2.21.0
 
 Enhanced critical-peer-review with research-backed methodologies (ACH, GRADE, ABP, pre-mortem) and merged Codex variant improvements for broader artifact scope, mandatory checklists, and pattern-level defect tracking.
