@@ -2,19 +2,18 @@
 
 ## [denubis-00-getting-started] 1.4.0
 
-Windows/Git Bash support and comprehensive plugin guide.
+Windows/Git Bash setup guide and full plugin catalogue.
 
 **New:**
-- `/setup` now detects Windows (Git Bash/MINGW) and skips Linux-only steps (dispatcher, RTK, status line)
-- Line ending check on Windows warns about `core.autocrlf` breaking hook scripts
-- uv prerequisite check with platform-appropriate install instructions
+- `/setup` skill now detects platform (Windows/macOS/Linux) and adjusts steps accordingly
+- Windows line-ending check (warns if `core.autocrlf=true` would break hook shebangs)
+- uv availability check with Windows-specific PATH guidance
+- Windows users are warned about Unix-only plugins and offered to disable them
 
 **Changed:**
-- README rewritten with all 13 plugins (was 7), grouped into tiers: Core, Recommended, Infrastructure (Linux/macOS only), Terminal-specific
-- README now includes Windows Terminal setup guide with Git Bash profile instructions
-- README now includes alternative terminal recommendations (WezTerm, Alacritty, Tabby)
-- Installation section restructured with prerequisites, platform-specific steps, and an "Academic Python/R developer" profile
-- `.gitattributes` added to force LF line endings on `.sh` and `.py` files
+- README updated with complete 13-plugin catalogue (was 7), grouped into tiers: Core, Recommended, Infrastructure (Unix-only), Terminal-specific, and Onboarding
+- Installation section now offers tiered plugin sets with cross-platform guidance
+- Added Prerequisites table, Windows Setup section, and Forking instructions
 
 ## [denubis-plan-and-execute] 2.21.0
 
