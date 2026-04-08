@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.22.0
+
+Post-session transcript archival via claude-wrapper.
+
+**New:**
+- claude-wrapper pre-assigns `--session-id` for fresh interactive sessions
+- After session exit, prompts "Press Enter to archive transcript, or Ctrl-C to skip"
+- Enter launches a new interactive session running `/transcript <uuid>`
+- Resumed sessions get a reminder to run `/transcript` next time
+
+## [denubis-extending-claude] 1.6.0
+
+Transcript skill now supports archiving prior sessions by UUID.
+
+**New:**
+- `/transcript <session-uuid>` reads the JSONL transcript directly instead of analysing the current conversation
+- Step 0 derives transcript path from CWD and reads the JSONL file
+- Archive command passes `--session-id` and `--transcript` for prior sessions
+- Command file forwards arguments to the skill
+
 ## [denubis-plan-and-execute] 2.21.0
 
 Enhanced critical-peer-review with research-backed methodologies (ACH, GRADE, ABP, pre-mortem) and merged Codex variant improvements for broader artifact scope, mandatory checklists, and pattern-level defect tracking.
