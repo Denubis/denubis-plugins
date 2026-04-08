@@ -1,14 +1,34 @@
 # Archive Transcript with Research Metadata
 
-Archive this conversation with research metadata using the IDW2025 reproducibility framework (Three Ps: Prompt/Process/Provenance).
+Archive a conversation with research metadata using the IDW2025 reproducibility framework (Three Ps: Prompt/Process/Provenance).
 
 **IMPORTANT**: This is an INTERACTIVE process. You MUST use the AskUserQuestion tool to gather metadata before archiving. Do NOT skip straight to archiving.
 
+## Invocation Modes
+
+This skill can be invoked two ways:
+
+1. **Current session** (`/transcript`): Analyze the current conversation.
+2. **Prior session by UUID** (`/transcript <session-uuid>`): Archive a previously completed session by reading its JSONL transcript file.
+
 ## Your Task
+
+### Step 0: Resolve the Transcript Source
+
+If a **session UUID** was provided as an argument:
+
+1. Derive the transcript path:
+   - Encode the current working directory: strip leading `/`, replace all `/` with `-`
+   - Path: `~/.claude/projects/-<encoded-cwd>/<session-uuid>.jsonl`
+2. Use the **Read** tool to read the JSONL file (it may be large — read the first 500 lines to get the conversation content).
+3. Extract user messages (`"type": "user"`) and assistant text responses to understand what the session was about.
+4. Proceed to Step 1 using what you read from the JSONL, NOT the current conversation.
+
+If **no UUID** was provided, analyze the current conversation as before.
 
 ### Step 1: Analyze the Conversation
 
-Review the full conversation and identify:
+Review the conversation (current session or JSONL content) and identify:
 
 1. A proposed **Title** (3-7 words)
 2. Draft **Three Ps** (IDW2025 framework):
@@ -72,10 +92,24 @@ questions:
 
 ### Step 4: Execute Archive
 
-ONLY after the user confirms, run the archive command with all the gathered metadata:
+ONLY after the user confirms, run the archive command with all the gathered metadata.
+
+**For the current session** (no UUID):
 
 ```bash
 claude-transcript-archive --retitle --local \
+  --title "YOUR CONFIRMED TITLE" \
+  --prompt "The Prompt summary you drafted" \
+  --process "The Process summary you drafted" \
+  --provenance "The Provenance summary you drafted"
+```
+
+**For a prior session** (UUID provided):
+
+```bash
+claude-transcript-archive --retitle --local \
+  --session-id "THE-SESSION-UUID" \
+  --transcript "~/.claude/projects/-<encoded-cwd>/<session-uuid>.jsonl" \
   --title "YOUR CONFIRMED TITLE" \
   --prompt "The Prompt summary you drafted" \
   --process "The Process summary you drafted" \
