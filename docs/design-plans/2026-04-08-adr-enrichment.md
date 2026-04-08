@@ -61,7 +61,9 @@ The implementation is template-only — no new files, no runtime code, no new di
 
 Template-only change. No runtime code, no new files, no new directories.
 
-Two existing skill files are modified to add ADR vocabulary to their templates:
+All seven templates in the `update-architecture-docs` skill were checked for decision-capturing sections. Only `template-database.md` has one (the "Design Decisions" section with Date/Context/Decision/Alternatives rejected). `template-constraints.md` has a "Constraint History" table (Date/Change/Reason), but this tracks changes to constraints over time, not architectural decisions with alternatives — it does not warrant ADR enrichment. The remaining five templates (DFD context, DFD process, state, personae, glossary) have no decision sections.
+
+Two existing skill files are modified:
 
 1. **`plugins/denubis-plan-and-execute/skills/writing-design-plans/SKILL.md`** — gains a `## Decision Record` section in the design plan document structure (after Architecture, before Existing Patterns) and writer guidance on populating it. The section contains one or more numbered decision records (DR1, DR2, ...), each with Status, Confidence, Reevaluation triggers, Decision, Consequences (Enables/Prevents), and Alternatives considered.
 
@@ -69,7 +71,7 @@ Two existing skill files are modified to add ADR vocabulary to their templates:
 
 ### Decision Record Format (Design Plans)
 
-Each decision record within a design plan follows this structure:
+The handover document showed an illustrative single-record format. This design refines it to use numbered DR[N] subsections with bold-label fields (more compact than sub-headings), supporting multiple records per plan. Each decision record follows this structure:
 
 ```markdown
 ### DR[N]: [Decision title — what was chosen over what]
@@ -89,7 +91,7 @@ Each decision record within a design plan follows this structure:
 
 ### Decision Record Format (Database Template)
 
-Each database design decision follows this enriched structure:
+Each database design decision follows this enriched structure. Status/Confidence/Reevaluation triggers are placed after Date to form a metadata block that a reader can scan before committing to the narrative Context/Decision/Consequences body:
 
 ```markdown
 ### [Decision Title]
@@ -148,7 +150,21 @@ Writers populate the Decision Record section during design documentation, drawin
 - **Standalone `docs/adr/` directory:** Rejected because it creates a parallel decision-tracking system that would drift from design plans. Fowler's ADRs are short documents — our design plans already serve that purpose for major decisions.
 - **New ADR skill:** Rejected because the existing design-plan and architecture-doc workflows already handle decision documentation. A separate skill would duplicate orchestration.
 
-### DR2: Multiple decision records per design plan
+### DR2: Placement after Architecture, before Existing Patterns
+**Status:** Accepted
+**Confidence:** High
+**Reevaluation triggers:** If writers consistently skip the section because it's buried in the body; if future templates restructure the body section order.
+
+**Decision:** We placed the Decision Record section after Architecture and before Existing Patterns, refining the handover's suggestion of "after Summary/before Implementation Phases."
+
+**Consequences:**
+- **Enables:** Natural reading flow — decisions emerge from the architecture discussion, so readers have the context they need before encountering the formal records.
+- **Prevents:** Early prominence — a reader scanning just the legibility header (Summary, DoD, AC, Glossary) won't see the Decision Records without scrolling into the body.
+
+**Alternatives considered:**
+- **After Summary (handover suggestion):** Rejected because decisions lack context before the Architecture section is read. Placing them early would require the Decision Record to re-explain architectural context already covered in the Architecture section.
+
+### DR3: Multiple decision records per design plan
 **Status:** Accepted
 **Confidence:** High
 **Reevaluation triggers:** If design plans consistently have only one decision, making multiple records feel like overhead.
