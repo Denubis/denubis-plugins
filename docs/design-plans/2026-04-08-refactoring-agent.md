@@ -49,7 +49,7 @@ A secondary capability is added to the planning stage: the `writing-implementati
 
 - **Fowler's refactoring catalog**: A reference catalog of 72 named refactoring patterns (e.g., Extract Method, Inline Variable) from Martin Fowler's *Refactoring* (2018). Provides a shared vocabulary for prescribing specific transformations.
 - **Two Hats discipline**: Fowler's metaphor for separating behaviour-preserving refactoring from feature work. When refactoring, no observable behaviour changes; when adding features, no structural tidying. The executor enforces this by reverting any transformation that breaks tests.
-- **Mantyla taxonomy**: A seven-category classification of code smells (Bloaters, Dispensables, Couplers, Change Preventers, OO Abusers, Temporary Fields, Comments) from Mantyla et al. (2003). Used here to organise smell findings into tiers.
+- **Mantyla taxonomy**: A five-category classification of code smells (Bloaters, Object-Orientation Abusers, Change Preventers, Dispensables, Couplers) from Mantyla, Vanhanen & Lassenius (2003), "A Taxonomy and an Initial Empirical Study of Bad Smells in Code," ICSM 2003. Used here to organise smell findings into tiers.
 - **Tier 1 / Tier 2 / Tier 3 smells**: A prioritisation applied on top of Mantyla's taxonomy in this design. Tier 1 smells are metrics-grounded (detectable by static tools); Tier 2 are design-level (require reasoning); Tier 3 are deferred (require cross-file or historical analysis not feasible in a single-phase run).
 - **complexipy**: A Python cognitive complexity analyser, invoked via `uvx` (no install required). Produces a numeric complexity score per function. The pipeline uses a threshold of 15.
 - **ast-grep**: A structural code search and transformation tool that matches syntax tree patterns rather than text. Used here both for smell detection (YAML rules) and for applying refactoring transformations.
@@ -62,18 +62,20 @@ A secondary capability is added to the planning stage: the `writing-implementati
 - **Scratchpad directory**: A per-session temporary directory used by agents to write intermediate artefacts (smell reports, reviewed reports, measurement outputs) that persist across turn boundaries and survive agent exhaustion.
 - **Checkpoint protocol**: A convention in this plugin where analysis agents write progress files to disk at intervals, so partial work is recoverable if an agent exhausts its turn budget before finishing.
 - **Marinescu detection strategies**: Logical combinations of metrics with statistically-derived thresholds for detecting design flaws, from Marinescu (2004). E.g., God Class = (access to foreign data > few) AND (weighted method count >= very high) AND (tight class cohesion < 1/3).
-- **iSMELL / ICSE 2025 / 2025 Systematic Review**: Recent empirical research cited to justify design choices: hybrid LLM + static tools outperform LLM-only smell detection; missing context causes 65% of LLM refactoring failures; LLM refactoring alone is unreliable. These findings directly motivate the measurement-first, critical-review-gated pipeline.
+- **iSMELL**: "Assembling LLMs with Expert Toolsets for Code Smell Detection and Refactoring," ASE 2024 (IEEE/ACM). Found hybrid LLM + specialist tools achieves +35% F1 over LLM-only approaches. Motivates the measurement-first pipeline.
+- **ICSE 2025 IDE track**: "LLM-Driven Code Refactoring: Opportunities and Limitations." Found 65% of LLM refactoring failures stem from missing context. Motivates providing measurement data to agents.
+- **2025 Systematic Review**: "Using LLMs to Enhance Code Quality," ScienceDirect. Found "refactored code by LLMs is not reliable." Motivates the critical review gate between detection and execution.
 
 ## Architecture
 
-Three-subagent pipeline for post-phase refactoring, replacing the non-existent `code-simplifier` agent. The pipeline separates concerns: detection, review, and execution are distinct agents with distinct models and responsibilities.
+Three-subagent pipeline for post-phase refactoring, replacing the code-simplifier dispatch (which references a non-existent agent, falling back to orchestrator self-refactoring with a thin "simplify code" prompt). The pipeline separates concerns: detection, review, and execution are distinct agents with distinct models and responsibilities.
 
 ### Agent Decomposition
 
 | Agent | Model | Role | Analogy |
 |-------|-------|------|---------|
 | `smell-assessor` | Sonnet | Structured smell detection against Mantyla taxonomy + skill rubrics. Read-only — no file edits. | Like code-reviewer: structured checklist, analysis-only, writes findings to disk |
-| `critical-peer-review` (existing) | Opus | Reviews smell report for overclaiming, downgrades weak findings, gates execution | Already exists — reused with smell-assessment-specific dispatch |
+| `critical-peer-review` (existing) | Opus | Reviews smell report for overclaiming, downgrades weak findings, gates execution | Already exists — reused with scoped dispatch (evidence grading and overclaiming detection apply; ACH matrix, pre-mortem, and timeline verification are suppressed as inapplicable to smell reports) |
 | `refactoring-executor` | Opus | Applies Fowler refactoring patterns to reviewed findings. Prefers ast-grep for structural transformations. | Like task-implementor: makes code changes, checkpoint commits |
 
 ### New Skill
@@ -177,14 +179,12 @@ ast-grep YAML rules for structural smell detection live in a `rules/` directory 
 **Goal:** Create the knowledge base that grounds all smell detection and refactoring decisions.
 
 **Components:**
-- `skills/refactoring-rubric/SKILL.md` — Mantyla taxonomy checklist (Bloaters, Dispensables, Couplers, Change Preventers), Fowler smell-to-refactoring mapping table, evidence grading criteria (Demonstrated/Plausible/Possible), Rule of Three gate, Two Hats discipline rules, Tier 3 deferred smells registry
-- `skills/refactoring-rubric/rules/` — ast-grep YAML rules for structural smell detection:
+- `skills/refactoring-rubric/SKILL.md` — Mantyla taxonomy checklist (Bloaters, OO Abusers, Change Preventers, Dispensables, Couplers), Fowler smell-to-refactoring mapping table, evidence grading criteria (Demonstrated/Plausible/Possible), Rule of Three gate, Two Hats discipline rules, Tier 3 deferred smells registry
+- `skills/refactoring-rubric/rules/` — ast-grep YAML rules for structural smell detection (Tier 1 only — smells requiring counting or comparison are Tier 2, assessed by the LLM):
   - `nesting-depth.yaml` — functions with >3 levels of nested control flow
-  - `fcis-violation.yaml` — functions containing both I/O calls and computation
-  - `long-parameter-list.yaml` — functions with >=4 parameters (JSON output, post-processed)
-  - `data-class.yaml` — classes with many attributes but few methods
+  - `fcis-violation.yaml` — functions containing I/O calls (open, requests.*, pathlib write/read, db.* — enumerated list, inherently brittle but useful as a signal)
+  - `long-parameter-list.yaml` — functions with >=4 parameters
   - `global-mutable-state.yaml` — module-level non-constant assignments
-  - `feature-envy.yaml` — methods with more foreign attribute access than self access (JSON output, post-processed)
 
 **Dependencies:** None (first phase)
 
@@ -223,7 +223,7 @@ ast-grep YAML rules for structural smell detection live in a `rules/` directory 
 **Goal:** Replace the thin code-simplifier dispatch with the three-subagent pipeline.
 
 **Components:**
-- `skills/executing-an-implementation-plan/SKILL.md` — Modify section 3d (Phase Refactor). Replace lines 476-506 with: measurement step (wc -l, complexipy, ast-grep rules), smell-assessor dispatch, gate check, critical-peer-review dispatch, gate check, refactoring-executor dispatch, final verification. Update turn budget table to include smell-assessor (150) and refactoring-executor (150). Update null/empty response handling for new agents. Update phase completion flow diagram.
+- `skills/executing-an-implementation-plan/SKILL.md` — Modify section `#### 3d. Phase Refactor` with: measurement step (wc -l, complexipy, ast-grep rules), smell-assessor dispatch, gate check, critical-peer-review dispatch (scoped: evidence grading and overclaiming detection only, suppress ACH/pre-mortem/timeline), gate check, refactoring-executor dispatch, final verification. Update turn budget table to include smell-assessor (150) and refactoring-executor (150). Note: this increases the maximum per-phase refactoring cost from 150 turns (current code-simplifier) to 450 turns (three agents at 150 each), mitigated by gate short-circuits. Update null/empty response handling for new agents. Update phase completion flow diagram.
 
 **Dependencies:** Phases 1, 2, 3 (all agents and skill must exist)
 
@@ -265,13 +265,13 @@ ast-grep YAML rules for structural smell detection live in a `rules/` directory 
 This design is grounded in:
 - **Fowler (2018):** Refactoring catalog (72 patterns), Two Hats metaphor, six refactoring workflows
 - **Beck (2003):** Red-Green-Refactor cycle, "make the change easy, then make the easy change"
-- **Mantyla et al. (2003):** Seven-category smell taxonomy (Bloaters, Dispensables, Couplers, Change Preventers, OO Abusers, Temporary Fields, Comments)
+- **Mantyla, Vanhanen & Lassenius (2003):** Five-category smell taxonomy (Bloaters, OO Abusers, Change Preventers, Dispensables, Couplers), ICSM 2003
 - **Marinescu (2004):** Detection strategies — logical combinations of metrics with thresholds
 - **Lanza & Marinescu (2006):** Operationalised detection for ~15 smells via composite metric rules
 - **DECOR/Moha et al. (2010):** Formal smell specification via DSL
-- **iSMELL (ASE 2024):** Hybrid LLM + specialist tools achieves +35% F1 over LLM-only approaches
-- **ICSE 2025:** 65% of LLM refactoring failures stem from missing context
-- **2025 Systematic Review:** "Refactored code by LLMs is not reliable" — validates the critical review gate
+- **iSMELL (ASE 2024):** "Assembling LLMs with Expert Toolsets for Code Smell Detection and Refactoring," IEEE/ACM ASE 2024 — hybrid LLM + specialist tools achieves +35% F1 over LLM-only approaches
+- **ICSE 2025 IDE track:** "LLM-Driven Code Refactoring: Opportunities and Limitations" — 65% of LLM refactoring failures stem from missing context
+- **2025 Systematic Review:** "Using LLMs to Enhance Code Quality," ScienceDirect — "Refactored code by LLMs is not reliable," validates the critical review gate
 
 ### Complexity Thresholds
 
