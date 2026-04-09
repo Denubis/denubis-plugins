@@ -111,6 +111,24 @@ The file is created by starting-a-design-plan Phase 3. This skill appends to tha
 
 [Data flow and system boundaries]
 
+## Decision Record
+
+### DR[N]: [Decision title - what was chosen over what]
+**Status:** Proposed | Accepted | Superseded by [link] | Deprecated
+**Confidence:** High | Medium | Low
+**Reevaluation triggers:** [Conditions under which to revisit]
+
+**Decision:** [Active voice: "We chose X over Y."]
+
+**Consequences:**
+- **Enables:** [What this unlocks]
+- **Prevents:** [What this forecloses]
+
+**Alternatives considered:**
+- **[Alternative]:** Rejected because [reason]
+
+[Repeat DR[N+1], DR[N+2], ... for each significant decision]
+
 ## Existing Patterns
 [Document codebase patterns discovered by investigator that this design follows]
 
@@ -390,6 +408,65 @@ Investigation found legacy authentication in `src/auth/`. This design diverges:
 - NEW: Separate services (`token_service.py`, `validator.py`) following FCIS
 
 Divergence justified by: Legacy code violates FCIS pattern, difficult to test, high coupling.
+```
+
+## Decision Record Section
+
+**Purpose:** Capture significant design decisions with enough context to understand why they were made, what they enable, and when to revisit them.
+
+**Placement:** After Architecture, before Existing Patterns. Decisions emerge from the architecture discussion, so readers have context before encountering the formal records.
+
+**What warrants a decision record:**
+- If brainstorming Phase 2 explored it as a named approach, it's a decision record
+- Technology choices (library X over Y) warrant a record
+- Architectural patterns (event-driven vs synchronous) warrant a record
+- Scope trade-offs explicitly discussed with the user warrant a record
+- If only one option was ever considered, it's not a decision — it's just the design
+
+**Mapping brainstorming output to Decision Record fields:**
+- The approach selected in Phase 2 becomes the **Decision** field
+- Rejected approaches become **Alternatives considered** with rejection reasons from the discussion
+- Trade-offs discussed during exploration inform **Consequences** (Enables/Prevents)
+- User's certainty during selection maps to **Confidence** (High if clear preference, Medium if close call, Low if "let's try this")
+- Concerns raised during brainstorming become **Reevaluation triggers**
+
+**Status values:**
+- **Proposed:** Decision under discussion, not yet approved.
+- **Accepted:** Decision is active and governs current implementation.
+- **Superseded by [new plan/section]:** A new decision replaces this one. The old record stays immutable; the new record references what it supersedes.
+- **Deprecated:** Decision is no longer relevant (e.g., feature removed) but was never formally replaced.
+
+**Fowler's superseding rule:** Accepted decisions are never reopened or edited. To change a decision, create a new record marked as superseding the old one. This preserves the audit trail — future readers see what governed work during each period.
+
+**Confidence levels:**
+- **High:** Strong evidence, well-understood domain, clear consensus.
+- **Medium:** Reasonable choice but alternatives were close, or domain has unknowns.
+- **Low:** Best guess given constraints; expect to revisit.
+
+**Style:**
+- Use the inverted pyramid: lead with what was decided, then why, then consequences
+- Active voice for Decision field: "We chose X over Y" not "X was selected"
+- Keep each record concise — if the explanation exceeds a paragraph, the decision may need splitting
+- Number records sequentially per document: DR1, DR2, DR3
+
+**Example:**
+```markdown
+## Decision Record
+
+### DR1: Enrich existing templates rather than create new ADR artefact type
+**Status:** Accepted
+**Confidence:** High
+**Reevaluation triggers:** If standalone decisions (not tied to a design plan) exceed what architecture docs can capture; if a separate docs/adr/ directory becomes needed.
+
+**Decision:** We chose to add ADR fields to existing design plan and architecture doc templates rather than creating a docs/adr/ directory or standalone ADR skill.
+
+**Consequences:**
+- **Enables:** ADR vocabulary in all future design plans with zero workflow change. Brainstorming output feeds directly into Decision Records.
+- **Prevents:** Capturing standalone architectural decisions not tied to a design plan or database doc.
+
+**Alternatives considered:**
+- **Standalone docs/adr/ directory:** Rejected because it creates a parallel system that would drift from design plans.
+- **New ADR skill:** Rejected because existing workflows already handle decision documentation.
 ```
 
 ## Additional Considerations
@@ -784,7 +861,7 @@ Brainstorming (Phase 4) completes
   -> User approved incrementally
 
 Writing Design Plans (this skill)
-  -> Append body: Architecture, Existing Patterns, Implementation Phases, Additional Considerations
+  -> Append body: Architecture, Decision Record, Existing Patterns, Implementation Phases, Additional Considerations
   -> Add exact paths from investigation
   -> Create discrete phases (<=8)
   -> Generate Acceptance Criteria inline (success + failure cases for each DoD item)
