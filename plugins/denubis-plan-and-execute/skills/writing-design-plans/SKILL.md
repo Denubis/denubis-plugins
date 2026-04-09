@@ -113,7 +113,7 @@ The file is created by starting-a-design-plan Phase 3. This skill appends to tha
 
 ## Decision Record
 
-### DR[N]: [Decision title - what was chosen over what]
+### DR[N]: [Decision title — what was chosen over what]
 **Status:** Proposed | Accepted | Superseded by [link] | Deprecated
 **Confidence:** High | Medium | Low
 **Reevaluation triggers:** [Conditions under which to revisit]

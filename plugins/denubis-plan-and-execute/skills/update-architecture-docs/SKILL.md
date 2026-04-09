@@ -73,6 +73,23 @@ DFD files cross-reference each other:
 
 See `template-dfd-context.md`, `template-dfd-process.md`, `template-database.md`, `template-personae.md`, `template-glossary.md`, `template-constraints.md`, and `template-state.md` in this skill directory for document templates.
 
+### Design Decisions (ADR Fields)
+
+The `template-database.md` Design Decisions section uses ADR-style fields. When populating these fields:
+
+**Status values:**
+- **Proposed:** Decision under discussion, not yet approved.
+- **Accepted:** Decision is active and governs current implementation.
+- **Superseded by [link]:** A new decision replaces this one. The old record stays immutable; the new record references what it supersedes. Accepted decisions are never reopened or edited — to change a decision, create a new entry that supersedes the old one.
+- **Deprecated:** Decision is no longer relevant (e.g., feature removed) but was never formally replaced.
+
+**Confidence levels:**
+- **High:** Strong evidence, well-understood domain, clear consensus.
+- **Medium:** Reasonable choice but alternatives were close, or domain has unknowns.
+- **Low:** Best guess given constraints; expect to revisit.
+
+**Consequences:** Use **Enables** for what the decision unlocks and **Prevents** for what it forecloses. These help future readers assess whether the decision still serves its purpose.
+
 ## Assessment Framework
 
 For each doc type, scan the input artifact for context signals. If a signal is found, check the corresponding atomic units against existing docs. If a contradiction pattern matches, HALT before proceeding.
