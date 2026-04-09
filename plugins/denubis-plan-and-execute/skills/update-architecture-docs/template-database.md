@@ -48,8 +48,15 @@ flowchart LR
 
 ### [Decision Title]
 **Date:** YYYY-MM-DD
+**Status:** Proposed | Accepted | Superseded by [link] | Deprecated
+**Confidence:** High | Medium | Low
+**Reevaluation triggers:** [Conditions under which to revisit]
+
 **Context:** [Why this decision was needed]
 **Decision:** [What was decided]
+**Consequences:**
+- **Enables:** [What this unlocks]
+- **Prevents:** [What this forecloses]
 **Alternatives rejected:** [What else was considered and why it was rejected]
 
 ## Denormalisation Register
