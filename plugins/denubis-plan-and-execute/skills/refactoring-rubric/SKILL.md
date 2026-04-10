@@ -125,39 +125,122 @@ Switching hats requires an explicit decision and a clean commit boundary.
 
 ## Part 6: Tier 3 Deferred Smells Registry
 
-These smells require cross-file or cross-module analysis not feasible in single-phase assessment. Full documentation added in Phase 6.
+These smells require cross-file, cross-module, or temporal analysis not feasible in single-phase assessment. Each entry documents the detection approach a future codebase-level tool would need.
 
-### Shotgun Surgery
-One-line: A single logical change requires edits across many files.
-Detection requires: Cross-file change frequency analysis (git history or dependency graph).
-Deferred because: Requires multi-file context window exceeding single-phase scope.
+#### Shotgun Surgery (Tier 3)
 
-### Divergent Change
-One-line: A single file is changed for many different, unrelated reasons.
-Detection requires: Change-reason classification across git history for each file.
-Deferred because: Requires temporal analysis of commit patterns, not static structure.
+**Category:** Change Preventers
 
-### Parallel Inheritance
-One-line: Adding a subclass in one hierarchy forces a matching subclass in another.
-Detection requires: Cross-hierarchy class pairing analysis across multiple files.
-Deferred because: Requires simultaneous structural comparison of two or more inheritance trees, not feasible in single-file scope.
+**What it is:** A single conceptual change requires coordinated edits across many files. The change cannot be localised because the responsibility is scattered. This makes changes expensive and error-prone — missing one file breaks the system.
 
-### Insider Trading
-One-line: Modules sharing too much internal knowledge across boundaries.
-Detection requires: Cross-module dependency analysis and boundary definition.
-Deferred because: Requires module boundary awareness not available in single-file assessment.
+**Detection approach:**
+- Required data: `git log --name-only` history, change coupling analysis
+- Detection heuristic: Group commits by logical change (branch or linked issue), measure file-set scope per change. Flag when change scope > threshold files consistently.
+- Reference: Marinescu (2004) detection strategy: change frequency > threshold AND change coupling > threshold
 
-### Mysterious Name
-One-line: Unclear naming requiring cross-file context to understand.
-Detection requires: Cross-file usage analysis to determine if naming is locally or globally ambiguous.
-Deferred because: Name clarity depends on broader project conventions and usage context.
+**Why deferred:** Requires temporal git history analysis across multiple files — not available in single-phase static assessment.
 
-### Cross-file Duplication
-One-line: Similar logic repeated across different modules.
-Detection requires: Cross-file structural comparison with semantic equivalence checking.
-Deferred because: Single-file ast-grep rules cannot compare across files.
+**What a future skill would need:**
+- Git log parsing with change coupling computation
+- Configurable thresholds for file-set scope
 
-### God Module
-One-line: A module that accumulates unrelated responsibilities over time.
-Detection requires: Cohesion analysis across all functions/classes in a module.
-Deferred because: Requires full-module semantic analysis beyond individual smell detection.
+#### Divergent Change (Tier 3)
+
+**Category:** Change Preventers
+
+**What it is:** A single file is modified for many different, unrelated reasons across commits. The file has accumulated multiple responsibilities, making it a bottleneck for unrelated changes.
+
+**Detection approach:**
+- Required data: Commit message classification, file change frequency analysis
+- Detection heuristic: Classify commit reasons per file. Flag when a file's change reasons span > 3 unrelated categories with high frequency.
+- Reference: Lanza & Marinescu (2006): WMC >= very high AND TCC < 1/3
+
+**Why deferred:** Requires temporal analysis of commit patterns and commit-reason classification, not static structure.
+
+**What a future skill would need:**
+- Commit message topic classification (LLM or keyword-based)
+- Per-file change frequency and reason diversity metrics
+
+#### Parallel Inheritance (Tier 3)
+
+**Category:** Change Preventers
+
+**What it is:** Adding a subclass in one hierarchy forces a matching subclass in another. The two hierarchies are coupled — every extension in one requires a mirrored extension in the other.
+
+**Detection approach:**
+- Required data: Cross-hierarchy class pairing analysis across multiple files
+- Detection heuristic: Identify class hierarchies with 1:1 subclass correspondence. Flag when creating a subclass in hierarchy A consistently requires a new subclass in hierarchy B.
+- Reference: Fowler (1999) — often a sign of missing delegation or Strategy pattern
+
+**Why deferred:** Requires simultaneous structural comparison of two or more inheritance trees across file boundaries.
+
+**What a future skill would need:**
+- Multi-file inheritance tree extraction
+- Cross-hierarchy correspondence detection
+
+#### Insider Trading (Tier 3)
+
+**Category:** Couplers
+
+**What it is:** Modules sharing too much internal knowledge across boundaries. Excessive imports of private/internal symbols, or modules that depend on each other's implementation details rather than public interfaces.
+
+**Detection approach:**
+- Required data: Import graph analysis, symbol visibility classification
+- Detection heuristic: Build module dependency graph. Flag modules with bidirectional dependencies or imports of conventionally-private symbols (prefixed `_`, not in `__all__`).
+- Reference: Moha et al. (2010) DECOR specification
+
+**Why deferred:** Requires module boundary awareness and import graph analysis not available in single-file assessment.
+
+**What a future skill would need:**
+- Full-project import graph construction
+- Symbol visibility classification (public vs internal)
+
+#### Mysterious Name (Tier 3)
+
+**Category:** Dispensables
+
+**What it is:** Variable, function, or class names that require cross-file context to understand. A name may be clear within its own module but ambiguous or misleading when referenced from another module.
+
+**Detection approach:**
+- Required data: Cross-file reference analysis, naming convention consistency check
+- Detection heuristic: For each exported symbol, measure "name informativeness" relative to usage context. Flag symbols whose name does not convey their purpose at call sites.
+
+**Why deferred:** Name quality is contextual — a name clear in one module may be mysterious when referenced from another. Requires cross-file usage analysis.
+
+**What a future skill would need:**
+- Cross-file symbol reference tracking
+- Naming informativeness heuristic (possibly LLM-based)
+
+#### Cross-file Duplication (Tier 3)
+
+**Category:** Dispensables
+
+**What it is:** Similar logic repeated across different modules. Unlike within-file duplication (detectable by ast-grep), this spans file boundaries and may use slightly different variable names or structures.
+
+**Detection approach:**
+- Required data: AST similarity analysis across files (token-level or tree-level), clone detection tools
+- Detection heuristic: Pairwise structural comparison of function bodies across files. Flag pairs with > 80% AST node similarity.
+- Reference: Fowler's Rule of Three applies, but detection must span files
+
+**Why deferred:** Single-file ast-grep rules cannot compare across files. Requires a clone detection pass over the full file set.
+
+**What a future skill would need:**
+- Multi-file AST comparison (e.g., jscpd, PMD CPD, or custom ast-grep orchestration)
+- Configurable similarity threshold
+
+#### God Module (Tier 3)
+
+**Category:** Bloaters
+
+**What it is:** A module that accumulates unrelated responsibilities over time. High fan-in (many importers depend on it) combined with low internal cohesion. Often grows organically as convenience functions get added.
+
+**Detection approach:**
+- Required data: Import dependency graph, cohesion metrics (LCOM), responsibility classification
+- Detection heuristic: Compute fan-in (number of importing modules) and internal cohesion (TCC or LCOM4). Flag modules with fan-in > threshold AND TCC < 1/3.
+- Reference: Marinescu God Class detection adapted to module level: ATFD > few AND WMC >= very high AND TCC < 1/3
+
+**Why deferred:** Requires full-module semantic analysis and import graph construction beyond individual smell detection.
+
+**What a future skill would need:**
+- Module-level cohesion metrics (TCC, LCOM4)
+- Import fan-in computation across the project
