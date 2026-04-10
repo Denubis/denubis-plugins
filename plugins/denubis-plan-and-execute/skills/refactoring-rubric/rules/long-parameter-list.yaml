@@ -1,0 +1,19 @@
+id: long-parameter-list
+language: python
+message: "Function has >=4 parameters — consider Introduce Parameter Object or Preserve Whole Object"
+severity: info
+rule:
+  kind: function_definition
+  has:
+    kind: parameters
+    has:
+      nthChild:
+        position: 4
+        ofRule:
+          any:
+            - kind: identifier
+            - kind: typed_parameter
+            - kind: default_parameter
+            - kind: typed_default_parameter
+            - kind: list_splat_pattern
+            - kind: dictionary_splat_pattern

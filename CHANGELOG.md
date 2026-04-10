@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.24.0
+
+Three-subagent refactoring pipeline replacing the non-functional code-simplifier dispatch.
+
+**New:**
+- `refactoring-rubric` skill: Mantyla taxonomy checklist, Fowler smell-to-refactoring mapping, evidence grading, ast-grep structural detection rules
+- `smell-assessor` agent (Sonnet, purple): structured smell detection against Mantyla taxonomy using measurement data + LLM reasoning
+- `refactoring-executor` agent (Opus, magenta): applies reviewed refactoring prescriptions with ast-grep preference and revert-on-red discipline
+- Preparatory refactoring: planner can insert "preparatory-refactor" phases when codebase investigation finds structural impediments
+- `Phase Type:` header field for implementation plan phases (infrastructure, functionality, preparatory-refactor)
+- Tier 3 deferred smells registry with detection approaches for future codebase-level refactoring
+
+**Changed:**
+- `executing-an-implementation-plan` section 3d: replaced code-simplifier dispatch with measurement → smell-assessor → critical-peer-review → refactoring-executor pipeline with gate short-circuits
+- `writing-implementation-plans`: extended codebase investigation with structural readiness question for phases modifying existing files
+- Turn budget table: removed code-simplifier, added smell-assessor and refactoring-executor (150 turns each)
+
 ## [denubis-plan-and-execute] 2.23.0
 
 ADR enrichment of design plan and database architecture templates.

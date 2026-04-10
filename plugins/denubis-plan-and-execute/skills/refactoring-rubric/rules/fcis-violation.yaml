@@ -1,0 +1,38 @@
+id: fcis-violation
+language: python
+message: "Function contains I/O calls — consider separating pure logic from side effects (FCIS pattern)"
+severity: warning
+rule:
+  kind: function_definition
+  has:
+    stopBy: end
+    any:
+      # Direct open() calls
+      - kind: call
+        has:
+          field: function
+          pattern: open
+      # requests.* calls
+      - kind: call
+        has:
+          field: function
+          kind: attribute
+          has:
+            field: object
+            pattern: requests
+      # pathlib read/write methods (match on the method name within the attribute node)
+      - kind: call
+        has:
+          field: function
+          kind: attribute
+          has:
+            field: attribute
+            regex: "^(read_text|write_text|read_bytes|write_bytes)$"
+      # db.* calls
+      - kind: call
+        has:
+          field: function
+          kind: attribute
+          has:
+            field: object
+            pattern: db
