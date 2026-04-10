@@ -10,6 +10,8 @@
 #   ExitWorktree       — paired with EnterWorktree
 #   ListMcpResourcesTool — meta-tool, rarely needed
 #   ReadMcpResourceTool  — meta-tool, rarely needed
+#   RemoteTrigger        — cloud cron, not used
+#   CronCreate/Delete/List — session-scoped cron, not used
 #
 # Agent teams:
 #   Enabled via CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
@@ -27,7 +29,7 @@
 
 set -euo pipefail
 
-DISALLOWED_TOOLS="NotebookEdit,EnterPlanMode,ExitPlanMode,EnterWorktree,ExitWorktree,ListMcpResourcesTool,ReadMcpResourceTool"
+DISALLOWED_TOOLS="NotebookEdit,EnterPlanMode,ExitPlanMode,EnterWorktree,ExitWorktree,ListMcpResourcesTool,ReadMcpResourceTool,RemoteTrigger,CronCreate,CronDelete,CronList"
 
 # Enable experimental agent teams
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
