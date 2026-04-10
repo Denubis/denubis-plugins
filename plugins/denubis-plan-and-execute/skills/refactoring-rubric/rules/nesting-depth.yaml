@@ -1,0 +1,30 @@
+id: nesting-depth
+language: python
+message: "Function has >3 levels of nested control flow — consider Extract Method or Decompose Conditional"
+severity: warning
+rule:
+  kind: function_definition
+  has:
+    stopBy: end
+    any:
+      - kind: if_statement
+      - kind: for_statement
+      - kind: while_statement
+    has:
+      stopBy: end
+      any:
+        - kind: if_statement
+        - kind: for_statement
+        - kind: while_statement
+      has:
+        stopBy: end
+        any:
+          - kind: if_statement
+          - kind: for_statement
+          - kind: while_statement
+        has:
+          stopBy: end
+          any:
+            - kind: if_statement
+            - kind: for_statement
+            - kind: while_statement
