@@ -171,6 +171,16 @@ grep -E "START_TASK_|START_SUBCOMPONENT_" [plan-directory]/phase_01.md
 
 The header includes the title (`# [Phase Title]`) and `**Goal:**` line. Extract the title for the task entry.
 
+**Extract Phase Type** from the header:
+
+```bash
+# Extract phase type (defaults to "functionality" if not specified)
+# Strip markdown bold formatting (**) from the extracted value
+grep "Phase Type:" [phase_file] | head -1 | sed 's/\*\*//g' | sed 's/Phase Type://' | xargs
+```
+
+If Phase Type is not specified in the header, default to "functionality". Plans created before the Phase Type field was introduced will not have this field.
+
 The grep output shows the task structure, e.g.:
 ```
 <!-- START_TASK_1 -->
@@ -245,6 +255,55 @@ Mark "Phase Na: Read" as complete.
 #### 3b. Execute All Tasks
 
 Mark "Phase Nb: Execute tasks" as in_progress.
+
+**If Phase Type is "preparatory-refactor":**
+
+This phase uses the three-subagent refactoring pipeline instead of task-implementor. Skip the test coverage check — preparatory refactoring preserves behaviour, no new tests are written.
+
+1. **Measurement** (same as section 3d.1):
+   Run wc -l, complexipy, and ast-grep on the phase's target files (listed in the `**Target Files:**` header field). Extract file paths from the header:
+   ```bash
+   grep -A 100 "Target Files:" [phase_file] | grep "^\- " | sed 's/^- //' | sed 's/`//g'
+   ```
+   Write results to SCRATCHPAD_DIR.
+
+2. **Dispatch smell-assessor** with "structural readiness" framing:
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:smell-assessor</parameter>
+<parameter name="description">Preparatory refactoring assessment for Phase [N]</parameter>
+<parameter name="max_turns">150</parameter>
+<parameter name="prompt">
+Assess structural readiness of existing code for upcoming implementation phase.
+
+FRAMING: structural-readiness
+This is preparatory refactoring — the goal is to make these files ready for upcoming changes,
+not to achieve general code quality.
+
+PHASE_FILES: [absolute paths to target files]
+MEASUREMENT_DATA_PATH: ${SCRATCHPAD_DIR}
+SCRATCHPAD_DIR: ${SCRATCHPAD_DIR}
+DESIGN_PLAN_PATH: [absolute path to design plan]
+PHASE_REFERENCE: Preparatory refactoring for Phase [N]: [Phase Name]
+UPCOMING_PHASE_GOAL: [Goal from the phase this preparation enables]
+</parameter>
+</invoke>
+```
+
+3. **Gate checks** (same as section 3d.3 and 3d.5)
+
+4. **Dispatch critical-peer-review** (same scoped dispatch as section 3d.4)
+
+5. **Dispatch refactoring-executor** (same as section 3d.6)
+
+6. **Verify green** and commit
+
+**Skip code review for preparatory-refactor phases** — the pipeline's critical-peer-review serves this purpose. Proceed directly to the next phase after verification.
+
+**If Phase Type is "infrastructure" or "functionality" (or unspecified):**
+
+Continue with the standard task-implementor dispatch below.
 
 **Before dispatching, verify test coverage for functionality tasks:**
 
