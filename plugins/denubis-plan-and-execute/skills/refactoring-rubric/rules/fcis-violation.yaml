@@ -21,6 +21,8 @@ rule:
             field: object
             pattern: requests
       # pathlib read/write methods
+      # regex on field:attribute targets the method name, not the whole attribute expression
+      # (field:function gives the attribute node; field:attribute inside it gives the method name string)
       - kind: call
         has:
           field: function

@@ -137,6 +137,11 @@ One-line: A single file is changed for many different, unrelated reasons.
 Detection requires: Change-reason classification across git history for each file.
 Deferred because: Requires temporal analysis of commit patterns, not static structure.
 
+### Parallel Inheritance
+One-line: Adding a subclass in one hierarchy forces a matching subclass in another.
+Detection requires: Cross-hierarchy class pairing analysis across multiple files.
+Deferred because: Requires simultaneous structural comparison of two or more inheritance trees, not feasible in single-file scope.
+
 ### Insider Trading
 One-line: Modules sharing too much internal knowledge across boundaries.
 Detection requires: Cross-module dependency analysis and boundary definition.
