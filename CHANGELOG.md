@@ -25,6 +25,7 @@ ADR enrichment of design plan and database architecture templates.
 - Decision Record section in `writing-design-plans` skill template (DR[N] subsections with Status, Confidence, Reevaluation triggers, Consequences, Alternatives)
 - Writer guidance for decision identification with brainstorming mapping and Fowler's superseding rule
 - ADR fields (Status, Confidence, Reevaluation triggers, structured Consequences) in `template-database.md` Design Decisions section
+
 ## [denubis-plan-and-execute] 2.22.0
 
 Post-session transcript archival via claude-wrapper.

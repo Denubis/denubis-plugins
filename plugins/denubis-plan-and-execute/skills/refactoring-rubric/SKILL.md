@@ -95,7 +95,7 @@ Three-level scale for each finding.
 | Grade | Definition | Action |
 |-------|-----------|--------|
 | **Demonstrated** | Metric exceeds threshold OR structural rule fires with exact match. Evidence is reproducible by running the same tool. | Proceed to refactoring. |
-| **Plausible** | Code exhibits the pattern but metric is borderline or detection is LLM-assessed. A competent reviewer would likely agree. | Proceed, but note the grade in report. Critical review may downgrade. |
+| **Plausible** | Code exhibits the pattern but metric is borderline or detection is LLM-assessed. A competent reviewer would likely agree. | Proceed, but note the grade in report. Critical review may reject if evidence is insufficient. |
 | **Possible** | Assessor suspects the smell but evidence is indirect or contextual. Reasonable people could disagree. | Report but flag for review. Critical review will likely reject unless corroborated. |
 
 ### Grading Rules
@@ -204,7 +204,7 @@ These smells require cross-file, cross-module, or temporal analysis not feasible
 **Detection approach:**
 - Required data: Cross-file reference analysis, naming convention consistency check
 - Detection heuristic: For each exported symbol, measure "name informativeness" relative to usage context. Flag symbols whose name does not convey their purpose at call sites.
-- Reference: No formal detection metric in literature. Fowler (1999) identifies naming as critical for revealing intent; Kerievsky (2004) on naming as the most impactful low-cost refactoring.
+- Reference: No formal detection metric in literature. Fowler (1999) identifies naming as critical for revealing intent (Rename Method, Rename Variable refactorings).
 
 **Why deferred:** Name quality is contextual — a name clear in one module may be mysterious when referenced from another. Requires cross-file usage analysis.
 

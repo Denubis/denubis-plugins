@@ -631,8 +631,10 @@ SCOPED REVIEW — apply ONLY these checks:
 DO NOT apply: ACH matrix, pre-mortem analysis, timeline verification, or other checks designed for debugging/postmortem artifacts.
 
 OUTPUT: Write reviewed-smell-report.md to ${SCRATCHPAD_DIR} with:
-- For each finding: verdict (proceed / downgrade / reject) with one-line justification
-- Summary: counts of proceed/downgrade/reject
+- For each finding: verdict (proceed / reject) with one-line justification
+  - "proceed" = finding is valid, executor should act on it (may note a lower evidence grade)
+  - "reject" = finding is overclaimed, unsupported, or contradicted by design plan
+- Summary: counts of proceed/reject
 </parameter>
 </invoke>
 ```
@@ -644,9 +646,9 @@ OUTPUT: Write reviewed-smell-report.md to ${SCRATCHPAD_DIR} with:
 After critical review completes, check the response:
 
 - Read `${SCRATCHPAD_DIR}/reviewed-smell-report.md`
-- Count findings with "proceed" verdict
+- Count findings with "proceed" verdict (findings marked "reject" are excluded from execution)
 - If zero proceed verdicts: announce "Critical review rejected all [N] findings. Reasons: [summary of rejection reasons]. No refactoring will be performed. Review the rejected findings above if you disagree." Proceed to 3d.7 (final verification).
-- If any proceed verdicts: proceed to refactoring executor.
+- If any proceed verdicts: proceed to refactoring executor with only the "proceed" findings.
 
 **If critical-peer-review returns null/empty:** Report turn exhaustion. The smell report still exists — ask human whether to skip refactoring or dispatch executor with unreviewed findings (not recommended).
 

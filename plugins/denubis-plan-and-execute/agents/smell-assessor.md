@@ -43,6 +43,17 @@ cat > "${SCRATCHPAD_DIR}/smell-report-wip.md" << 'CHECKPOINT'
 CHECKPOINT
 ```
 
+Write final report using:
+
+```bash
+cat > "${SCRATCHPAD_DIR}/smell-report.md" << 'REPORT'
+# Smell Assessment Report
+[final report content — see Output Format below]
+REPORT
+```
+
+**You MUST write the final report to disk at `${SCRATCHPAD_DIR}/smell-report.md`.** The orchestrator reads this file for gate checks. Returning the report only in stdout is not sufficient.
+
 **Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
 
 ## Assessment Process
