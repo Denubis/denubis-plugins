@@ -291,7 +291,7 @@ UPCOMING_PHASE_GOAL: [Goal from the phase this preparation enables]
 </invoke>
 ```
 
-3. **Gate checks** (same as section 3d.3 and 3d.5)
+3. **Gate checks** (same as section 3d.3 and 3d.5). The gate reads `${SCRATCHPAD_DIR}/smell-report.md` — the same file written by the smell-assessor in step 2. The structural-readiness framing does not change the output filename.
 
 4. **Dispatch critical-peer-review** (same scoped dispatch as section 3d.4)
 
@@ -301,7 +301,7 @@ UPCOMING_PHASE_GOAL: [Goal from the phase this preparation enables]
 
 **Skip code review for preparatory-refactor phases** — the pipeline's critical-peer-review serves this purpose. Proceed directly to the next phase after verification.
 
-**If Phase Type is "infrastructure" or "functionality" (or unspecified):**
+**If Phase Type is NOT "preparatory-refactor" (i.e. "infrastructure", "functionality", or unspecified):**
 
 Continue with the standard task-implementor dispatch below.
 
