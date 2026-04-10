@@ -204,6 +204,7 @@ These smells require cross-file, cross-module, or temporal analysis not feasible
 **Detection approach:**
 - Required data: Cross-file reference analysis, naming convention consistency check
 - Detection heuristic: For each exported symbol, measure "name informativeness" relative to usage context. Flag symbols whose name does not convey their purpose at call sites.
+- Reference: No formal detection metric in literature. Fowler (1999) identifies naming as critical for revealing intent; Kerievsky (2004) on naming as the most impactful low-cost refactoring.
 
 **Why deferred:** Name quality is contextual — a name clear in one module may be mysterious when referenced from another. Requires cross-file usage analysis.
 
