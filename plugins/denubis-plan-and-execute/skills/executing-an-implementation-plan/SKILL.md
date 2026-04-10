@@ -615,7 +615,7 @@ Commit refactoring separately from implementation.
 
 **Print the full refactoring-executor response** (transparency rules).
 
-**If refactoring-executor returns null/empty:** Check for WIP commit (`rtk git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved.
+**If refactoring-executor returns null/empty:** Check for WIP commit (`rtk git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved. Ask the human whether to continue with the partial refactoring as-is, revert it, or proceed to final verification.
 
 ##### 3d.7: After refactoring (final verification)
 
