@@ -479,35 +479,150 @@ The phase is Green — tests pass, UAT confirmed. Now clean up before building t
 
 **Scope:** Only files touched by this phase. No cross-module reorganisation.
 
-**What to refactor:**
-- Reduce duplication, improve naming, extract helpers
-- Simplify overly complex logic from minimal-to-pass implementations
-- Fix code smells
-
 **Rules:** No features, no behaviour changes. If tests break, revert.
 
-**If `code-simplifier:code-simplifier` is available**, dispatch it:
+##### 3d.1: Measurement (orchestrator runs directly)
+
+Before dispatching any agent, run three measurement commands on the phase's files and write results to SCRATCHPAD_DIR:
+
+```bash
+# Collect phase files (files touched by this phase's implementation)
+PHASE_FILES="[list of files from phase task, space-separated]"
+
+# 1. Line counts
+wc -l ${PHASE_FILES} > "${SCRATCHPAD_DIR}/line-counts.txt"
+
+# 2. Cognitive complexity
+uvx complexipy ${PHASE_FILES} --max-complexity-allowed 15 > "${SCRATCHPAD_DIR}/complexipy-output.txt" 2>&1 || true
+
+# 3. Structural smell detection (ast-grep rules from refactoring-rubric)
+# Write one JSON file per rule to avoid concatenated/malformed JSON
+RULES_DIR="$(git rev-parse --show-toplevel)/plugins/denubis-plan-and-execute/skills/refactoring-rubric/rules"
+for rule in "${RULES_DIR}"/*.yaml; do
+  rulename=$(basename "$rule" .yaml)
+  ast-grep scan --rule "$rule" ${PHASE_FILES} --json > "${SCRATCHPAD_DIR}/structural-smells-${rulename}.json" 2>&1 || true
+done
+```
+
+Note: `|| true` on complexipy and ast-grep ensures the pipeline continues even if tools are unavailable. The smell-assessor handles missing data gracefully.
+
+##### 3d.2: Dispatch smell-assessor
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">code-simplifier:code-simplifier</parameter>
-<parameter name="description">Phase [N] refactor</parameter>
+<parameter name="subagent_type">denubis-plan-and-execute:smell-assessor</parameter>
+<parameter name="description">Phase [N] smell assessment</parameter>
 <parameter name="max_turns">150</parameter>
 <parameter name="prompt">
-Simplify code changed in this phase. Files: [list]. Working directory: [dir].
-Preserve all functionality. Find the test command in CLAUDE.md and run after changes.
+Assess code quality for phase [N] files.
+
+PHASE_FILES: [absolute paths to all phase files, one per line]
+MEASUREMENT_DATA_PATH: ${SCRATCHPAD_DIR}
+  - ${SCRATCHPAD_DIR}/line-counts.txt
+  - ${SCRATCHPAD_DIR}/complexipy-output.txt
+  - ${SCRATCHPAD_DIR}/structural-smells-*.json (one file per ast-grep rule)
+SCRATCHPAD_DIR: ${SCRATCHPAD_DIR}
+DESIGN_PLAN_PATH: [absolute path to design plan]
+PHASE_REFERENCE: Phase [N]: [Phase Name]
+</parameter>
+</invoke>
+```
+
+**Print the full smell-assessor response** (transparency rules).
+
+##### 3d.3: Gate check — no findings
+
+After smell-assessor completes, check the response:
+
+- Read `${SCRATCHPAD_DIR}/smell-report.md`
+- If the Findings section is empty (only "No Action Needed" entries): announce "No smells detected in phase [N] files. Skipping refactoring." and proceed to 3d.7 (final verification).
+- If findings exist: proceed to critical review.
+
+**If smell-assessor returns null/empty:** Check for `${SCRATCHPAD_DIR}/smell-report-wip.md`. If found, read partial findings and report to human. If not found, report turn exhaustion with no checkpoint. Ask human how to proceed.
+
+##### 3d.4: Dispatch critical-peer-review (scoped)
+
+The critical-peer-review agent is dispatched with a scoped briefing. Only evidence grading and overclaiming detection apply. Suppress ACH matrix, pre-mortem, and timeline verification as inapplicable to smell reports.
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:critical-peer-review</parameter>
+<parameter name="description">Review smell assessment for Phase [N]</parameter>
+<parameter name="max_turns">150</parameter>
+<parameter name="prompt">
+Review the smell assessment report for overclaiming and evidence-grade violations.
+
+DOCUMENT: ${SCRATCHPAD_DIR}/smell-report.md
+CONTEXT: Phase [N] code files and design plan.
+  Phase code: [absolute paths to phase files, one per line]
+  Design plan: [absolute path to design plan]
+
+SCOPED REVIEW — apply ONLY these checks:
+1. Evidence grading: Does each finding's grade match the evidence provided?
+   - "Demonstrated" must cite specific tool output (metric value, ast-grep match)
+   - "Plausible" must have reasonable LLM reasoning, not just assertion
+   - "Possible" is acceptable only with explicit uncertainty acknowledgment
+2. Overclaiming: Are any findings overstated relative to their evidence?
+3. Speculative Generality: For any finding claiming Speculative Generality, check the design plan — if the design calls for the abstraction, REJECT the finding
+4. Rule of Three: For Duplicate Code findings, verify 3+ instances cited
+
+DO NOT apply: ACH matrix, pre-mortem analysis, timeline verification, or other checks designed for debugging/postmortem artifacts.
+
+OUTPUT: Write reviewed-smell-report.md to ${SCRATCHPAD_DIR} with:
+- For each finding: verdict (proceed / downgrade / reject) with one-line justification
+- Summary: counts of proceed/downgrade/reject
+</parameter>
+</invoke>
+```
+
+**Print the full critical-peer-review response** (transparency rules).
+
+##### 3d.5: Gate check — all findings rejected
+
+After critical review completes, check the response:
+
+- Read `${SCRATCHPAD_DIR}/reviewed-smell-report.md`
+- Count findings with "proceed" verdict
+- If zero proceed verdicts: announce "Critical review rejected all [N] findings. Reasons: [summary of rejection reasons]. No refactoring will be performed. Review the rejected findings above if you disagree." Proceed to 3d.7 (final verification).
+- If any proceed verdicts: proceed to refactoring executor.
+
+**If critical-peer-review returns null/empty:** Report turn exhaustion. The smell report still exists — ask human whether to skip refactoring or dispatch executor with unreviewed findings (not recommended).
+
+##### 3d.6: Dispatch refactoring-executor
+
+```
+<invoke name="Task">
+<parameter name="subagent_type">denubis-plan-and-execute:refactoring-executor</parameter>
+<parameter name="description">Phase [N] refactoring execution</parameter>
+<parameter name="max_turns">150</parameter>
+<parameter name="prompt">
+Apply reviewed refactoring prescriptions to phase [N] files.
+
+REVIEWED_REPORT_PATH: ${SCRATCHPAD_DIR}/reviewed-smell-report.md
+PHASE_FILES: [absolute paths to phase files, one per line]
+WORKING_DIRECTORY: [absolute path to working directory]
+PHASE_REFERENCE: Phase [N]: [Phase Name]
+
+Apply only findings with "proceed" verdict. One transformation at a time.
+Tests green after each. Revert on red — do not fix tests.
 Commit refactoring separately from implementation.
 </parameter>
 </invoke>
 ```
 
-**If code-simplifier is not available**, refactor directly — review the phase's files yourself, apply the same criteria, keep tests green, commit separately.
+**Print the full refactoring-executor response** (transparency rules).
 
-**After refactoring:** Run tests. If green, mark phase complete. If tests fail, revert and proceed without.
+**If refactoring-executor returns null/empty:** Check for WIP commit (`rtk git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved.
+
+##### 3d.7: After refactoring (final verification)
+
+Run tests as final safety net:
+- If green: mark phase complete
+- If tests fail: revert refactoring commit and proceed without. Announce: "Refactoring broke tests despite per-transformation verification. Reverted refactoring commit. Proceeding with implementation as-is."
 
 **Phase completion flow:**
 ```
-Code review → Proleptic → UAT → Refactor → Verify green → Next phase
+Code review → Proleptic → UAT → Measure → Assess → [Gate] → Review → [Gate] → Refactor → Verify green → Next phase
 ```
 
 #### 3e. Context Management Between Phases
