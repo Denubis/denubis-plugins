@@ -32,6 +32,8 @@ Before starting any transformations, complete these steps in order:
 
 One commit total. Git history stays clean. Progress is always recoverable.
 
+**Hook failures during checkpoint:** If a pre-commit hook fails on `git commit --amend`, treat the current transformation as failed — revert it and record in the Reverted list. Do not debug the hook failure or skip hooks.
+
 **Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
 
 ## Execution Process
@@ -61,7 +63,7 @@ For each finding marked "proceed" in the reviewed smell report:
 | Refactoring Pattern | ast-grep? | Approach |
 |-------------------|-----------|----------|
 | Rename (function, method, variable) | Yes | `ast-grep run -p 'old($$$)' -r 'new($$$)' -l py -U` |
-| Inline Variable / Inline Function | Yes | Pattern match + rewrite |
+| Inline Variable / Inline Function | Yes | `ast-grep run -p '$VAR = $EXPR' -r '$EXPR' -l py` (match assignment, inline the value) |
 | Extract Method | No | Manual — requires creating new function + replacing call site |
 | Replace Nested Conditional with Guard Clauses | No | Manual — structural reshaping |
 | Introduce Parameter Object | Partial | ast-grep can find call sites to update after manual class creation |
@@ -70,13 +72,14 @@ For each finding marked "proceed" in the reviewed smell report:
 | Remove Dead Code | Yes | ast-grep to find, then delete |
 
 **3. Attempt transformation:**
+- **Before starting:** snapshot the working tree state with `git diff --name-only` (should be empty if baseline is clean)
 - If ast-grep applicable: dry-run first (no `-U`), review diff, then apply (`-U`)
 - If manual edit: use Edit tool with precise file:line targeting
 - If partial ast-grep: manual structural change first, then ast-grep for call site updates
 
 **4. Run tests:** Use test command from CLAUDE.md.
 - **GREEN:** Record in Applied list. `git add [files] && git commit --amend --no-edit`
-- **RED:** Revert immediately. `git checkout -- [changed files]`. Record in Reverted list with failure reason. Do NOT debug. Do NOT fix the test. Move to next finding.
+- **RED:** Revert all working tree changes: `git checkout -- .` (safe — the WIP commit has all prior successful transformations, so reverting the entire working tree restores the last good state). Record in Reverted list with failure reason. Do NOT debug. Do NOT fix the test. Move to next finding.
 
 **5. Move to next finding.**
 
@@ -152,7 +155,7 @@ Message: [message]
 - Process findings one at a time — never batch transformations
 - Prefer ast-grep for structural transformations (dry-run first, then apply)
 - Run tests after EVERY transformation — no exceptions
-- Revert immediately on test failure — `git checkout -- [files]`
+- Revert immediately on test failure — `git checkout -- .` (WIP commit has all prior successes)
 - Record every transformation (applied or reverted) in the report
 - Run final complexity measurement for delta reporting
 - Checkpoint commit after each successful transformation
