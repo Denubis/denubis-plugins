@@ -211,6 +211,15 @@ The design plan distinguishes between infrastructure phases (verified operationa
 |------------|----------------|--------------|
 | Infrastructure | Create files, configure, verify operationally | Commands succeed (install, build, run) |
 | Functionality | Write tests, implement, verify tests pass | Tests pass for the behavior |
+| Preparatory-refactor | Restructure existing code for upcoming phase | Tests stay green after restructuring |
+
+**Preparatory-refactor phases** (Beck's "make the change easy"):
+- Inserted by the planner when codebase investigation reveals structural impediments in files an upcoming phase will modify
+- Goal always references the upcoming phase it enables (e.g., "Restructure auth middleware to enable Phase 3's OAuth2 integration")
+- **Verifies: None** — verification is that tests stay green after restructuring
+- Uses the three-subagent refactoring pipeline (smell-assessor → critical-peer-review → refactoring-executor) with "structural readiness" framing
+- No new tests written (refactoring preserves behaviour, Two Hats discipline)
+- Do NOT insert for phases that only create new files — there is nothing to restructure
 
 **Infrastructure tasks** (project setup, config files, dependencies):
 - Don't force TDD on scaffolding
@@ -276,6 +285,8 @@ The execution agent uses these markers to identify related tasks. The tests task
 
 **Codebase verified:** [Date/time of verification]
 
+**Phase Type:** infrastructure | functionality | preparatory-refactor
+
 ---
 
 ## Acceptance Criteria Coverage
@@ -299,6 +310,42 @@ This phase implements and tests:
 - Include both the criterion heading (`{slug}.AC1`) and the specific cases (`{slug}.AC1.1`, `{slug}.AC1.3`)
 - Tasks in this phase must produce tests that verify these specific cases
 - An AC case may appear in multiple phases if partially addressed, but final phase must complete it
+
+Phase Type is required for all new plans. The execution skill uses this field to determine dispatch behaviour. If omitted, the executor defaults to functionality.
+
+**Preparatory-refactor header example:**
+
+```markdown
+# [Feature Name] Implementation Plan — Preparatory Refactoring for Phase [N]
+
+**Goal:** Restructure [target files] to enable Phase [N]: [Phase Name]
+
+**Architecture:** [What structural changes are needed and why they enable the upcoming phase]
+
+**Tech Stack:** [Same as the phase it enables]
+
+**Scope:** Preparatory phase inserted before Phase [N] of [total] from original design
+
+**Codebase verified:** [Date/time]
+
+**Phase Type:** preparatory-refactor
+
+**Target Files:**
+- `[absolute/path/to/file1.py]`
+- `[absolute/path/to/file2.py]`
+
+---
+
+## Acceptance Criteria Coverage
+
+This phase is preparatory refactoring. It restructures existing code to enable the upcoming implementation phase.
+
+**Verifies: None** — success = tests green after restructuring.
+
+**Enables:** Phase [N]: [Phase Name] — [what structural readiness this provides]
+
+---
+```
 
 ## Task and Subcomponent Markers
 
@@ -464,6 +511,18 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
      - Python code? Activate python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
+   - **Structural readiness check (for phases modifying existing files):**
+     If this phase modifies existing files (not just creating new ones), add to the investigator query:
+     "The upcoming phase will modify these existing files: [list]. Assess their structural readiness:
+     - Are there mixed concerns that should be separated before the phase changes arrive?
+     - Are there hardcoded assumptions that need generalising?
+     - Are there missing seams (no clear extension points for the new functionality)?
+     - Would the phase's changes be significantly easier if any structural prep work was done first?"
+     **If the investigator reports impediments:** Surface them to the planner. The planner should consider inserting a "preparatory-refactor" phase before this phase. Use AskUserQuestion:
+     Question: "Codebase investigation found structural impediments in files Phase [N] will modify: [summary]. Insert a preparatory-refactor phase before Phase [N]?"
+     Options: "Yes — insert preparatory-refactor phase" | "No — proceed without (implementation may be harder)"
+     **If the user approves:** Insert a preparatory-refactor phase with goal referencing the upcoming phase, Phase Type: preparatory-refactor, and tasks empty (the refactoring pipeline determines what to do at execution time based on smell assessment). Number as Phase [N-1.5] or renumber subsequent phases.
+     **If the phase only creates new files:** Skip the structural readiness check entirely.
    - Mark task NB as completed
 
 3. **Task NC: Research external dependencies** (if phase involves them)
@@ -561,6 +620,18 @@ Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens
      - Python code? Activate python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
+   - **Structural readiness check (for phases modifying existing files):**
+     If this phase modifies existing files (not just creating new ones), add to the investigator query:
+     "The upcoming phase will modify these existing files: [list]. Assess their structural readiness:
+     - Are there mixed concerns that should be separated before the phase changes arrive?
+     - Are there hardcoded assumptions that need generalising?
+     - Are there missing seams (no clear extension points for the new functionality)?
+     - Would the phase's changes be significantly easier if any structural prep work was done first?"
+     **If the investigator reports impediments:** Surface them to the planner. The planner should consider inserting a "preparatory-refactor" phase before this phase. Use AskUserQuestion:
+     Question: "Codebase investigation found structural impediments in files Phase [N] will modify: [summary]. Insert a preparatory-refactor phase before Phase [N]?"
+     Options: "Yes — insert preparatory-refactor phase" | "No — proceed without (implementation may be harder)"
+     **If the user approves:** Insert a preparatory-refactor phase with goal referencing the upcoming phase, Phase Type: preparatory-refactor, and tasks empty (the refactoring pipeline determines what to do at execution time based on smell assessment). Number as Phase [N-1.5] or renumber subsequent phases.
+     **If the phase only creates new files:** Skip the structural readiness check entirely.
    - Mark task NB as completed
 
 3. **Task NC: Research external dependencies** (if phase involves them)
@@ -621,6 +692,18 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
      - Python code? Activate python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
+   - **Structural readiness check (for phases modifying existing files):**
+     If this phase modifies existing files (not just creating new ones), add to the investigator query:
+     "The upcoming phase will modify these existing files: [list]. Assess their structural readiness:
+     - Are there mixed concerns that should be separated before the phase changes arrive?
+     - Are there hardcoded assumptions that need generalising?
+     - Are there missing seams (no clear extension points for the new functionality)?
+     - Would the phase's changes be significantly easier if any structural prep work was done first?"
+     **If the investigator reports impediments:** Surface them to the planner. The planner should consider inserting a "preparatory-refactor" phase before this phase. Use AskUserQuestion:
+     Question: "Codebase investigation found structural impediments in files Phase [N] will modify: [summary]. Insert a preparatory-refactor phase before Phase [N]?"
+     Options: "Yes — insert preparatory-refactor phase" | "No — proceed without (implementation may be harder)"
+     **If the user approves:** Insert a preparatory-refactor phase with goal referencing the upcoming phase, Phase Type: preparatory-refactor, and tasks empty (the refactoring pipeline determines what to do at execution time based on smell assessment). Number as Phase [N-1.5] or renumber subsequent phases.
+     **If the phase only creates new files:** Skip the structural readiness check entirely.
    - Mark task NB as completed
 
 3. **Task NC: Research external dependencies** (if phase involves them)
