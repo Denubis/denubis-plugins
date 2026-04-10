@@ -11,7 +11,7 @@
         {
             "name": "denubis-00-getting-started",
             "description": "Getting started guide and onboarding for denubis-plugins",
-            "version": "1.3.0",
+            "version": "1.4.0",
             "source": "./plugins/denubis-00-getting-started",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -80,7 +80,7 @@
         {
             "name": "denubis-hook-claudemd-reminder",
             "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "source": "./plugins/denubis-hook-claudemd-reminder",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -96,7 +96,7 @@
         {
             "name": "denubis-hook-shortcut-detection",
             "description": "Stop hook that detects shortcut phrases and blocks with E-STOP for user go/no-go decision.",
-            "version": "2.0.2",
+            "version": "2.0.3",
             "source": "./plugins/denubis-hook-shortcut-detection",
             "author": {
                 "name": "Brian Ballsun-Stanton",
@@ -173,7 +173,7 @@
         {
             "name": "denubis-hook-branch-bg",
             "description": "SessionStart hook that sets terminal background colour based on git repo (hue) and branch (hue/lightness/saturation offsets) via OSC 11. Uses git-common-dir so worktrees share a colour family.",
-            "version": "0.2.2",
+            "version": "0.2.3",
             "source": "./plugins/denubis-hook-branch-bg",
             "author": {
                 "name": "Brian Ballsun-Stanton",

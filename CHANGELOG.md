@@ -17,6 +17,36 @@ Three-subagent refactoring pipeline replacing the non-functional code-simplifier
 - `writing-implementation-plans`: extended codebase investigation with structural readiness question for phases modifying existing files
 - Turn budget table: removed code-simplifier, added smell-assessor and refactoring-executor (150 turns each)
 
+## Windows compatibility fixes
+
+Cross-cutting patch release for Windows/Git Bash support.
+
+**Fixed:**
+- `uv run python3` → `uv run python` in all hook commands (`python3` doesn't exist on Windows)
+- Hardcoded `/tmp` path in shortcut-detector.py → `tempfile.gettempdir()` for cross-platform temp dirs
+- Restored `.gitattributes` to force LF line endings on `.sh`/`.py` files (prevents broken shebangs on Windows clones)
+
+**Affected plugins:**
+- [denubis-plan-and-execute] 2.21.0 → 2.21.1
+- [denubis-hook-shortcut-detection] 2.0.2 → 2.0.3
+- [denubis-hook-claudemd-reminder] 1.1.1 → 1.1.2
+- [denubis-hook-branch-bg] 0.2.2 → 0.2.3
+
+## [denubis-00-getting-started] 1.4.0
+
+Windows/Git Bash setup guide and full plugin catalogue.
+
+**New:**
+- `/setup` skill now detects platform (Windows/macOS/Linux) and adjusts steps accordingly
+- Windows line-ending check (warns if `core.autocrlf=true` would break hook shebangs)
+- uv availability check with Windows-specific PATH guidance
+- Windows users are warned about Unix-only plugins and offered to disable them
+
+**Changed:**
+- README updated with complete 13-plugin catalogue (was 7), grouped into tiers: Core, Recommended, Infrastructure (Unix-only), Terminal-specific, and Onboarding
+- Installation section now offers tiered plugin sets with cross-platform guidance
+- Added Prerequisites table, Windows Setup section, and Forking instructions
+
 ## [denubis-plan-and-execute] 2.23.0
 
 ADR enrichment of design plan and database architecture templates.
@@ -45,7 +75,6 @@ Transcript skill now supports archiving prior sessions by UUID.
 - Step 0 derives transcript path from CWD and reads the JSONL file
 - Archive command passes `--session-id` and `--transcript` for prior sessions
 - Command file forwards arguments to the skill
-
 ## [denubis-plan-and-execute] 2.21.0
 
 Enhanced critical-peer-review with research-backed methodologies (ACH, GRADE, ABP, pre-mortem) and merged Codex variant improvements for broader artifact scope, mandatory checklists, and pattern-level defect tracking.
