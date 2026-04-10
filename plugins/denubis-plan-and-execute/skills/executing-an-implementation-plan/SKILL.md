@@ -71,7 +71,9 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 | task-bug-fixer | 150 | Fixing review issues |
 | code-reviewer | 150 | Phase code review (via requesting-code-review skill) |
 | proleptic-challenger | 150 | Phase transition challenge |
-| code-simplifier | 150 | Post-phase refactoring |
+| smell-assessor | 150 | Post-phase smell assessment |
+| critical-peer-review | 150 | Smell report review (scoped: evidence grading only) |
+| refactoring-executor | 150 | Post-phase refactoring execution |
 | project-claude-librarian | 150 | Updating project context |
 | test-analyst | 150 | Test coverage analysis |
 
@@ -79,19 +81,20 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 
 ## Null / Empty Subagent Response (Turn Exhaustion)
 
-**A null or empty response from any subagent (task-implementor, bug-fixer, code-simplifier, etc.) means it ran out of turns.**
+**A null or empty response from any subagent (task-implementor, bug-fixer, smell-assessor, etc.) means it ran out of turns.**
 
 This is NOT a transient error and retrying with the same budget will produce the same result.
 
 **Recovery — check for checkpointed state before halting:**
 
-1. **For code-producing agents** (task-implementor, task-bug-fixer, code-simplifier):
+1. **For code-producing agents** (task-implementor, task-bug-fixer, refactoring-executor):
    - Run `rtk git log -1 --oneline` to check for a WIP commit
    - Run `rtk git diff --stat HEAD~1..HEAD` to see what work was preserved
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
-2. **For analysis agents** (code-reviewer, test-analyst):
-   - Check for `review-wip.md` or `test-analysis-wip.md` in the plan directory
+2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review):
+   - Check for `review-wip.md`, `test-analysis-wip.md`, or `smell-report-wip.md` in the scratchpad directory
+   - For critical-peer-review: check for `reviewed-smell-report.md` — if present, review completed (executor can proceed); if absent, review exhausted with no output
    - If a checkpoint file exists, read it and report the partial findings
 
 3. **Report to the human** with recovery information:
