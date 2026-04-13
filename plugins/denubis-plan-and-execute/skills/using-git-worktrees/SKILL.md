@@ -1,113 +1,142 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification
-user-invocable: false
+description: Use when starting feature work that needs isolation, before executing implementation plans, or when the user asks for a worktree — sets up worktrees with project-specific configuration, LFS handling, and baseline verification
+user-invocable: true
 ---
 
 # Using Git Worktrees
 
 ## Overview
 
-Git worktrees create isolated workspaces sharing the same repository, allowing work on multiple branches simultaneously without switching.
+Git worktrees create isolated workspaces sharing the same repository. Claude Code has built-in worktree support via `claude -w` (which uses `.claude/worktrees/`). This skill layers project-specific setup on top: LFS handling, dependency installation, `.ed3d/worktree-setup.md` instructions, and baseline test verification.
 
-**Core principle:** Systematic directory selection + safety verification = reliable isolation.
+**Two worktree locations exist:**
+- **`.worktrees/`** — our convention for mid-session worktrees (project-local, gitignored)
+- **`.claude/worktrees/`** — Claude Code's built-in location (used by `claude -w`)
+
+Both are valid. The skill handles either.
 
 **Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
 
-## Directory Selection Process
+## How Worktrees Are Created
 
-Follow this priority order:
+### Starting a new session in a worktree
 
-### 1. Check Existing Directories
-
-```bash
-# Check in priority order
-ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-ls -d worktrees 2>/dev/null      # Alternative
-```
-
-**If found:** Use that directory. If both exist, `.worktrees` wins.
-
-### 2. Check CLAUDE.md
+Recommend the user launch a new session with `claude -w`:
 
 ```bash
-grep -i "worktree.*director" CLAUDE.md 2>/dev/null
+claude -w feature-auth                  # Named worktree
+claude -w 42-add-oauth-support          # Named after issue (see Naming section)
+claude -w feature-auth --tmux           # With tmux session
 ```
 
-**If preference specified:** Use it without asking.
+The user runs this from their terminal, not from within Claude. After launching, this skill runs setup steps in the new session.
 
-### 3. Ask User
+### Creating a worktree mid-session
 
-If no directory exists and no CLAUDE.md preference:
-
-```
-No worktree directory found. Where should I create worktrees?
-
-1. .worktrees/ (project-local, hidden)
-2. ~/.claude/worktrees/<project-name>/ (global location)
-
-Which would you prefer?
-```
-
-## Safety Verification
-
-### For Project-Local Directories (.worktrees or worktrees)
-
-**MUST verify .gitignore before creating worktree:**
+When isolation is needed during an existing session (e.g., brainstorming approved a design, implementation plan starting), use `.worktrees/`:
 
 ```bash
-# Check if directory pattern in .gitignore
-grep -q "^\.worktrees/$" .gitignore || grep -q "^worktrees/$" .gitignore
+git worktree add .worktrees/<name> -b <branch-name>
+cd .worktrees/<name>
 ```
 
-**If NOT in .gitignore:**
-
-Per Jesse's rule "Fix broken things immediately":
-1. Add appropriate line to .gitignore
-2. Commit the change
-3. Proceed with worktree creation
-
-**Why critical:** Prevents accidentally committing worktree contents to repository.
-
-### For Global Directory (~/.claude/worktrees)
-
-No .gitignore verification needed - outside project entirely.
-
-## Creation Steps
-
-### 1. Detect Project Name
+**MUST verify `.worktrees/` is gitignored before creating:**
 
 ```bash
-project=$(basename "$(git rev-parse --show-toplevel)")
+git check-ignore -q .worktrees/test 2>/dev/null
 ```
 
-### 2. Create Worktree
+If `.worktrees/` is not ignored, add it to `.gitignore` immediately, commit, then proceed.
+
+### Detecting an existing worktree
+
+If the session is already inside a worktree (user launched with `claude -w`), detect it and skip creation:
 
 ```bash
-# Determine full path
-case $LOCATION in
-  .worktrees|worktrees)
-    path="$LOCATION/$BRANCH_NAME"
-    ;;
-  ~/.claude/worktrees/*)
-    path="~/.claude/worktrees/$project/$BRANCH_NAME"
-    ;;
-esac
-
-# Create worktree with new branch
-git worktree add "$path" -b "$BRANCH_NAME"
-cd "$path"
+# Returns the .git dir — if it's a file pointing elsewhere, we're in a worktree
+git rev-parse --git-common-dir
+# If this differs from $(git rev-parse --git-dir), we're in a worktree
 ```
 
-### 3. Copy Environment Files
+If already in a worktree, proceed directly to setup steps.
 
-**Worktrees share the git repo but NOT untracked files like `.env`, database configs, or local settings.** These must be copied from the main checkout.
+## Naming Worktrees
+
+### From a git issue
+
+When the user references an issue number, construct a descriptive name:
 
 ```bash
-# Get main repo path
+# Fetch issue title for a meaningful branch name
+gh issue view 42 --json title,number --jq '"\(.number)-\(.title)"' | \
+  tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-' | head -c 50
+# Result: 42-add-oauth-support
+```
+
+Use this as the worktree name: `claude -w 42-add-oauth-support` or `git worktree add .worktrees/42-add-oauth-support -b 42-add-oauth-support`.
+
+### From a description
+
+When the user describes the work without an issue number, derive a short kebab-case name from the description. Keep it under 30 characters. Ask if ambiguous.
+
+### Quick reference
+
+| Source | Example name |
+|--------|-------------|
+| Issue #42 "Add OAuth support" | `42-add-oauth-support` |
+| User says "fix the login bug" | `fix-login-bug` |
+| Design plan approved | `implement-<plan-slug>` |
+| No context given | Ask the user |
+
+## Setup Steps
+
+After the worktree exists and you're inside it, run these steps in order.
+
+### 1. Handle LFS Files
+
+**Git LFS and worktrees have a known bad interaction.** LFS-tracked files can appear as modified due to pointer/content mismatch. This causes pre-commit's stash mechanism to fail — hooks pass, but the stash restore fails and the commit is aborted.
+
+```bash
+if git lfs env >/dev/null 2>&1; then
+  git diff --name-only | while IFS= read -r f; do
+    [ -n "$f" ] && \
+      git check-attr filter -- "$f" 2>/dev/null | grep -q 'filter: lfs' && \
+      git update-index --assume-unchanged -- "$f"
+  done
+fi
+```
+
+**Why:** The files aren't actually changed — the filter driver transforms content differently in the worktree context. `assume-unchanged` stops git from reporting them as modified, preventing pre-commit stash failures.
+
+This is automatic. No project configuration needed.
+
+### 2. Ensure `.worktreeinclude` Exists
+
+Claude Code's `.worktreeinclude` file (in the project root, `.gitignore` syntax) tells it which gitignored files to copy into new worktrees. If the project has `.env` files but no `.worktreeinclude`, suggest creating one:
+
+```bash
 main_repo=$(git worktree list | head -1 | awk '{print $1}')
+if [ ! -f "$main_repo/.worktreeinclude" ]; then
+  ls "$main_repo"/.env* 2>/dev/null
+fi
+```
 
-# Check for .env files in the main checkout and copy them
+If `.env` files exist but `.worktreeinclude` doesn't, tell the user:
+
+> This project has `.env` files but no `.worktreeinclude`. Creating one ensures worktrees automatically get these files. Shall I create it?
+
+A typical `.worktreeinclude`:
+```
+.env
+.env.local
+.env.test
+.env.development
+```
+
+For the current worktree, if `.worktreeinclude` didn't exist at creation time, copy the files manually:
+
+```bash
 for env_file in .env .env.local .env.test .env.development; do
   if [ -f "$main_repo/$env_file" ] && [ ! -f "$env_file" ]; then
     cp "$main_repo/$env_file" "$env_file"
@@ -115,19 +144,14 @@ for env_file in .env .env.local .env.test .env.development; do
 done
 ```
 
-**Also check CLAUDE.md** for project-specific environment setup (database creation, service configuration, etc.). Common needs:
-- **Database:** The project may need its own test database. Check if the test config references a specific database name or uses the same one as the main checkout.
-- **Docker/services:** If the project uses `docker compose`, the worktree may need its own compose override or the services may already be shared.
-- **Local config files:** Some projects have `config/local.py`, `settings.local.json`, or similar that are gitignored.
+### 3. Install Dependencies and Run Project Setup
 
-**If the project uses a database:** Ask the user whether the worktree should share the main checkout's database or create a separate one. Shared databases can cause test conflicts if both checkouts run tests simultaneously.
+This step has two parts, always in this order: **auto-detect first, then custom instructions.**
 
-### 4. Run Project Setup
-
-**Check CLAUDE.md** for project-specific setup instructions first. If none found, auto-detect:
+**Part A: Auto-detect and install dependencies:**
 
 ```bash
-# Python (preferred)
+# Python
 if [ -f pyproject.toml ]; then uv sync; fi
 
 # Node.js
@@ -140,18 +164,30 @@ if [ -f Cargo.toml ]; then cargo build; fi
 if [ -f go.mod ]; then go mod download; fi
 ```
 
-### 5. Verify Clean Baseline
+**Part B: Check `.ed3d/worktree-setup.md` for additional instructions:**
 
-**Find the test command in CLAUDE.md** (or project config). Run it to ensure worktree starts clean.
+```bash
+main_repo=$(git worktree list | head -1 | awk '{print $1}')
+if [ -f "$main_repo/.ed3d/worktree-setup.md" ]; then
+  cat "$main_repo/.ed3d/worktree-setup.md"
+fi
+```
+
+This file contains plain instructions for post-install worktree setup — migrations to run, databases to create, config files to copy. Execute these **after** dependency installation (Part A). If any step is destructive or unclear, confirm with the user before executing.
+
+### 4. Verify Clean Baseline
+
+**Find the test command** in CLAUDE.md or project config. Run it to ensure the worktree starts clean.
 
 **If tests fail:** Report failures, ask whether to proceed or investigate.
 
 **If tests pass:** Report ready.
 
-### 6. Report Location
+### 5. Report
 
 ```
 Worktree ready at <full-path>
+Branch: <branch-name>
 Tests passing (<N> tests, 0 failures)
 Ready to implement <feature-name>
 ```
@@ -160,95 +196,147 @@ Ready to implement <feature-name>
 
 | Situation | Action |
 |-----------|--------|
-| `.worktrees/` exists | Use it (verify .gitignore) |
-| `worktrees/` exists | Use it (verify .gitignore) |
-| Both exist | Use `.worktrees/` |
-| Neither exists | Check CLAUDE.md → Ask user |
-| Directory not in .gitignore | Add it immediately + commit |
-| Tests fail during baseline | Report failures + ask |
+| New session needed | Recommend `claude -w <name>` |
+| Mid-session isolation | `git worktree add .worktrees/<name>` (verify .gitignore) |
+| Already in a worktree | Skip creation, run setup steps |
+| Issue number given | Fetch title with `gh issue view`, build descriptive name |
+| LFS configured | Auto-apply `assume-unchanged` to dirty LFS files |
+| No `.worktreeinclude` but `.env` files exist | Suggest creating `.worktreeinclude` |
+| `.ed3d/worktree-setup.md` exists | Read from main checkout, follow its instructions |
 | No pyproject.toml/package.json | Skip dependency install |
-| Project has .env files | Copy from main checkout |
-| Project uses a database | Ask user: share or create separate |
+| Tests fail during baseline | Report failures + ask |
 | Removing a worktree | `cd` to main repo first, then `git worktree remove` |
+
+## `.ed3d/worktree-setup.md` Format
+
+This file lives in the project's `.ed3d/` directory alongside `design-plan-guidance.md` and `implementation-plan-guidance.md`. It contains plain instructions for worktree-specific setup — things that go beyond dependency installation.
+
+Example:
+
+```markdown
+# Worktree Setup
+
+## Database
+Create a separate test database for the worktree:
+    createdb myproject_test
+    uv run alembic upgrade head
+
+## Services
+Docker services are shared — do not run `docker compose up` in the worktree.
+The main checkout's services at localhost:5432 and localhost:6379 are used by all worktrees.
+
+## Additional config
+Copy `config/local.example.py` to `config/local.py` and set DEBUG = True.
+```
 
 ## Removing Worktrees Safely
 
-When removing a worktree, **you MUST ensure your CWD is outside the worktree first.** This is a POSIX limitation: the kernel cannot remove a directory that is any process's CWD. Claude Code's Bash tool persists CWD between calls, so after working in a worktree your CWD is almost certainly inside it.
+**For worktrees created with `claude -w`:** Claude handles cleanup automatically on session exit. Worktrees with no changes are removed; worktrees with changes prompt to keep or discard.
+
+**For worktrees created mid-session (`.worktrees/`):** You must remove them manually. Ensure your CWD is outside the worktree first — the kernel cannot remove a directory that is any process's CWD.
 
 ```bash
-# Get the main repo path
 main_repo=$(git worktree list | head -1 | awk '{print $1}')
-
-# Navigate out FIRST
 cd "$main_repo"
-
-# THEN remove
 git worktree remove <worktree-path>
 ```
 
 **Failure modes if you skip `cd`:**
 - Modern git: `fatal: cannot remove worktree '<path>': '<path>' is the current working directory`
-- Older git: `pwd: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory`
-- Both are unrecoverable without navigating to a valid directory first
+- Older git: `pwd: error retrieving current directory: getcwd: cannot access parent directories`
 
-**Note:** The `finishing-a-development-branch` skill handles this automatically. This section documents the principle for any other context where worktree removal is needed.
+**Note:** The `finishing-a-development-branch` skill handles this automatically.
 
 ## Common Mistakes
 
-**Skipping .gitignore verification**
-- **Problem:** Worktree contents get tracked, pollute git status
-- **Fix:** Always grep .gitignore before creating project-local worktree
+**Skipping LFS handling**
+- **Problem:** Pre-commit stash fails on dirty LFS files, aborting commits even though all hooks pass
+- **Fix:** Always check for LFS after entering the worktree and `assume-unchanged` any dirty LFS-tracked files
 
-**Assuming directory location**
-- **Problem:** Creates inconsistency, violates project conventions
-- **Fix:** Follow priority: existing > CLAUDE.md > ask
+**Ignoring `.ed3d/worktree-setup.md`**
+- **Problem:** Project-specific setup steps are skipped, leading to broken state (missing databases, unmigrated schemas)
+- **Fix:** Always check for `.ed3d/worktree-setup.md` in the main checkout
+
+**Skipping .gitignore verification for `.worktrees/`**
+- **Problem:** Worktree contents get tracked, pollute git status
+- **Fix:** Always verify `.worktrees/` is in `.gitignore` before creating mid-session worktrees
 
 **Proceeding with failing tests**
 - **Problem:** Can't distinguish new bugs from pre-existing issues
 - **Fix:** Report failures, get explicit permission to proceed
 
 **Removing worktree while CWD is inside it**
-- **Problem:** Shell can't resolve `getcwd()`, git can't remove the directory, every subsequent Bash call may fail
-- **Fix:** Always `cd "$main_repo"` before `git worktree remove`. See "Removing Worktrees Safely" above.
+- **Problem:** Shell can't resolve `getcwd()`, every subsequent Bash call may fail
+- **Fix:** Always `cd "$main_repo"` before `git worktree remove`
 
 **Skipping environment file setup**
-- **Problem:** Tests fail with missing config, wrong database, or missing secrets because `.env` files are gitignored and not present in the new worktree
-- **Fix:** Copy `.env*` files from main checkout before running setup. Check CLAUDE.md for database/service configuration needs.
+- **Problem:** Tests fail with missing config or secrets
+- **Fix:** Ensure `.worktreeinclude` exists or copy `.env*` files manually
 
-**Hardcoding setup commands**
-- **Problem:** Breaks on projects using different tools
-- **Fix:** Auto-detect from project files (package.json, etc.)
+## Example Workflows
 
-## Example Workflow
+### User invokes `/using-git-worktrees` for a new issue
+
+```
+User: /using-git-worktrees 42
+
+You: I'm using the using-git-worktrees skill to set up an isolated workspace.
+
+[Fetch issue #42: "Add OAuth support for SAML providers"]
+[Recommend: claude -w 42-add-oauth-support --tmux]
+[User launches new session]
+```
+
+### Mid-session worktree (from brainstorming)
 
 ```
 You: I'm using the using-git-worktrees skill to set up an isolated workspace.
 
-[Check .worktrees/ - exists]
-[Verify .gitignore - contains .worktrees/]
-[Create worktree: git worktree add .worktrees/auth -b feature/auth]
+[Verify .gitignore contains .worktrees/]
+[Create: git worktree add .worktrees/implement-oauth -b implement-oauth]
+[Check LFS - configured, 38 dirty files → assume-unchanged applied]
+[Check .worktreeinclude - exists, .env files already copied]
+[Read .ed3d/worktree-setup.md - found, creating test database]
 [Run uv sync]
-[Find test command in CLAUDE.md → uv run pytest]
+[Run alembic upgrade head per worktree-setup.md]
 [Run uv run pytest - 47 passing]
 
-Worktree ready at /home/user/myproject/.worktrees/auth
+Worktree ready at /home/user/myproject/.worktrees/implement-oauth
+Branch: implement-oauth
 Tests passing (47 tests, 0 failures)
-Ready to implement auth feature
+Ready to implement OAuth support
+```
+
+### Already in a worktree (launched with `claude -w`)
+
+```
+You: I'm using the using-git-worktrees skill to set up an isolated workspace.
+
+[Detected: already in worktree at .claude/worktrees/feature-auth]
+[Check LFS - not configured, skipping]
+[Check .worktreeinclude - missing, but .env exists in main → suggesting creation]
+[Read .ed3d/worktree-setup.md - not found, using auto-detection]
+[Run npm install]
+[Run npm test - 122 passing]
+
+Worktree ready (already created by claude -w)
+Tests passing (122 tests, 0 failures)
+Ready to work
 ```
 
 ## Red Flags
 
 **Never:**
-- Create worktree without .gitignore verification (project-local)
+- Skip `.gitignore` verification for `.worktrees/`
 - Skip baseline test verification
 - Proceed with failing tests without asking
-- Assume directory location when ambiguous
-- Skip CLAUDE.md check
 - Run `git worktree remove` while CWD is inside the worktree
+- Ignore `.ed3d/worktree-setup.md` when it exists
 
 **Always:**
-- Follow directory priority: existing > CLAUDE.md > ask
-- Verify .gitignore for project-local
+- Handle LFS files after entering the worktree
+- Check for `.worktreeinclude` and suggest creating it if needed
+- Check `.ed3d/worktree-setup.md` before falling back to auto-detection
 - Auto-detect and run project setup
 - Verify clean test baseline
 - `cd` to main repo root before removing a worktree
@@ -256,9 +344,9 @@ Ready to implement auth feature
 ## Integration
 
 **Called by:**
-- **brainstorming** (Phase 4) - REQUIRED when design is approved and implementation follows
-- Any skill needing isolated workspace
+- **starting-an-implementation-plan** - sets up workspace before implementation
+- User invocation via `/using-git-worktrees`
 
 **Pairs with:**
 - **finishing-a-development-branch** - REQUIRED for cleanup after work complete
-- **executing-an-implementation-plan** - Work happens in this worktree
+- **executing-an-implementation-plan** - work happens in this worktree

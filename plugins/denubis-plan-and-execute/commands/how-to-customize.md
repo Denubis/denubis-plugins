@@ -34,6 +34,16 @@ Loaded when starting an implementation plan and again during code reviews.
 - **Commit conventions**: Message format, granularity
 - **Project-specific patterns**: How things are done here
 
+### `.ed3d/worktree-setup.md`
+
+Loaded when setting up a git worktree (via `claude -w` or mid-session worktree creation). Contains plain instructions for project-specific worktree setup beyond dependency installation.
+
+**What to include:**
+- **Database setup**: Create/migrate test databases for the worktree
+- **Service configuration**: Which services are shared vs. need separate instances
+- **Additional config files**: Files to copy or create that aren't covered by `.worktreeinclude`
+- **Post-install steps**: Migrations, seed data, build steps
+
 ## Example Files
 
 ### `.ed3d/design-plan-guidance.md`
@@ -85,6 +95,24 @@ Loaded when starting an implementation plan and again during code reviews.
 - Conventional commits: feat:, fix:, chore:, docs:
 - One logical change per commit
 - Tests and implementation in same commit
+```
+
+### `.ed3d/worktree-setup.md`
+
+```markdown
+# Worktree Setup
+
+## Database
+Create a separate test database for the worktree:
+    createdb myproject_test
+    uv run alembic upgrade head
+
+## Services
+Docker services are shared — do not run `docker compose up` in the worktree.
+The main checkout's services at localhost:5432 and localhost:6379 are used by all worktrees.
+
+## Additional config
+Copy `config/local.example.py` to `config/local.py` and set DEBUG = True.
 ```
 
 ## Notes

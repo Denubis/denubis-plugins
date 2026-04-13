@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.26.0
+
+Rewrite worktree skill for compatibility with Claude Code's built-in `claude -w` support.
+
+**New:**
+- LFS handling: automatic `assume-unchanged` on dirty LFS-tracked files to prevent pre-commit stash failures in worktrees
+- `.ed3d/worktree-setup.md`: project-specific worktree setup instructions (database creation, migrations, service config)
+- `.worktreeinclude` awareness: suggests creating one when `.env` files exist without it
+- Issue-based worktree naming via `gh issue view`
+- Worktree skill is now user-invocable (`/using-git-worktrees`)
+- `how-to-customize` documents `.ed3d/worktree-setup.md` alongside existing guidance files
+
+**Changed:**
+- Worktree skill rewritten to layer on top of `claude -w` rather than reimplementing worktree management
+- Two worktree locations documented: `.worktrees/` (mid-session) and `.claude/worktrees/` (claude -w)
+- `.gitignore` check uses `git check-ignore` instead of rigid grep pattern
+- Setup steps merged to enforce explicit ordering: auto-detect dependencies first, then `.ed3d/worktree-setup.md` instructions
+- Removed stale brainstorming Phase 4 cross-reference
+
 ## [denubis-plan-and-execute] 2.25.0
 
 Incorporate lessons from Cantrill's "The Peril of Laziness Lost" and Oxide RFD 576 on LLM coding discipline.
