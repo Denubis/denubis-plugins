@@ -190,6 +190,12 @@ Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
 
   Fix ALL issues — including every Minor issue. The goal is ZERO issues on re-review.
   Minor issues are not optional. Do not skip them.
+
+  IMPORTANT: Fix issues with targeted, minimal edits. Do NOT
+  wholesale-regenerate files to address review comments — this makes
+  iterative review impossible. Each fix should be traceable to the
+  specific issue it addresses. If a fix requires restructuring a file,
+  explain why in your commit message.
 </parameter>
 </invoke>
 ```
@@ -317,6 +323,7 @@ HEAD_SHA: [sha]
 - Proceed with ANY unfixed issues (Critical, Important, OR Minor)
 - Argue with valid technical feedback without evidence
 - Rationalize skipping Minor issues ("they're just style", "we can fix later")
+- Wholesale-regenerate files to address review comments (makes iterative review impossible — fixes must be targeted edits traceable to specific issues)
 
 **Minor issues are NOT optional.** The code reviewer flagged them for a reason. Fix all of them. "Minor" means lower severity, not "ignorable."
 

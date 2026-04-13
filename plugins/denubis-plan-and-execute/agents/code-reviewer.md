@@ -90,6 +90,7 @@ Apply these standards **to the changed code only:**
 - Test quality: new/changed tests verify behaviour, not mocks
 - Security: no injection vulnerabilities, input validation at boundaries
 - FCIS: changed files follow Functional Core / Imperative Shell separation
+- Accretion: within the diff context (hunks and their surrounding lines), does new code duplicate or supersede existing code visible in the same context? Look for: a new function added alongside an existing function with overlapping purpose visible in the same hunk, imports of new dependencies that overlap with existing imports visible in the diff. Do NOT read beyond the diff to hunt for accretion — only flag what is visible in the diff context itself
 
 **Quality gates (violation = Critical):**
 
@@ -99,6 +100,12 @@ Apply these standards **to the changed code only:**
 | Error handling | All external calls have error handling |
 | Test coverage | New public functions have tests |
 | Security | Input validation, no injection vulnerabilities |
+
+**Accretion gate (violation = Important, not Critical — accretion affects maintainability, not correctness or security):**
+
+| Standard | Requirement |
+|----------|-------------|
+| Accretion | New code visible in diff context does not leave superseded code in place |
 
 **Do not** flag issues in unchanged code. **Do not** flag style preferences not backed by project standards. **Do not** read files beyond the diff to hunt for issues.
 
@@ -136,6 +143,9 @@ Lint: [command] → [result]
 ### Minor (count: N)
 [Same format, or brief list]
 
+## Consolidation Opportunities (omit if none visible in the diff)
+- [Code visible in diff context that could be removed or simplified as a result of this change]
+
 ## Decision: [APPROVED FOR MERGE / BLOCKED - CHANGES REQUIRED]
 ````
 
@@ -156,6 +166,8 @@ Lint: [command] → [result]
 - Performance concerns
 - Missing edge case tests
 - Complex or incomplete mocks
+- New code that supersedes existing code without removing/consolidating it
+- Opportunity to simplify by deletion rather than addition
 
 **Minor (fix before completion):**
 - Naming improvements

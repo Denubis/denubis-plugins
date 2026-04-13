@@ -66,6 +66,7 @@ These are not in Mantyla's original taxonomy but are detectable at Tier 1 with s
 | Deep Nesting | T1 | >3 levels nested control flow (ast-grep rule) | Replace Nested Conditional with Guard Clauses, Decompose Conditional, Extract Method |
 | FCIS Violation | T1 | I/O calls in functions that should be pure (ast-grep rule) | Extract Method (separate I/O from logic), Move Function |
 | Global Mutable State | T1 | Module-level non-constant assignments (ast-grep rule) | Encapsulate Variable, Replace Global with Module-Level Function |
+| Accretion (Layercake) | T2 | LLM-assessed: new capability added without replacing or consolidating what it supersedes; multiple solutions to the same problem coexisting. Not in Mantyla's original taxonomy. | Remove Dead Code, Inline Class, Extract Method (consolidate into one) |
 
 ## Part 2: Fowler Smell-to-Refactoring Mapping
 
@@ -83,6 +84,7 @@ Primary lookup table for smell-to-refactoring decisions.
 | Feature Envy | Move Function | Extract Method + Move Function |
 | Data Class | Move Function (into the class) | Encapsulate Record |
 | Speculative Generality | Inline Class | Collapse Hierarchy, Remove Dead Code |
+| Accretion (Layercake) | Remove Dead Code | Inline Class, Extract Method (consolidate) |
 | Dead Code | Remove Dead Code | -- |
 | Switch Statements | Replace Conditional with Polymorphism | Introduce Special Case |
 | Message Chains | Hide Delegate | Extract Method |

@@ -47,6 +47,27 @@ Model the full error space. No shortcuts.
 - Ignore edge cases because "they probably won't happen"
 - Use `Any` or `# type: ignore` to bypass checking
 
+### Virtuous Laziness
+
+Code is a liability, not an asset. Every line requires reading, testing, debugging, and maintaining. Optimise for the smallest system that solves the problem.
+
+**Before adding code, complete this checklist:**
+
+1. Can an existing function/module be extended instead of creating a new one?
+2. Can existing code be *removed* to make this unnecessary?
+3. Does this addition consolidate or duplicate what's already here?
+4. Will a future reader understand why this exists without asking?
+
+If the answer to #1 is yes, extend. If #2 is yes, delete. If #3 is "duplicate," stop and refactor first.
+
+**The deletion test:** When you finish a change, check whether any existing code is now dead, redundant, or superseded by what you wrote. Remove it in the same change. New code that *could* replace old code but doesn't should be rare — if the system keeps growing without anything being removed, something is wrong.
+
+**Don't:**
+- Add a new module when an existing one covers 80% of the need
+- Stack a workaround on top of a workaround (the "layercake")
+- Generate a file you cannot explain the necessity of in one sentence
+- Solve a problem by adding an abstraction layer instead of simplifying the layer that has the problem
+
 ### Pragmatic Incrementalism
 
 - Prefer specific, composable logic over abstract frameworks
@@ -173,6 +194,7 @@ def calculate_tax(amount: Decimal, rate: Decimal) -> Decimal:
 | "We might need this later" | Premature abstraction is costly | Wait for third use |
 | "The type system is too strict" | Strictness catches bugs early | Fix the error |
 | "I'll refactor later" | Later never comes | Do it now or don't |
+| "I'll add a new module for this" | Existing module probably handles it | Extend, don't proliferate |
 
 ## Red Flags
 
@@ -184,3 +206,6 @@ def calculate_tax(amount: Decimal, rate: Decimal) -> Decimal:
 - Type assertions to bypass the checker
 - Functions you can't explain simply
 - TODOs without context
+- New files added without any files removed or simplified
+- Multiple implementations of similar functionality coexisting (the "layercake" — new solution added, old solution not removed)
+- System growing monotonically across tasks without consolidation
