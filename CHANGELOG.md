@@ -1,5 +1,19 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.25.0
+
+Incorporate lessons from Cantrill's "The Peril of Laziness Lost" and Oxide RFD 576 on LLM coding discipline.
+
+**New:**
+- `coding-effectively`: "Virtuous Laziness" section — 4-point pre-addition checklist, deletion test, code-as-liability framing
+- `refactoring-rubric`: "Accretion (Layercake)" smell in Additional Structural Smells — detects new code added without consolidating what it supersedes
+- `code-reviewer` agent: accretion quality check (Important severity), scoped to diff context; Consolidation Opportunities output section
+- `requesting-code-review`: bug-fixer constraint requiring targeted edits, not wholesale file regeneration
+
+**Changed:**
+- `coding-effectively`: new common mistake ("I'll add a new module for this"), three new red flags for monotonic growth
+- `code-reviewer`: new Important-severity entries for superseded code and deletion opportunities
+
 ## [denubis-plan-and-execute] 2.24.0
 
 Three-subagent refactoring pipeline replacing the non-functional code-simplifier dispatch.
