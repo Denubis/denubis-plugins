@@ -1,5 +1,13 @@
 # Changelog
 
+## [denubis-extending-claude] 1.7.0
+
+Transcript archiving moved to standalone `transcript-archive` plugin.
+
+**Changed:**
+- Removed `/transcript` command and skill — now provided by the separate [`transcript-archive`](https://github.com/Denubis/claude-code-research-transcript-hook) marketplace plugin
+- Removed `transcript` and `idw2025` keywords from plugin metadata
+
 ## [denubis-plan-and-execute] 2.26.0
 
 Rewrite worktree skill for compatibility with Claude Code's built-in `claude -w` support.

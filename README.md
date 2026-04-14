@@ -51,7 +51,7 @@ These make Claude Code noticeably better to work with.
 |--------|-------------|
 | **`denubis-hook-skill-reinforcement`** | Reminds Claude to actually use its skills (you'd be surprised how often it forgets). |
 | **`denubis-hook-shortcut-detection`** | E-STOP when Claude tries to take shortcuts — blocks and asks before proceeding. |
-| **`denubis-extending-claude`** | Meta-skills for writing plugins, agents, skills, CLAUDE.md maintenance, and `/transcript` archiving. |
+| **`denubis-extending-claude`** | Meta-skills for writing plugins, agents, skills, CLAUDE.md maintenance, and syncing with upstream. |
 | **`denubis-git-commit`** | `/commit` as a proper skill with multi-commit support. |
 | **`denubis-hook-claudemd-reminder`** | Reminds Claude to update CLAUDE.md before committing when things have changed. |
 
@@ -92,16 +92,7 @@ These bash-heavy hooks do not work on Windows (even with Git Bash). Skip them on
 
 ### Transcript Archiving
 
-The `/transcript` command archives conversations with IDW2025 research metadata:
-
-```
-/transcript
-```
-
-Outputs:
-- **SUMMARY.md** - Human-readable markdown summary
-- `index.html` - Full HTML transcript
-- `session.meta.json` - Structured metadata (Three Ps framework)
+Transcript archiving is provided by the separate [`transcript-archive`](https://github.com/Denubis/claude-code-research-transcript-hook) plugin. Install it as a marketplace plugin for the `/transcript` command, bulk archival, status reporting, and more.
 
 ## Prerequisites
 
