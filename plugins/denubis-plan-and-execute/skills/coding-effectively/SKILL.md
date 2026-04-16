@@ -33,6 +33,33 @@ When designing features, think about properties upfront. This surfaces design ga
 
 Surface these during design, not during debugging.
 
+## Tool Verification
+
+**Before using any external tool, check `.ed3d/tools.md`.** Never claim a tool is unavailable without checking.
+
+**Protocol:**
+1. Check `.ed3d/tools.md` -- if the tool is listed, use the documented invocation
+2. If not listed, run `which <tool>` and `<tool> --version`
+3. If found, append to `.ed3d/tools.md` with invocation, version, path, and any notes
+4. If genuinely not found after both checks, then report unavailable
+
+**`.ed3d/tools.md` format:**
+
+```markdown
+## pandoc
+- Invocation: `pandoc`
+- Version: 3.1.9
+- Path: /usr/bin/pandoc
+- Notes: supports --pdf-engine=xelatex
+
+## ruff
+- Invocation: `uv run ruff`
+- Version: 0.8.2
+- Notes: always via uv run, never .venv/bin/ruff
+```
+
+**Why:** Agents repeatedly claim tools are missing without checking. This caused "you have pandoc, mate." The file persists across sessions -- once discovered, a tool stays discovered.
+
 ## Core Principles
 
 ### Correctness Over Convenience

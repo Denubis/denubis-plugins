@@ -128,6 +128,7 @@ You MUST complete each phase before proceeding to the next.
    - **Run the full differential:** `rtk git diff <merge-base>...HEAD` for all changes since divergence. This is your **evidence universe**.
    - **Review recent commits:** `rtk git log <merge-base>..HEAD --oneline` for the change narrative.
    - **Check non-code changes:** New dependencies, config changes, environmental differences.
+   - **Verify tool availability:** Before using any diagnostic tool, check `.ed3d/tools.md` then `which <tool>`. Never claim a tool is unavailable without checking both. If found, append to `.ed3d/tools.md`.
    - **Search past sessions:** Use `cc-search-chats search "error message or topic"` to find if this issue was encountered and resolved before.
 
    **If the differential is empty** (bug exists on the reference branch too): State this explicitly. The contradiction is between the code's behaviour and its specification. Cite the specification, documentation, or test that describes expected behaviour. The evidence universe shifts from "what changed" to "what the code does vs what it should do."
