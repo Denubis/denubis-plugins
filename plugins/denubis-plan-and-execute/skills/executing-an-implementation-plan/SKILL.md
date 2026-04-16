@@ -428,6 +428,7 @@ The task-implementor's response must contain evidence for each of these. Missing
 |-------|-----------------|------------|
 | Tests ran | Test command output with pass/fail counts. Must be the project's full suite per CLAUDE.md, not a subset | "Re-run with the full test suite per CLAUDE.md and report output" |
 | Verification evidence | Build/lint/type-check output showing clean state | "Run verification-before-completion and report results" |
+| TDD evidence | RED-GREEN-REFACTOR cycle: test written first, failed, implementation added, test passed. Show the test name and the failure-then-pass sequence | "Show the RED-GREEN sequence: which test did you write first, how did it fail, what did you implement to pass it?" |
 | Commit made | Commit hash for the work | "Commit your changes and report the hash" |
 
 **Do not accept "Task complete" without evidence.** A claim without output is not evidence. Send the task back.
