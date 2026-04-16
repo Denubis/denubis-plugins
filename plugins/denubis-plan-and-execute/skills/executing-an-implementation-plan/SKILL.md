@@ -413,6 +413,18 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 
 **Print each task-implementor's response** before moving to the next task.
 
+**Acceptance rubric -- check before accepting each task as done:**
+
+The task-implementor's response must contain evidence for each of these. Missing evidence = reject, send back with specific demands.
+
+| Check | What to look for | If missing |
+|-------|-----------------|------------|
+| Tests ran | Test command output with pass/fail counts. Must be the project's full suite per CLAUDE.md, not a subset | "Re-run with the full test suite per CLAUDE.md and report output" |
+| Verification evidence | Build/lint/type-check output showing clean state | "Run verification-before-completion and report results" |
+| Commit made | Commit hash for the work | "Commit your changes and report the hash" |
+
+**Do not accept "Task complete" without evidence.** A claim without output is not evidence. Send the task back.
+
 **No code review between tasks.** Execute all tasks in the phase first.
 
 After all tasks complete, mark "Phase Nb: Execute tasks" as complete.
