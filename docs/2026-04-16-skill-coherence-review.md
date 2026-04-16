@@ -418,12 +418,15 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 - **H14**: Frustration-signal search in critical-peer-review
 - **H2a**: Research and build DoD rubric
 - **H2b** (blocked by H2a): Remove DoD from asking-clarifying-questions
-- **M1**: Gate merge-to-main behind .ed3d/merge-policy
-- **M2**: CWD re-verification after /clear
-- **M3**: Orchestrator acceptance rubric
-- **M8**: Two mandatory cleanup/docs stages with ADRs
-- **M24**: Split critical-peer-review with progressive disclosure
 - **M25**: Rename worker skills to {parent}-{action} (do LAST)
+
+### Completed — structural mediums (this session)
+
+- **M1**: Gate merge-to-main behind .ed3d/merge-policy opt-in
+- **M2**: CWD re-verification after /clear (3 checks: worktree exists, not main, branch matches)
+- **M3**: Orchestrator acceptance rubric (tests ran, verification evidence, commit hash)
+- **M8**: Two mandatory stages (post-implementation cleanup + post-acceptance ADR promotion)
+- **M24**: Split critical-peer-review checklists into progressive disclosure (5 checklist files)
 
 ### Completed — smaller edits (this session, uncommitted)
 
