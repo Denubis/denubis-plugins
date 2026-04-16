@@ -424,15 +424,24 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 
 The task-implementor's response must contain evidence. Missing evidence = reject, send back with specific demands.
 
-**Which checks apply depends on task type.** Read the phase's `Phase Type:` header and the task's nature:
+**Which checks apply depends on task type.** Read the phase's `Phase Type:` header and the task's signals (`Verifies:`, `Files:`, task description):
 
-| Check | Functionality tasks | Infrastructure tasks | Preparatory-refactor | Config/docs tasks |
-|-------|:------------------:|:-------------------:|:-------------------:|:-----------------:|
-| Tests ran (full suite) | Required | Required | Required | Not required |
-| Verification evidence (build/lint/type-check) | Required | Required | Required | Required |
-| TDD evidence (RED-GREEN-REFACTOR) | Required | Not required | Not required | Not required |
-| Tests stay green | N/A | N/A | Required | N/A |
-| Commit made | Required | Required | Required | Required |
+| Check | Functionality | Test-only | Infrastructure | Migration | Config/dependency | Documentation | Diagnostic |
+|-------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Tests ran (full suite) | Required | Targeted OK | Required | Regression suite | Not required | Not required | Not required |
+| Verification (build/lint/type) | Required | Lint | Required | Lint + tool confirmation | Install + import + lint | Docs build | Output shown |
+| TDD evidence (RED-GREEN) | Required | N/A (test IS deliverable) | Not required | Not required | Not required | Not required | Not required |
+| Tests stay green | N/A | N/A | N/A | Required | N/A | N/A | N/A |
+| Commit made | Required | Required | Required | Required | Required | Required | Not required |
+
+**How to identify task type:**
+- **Functionality**: has `Testing:` section with new tests, writes implementation + test code
+- **Test-only**: only test files listed, `Verifies:` references prior task's implementation
+- **Infrastructure**: creates project scaffolding, no business logic (e.g. directory structure, CI config)
+- **Migration**: uses ast-grep or bulk-modifies 10+ files mechanically, `Verifies: existing tests stay green`
+- **Config/dependency**: modifies pyproject.toml, .env, config files only
+- **Documentation**: only .md files modified, `Verifies: None` or `docs build`
+- **Diagnostic**: `Files: None (diagnostic only)` or `No commit needed`
 
 **What to look for in each check:**
 
@@ -588,14 +597,14 @@ If Phase Type is `infrastructure` or `preparatory-refactor` → coherence review
 
 **Step 2: For `functionality` phases (or unspecified Phase Type), check for Popper UAT entries.**
 
-Search the implementation plan's three-lens analysis (or the phase file's design decisions) for entries marked **"Popper (your UAT):"** — these are items requiring human interaction and judgment.
+Read `uat-requirements.md` in the implementation plan directory. Check whether this phase has any entries under its `## Phase [N]` section.
 
 | Popper UAT entries present? | Route | Rationale |
 |-----------------------------|-------|-----------|
-| Yes — at least one `Popper (your UAT):` entry exists | UAT gate | The planner identified something requiring human judgment. |
-| No — all Popper entries were routed to test-requirements.md or deferred to a future phase | Coherence review | No human-judgment items in this phase. |
+| Yes — at least one entry exists for this phase in `uat-requirements.md` | UAT gate | The planner identified something requiring human judgment. |
+| No — no entries for this phase (all were routed to test-requirements.md or deferred to a future phase) | Coherence review | No human-judgment items in this phase. |
 
-**Step 3: If no three-lens analysis exists** (older plans, plans without design-decisions review mode):
+**Step 3: If no `uat-requirements.md` exists** (older plans, plans written before this convention):
 
 Check whether the phase's acceptance criteria include any item where the verification requires human interaction and opinion — not just running a command and comparing output. If yes → UAT gate. If all ACs reduce to automated verification → coherence review.
 
@@ -605,7 +614,7 @@ Check whether the phase's acceptance criteria include any item where the verific
 
 Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
 
-Locate Popper UAT entries from the implementation plan. Present using the `human-uat-gate` skill format.
+Read this phase's entries from `uat-requirements.md`. Present using the `human-uat-gate` skill format.
 
 **Coherence review path:**
 
@@ -920,8 +929,8 @@ Before final review, verify the implementation matches the design plan.
 **Compare what was designed against what was built:**
 
 1. Read the design plan's component list, data flows, and acceptance criteria
-2. For each designed component, verify it exists in the implementation (grep for the class/function/file)
-3. For each designed data flow or integration, verify the implementation matches
+2. For each designed component, verify it exists AND its behaviour matches the design description (not just existence — check that its parameters, return types, consumers, and responsibilities match what the design specified)
+3. For each designed data flow or integration, trace the actual code path and verify it matches the design's description
 4. Flag any deviations:
    - **Designed but not built:** component in design plan has no corresponding code
    - **Built but not designed:** code exists that the design plan didn't specify
@@ -1127,7 +1136,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [No cross-phase state -- suggest /clear with self-contained resume prompt]
 [User runs /clear, pastes resume prompt]
 
---- Phase 2 (functionality, no Popper UAT entries -> coherence review) ---
+--- Phase 2 (functionality, no entries in uat-requirements.md -> coherence review) ---
 
 [Create fresh task list for Phase 2:]
 - [ ] Phase 2a: Read /path/to/phase_02.md -- Token Service
@@ -1138,7 +1147,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Mark 2a in_progress, read phase_02.md]
 → Phase Type: functionality. Contains 3 tasks: types, service, tests
-→ No Popper (your UAT) entries — all Popper items routed to test-requirements.md
+→ No entries in uat-requirements.md for Phase 2 — all items routed to test-requirements.md
 
 [Mark 2a complete, 2b in_progress]
 
@@ -1154,7 +1163,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Proleptic challenge for Phase 2]
 → One counterargument about token expiry edge case. Human evaluates, proceeds.
 
-[Routing rubric: functionality + no Popper UAT entries → coherence review]
+[Routing rubric: functionality + no uat-requirements.md entries → coherence review]
 [Dispatch coherence-reviewer]
 → Baked-in assumption: token refresh uses sliding window (design was silent).
 → Rating: notable — affects Phase 3's auth flow UI.
@@ -1166,15 +1175,15 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Mark 2d complete]
 
---- Phase 3 (functionality, has Popper UAT entries → UAT gate) ---
+--- Phase 3 (functionality, has uat-requirements.md entries → UAT gate) ---
 
 [Mark 3a in_progress, read phase_03.md]
-→ Phase Type: functionality. Popper (your UAT) entries present:
-  "Use the extraction UI and assess whether entries match chapter 3's content"
+→ Phase Type: functionality. uat-requirements.md has entries for Phase 3:
+  "This decision assumes: the extraction UI surfaces entries matching chapter structure"
 
 [Execute tasks, code review, proleptic challenge...]
 
-[Routing rubric: functionality + Popper UAT entries → UAT gate]
+[Routing rubric: functionality + uat-requirements.md entries → UAT gate]
 [Use human-uat-gate skill]
 → Human interacts with extraction UI, evaluates output against domain knowledge.
 → Confirmed.
