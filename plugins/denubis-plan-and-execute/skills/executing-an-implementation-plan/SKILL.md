@@ -51,7 +51,32 @@ A build fails. You change something without reading the error properly. It fails
 2. Use `denubis-plan-and-execute:using-git-worktrees` to create an isolated workspace.
 3. Resume execution in the worktree.
 
-**Check:** `git branch --show-current` — if it returns `main` or `master`, you are in the wrong place.
+**Check:** `git branch --show-current` -- if it returns `main` or `master`, you are in the wrong place.
+
+## Post-Resume Verification (after /clear)
+
+**Non-negotiable.** After /clear, Claude resets to the repo root. Before any work, run all three checks:
+
+```bash
+# 1. If resume prompt mentions a worktree, verify it exists
+git worktree list
+# Confirm the stated working directory appears in the list
+
+# 2. Verify NOT on main/master
+git branch --show-current
+# Must NOT be main or master
+
+# 3. Verify branch matches resume prompt's claim
+# The branch name must match what the resume prompt states
+```
+
+**If any check fails:** STOP. Do not proceed. Report which check failed and what you found.
+
+- Worktree missing -> it may have been cleaned up. Ask the user.
+- On main/master -> `cd` to the worktree path from the resume prompt, then re-check.
+- Branch mismatch -> you are in the wrong worktree. Navigate to the correct one.
+
+**Why all three:** Any single check can pass while the state is wrong. On a feature branch in the wrong worktree passes check 2 but fails check 3. In a worktree that exists but was reset passes check 1 but fails check 2.
 
 ## MANDATORY: Human Transparency
 
