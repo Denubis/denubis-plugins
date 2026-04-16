@@ -221,10 +221,40 @@ Options:
   - "Needs adjustment" (User will clarify what's missing or wrong)
 ```
 
-Present the Definition of Done as a brief statement (2-4 sentences) covering:
+Present the Definition of Done as a brief statement covering:
 - Primary deliverable(s)
 - Success criteria
 - Key exclusions (if any were discussed)
+
+**Every DoD entry must pass three tests** (derived from Scrum Guide's "formal description of Done" requirement, Schwaber & Sutherland 2020; Rubin's *Essential Scrum* quality criteria for sprint goals; Cohn's INVEST criteria adapted from user stories to deliverables):
+
+1. **Observable** — describes something a person can see, use, or demonstrate. Not internal state, not "code is clean." (Cohn: "Testable" — if you can't observe it, you can't test it.)
+   - Good: "User can upload a CSV and see parsed results"
+   - Bad: "CSV parsing is implemented correctly"
+
+2. **Falsifiable** — there is a concrete experience that would prove it's *not* done. This is how DoD feeds UAT: the falsification becomes the acceptance criterion. (Popper: a claim that cannot be falsified is not a claim.)
+   - Good: "Search returns results within 2 seconds for 10k records"
+   - Bad: "Search performs well"
+
+3. **Scoped** — draws a boundary. Says what's included *and* what's excluded. If nothing is excluded, the scope is suspect. (Rubin: unbounded work items are unestimable and unplannable.)
+   - Good: "Supports CSV and TSV. Excel files are out of scope."
+   - Bad: "Supports file uploads"
+
+**Anti-patterns — reject DoD entries that match these:**
+
+| Pattern | Problem |
+|---------|---------|
+| "X is implemented" | Implementation is the means, not the goal. What can the user *do*? |
+| "X works correctly" | Unfalsifiable — what does "correctly" look like? |
+| "All tests pass" | That's verification-before-completion's job, not DoD |
+| No exclusions mentioned | Scope will creep during brainstorming |
+
+**How later phases consume the DoD:**
+
+- **Brainstorming (Phase 4):** DoD constrains exploration — proposals must deliver what DoD promises
+- **Writing design plans:** Each DoD entry generates acceptance criteria (AC) with success + failure cases
+- **Implementation planning:** ACs become test-requirements.md entries
+- **UAT:** DoD entries requiring human judgment become uat-requirements.md entries
 
 **If the Definition of Done is unclear:**
 
@@ -234,6 +264,10 @@ Examples of clarifying questions:
 - "What's the primary deliverable here — is it [X] or [Y]?"
 - "How will you know this is done? What would you test or demonstrate?"
 - "You mentioned [feature]. Is that in scope for this design, or a future addition?"
+
+**Quality gate — reject vague DoD before confirmation:**
+
+If any DoD entry fails the three tests above, do not present it for confirmation. State which test it fails and ask the user to revise. Example: "This entry fails the Falsifiable test — what specific outcome would prove it's not done?" Loop until every entry passes all three tests, then present for confirmation.
 
 **Do not proceed to brainstorming until Definition of Done is confirmed.**
 
