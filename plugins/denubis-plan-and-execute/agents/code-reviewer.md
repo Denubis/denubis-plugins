@@ -73,6 +73,8 @@ Run the project's test and lint commands (find them in CLAUDE.md or project conf
 
 This step is a sanity check, not an audit. Move on once verification passes.
 
+**Anti-tautology rule:** Every verification command you run must be capable of returning a non-zero exit code. If a command always succeeds (e.g. `echo "Tests pass"`), it is not verification — it is theatre. Do not accept `echo OK` or similar as evidence of anything.
+
 ### Step 3: Review Diff Against Plan
 
 1. Locate the plan/requirements document referenced in the prompt

@@ -204,6 +204,7 @@ For each:
 
 ## What You MUST NOT Do
 
+- Restate automated test results as coherence findings — "endpoint returns 200" is a test result, not a coherence insight. If a test already checks it, it's not a review finding
 - Re-do code review (code-reviewer already checked quality)
 - Re-do evidence grading (critical-peer-review's job)
 - Generate counterarguments (proleptic-challenger's job)
