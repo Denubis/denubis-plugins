@@ -248,62 +248,18 @@ If any answer unsettles you, go back and investigate before proceeding.
 
 ## Artifact-Specific Checks
 
-### Debugging Analysis
+After classifying the artifact (step above), load the corresponding checklist from `checklists/` in this skill's directory:
 
-Mandatory checks:
+| Artifact type | Checklist file |
+|---------------|----------------|
+| `debugging-analysis` | `checklists/debugging-analysis.md` |
+| `incident-analysis` | `checklists/incident-analysis.md` |
+| `design-plan` | `checklists/design-plan.md` |
+| `implementation-plan` | `checklists/implementation-plan.md` |
+| `generated-artifact` | `checklists/generated-artifact.md` |
+| `technical-reasoning` | No specific checklist -- use core protocol only |
 
-- Symptom-to-mechanism jump unsupported by evidence
-- Production path claimed from synthetic test only
-- Alternative hypotheses not ruled out
-- Negative border not tested
-- Code path or stack frame cited incorrectly
-- Fix proposed before mechanism isolation
-
-### Incident Analysis
-
-Mandatory checks:
-
-- Time-window contamination
-- Timezone mismatch or silent timezone assumption
-- Aggregation before filtering
-- Contaminated provenance
-- Deploy, restart, migration, or config-change boundaries not reconciled
-- "Latest log" or "same run" claims without provenance proof
-- Counts lacking exact query or command
-
-### Design Plan
-
-Mandatory checks:
-
-- Requirement missing from the plan
-- Contradiction with existing architecture or prior design decisions
-- Unstated assumptions treated as facts
-- Acceptance criteria too vague to verify
-- Rollout, migration, or failure-mode handling omitted where required
-- Feasibility claimed without concrete evidence
-- Risks named without actionable mitigations
-
-### Implementation Plan
-
-Mandatory checks:
-
-- File ownership or write scope unclear
-- Sequence impossible or dependency order wrong
-- Verification commands missing or non-specific
-- Migration, backfill, rollback, or cleanup omitted where required
-- Tests named vaguely instead of concretely
-- Hidden blocking assumptions
-- Steps too abstract to execute
-
-### Generated Artifact
-
-Mandatory checks:
-
-- Artifact does not match its claimed generating inputs
-- Provenance of the artifact is unclear
-- Toolchain version or runtime context omitted
-- Output compared against the wrong baseline
-- Rendered or visual defect attributed to the wrong stage
+**Read the checklist file and apply every item.** Do not skip items because they seem inapplicable -- state "N/A: [reason]" instead.
 
 ## The Ripple Rule
 
