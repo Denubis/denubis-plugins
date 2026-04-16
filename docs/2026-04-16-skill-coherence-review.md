@@ -54,15 +54,62 @@
 
 ---
 
-### H12: Popper three-way sort examples
+### H12: Popper system redesign (pipeline, quality rubric, template, persistence)
 
-**Problem:** The "Decision 1: Prompt vocabulary format" example buries an undeclared decision inside a fake UAT. Three stacked failures: (1) the "UAT" is actually a test, (2) the decision (Option A over B) is never explicitly stated, (3) no justification for why A beats B.
+**Problem — three stacked failures:**
+1. **Broken pipeline** — Popper entries generated during three-lens analysis then explicitly discarded (line 825: "Plan document contains ONLY the implementation tasks"). human-uat-gate tries to find them, gets nothing, improvises from acceptance criteria. The three-lens analysis is ceremonial.
+2. **No quality rubric** — 53% of existing Human Verification entries are tautological ("read template, confirm keywords present"). No principle distinguishing good entries from bad.
+3. **Bad template** — decisions are implicit, undeclared, buried inside fake UATs.
 
-**Agreed correct pattern:**
-1. **Options** — present the alternatives
-2. **Counterarguments** — what argues against each
-3. **Decision** — explicit, defended
-4. **Human-facing falsifiable statements** — about what a human would *experience in interaction* that could prove the decision wrong. NOT "run this and check output" — that's a test.
+**Audit evidence:** Subagent rated every Popper/HV entry across all accessible plans. Zero Popper entries persisted in any plan file. Of HV entries: 26% Good, 53% Tautological, 5% Buried decision.
+
+**Agreed fix — four parts:**
+
+**Part 1: Persistence.** Create `uat-requirements.md` parallel to `test-requirements.md`. Human-judgment falsification entries persist here. Automatable entries go to test-requirements.md. Different consumers, same directory.
+
+**Part 2: Quality rubric (Carnap's Mark I eyeball).** The developer is the instrument. A good UAT entry requires:
+1. What the human **does** — an action pursuing the design objective, not a verification procedure
+2. What they're **judging** — a subjective quality only a human can evaluate
+3. What **failure** looks like — a concrete experience proving the decision wrong
+
+Ruled out: "read X and confirm Y present" (inspection, not use), "run X see Y" (a test), "check that Z works" (unfalsifiable).
+
+**Part 3: Falsification template (Popper as risky statement).** Make the strongest claim the decision implies, then try to shatter it:
+
+```
+**This decision assumes:** [the assumption baked into the implementation]
+**To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
+**It's wrong if:** [the specific experience that shows the assumption failed your intent]
+```
+
+The developer uses the system for its purpose and asks: does this match what I meant? The gap between intent and result is the falsification.
+
+**Part 4: Decision record template.** Title declares the recommended decision. Options → Counterarguments → Recommendation → Philosophers comment on the whole:
+
+```
+### DR1: Use grouped-by-category prompt vocabulary (recommended)
+
+**Options considered:**
+- Grouped by category with descriptions
+- Flat sorted list
+- Hierarchical with collapsible sections
+
+**Counterarguments:**
+- Grouped: may impose taxonomy that doesn't match how the archive works
+- Flat: loses semantic structure at 48 labels
+- Hierarchical: adds complexity model may not respect
+
+**Recommendation:** Grouped by category — semantic structure helps model understand category boundaries.
+
+**This decision assumes:** the grouping matches how the developer thinks about the source material
+**To shatter it:** process a batch of mixed-content pages and judge whether the labels match your understanding of the material
+**It's wrong if:** the categories don't map to how you actually think about this archive, or you can't find the right label without fighting the structure
+
+**Haraway:** [only if interesting]
+**Lakatos:** [only if interesting]
+```
+
+**Sources:** Popper (1959), Carnap's operationalism. Audit data from plan review subagent.
 
 ---
 
@@ -406,22 +453,22 @@ Orchestrator/worker relationship is clear. Inner skill's HALT is a valid safety 
 
 M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4, L5, L6
 
-### Remaining — structural changes (need design/implementation plans)
+### Remaining — needs implementation
 
-- **H1** (blocked by H13): requesting-code-review triggers + BASE_SHA guidance
-- **H3**: Per-phase task lists in executing-an-implementation-plan
-- **H4**: PEP version compatibility table in python-idioms
-- **H5**: .ed3d/tools.md lazy discovery mechanism
 - **H7**: Citation requirement for architecture docs
-- **H12**: Fix Popper three-way sort examples
-- **H13**: Wire full-branch code review into finishing-a-development-branch
-- **H14**: Frustration-signal search in critical-peer-review
+- **H12**: Popper system redesign (pipeline, quality rubric, template, persistence) -- see updated H12 section above
 - **H2a**: Research and build DoD rubric
 - **H2b** (blocked by H2a): Remove DoD from asking-clarifying-questions
 - **M25**: Rename worker skills to {parent}-{action} (do LAST)
+- Critical-peer-review: "all findings to human" rule added but needs version bump/changelog at end
 
-### Completed — structural mediums (this session)
+### Completed — structural changes (sessions 3-4)
 
+- **H1** + **H13**: Full-branch code review wired into finishing-a-development-branch; requesting-code-review triggers fixed (per-phase + pre-merge scopes with distinct BASE_SHA)
+- **H3**: Per-phase task lists, false /clear persistence claim removed, "Prepare for next phase" task defined
+- **H4**: PEP version compatibility table (695, 701, 696, 649, 750, 758, 765), tooling rule (uv run), version check
+- **H5**: .ed3d/tools.md lazy discovery in coding-effectively + systematic-debugging
+- **H14**: Frustration-signal search as step 0 in critical-peer-review
 - **M1**: Gate merge-to-main behind .ed3d/merge-policy opt-in
 - **M2**: CWD re-verification after /clear (3 checks: worktree exists, not main, branch matches)
 - **M3**: Orchestrator acceptance rubric (tests ran, verification evidence, commit hash)
