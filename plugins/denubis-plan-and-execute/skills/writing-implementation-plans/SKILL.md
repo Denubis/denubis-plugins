@@ -452,11 +452,13 @@ Before creating the Finalization task, check if `.ed3d/implementation-plan-guida
       → blocked by: all Phase *D tasks
 ```
 
-**After Finalization, create Test Requirements task:**
+**After Finalization, create Test Requirements and UAT Requirements tasks:**
 
 ```markdown
 - [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
       → blocked by: Finalization
+- [ ] UAT Requirements: Collate uat-requirements.md from phase decisions
+      → blocked by: Test Requirements
 ```
 
 **Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth-99.md`:**
@@ -493,6 +495,9 @@ TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issue
 
 TaskCreate: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"
   → TaskUpdate: addBlockedBy: [Finalization]
+
+TaskCreate: "UAT Requirements: Collate uat-requirements.md from phase decisions"
+  → TaskUpdate: addBlockedBy: [Test Requirements]
 ```
 
 **Why absolute paths in task descriptions:** After compaction, the task list is all that remains. Absolute paths ensure you know exactly which files to read/write without relying on context.
@@ -605,7 +610,7 @@ Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens
 7. **Task ND: Write phase file (if approved)**
    - Mark task ND as in_progress
    - Write to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
-   - Plan document contains ONLY the implementation tasks (no verification findings)
+   - Phase file contains ONLY the implementation tasks (no verification findings)
    - Mark task ND as completed, continue to next phase
 
 8. **If needs revision:** Revise based on feedback, present again (do NOT mark ND as in_progress until approved)
@@ -741,7 +746,7 @@ Phase 2 (Token Service, functionality, no UI) has 4 design decisions:
 
 1. "Token validation rejects expired tokens" → **Automatable.** Write integration test: `test_expired_token_returns_401`. Goes to test-requirements.md.
 2. "Token refresh uses sliding window expiry" → **Automatable.** Write test: `test_sliding_window_extends_on_activity`. Goes to test-requirements.md.
-3. "The auth flow feels discoverable to a new user without documentation" → **Human judgment, but not in this phase.** The UI doesn't exist until Phase 4. Deferred: "Popper (your UAT) for Phase 4, back-reference DR2 from Phase 2."
+3. "The auth flow feels discoverable to a new user without documentation" → **Human judgment, but not in this phase.** The UI doesn't exist until Phase 4. Persisted to `uat-requirements.md` under Phase 4, back-reference DR2 from Phase 2.
 4. "Concurrent refresh requests don't create duplicate tokens" → **Automatable.** Write test: `test_concurrent_refresh_deduplicates`. Goes to test-requirements.md.
 
 Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends it to coherence-review, not the UAT gate. The one human-judgment item lands in Phase 4's UAT where it belongs.
@@ -1004,6 +1009,7 @@ These are violations of the skill requirements:
 | "I'll skip creating granular tasks, one per phase is enough" | Granular tasks survive compaction. Create NA, NB, NC, ND per phase + Finalization. |
 | "Dependencies are obvious, don't need addBlockedBy" | Task list shows blocked status. Set dependencies explicitly with TaskUpdate. |
 | "Relative paths are fine in task descriptions" | After compaction, context is lost. Use absolute paths so tasks are self-contained. |
+| "The consumer is obvious" / "It'll be used in a later phase" | Name the call site now. If you can't, the function doesn't belong in this task. "Used later" is how orphaned code gets planned. |
 | "I'll paraphrase the task name, same meaning" | NO. Task names are VERBATIM. "and activate relevant skills" triggers behavior post-compaction. |
 | "I know how this library works from training" | Research it. APIs change. Use internet-researcher for docs, remote-code-researcher for internals. |
 | "Docs are probably accurate enough" | Usually yes. But if extending/customizing library behavior, verify with source code. |
@@ -1111,6 +1117,9 @@ Which approach should I take?
 - [ ] **If batch mode:** Write directly without asking
 - [ ] Write test-requirements.md to PLAN_DIR
 - [ ] Mark Test Requirements task as completed
+- [ ] Collate uat-requirements.md from phase decisions (design decisions mode) or construct from ACs (other modes)
+- [ ] Write uat-requirements.md to PLAN_DIR
+- [ ] Mark UAT Requirements task as completed
 - [ ] Proceed to execution handoff
 
 ## Plan Validation (Finalization Task)
@@ -1229,11 +1238,10 @@ Test requirements map acceptance criteria to specific automated tests, and ident
 <parameter name="prompt">
 Read the design at [DESIGN_PATH] and implementation phases in [PLAN_DIR].
 
-Generate test-requirements.md mapping each acceptance criterion to:
-- Automated tests: criterion, test type (unit/integration/e2e), expected test file path
-- Human verification: criteria that can't be automated, with justification and verification approach
+Generate test-requirements.md mapping each acceptance criterion to automated tests:
+- Criterion, test type (unit/integration/e2e), expected test file path
 
-Rationalize against implementation decisions made during planning. Every acceptance criterion must map to either an automated test or documented human verification.
+Human-judgment verification is tracked separately in uat-requirements.md (generated during phase planning, not here). Every acceptance criterion must map to either an automated test in test-requirements.md or a human-judgment entry in uat-requirements.md. Flag any AC that appears in neither.
 </parameter>
 </invoke>
 ```
@@ -1261,11 +1269,58 @@ Rationalize against implementation decisions made during planning. Every accepta
 
 **Step 3: Write and complete**
 
-Write to `[PLAN_DIR]/test-requirements.md`. Mark task completed. Proceed to execution handoff.
+Write to `[PLAN_DIR]/test-requirements.md`. Mark task completed. Proceed to UAT requirements collation.
+
+## UAT Requirements Collation
+
+**Tracked task: "UAT Requirements: Collate uat-requirements.md from phase decisions"**
+
+Mark in_progress after Test Requirements completes.
+
+UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `human-uat-gate` skill reads this file during execution.
+
+**For design decisions mode:** UAT entries were already generated per-phase during step 8 (Task ND). Collate them into a single file.
+
+**For interactive and batch modes:** Review each phase for acceptance criteria that require human judgment (using the Carnap quality rubric). Construct falsification entries for any that qualify.
+
+**Format:**
+
+```markdown
+# UAT Requirements
+
+Human-judgment falsification entries. Each requires a human to USE the built thing
+and exercise judgment that automated tests cannot capture.
+
+Quality gate: every entry must have (1) what the human DOES (an action, not inspection),
+(2) what they're JUDGING (subjective quality), (3) what FAILURE looks like (concrete experience).
+
+## Phase [N]: [Phase Name]
+
+### DR[X]: [Decision title]
+
+**This decision assumes:** [assumption]
+**To shatter it:** [human interaction pursuing the design objective]
+**It's wrong if:** [concrete failure experience]
+
+### DR[Y]: [Decision title] (back-reference from Phase [M] DR[Z])
+
+**This decision assumes:** [assumption]
+**To shatter it:** [human interaction — deferred from earlier phase]
+**It's wrong if:** [concrete failure experience]
+
+## Phase [N+1]: [Phase Name]
+...
+```
+
+**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+
+**Step: Write and complete**
+
+Write to `[PLAN_DIR]/uat-requirements.md`. Mark task completed. Proceed to execution handoff.
 
 ## Execution Handoff
 
-After Test Requirements generation completes, announce:
+After UAT Requirements collation completes, announce:
 
-**"Implementation plan complete and validated. Saved to [count] phase files + test-requirements.md in `docs/implementation-plans/YYYY-MM-DD-<feature-name>/`. The first phase file is `<full-path>`. Test requirements are in `<full-path>/test-requirements.md`."**
+**"Implementation plan complete and validated. Saved to [count] phase files + test-requirements.md + uat-requirements.md in `docs/implementation-plans/YYYY-MM-DD-<feature-name>/`. The first phase file is `<full-path>`."**
 
