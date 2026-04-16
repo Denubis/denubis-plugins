@@ -129,10 +129,11 @@ ALTER TABLE bookings ADD CONSTRAINT excl_bookings_no_overlap
 
 ```python
 # Pure join table — composite PK, no surrogate key
+# Timestamps use server_default so Postgres generates tz-aware values
 class UserRole(SQLModel, table=True):
     user_id: UUID = Field(foreign_key="user.id", primary_key=True)
     role_name: str = Field(foreign_key="role.name", primary_key=True)
-    granted_at: datetime = Field(default_factory=datetime.now)
+    granted_at: datetime = Field(sa_column_kwargs={"server_default": text("now()")})
 ```
 
 **Association tables with extra data** get their own surrogate PK:
@@ -143,7 +144,7 @@ class Enrollment(SQLModel, table=True):
     student_id: UUID = Field(foreign_key="student.id")
     course_id: UUID = Field(foreign_key="course.id")
     grade: str | None = None
-    enrolled_at: datetime = Field(default_factory=datetime.now)
+    enrolled_at: datetime = Field(sa_column_kwargs={"server_default": text("now()")})
 
     __table_args__ = (
         UniqueConstraint("student_id", "course_id", name="uq_enrollment_student_course"),
