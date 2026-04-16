@@ -829,9 +829,17 @@ Discard: all subagent output, review details, and fix cycle content — work is 
 
 Proceed to the next phase's "Read" step. Repeat 3a-3e for each phase.
 
-### 4. Update Project Context
+### 4. Post-Implementation Stages (Mandatory)
 
-After all phases complete, invoke the `denubis-extending-claude:project-claude-librarian` subagent (when available) to review changes and update CLAUDE.md files if needed.
+After all phases complete, two mandatory stages run outside the normal phase numbering. Neither is skippable.
+
+#### Stage 1: Post-Implementation Cleanup
+
+Before final review, update documentation to match what was actually built.
+
+**4a. Librarian updates:**
+
+Invoke `denubis-extending-claude:project-claude-librarian` (when available) to review changes and update CLAUDE.md/AGENTS.md files if contracts or structure changed.
 
 ```
 <invoke name="Task">
@@ -856,9 +864,27 @@ After all phases complete, invoke the `denubis-extending-claude:project-claude-l
 </invoke>
 ```
 
-**If librarian reports updates:** Review the changes, then proceed to final review.
-**If librarian reports no updates needed:** Proceed to final review.
-**If librarian subagent is unavailable:** skip this entire step. Say aloud that you're skipping it because the `denubis-extending-claude` plugin is not available.
+**If librarian subagent is unavailable:** skip this step. Say aloud that you're skipping it because the `denubis-extending-claude` plugin is not available.
+
+**4b. Architecture docs with citations:**
+
+If architecture docs exist (`docs/architecture/`), update them to reflect what was built. Every claim must cite its source: file + symbol name (e.g. `src/models/permission.py::Permission`). No line numbers -- they shift.
+
+**4c. Implementation-time ADRs:**
+
+For decisions made during implementation that were not in the design plan, create ADR files in `docs/architecture/decisions/` with status `Proposed`. These capture the "why" behind implementation choices the design didn't specify.
+
+#### Stage 2: Post-Acceptance
+
+After final review and UAT/coherence review pass:
+
+**4d. ADRs Proposed -> Accepted:**
+
+Any ADRs created in Stage 1 move from `Proposed` to `Accepted` with a timestamp. The implementation is now the accepted approach.
+
+**4e. Final citation pass:**
+
+Architecture docs get a final citation pass -- all citations now point to accepted, reviewed code rather than in-progress work.
 
 ### 5. Final Review Sequence
 
