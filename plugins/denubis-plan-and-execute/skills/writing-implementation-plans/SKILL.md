@@ -438,14 +438,14 @@ Before creating tasks, capture absolute paths:
 
 **After all phase tasks, create finalization task:**
 
-Before creating the Finalization task, check if `.denubis/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
+Before creating the Finalization task, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
 
 ```markdown
-# If .denubis/implementation-plan-guidance.md exists:
-- [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .denubis/implementation-plan-guidance.md]), fix ALL issues including minor ones
+# If .ed3d/implementation-plan-guidance.md exists:
+- [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .ed3d/implementation-plan-guidance.md]), fix ALL issues including minor ones
       → blocked by: all Phase *D tasks
 
-# If .denubis/implementation-plan-guidance.md does NOT exist:
+# If .ed3d/implementation-plan-guidance.md does NOT exist:
 - [ ] Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones
       → blocked by: all Phase *D tasks
 ```
@@ -665,9 +665,44 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 | Lens | Question | When to include |
 |------|----------|----------------|
-| **Popper (falsification)** | What would prove this decision wrong? → This IS the human-testable UAT | **Always.** Every decision gets a falsification test the human can perform. |
+| **Popper (falsification)** | What would prove this decision wrong? | **Always.** Every decision gets a falsification test — but the output depends on whether a human can judge it or a machine can (see Popper discipline below). |
 | **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
 | **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Only when interesting.** Include for: vendor/platform lock-in, data residency, accessibility, security model, cost distribution, technology that constrains future options. Omit for routine structural decisions. Its presence signals "someone bears an invisible cost." |
+
+**Popper discipline — falsification tests must earn their format:**
+
+Every design decision gets a falsification test. But the *output* of that test depends on whether a human or a machine should verify it.
+
+**The sorting question:** "Can this prediction be proven wrong by automated test, or does it require human judgment?"
+
+| Answer | What to write | Where it goes |
+|--------|--------------|---------------|
+| **Automatable** — the prediction reduces to "run X, compare output to Y" | Write it as a test requirement | `test-requirements.md` — the test-analyst validates coverage during execution |
+| **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry | Stays in the three-lens presentation; the `human-uat-gate` skill uses it during execution |
+| **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | Attach to the future phase's Popper entries, with a back-reference to the decision (DR[N]) made here |
+
+**A bad Popper entry restates what automated tests verify:**
+- "Run the validator and see it validates" — that's a unit test
+- "Call the endpoint and see 200 OK" — that's an integration test
+- "Run `uv sync` and see no errors" — that's a build check
+
+**A good Popper entry describes something only a human can judge:**
+- "Use the extraction workflow on chapter 3 and assess whether the entries match your understanding of the source material" — domain judgment
+- "Navigate the auth flow as a new user and evaluate whether the steps are discoverable without documentation" — usability judgment
+- "Read the generated report and assess whether the relationship between X and Y is accurately represented" — interpretation judgment
+
+**For phases with no user-facing surface** (most foundational phases): there are typically no Popper UAT entries. Instead, the decision's falsification test is either an automated test requirement or a note that human verification is deferred to the phase where the experience exists. The `coherence-review` skill handles the human touchpoint for these phases — checking whether the foundations support the future UAT, not re-running tests by hand.
+
+**Worked example — sorting a phase's decisions across the three buckets:**
+
+Phase 2 (Token Service, functionality, no UI) has 4 design decisions:
+
+1. "Token validation rejects expired tokens" → **Automatable.** Write integration test: `test_expired_token_returns_401`. Goes to test-requirements.md.
+2. "Token refresh uses sliding window expiry" → **Automatable.** Write test: `test_sliding_window_extends_on_activity`. Goes to test-requirements.md.
+3. "The auth flow feels discoverable to a new user without documentation" → **Human judgment, but not in this phase.** The UI doesn't exist until Phase 4. Deferred: "Popper (your UAT) for Phase 4, back-reference DR2 from Phase 2."
+4. "Concurrent refresh requests don't create duplicate tokens" → **Automatable.** Write test: `test_concurrent_refresh_deduplicates`. Goes to test-requirements.md.
+
+Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends it to coherence-review, not the UAT gate. The one human-judgment item lands in Phase 4's UAT where it belongs.
 
 **Lakatos discipline:**
 - The hard core = design plan's architectural commitments (inherited, not questioned here)
@@ -742,22 +777,26 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 **Design decisions in this phase:**
 
-### Decision 1: [Vendor/platform choice with invisible costs]
-**Popper (your UAT):** If this decision is right, you should be able to:
-[concrete interaction the human can perform — CLI command, URL to visit,
-observable output, UI state to inspect]. You should see [expected outcome].
-If instead you see [unexpected outcome], [what that means about the decision].
+### Decision 1: [Choice with user-facing implications]
+**Popper (your UAT):** Use the [feature/workflow] and evaluate whether
+[subjective quality the human must judge]. You should see [expected experience].
+If instead you see [unexpected experience], this decision about [X] was wrong.
 **Haraway:** Shaped by [perspective]. Benefits: [who]. Cost borne by: [who].
 Absent: [whose perspective wasn't consulted].
 
 ### Decision 2: [Choice with a degenerating signal]
-**Popper (your UAT):** [falsification test]
+**Popper:** → **test-requirement** — write an integration test that [specific
+automated verification]. Added to test-requirements.md.
 **Lakatos: DEGENERATING** — [specific evidence: what workaround is required,
 which code outside this phase's scope needs modification, which later phase
 is made harder, or what existing capability is being duplicated and why].
 
-### Decision 3: [Routine choice — no Lakatos or Haraway needed]
-**Popper (your UAT):** [falsification test]
+### Decision 3: [Foundational choice — no user experience in this phase]
+**Popper:** Human verification deferred to Phase [M] (DR[N] back-reference).
+The automated guard is [test name/description] in test-requirements.md.
+
+### Decision 4: [Routine choice — no Lakatos or Haraway needed]
+**Popper (your UAT):** [genuinely human-falsifiable interaction requiring judgment]
 
 [Continue for all non-trivial decisions in this phase...]
 ```
@@ -1024,7 +1063,7 @@ After all phase D tasks are completed, mark the Finalization task as in_progress
 
   DESIGN_PLAN: [path to design plan, e.g., docs/design-plans/YYYY-MM-DD-feature.md]
 
-  IMPLEMENTATION_GUIDANCE: [absolute path to .denubis/implementation-plan-guidance.md, or "None" if file does not exist]
+  IMPLEMENTATION_GUIDANCE: [absolute path to .ed3d/implementation-plan-guidance.md, or "None" if file does not exist]
 
   IMPLEMENTATION_PHASES:
   - [path to phase_01.md]
