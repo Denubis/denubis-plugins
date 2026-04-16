@@ -201,6 +201,8 @@ For infrastructure tasks:
 - Task N requires bootstrap credentials? Prior task provisions them.
 - Never write code that assumes "this will exist somehow."
 
+**Consumer-tracing requirement:** Every new function, class, or field in a task must name its call site — what existing or planned code will invoke it and in which task. No call site = no function. This catches orphaned code at planning time. If a function's only consumer is "will be used later," it doesn't belong in this task.
+
 ## Task Types: Infrastructure vs Functionality
 
 **Match task structure to what the design phase specifies.**
@@ -685,18 +687,51 @@ Every design decision gets a falsification test. But the *output* of that test d
 | Answer | What to write | Where it goes |
 |--------|--------------|---------------|
 | **Automatable** — the prediction reduces to "run X, compare output to Y" | Write it as a test requirement | `test-requirements.md` — the test-analyst validates coverage during execution |
-| **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry | Stays in the three-lens presentation; the `human-uat-gate` skill uses it during execution |
-| **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | Attach to the future phase's Popper entries, with a back-reference to the decision (DR[N]) made here |
+| **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry using the falsification template below | `uat-requirements.md` — the `human-uat-gate` skill uses it during execution. **These entries MUST be persisted.** |
+| **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | `uat-requirements.md` under the future phase's section, with a back-reference to the decision (DR[N]) made here |
+
+**Quality rubric — Carnap's "Mark I eyeball" test:**
+
+The developer is the instrument. A good UAT entry requires ALL THREE:
+
+1. **What the human does** — an action pursuing the design objective, not a verification procedure. The human *uses* the thing for its purpose.
+2. **What they're judging** — a subjective quality only a human can evaluate (usability, domain correctness, workflow fit, clarity, discoverability).
+3. **What failure looks like** — a concrete experience proving the decision wrong. Not "it doesn't work" but what the human would see, feel, or be unable to do.
+
+**Ruled out by this rubric:**
+- "Read X and confirm Y is present" — inspection, not use
+- "Run X and see Y" — that's a test, automate it
+- "Check that Z works" — unfalsifiable (what does "works" look like?)
+- "Verify the output matches the spec" — comparison, not judgment
+- "Curl the endpoint and check the response" — integration test the human is running by hand
+
+**Audit evidence:** 76% of Popper entries in real plans were tautological — manual re-runs of what automated tests already verify. The rubric exists to prevent this.
+
+**Falsification template (Popper as risky statement):**
+
+Make the strongest claim the decision implies, then try to shatter it:
+
+```
+**This decision assumes:** [the assumption baked into the implementation]
+**To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
+**It's wrong if:** [the specific experience that shows the assumption failed your intent]
+```
+
+The developer uses the system for its purpose and asks: does this match what I meant? The gap between intent and result is the falsification.
 
 **A bad Popper entry restates what automated tests verify:**
 - "Run the validator and see it validates" — that's a unit test
 - "Call the endpoint and see 200 OK" — that's an integration test
 - "Run `uv sync` and see no errors" — that's a build check
+- "Check the database for the new row" — that's an assertion
+- "Verify the button appears when sharing is enabled" — if a boolean controls visibility, test the boolean
 
 **A good Popper entry describes something only a human can judge:**
 - "Use the extraction workflow on chapter 3 and assess whether the entries match your understanding of the source material" — domain judgment
 - "Navigate the auth flow as a new user and evaluate whether the steps are discoverable without documentation" — usability judgment
 - "Read the generated report and assess whether the relationship between X and Y is accurately represented" — interpretation judgment
+- "Use the incident timeline tool against the 2026-03-16 data and judge whether the correlated events tell a coherent story" — analytical judgment
+- "Read the generated guide as a new instructor and assess whether you could complete the setup without asking for help" — completeness judgment
 
 **For phases with no user-facing surface** (most foundational phases): there are typically no Popper UAT entries. Instead, the decision's falsification test is either an automated test requirement or a note that human verification is deferred to the phase where the experience exists. The `coherence-review` skill handles the human touchpoint for these phases — checking whether the foundations support the future UAT, not re-running tests by hand.
 
@@ -784,26 +819,50 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Design decisions in this phase:**
 
-### Decision 1: [Choice with user-facing implications]
-**Popper (your UAT):** Use the [feature/workflow] and evaluate whether
-[subjective quality the human must judge]. You should see [expected experience].
-If instead you see [unexpected experience], this decision about [X] was wrong.
-**Haraway:** Shaped by [perspective]. Benefits: [who]. Cost borne by: [who].
-Absent: [whose perspective wasn't consulted].
+### DR1: [Title declares the recommended decision]
 
-### Decision 2: [Choice with a degenerating signal]
-**Popper:** → **test-requirement** — write an integration test that [specific
-automated verification]. Added to test-requirements.md.
-**Lakatos: DEGENERATING** — [specific evidence: what workaround is required,
-which code outside this phase's scope needs modification, which later phase
-is made harder, or what existing capability is being duplicated and why].
+**Options considered:**
+- [Option A — the recommended choice]
+- [Option B]
+- [Option C, if applicable]
 
-### Decision 3: [Foundational choice — no user experience in this phase]
-**Popper:** Human verification deferred to Phase [M] (DR[N] back-reference).
-The automated guard is [test name/description] in test-requirements.md.
+**Counterarguments:**
+- [Option A]: [strongest argument against it]
+- [Option B]: [strongest argument against it]
 
-### Decision 4: [Routine choice — no Lakatos or Haraway needed]
-**Popper (your UAT):** [genuinely human-falsifiable interaction requiring judgment]
+**Recommendation:** [Option A] — [why, in one sentence].
+
+**This decision assumes:** [the assumption baked into the implementation]
+**To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
+**It's wrong if:** [the specific experience that shows the assumption failed your intent]
+
+**Haraway:** [only if someone bears an invisible cost — vendor lock-in, accessibility, data residency, etc.]
+**Lakatos:** [only if DEGENERATING — cite specific evidence of workaround/scope-leak]
+
+### DR2: [Choice with automatable verification]
+
+**Options considered:**
+- [...]
+
+**Recommendation:** [...]
+
+**Popper:** -> **test-requirement** — write [test type] test: `test_[name]` that [specific automated verification]. Added to test-requirements.md.
+**Lakatos: DEGENERATING** — [only if applicable, with specific evidence]
+
+### DR3: [Foundational choice — no user experience in this phase]
+
+**Options considered:**
+- [...]
+
+**Recommendation:** [...]
+
+**This decision assumes:** [assumption]
+**To shatter it:** Deferred to Phase [M] — the user-facing experience doesn't exist yet.
+**It's wrong if:** [what you'd see in Phase M that proves this foundation was wrong]
+*(Persisted to uat-requirements.md under Phase [M], back-reference DR3 from Phase [N])*
+
+### DR4: [Routine choice — no alternatives worth reviewing]
+**Popper:** -> **test-requirement** — `test_[name]`. Added to test-requirements.md.
 
 [Continue for all non-trivial decisions in this phase...]
 ```
@@ -819,10 +878,11 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
 - "Needs revision - [describe changes]"
 - "Other"
 
-8. **Task ND: Write phase file (if approved)**
+8. **Task ND: Write phase file and persist UAT entries (if approved)**
    - Mark task ND as in_progress
-   - Write to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
-   - Plan document contains ONLY the implementation tasks (no lens analysis, no verification findings)
+   - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
+   - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
+   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Generation below). Automatable entries go to test-requirements.md as before.
    - Mark task ND as completed, continue to next phase
 
 9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
