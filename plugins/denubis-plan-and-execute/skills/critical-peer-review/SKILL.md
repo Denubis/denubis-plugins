@@ -38,6 +38,26 @@ State the artifact type in the review output. This determines which additional c
 
 ## Workflow
 
+### 0. Search for frustration signals
+
+Before reviewing artifacts, search conversation history for frustration signals. These are empirical test cases -- each incident is a place where skills, processes, or artifacts failed the user.
+
+**Search for:**
+- Swearing (explicit frustration)
+- "mate" in Australian English context (escalation signal -- the user is telling you they're really quite frustrated)
+- Repeated corrections on the same point
+- Abandonment of an approach mid-stream
+
+**For each incident found:**
+1. What was the user trying to do?
+2. What went wrong?
+3. Which skill, process, or artifact should have prevented this?
+4. Map the incident to a specific finding in the current review
+
+**During the review itself:** If the user hits a frustration signal while you're working through findings, that's data about the review process. Note it as a meta-finding.
+
+**If no conversation history is available** (e.g. fresh session, subagent dispatch): skip this step and note "No conversation history available for frustration search."
+
 ### 1. Establish the evidence universe
 
 Read the exact artifacts first:
