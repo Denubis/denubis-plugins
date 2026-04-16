@@ -60,9 +60,9 @@ For each direct dependency, produce a falsifiable claim:
 5. For type stubs (`types-*`): verify the parent package is still used
 
 **Falsification means actively trying to break the claim.** Follow the evidence chain:
-- "It's imported" → Where? → Is that code reachable? → Is it tested? → Do the tests pass?
-- "It's a CLI tool" → Where is it invoked? → Is that invocation still in use?
-- "It's a pytest plugin" → Is it in `conftest.py` or `pyproject.toml [tool.pytest]`? → Do tests actually use its features?
+- "It's imported" -> Where? -> Is that code reachable? -> Is it tested? -> Do the tests pass?
+- "It's a CLI tool" -> Where is it invoked? -> Is that invocation still in use?
+- "It's a pytest plugin" -> Is it in `conftest.py` or `pyproject.toml [tool.pytest]`? -> Do tests actually use its features?
 
 #### Step 3: Present Findings
 
@@ -104,16 +104,16 @@ Filter to **direct dependencies only**. Transitive dependencies get upgraded thr
 #### Step 2: Sort by Risk
 
 Primary sort: **semver bump size** (smallest first)
-- Patch bumps (1.2.3 → 1.2.4): first
-- Minor bumps (1.2.0 → 1.3.0): second
-- Major bumps (1.0.0 → 2.0.0): last
+- Patch bumps (1.2.3 -> 1.2.4): first
+- Minor bumps (1.2.0 -> 1.3.0): second
+- Major bumps (1.0.0 -> 2.0.0): last
 
-Within each semver tier, order is not critical. Use TaskCreate to track every package individually — one task per package, updated as you go:
+Within each semver tier, order is not critical. For 3+ packages, use TaskCreate to track every package individually — one task per package, updated as you go. For 1-2 packages, task tracking is optional:
 
 ```
-- [ ] package-a (1.2.3 → 1.2.4) — patch
-- [ ] package-b (1.0.0 → 1.1.0) — minor
-- [ ] package-c (2.0.0 → 3.0.0) — major
+- [ ] package-a (1.2.3 -> 1.2.4) — patch
+- [ ] package-b (1.0.0 -> 1.1.0) — minor
+- [ ] package-c (2.0.0 -> 3.0.0) — major
 ```
 
 #### Step 3: Per-Package Upgrade Loop
@@ -162,7 +162,7 @@ Run the test command documented in CLAUDE.md. The full suite, not a subset.
 If tests **pass**:
 ```bash
 git add uv.lock docs/dependency-rationale.md
-git commit -m "chore: upgrade <package> <old> → <new>
+git commit -m "chore: upgrade <package> <old> -> <new>
 
 <classification>: <one-line summary of what changed>
 Files using this package: <list>
@@ -183,9 +183,9 @@ Mark the package as "reverted" in the task list with the reason.
 **3g. Note documentation updates.**
 
 If the changelog mentions:
-- New capabilities relevant to us → note for later
-- Deprecation warnings for APIs we use → create a follow-up task
-- Behaviour changes → verify our code handles the new behaviour
+- New capabilities relevant to us -> note for later
+- Deprecation warnings for APIs we use -> create a follow-up task
+- Behaviour changes -> verify our code handles the new behaviour
 
 #### Step 4: Summary
 
@@ -209,10 +209,10 @@ After all packages are processed, report:
 ## Red Flags — STOP
 
 If you find yourself reasoning any of these, you're rationalising:
-- "These three patches are safe, I'll batch them" → No. One at a time.
-- "I know what this package does, I don't need the changelog" → Read it anyway.
-- "The tests are slow, I'll run them at the end" → Run them every time.
-- "This transitive dep is outdated, I'll just bump it directly" → Upgrade the parent.
-- "I'll check for unused packages later" → Audit first. Don't upgrade dead weight.
-- "We're short on time, skip the audit" → Do fewer upgrades instead. The audit is faster than upgrading packages you'll remove.
-- "CLAUDE.md doesn't have a test command but I know it's pytest" → Stop. Document it first.
+- "These three patches are safe, I'll batch them" -> No. One at a time.
+- "I know what this package does, I don't need the changelog" -> Read it anyway.
+- "The tests are slow, I'll run them at the end" -> Run them every time.
+- "This transitive dep is outdated, I'll just bump it directly" -> Upgrade the parent.
+- "I'll check for unused packages later" -> Audit first. Don't upgrade dead weight.
+- "We're short on time, skip the audit" -> Do fewer upgrades instead. The audit is faster than upgrading packages you'll remove.
+- "CLAUDE.md doesn't have a test command but I know it's pytest" -> Stop. Document it first.

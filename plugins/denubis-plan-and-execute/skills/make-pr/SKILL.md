@@ -136,8 +136,8 @@ Stop. Do not proceed to push or PR creation.
 ## Step 5: Determine Base Branch and PR Details
 
 ```bash
-# Find base branch
-git merge-base HEAD main 2>/dev/null && echo "main" || echo "master"
+# Find base branch (test branch existence, not ancestry)
+git rev-parse --verify main 2>/dev/null && echo "main" || echo "master"
 ```
 
 Analyse the branch commits to draft PR title and body:

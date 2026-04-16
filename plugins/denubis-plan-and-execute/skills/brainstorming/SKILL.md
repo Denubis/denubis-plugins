@@ -40,33 +40,28 @@ flowchart TD
     Web([Internet])
     User([User])
 
-    P41["4.1 Codebase Investigation"]
-    G41{"GATE:<br>project state<br>understood?"}
-    P42["4.2 Understanding"]
-    G42{"GATE:<br>purpose, constraints,<br>criteria gathered?"}
-    P43["4.3 Exploration"]
-    G43{"GATE:<br>approach selected<br>by user?"}
-    P44["4.4 Design Presentation"]
-    G44{"GATE:<br>all sections<br>approved by user?"}
+    P1["Phase 1: Understanding"]
+    G1{"GATE:<br>purpose, constraints,<br>criteria gathered?"}
+    P2["Phase 2: Exploration"]
+    G2{"GATE:<br>approach selected<br>by user?"}
+    P3["Phase 3: Design Presentation"]
+    G3{"GATE:<br>all sections<br>approved by user?"}
 
-    CB -->|"patterns, existing code"| P41
-    P41 --> G41 --> P42
+    User -->|answers| P1
+    P1 -->|"one question at a time"| User
+    P1 --> G1 --> P2
 
-    User -->|answers| P42
-    P42 -->|"one question at a time"| User
-    P42 --> G42 --> P43
+    CB -->|patterns| P2
+    Web -->|"docs, practices"| P2
+    P2 -->|"2-3 approaches<br>with trade-offs"| User
+    User -->|selection| P2
+    P2 --> G2 --> P3
 
-    CB -->|patterns| P43
-    Web -->|"docs, practices"| P43
-    P43 -->|"2-3 approaches<br>with trade-offs"| User
-    User -->|selection| P43
-    P43 --> G43 --> P44
-
-    P44 -->|"sections, 200-300w each"| User
-    User -->|"approval or revision"| P44
-    P44 --> G44
-    G44 -->|revise| P44
-    G44 -->|"all approved"| Out(["Validated design →<br>5.0 Design Documentation"])
+    P3 -->|"sections, 200-300w each"| User
+    User -->|"approval or revision"| P3
+    P3 --> G3
+    G3 -->|revise| P3
+    G3 -->|"all approved"| Out(["Validated design →<br>Design Documentation"])
 ```
 
 **The terminal state is a validated design.** The ONLY next step after brainstorming is design documentation (Process 5.0). Do NOT invoke implementation skills, frontend-design, or EnterPlanMode from brainstorming.

@@ -27,6 +27,16 @@ A build fails. You change something without reading the error properly. It fails
 
 **If 3 fixes fail:** STOP and invoke `systematic-debugging`. The problem is deeper than you thought.
 
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Design plan** | The document in `docs/design-plans/` describing *what* to build and *why* (output of brainstorming/design process) |
+| **Implementation plan** | The document(s) in `docs/implementation-plans/` describing *how* to build it (output of writing-implementation-plans) |
+| **Phase** | A numbered unit of implementation work (e.g. Phase 1, Phase 2). Each phase has its own file (`phase_01.md`) and contains multiple tasks |
+| **Task** | A single unit of work within a phase, executed by a subagent (task-implementor) |
+| **Stage** | A mandatory workflow step outside the phase numbering (e.g. post-implementation cleanup, post-acceptance) |
+
 ## Overview
 
 **When NOT to use:**
@@ -747,6 +757,8 @@ All remaining work is tracked in the task list with absolute paths. The git hist
 Suggest: /clear then paste this to resume:
 
 ---
+/session-naming
+
 /executing-an-implementation-plan
 
 Plan directory: [absolute path to implementation plan directory]

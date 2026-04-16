@@ -29,7 +29,7 @@ Three lenses, each asking a different question:
 - Popper, K. (1963). *Conjectures and Refutations*. Routledge. — Falsifiability as demarcation; a claim that cannot be tested is not a useful claim.
 - Lakatos, I. (1978). *The Methodology of Scientific Research Programmes*. Cambridge University Press. — Hard core (protected assumptions) vs protective belt (adjustable auxiliaries); progressive programmes predict new facts, degenerating ones only accommodate old ones.
 - Haraway, D. (1988). Situated Knowledges. *Feminist Studies*, 14(3), 575–599. — All knowledge is partial and situated; objectivity requires naming the perspective, not claiming none.
-- See also: Kudina, O., Ballsun-Stanton, B., & Alfano, M. (2025). The use of large language models as scaffolds for proleptic reasoning. *Asian Journal of Philosophy*, 4, 24. DOI: 10.1007/s44204-025-00247-1
+- See also: Kudina, O., Ballsun-Stanton, B., & Alfano, M. (2025). The use of large language models as scaffolds for proleptic reasoning. *Asian Journal of Philosophy*, 4, 24. https://doi.org/10.1007/s44204-025-00247-1
 
 ## When to Use
 
