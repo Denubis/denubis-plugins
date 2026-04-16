@@ -247,6 +247,13 @@ You MUST complete each phase before proceeding to the next.
    - Ask for help
    - Research more
 
+6. **When You DO Know — Present, Don't Deflect**
+   - If you have diagnostic evidence sufficient to answer a question (logs, telemetry, profiling output, stack traces), **present your analysis as a defended argument**.
+   - Use Toulmin structure: claim ("The bottleneck is X"), evidence ("telemetry shows Y"), warrant ("this indicates Z because..."), anticipated critique ("the main counterargument is W").
+   - Do NOT present evidence and ask the human to draw the conclusion. Do NOT ask questions you can answer from available data.
+   - Deflecting an answerable question wastes the human's time and signals you are not engaging with the evidence.
+   - This complements step 4's "wait for human feedback" — step 4 applies when your prediction was falsified and you need the human's perspective. Step 6 applies when the evidence is clear and you should present your analysis.
+
 ### MANDATORY: Context Clear Before Hypothesis Testing
 
 **Why:** The same context that generated the hypothesis also tests it, creating confirmation bias. A fresh context forces hypothesis testing to start from evidence, not from the framing of the generation phase.
@@ -575,6 +582,15 @@ Multiple contributing factors, not a single "root cause."]
    - Are we "sticking with it through sheer inertia"?
    - Should we refactor architecture vs. continue fixing symptoms?
 
+6. **If Problems Are Cascading Across Branches or Locations: STOP IMMEDIATELY**
+
+   **Pattern indicating cascading failure:**
+   - A fix in branch/module A breaks something in branch/module B
+   - Fixing B then breaks something in C
+   - The blast radius is expanding with each fix attempt
+
+   **This is not a 3-failure-count situation — this is an emergency stop.** Revert to the last known good state across ALL affected branches before investigating further. Do not attempt fixes while the blast radius is growing. The problem is structural and each fix is making it worse.
+
    **Discuss with your human partner before attempting more fixes**
 
    This is NOT a failed hypothesis - this is a wrong architecture.
@@ -626,7 +642,7 @@ If you catch yourself thinking:
 
 **ALL of these mean: STOP. Return to Phase 1.**
 
-**If 3+ fixes failed:** Question the architecture (see Phase 4.5)
+**If 3+ fixes failed:** Question the architecture (see Phase 4, step 5)
 
 ## Your Human Partner's Signals You're Doing It Wrong
 
@@ -636,6 +652,7 @@ If you catch yourself thinking:
 - "Stop guessing" - You're proposing fixes without understanding
 - "Ultrathink this" - Question fundamentals, not just symptoms
 - "We're stuck?" (frustrated) - Your approach isn't working
+- "You tell me" - You deflected a question you had the data to answer. Present your analysis as an argument (see Phase 3, step 6).
 - "Mate" - Your human partner is frustrated. Stop, acknowledge, course-correct.
 - "Overclaiming" / "that's not confirmed" - Your evidence grade doesn't match your language. Downgrade and recheck.
 
