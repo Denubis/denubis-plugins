@@ -1,6 +1,7 @@
 ---
 name: syncing-with-upstream
 description: Use when integrating changes from upstream ed3d-plugins into this fork - handles the ed3d->denubis rename, conflict resolution, and merge workflow
+user-invocable: true
 ---
 
 # Syncing with Upstream
@@ -103,7 +104,7 @@ feat: merge upstream [feature name] (<commit-hash>)
 
 Upstream commit: <full-hash>
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
 ```
