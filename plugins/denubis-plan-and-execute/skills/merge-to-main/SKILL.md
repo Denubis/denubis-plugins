@@ -15,6 +15,17 @@ Merge the current feature branch to main after verifying all test gates pass, th
 
 ## Step 1: Preflight Checks
 
+### Merge policy opt-in (check first)
+
+```bash
+# Check for project-level merge policy
+cat .ed3d/merge-policy 2>/dev/null
+```
+
+**If `.ed3d/merge-policy` does not exist:** Stop. Direct merge to main requires project-level opt-in. Use `/make-pr` instead to create a pull request. If the project intentionally uses direct merge (e.g. single-developer repo, no PR workflow), create `.ed3d/merge-policy` with a one-line explanation of why.
+
+### Branch and state checks
+
 ```bash
 # Must not already be on main/master
 current=$(git branch --show-current)
