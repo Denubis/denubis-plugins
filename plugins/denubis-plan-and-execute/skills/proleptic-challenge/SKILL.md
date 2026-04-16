@@ -76,16 +76,25 @@ Before proceeding, here are counterarguments to consider:
 When ready, let me know how you'd like to proceed.
 ```
 
+## Presenting Findings: No Pre-Filtering
+
+**Present ALL counterarguments to the human.** Do not dismiss, downgrade, or filter findings on the human's behalf. "I think this one is fine" is not dismissal — it is the orchestrator overriding the challenge process.
+
+If the challenger found it worth raising, it goes to the human. The human decides what to dismiss.
+
 ## After Human Responds
 
 | Human Response | Action |
 |----------------|--------|
-| Dismisses concerns with reasoning | Proceed to next step |
+| Dismisses with cited evidence | Proceed. Evidence = specific file, design plan section, or test that refutes the concern |
 | Addresses concerns by adjusting proposal | Update proposal, then proceed |
 | Acknowledges tradeoff and proceeds | Proceed with noted risk |
 | Identifies new issues | Discuss further, do NOT proceed until resolved |
+| Dismisses without evidence | Ask for evidence. "Which file/test/design section refutes this?" |
 
 **DO NOT proceed automatically.** Wait for human response.
+
+**Dismissal requires evidence.** A dismissed concern must cite the specific code (`file::symbol`), design plan section, or test that makes the concern inapplicable. "I've already considered this" or "that's not relevant" without a citation is not sufficient — ask what specifically refutes it.
 
 ## The "Drunk Tutor" Framing
 
@@ -104,6 +113,7 @@ Both the proposal AND the counterarguments may be flawed:
 | "Design is simple, no need for counterarguments" | Simple designs can have hidden assumptions. |
 | "We're running behind, skip this step" | Skipping now = fixing later at higher cost. |
 | "Counterarguments seem weak, don't present" | Human judges strength, not you. Present them. |
+| "This concern doesn't apply" | Cite the specific code or design section that refutes it, or present it. |
 | "User already addressed these concerns" | Present anyway. Fresh eyes may see new angles. |
 | "This is just busywork" | Forcing evaluation prevents premature consensus. |
 
