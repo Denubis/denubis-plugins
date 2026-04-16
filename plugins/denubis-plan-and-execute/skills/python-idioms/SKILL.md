@@ -5,7 +5,35 @@ description: Use when writing Python code - covers Python 3.14+ patterns, t-stri
 
 # Python Idioms
 
-**Assumes Python 3.14+.** Document fallback patterns where needed for older versions.
+**Assumes Python 3.14+** unless project CLAUDE.md says otherwise. **Check `python --version` before assuming 3.14 features are available** -- some projects (e.g. vllm) require 3.12.
+
+## Version Compatibility
+
+| PEP | Feature | Min Version | Syntax change? |
+|-----|---------|-------------|----------------|
+| 695 | Type parameter syntax (`def f[T]()`) | 3.12 | Yes |
+| 701 | F-string nesting, backslashes, comments | 3.12 | Relaxation |
+| 696 | Type parameter defaults (`class Foo[T = str]`) | 3.13 | Yes |
+| 649 | Deferred annotation evaluation | 3.14 | No |
+| 750 | Template strings (`t"..."`) | 3.14 | Yes |
+| 758 | Except without parentheses | 3.14 | Yes |
+| 765 | SyntaxWarning for return/break/continue in finally | 3.14 | Restriction |
+
+## Tooling
+
+**Use `uv run` for all tooling** unless project CLAUDE.md says otherwise. Never `.venv/bin/X` or `python -m X`.
+
+```bash
+# Good
+uv run ruff check .
+uv run pytest
+uv run ty check
+
+# Bad
+.venv/bin/ruff check .
+python -m ruff check .
+python -m pytest
+```
 
 ## Type Annotations
 
@@ -39,7 +67,38 @@ result = some_library_call()  # type: ignore[no-untyped-call]
 - Always add TODO with timeline
 - Check on every `uv sync --upgrade` if still needed
 
-### Deferred Annotations (PEP 649)
+### Type Parameter Syntax (PEP 695, 3.12+)
+
+```python
+# Good: inline type parameters
+def first[T](items: list[T]) -> T:
+    return items[0]
+
+class Stack[T]:
+    def push(self, item: T) -> None: ...
+    def pop(self) -> T: ...
+
+# Type alias with the type statement
+type Vector[T] = list[T]
+
+# Old style (avoid in 3.12+)
+from typing import TypeVar
+T = TypeVar("T")
+def first(items: list[T]) -> T: ...
+```
+
+### Type Parameter Defaults (PEP 696, 3.13+)
+
+```python
+# Default type parameter
+class Response[T = dict]:
+    data: T
+
+r = Response()       # T defaults to dict
+r2 = Response[str]()  # T is str
+```
+
+### Deferred Annotations (PEP 649, 3.14+)
 
 Forward references work without quotes in 3.14+:
 
@@ -206,6 +265,46 @@ f.close()  # may not run on exception
 ```
 
 Never rely on `__del__` for cleanup - garbage collection timing is unpredictable.
+
+## Exception Handling
+
+### Except Without Parentheses (PEP 758, 3.14+)
+
+```python
+# Good (3.14+): no parentheses needed without as
+except KeyError, ValueError:
+    handle_error()
+
+# Required: parentheses WITH as binding
+except (KeyError, ValueError) as e:
+    handle_error(e)
+
+# Still valid: parentheses always work
+except (KeyError, ValueError):
+    handle_error()
+
+# Pre-3.14: parentheses always required
+except (KeyError, ValueError):
+    handle_error()
+```
+
+### Finally Block Restrictions (PEP 765, 3.14+)
+
+```python
+# Bad (3.14 SyntaxWarning): return/break/continue exiting finally
+def risky():
+    try:
+        return compute()
+    finally:
+        return default  # silently swallows exceptions -- now warns
+
+# Good: let finally clean up, don't exit from it
+def safe():
+    try:
+        return compute()
+    finally:
+        cleanup()  # runs, then original return proceeds
+```
 
 ## Iteration Patterns
 
