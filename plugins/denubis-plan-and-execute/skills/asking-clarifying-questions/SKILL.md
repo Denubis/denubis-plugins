@@ -150,7 +150,31 @@ User says "should follow pattern Y" -> Ask: Which aspect?
 
 **Use open-ended questions** for understanding "why" - allows user to explain context.
 
-### 4. Version and API Specifics
+### 4. Scale and Capacity
+
+When the design involves users, records, or requests, ask about expected scale. Missing this causes "uhhh, mate. 1800 students"-type surprises mid-implementation.
+
+**Ask:**
+- How many users/records/requests are expected?
+- What are current limits or quotas?
+- What growth is expected (timeframe)?
+- Are there burst/peak patterns (e.g. semester start, batch processing)?
+
+**Examples:**
+
+User says "build a dashboard for students" -> Ask: How many students?
+- 30 (one class — simple queries, no pagination needed)
+- 1800 (one cohort — pagination, indexing, query optimisation matter)
+- 50,000 (institution-wide — caching, async loading, database design all critical)
+
+User says "process submissions" -> Ask: What volume?
+- 10/day (synchronous processing fine)
+- 1000/hour (need queue, background workers)
+- Burst of 500 in 5 minutes (need rate limiting, backpressure)
+
+**Scale determines architecture.** A solution for 30 users and a solution for 50,000 users are different systems. Clarify this before any design work.
+
+### 5. Version and API Specifics
 
 When user mentions external services or libraries, verify current state.
 
@@ -174,7 +198,7 @@ User says "use React Router" -> Check:
 
 **Don't do deep research** - save that for brainstorming. Just verify basics.
 
-### 5. Definition of Done (Required Final Step)
+### 6. Definition of Done (Required Final Step)
 
 **Before handing off to brainstorming, you MUST establish the Definition of Done.**
 
