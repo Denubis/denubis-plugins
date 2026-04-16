@@ -256,23 +256,30 @@ If the file exists, note its **absolute path** for use during final review. The 
 
 **Session naming:** After discovering phases, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the implementation plan context.
 
-### 2. Create Phase-Level Task List
+### 2. Create Task List for Current Phase Only
 
-Use TaskCreate to create **three task entries per phase**. Include the title from the header:
+**The task list does NOT persist across /clear.** Create tasks for the current phase only -- never all phases upfront.
+
+**Source of truth:**
+- **Overall progress:** Plan files on disk + resume prompt (which phase you're on)
+- **Current phase progress:** Task list (what's done within this phase)
+
+Use TaskCreate to create tasks for the current phase:
 
 ```
-- [ ] Phase 1a: Read /absolute/path/to/phase_01.md — Document Infrastructure Implementation Plan
-- [ ] Phase 1b: Execute tasks
-- [ ] Phase 1c: Code review
-- [ ] Phase 2a: Read /absolute/path/to/phase_02.md — API Integration
-- [ ] Phase 2b: Execute tasks
-- [ ] Phase 2c: Code review
-...
+- [ ] Phase Na: Read /absolute/path/to/phase_0N.md -- [Phase Title]
+- [ ] Phase Nb: Execute tasks
+- [ ] Phase Nc: Code review
+- [ ] Prepare for next phase (or invoke final review if last phase)
 ```
 
-**Why absolute paths in task entries:** After compaction, context may be summarized. The absolute path in the task entry ensures you always know exactly which file to read.
+**Why absolute paths in task entries:** After compaction, context may be summarised. The absolute path in the task entry ensures you always know exactly which file to read.
 
-**Why include the title:** Gives visibility into what each phase covers without loading full content.
+**Why include the title:** Gives visibility into what this phase covers without loading full content.
+
+**After each phase completes:** Create a fresh task list for the next phase. The previous phase's tasks are done and no longer needed.
+
+**On last phase:** The final task is "Invoke post-implementation stages and final review" instead of "Prepare for next phase."
 
 ### 3. Execute Each Phase
 
@@ -778,7 +785,7 @@ Code review → Proleptic → Coherence review → Measure → Assess → [Gate]
 
 | Condition | Action |
 |-----------|--------|
-| No complex cross-phase state accumulated (no mid-plan decisions, workarounds, or unresolved concerns) | Suggest `/clear` — task list has remaining phases with absolute paths, git has the work, SessionStart hook re-injects skill context |
+| No complex cross-phase state accumulated (no mid-plan decisions, workarounds, or unresolved concerns) | Suggest `/clear` — resume prompt has everything needed to create a fresh task list for the next phase |
 | Cross-phase decisions, constraints, or workarounds were discovered that aren't captured in task descriptions or commits | Suggest `/compact` with preservation instructions |
 | First phase just completed (minimal context used) | Skip — not worth the interruption yet |
 
@@ -789,7 +796,7 @@ Construct a resume prompt the user can paste after `/clear`. It must be self-con
 ```
 Phase N complete and committed. Context is heavy from subagent output and review cycles.
 
-All remaining work is tracked in the task list with absolute paths. The git history has everything.
+The git history has everything. The resume prompt below is self-contained -- it has all the information needed to create a fresh task list for the next phase.
 
 Suggest: /clear then paste this to resume:
 
@@ -801,15 +808,16 @@ Suggest: /clear then paste this to resume:
 Plan directory: [absolute path to implementation plan directory]
 Completed phases: 1 through N
 Next phase: N+1 of M
+Total phases: M
 Working directory: [absolute worktree path]
 Implementation guidance: [absolute path, or "none"]
 Test requirements: [absolute path, or "none"]
 
-The task list has remaining phases with absolute paths. Check it with TaskList.
+Create a fresh task list for Phase N+1 using the plan file at [absolute path to phase file].
 ---
 
-This gives a fresh context window. The SessionStart hook will re-inject skill context,
-and the task list persists across /clear.
+This gives a fresh context window. The SessionStart hook will re-inject skill context.
+The task list does NOT persist across /clear -- the resume prompt is the bridge.
 ```
 
 **When suggesting `/compact`:**
@@ -819,7 +827,7 @@ Phase N complete. Context is heavy but there's cross-phase state worth preservin
 - [list what needs preserving: decisions, constraints, workarounds]
 
 Suggest: /compact Preserve: (1) implementation plan path: [path], (2) current phase: N of M,
-(3) [specific decisions/constraints to preserve], (4) task list has remaining phases.
+(3) [specific decisions/constraints to preserve], (4) next phase: N+1 of M, create fresh task list.
 Discard: all subagent output, review details, and fix cycle content — work is committed.
 ```
 
@@ -827,7 +835,9 @@ Discard: all subagent output, review details, and fix cycle content — work is 
 
 #### 3f. Move to Next Phase
 
-Proceed to the next phase's "Read" step. Repeat 3a-3e for each phase.
+Create a fresh task list for the next phase (same structure as section 2), then proceed to the next phase's "Read" step. Repeat 3a-3f for each phase.
+
+**On last phase:** Skip task list creation and proceed to section 4 (Post-Implementation Stages).
 
 ### 4. Post-Implementation Stages (Mandatory)
 
@@ -1021,19 +1031,12 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Read first 3 lines of each to get titles]
 [Phase 1: infrastructure, Phase 2: functionality, Phase 3: functionality]
 
-[Create tasks with TaskCreate:]
-- [ ] Phase 1a: Read /path/to/phase_01.md — Project Setup
+[Create tasks for Phase 1 only:]
+- [ ] Phase 1a: Read /path/to/phase_01.md -- Project Setup
 - [ ] Phase 1b: Execute tasks
 - [ ] Phase 1c: Code review + verification
 - [ ] Phase 1d: Refactor
-- [ ] Phase 2a: Read /path/to/phase_02.md — Token Service
-- [ ] Phase 2b: Execute tasks
-- [ ] Phase 2c: Code review + verification
-- [ ] Phase 2d: Refactor
-- [ ] Phase 3a: Read /path/to/phase_03.md — Extraction UI
-- [ ] Phase 3b: Execute tasks
-- [ ] Phase 3c: Code review + verification
-- [ ] Phase 3d: Refactor
+- [ ] Prepare for Phase 2
 
 --- Phase 1 (infrastructure → coherence review) ---
 
@@ -1072,10 +1075,17 @@ You: I'm using the `executing-an-implementation-plan` skill.
 --- Context management ---
 
 [Phase 1 complete, context heavy from subagent output]
-[No cross-phase state — suggest /clear]
-[User runs /clear, resumes with "Continue executing the implementation plan"]
+[No cross-phase state -- suggest /clear with self-contained resume prompt]
+[User runs /clear, pastes resume prompt]
 
---- Phase 2 (functionality, no Popper UAT entries → coherence review) ---
+--- Phase 2 (functionality, no Popper UAT entries -> coherence review) ---
+
+[Create fresh task list for Phase 2:]
+- [ ] Phase 2a: Read /path/to/phase_02.md -- Token Service
+- [ ] Phase 2b: Execute tasks
+- [ ] Phase 2c: Code review + verification
+- [ ] Phase 2d: Refactor
+- [ ] Prepare for Phase 3
 
 [Mark 2a in_progress, read phase_02.md]
 → Phase Type: functionality. Contains 3 tasks: types, service, tests
