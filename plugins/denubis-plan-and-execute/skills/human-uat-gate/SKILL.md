@@ -34,15 +34,27 @@ Invoke the UAT gate:
 
 ### Step 1: Locate Falsification Tests
 
-Find the Popper falsification tests from the implementation plan — these are the "**Popper (your UAT):**" entries that describe human interactions requiring judgment. They define what the human should be able to experience and evaluate.
+Find the Popper falsification tests from `uat-requirements.md` in the implementation plan directory. These contain the persisted human-judgment entries generated during planning, using the format:
+
+```
+**This decision assumes:** [assumption]
+**To shatter it:** [human interaction]
+**It's wrong if:** [failure experience]
+```
 
 **Sources (in order of preference):**
-- Implementation plan's Popper falsification tests (primary — these ARE the UAT)
+- `uat-requirements.md` in the implementation plan directory (primary — these ARE the UAT)
 - Design document's Definition of Done
 - For design work: Phase 3 of starting-a-design-plan
 - For features: Requirements from the original request
 
-If no formal falsification tests exist, construct them from the acceptance criteria. Every UAT item must describe a human interaction where judgment is required — not a command to run and output to compare.
+If `uat-requirements.md` doesn't exist or has no entries for this phase, construct falsification tests from the acceptance criteria. Apply the **Carnap quality rubric** — every entry must have:
+
+1. **What the human does** — an action pursuing the design objective, not inspection
+2. **What they're judging** — a subjective quality only a human can evaluate
+3. **What failure looks like** — a concrete experience proving the decision wrong
+
+**Reject tautological entries.** If a proposed UAT item reduces to "run X, see Y" or "check that Z is present," it belongs in test-requirements.md as an automated test, not here. Apply the anti-smuggling tests: (1) **Decomposition** — if the mechanism is automatable, the entry must be about the surface alone; (2) **Reduction** — if each step could be an automated assertion, it's an integration test by hand; (3) **Disagreement** — the "It's wrong if" must describe something two reasonable people could disagree about.
 
 ### Step 2: Present UAT to Human
 
@@ -53,13 +65,13 @@ Code review passed. Automated tests cover correctness. Below: items where your j
 
 ### Interact and Evaluate
 
-- [ ] **Try:** [Human interaction — use the UI, run the workflow, read the output]
-  **Judge:** [What requires human assessment — does it make sense? Is the workflow natural? Does the output look right for the domain?]
-  **If wrong:** [What you'd expect to see instead, and what that would mean about the design]
+- [ ] **This decision assumes:** [the assumption from uat-requirements.md]
+  **To shatter it:** [use the built thing for its intended purpose]
+  **It's wrong if:** [the specific experience that shows it failed]
 
-- [ ] **Try:** [Another interaction]
-  **Judge:** [What requires human assessment]
-  **If wrong:** [What that would mean]
+- [ ] **This decision assumes:** [another assumption]
+  **To shatter it:** [another interaction]
+  **It's wrong if:** [another failure experience]
 ...
 
 ### Probe These Boundaries
@@ -118,7 +130,7 @@ UAT rejected
 
 | Workflow Stage | Where to Find Tests |
 |----------------|---------------------|
-| Implementation phase | **Popper (your UAT)** entries in the implementation plan (primary source) |
+| Implementation phase | `uat-requirements.md` in the implementation plan directory (primary source) |
 | Design completion | Definition of Done from Phase 3 of starting-a-design-plan |
 | Feature completion | Original user request + any clarifications |
 | Bug fix | "Bug is fixed when [specific behavior] works — verify by [action]" |

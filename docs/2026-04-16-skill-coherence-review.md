@@ -455,7 +455,7 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 
 ### Remaining — needs implementation
 
-- **H12**: Popper system redesign (pipeline, quality rubric, template, persistence) -- see updated H12 section above (in progress, separate thread)
+- ~~**H12**: Popper system redesign~~ DONE — uat-requirements.md persistence, Carnap quality rubric, falsification template ("assumes/shatter/wrong if"), decision record template (DR format with options+counterarguments), three anti-smuggling tests (decomposition, reduction, disagreement). Touched: writing-implementation-plans, human-uat-gate, executing-an-implementation-plan
 - **M25**: Rename worker skills to {parent}-{action} (do LAST)
 
 ### Completed — structural changes (sessions 3-4)

@@ -724,19 +724,29 @@ Make the strongest claim the decision implies, then try to shatter it:
 
 The developer uses the system for its purpose and asks: does this match what I meant? The gap between intent and result is the falsification.
 
+**Three anti-smuggling tests — apply to EVERY proposed UAT entry:**
+
+1. **Decomposition test:** Separate the mechanism from the surface. If the mechanism ("Stytch prevents re-auth") can be proven wrong by automated test, the UAT entry must be about the surface alone ("the rejection experience makes sense to a student") — not the mechanism wearing a UX hat. If the surface judgment is trivial once the mechanism is verified, there is no UAT entry.
+
+2. **Reduction test:** If each step in a multi-step scenario could be verified by an automated test in isolation, the scenario is an integration test the human is running by hand. Automate it. "Run the CLI, then switch to the browser, then watch the tabs" looks complex but each step is an assertion.
+
+3. **Disagreement test:** The "It's wrong if" must describe something two reasonable people could disagree about. If every observer would reach the same verdict ("the page shows an error" / "the row is missing"), it's an automated check, not a judgment. This kills "feels" padding — "timing feels unreliable" is either measurable (automate it) or genuinely subjective (keep it, but say what "unreliable" looks like).
+
 **A bad Popper entry restates what automated tests verify:**
 - "Run the validator and see it validates" — that's a unit test
 - "Call the endpoint and see 200 OK" — that's an integration test
 - "Run `uv sync` and see no errors" — that's a build check
 - "Check the database for the new row" — that's an assertion
 - "Verify the button appears when sharing is enabled" — if a boolean controls visibility, test the boolean
+- "Run the ban command and observe the full workflow" — multi-step integration test (fails reduction test)
+- "Attempt to log in as a banned user and evaluate the rejection experience" — automatable core with UX wrapper (fails decomposition test: "Stytch prevents re-auth" is a test; "experience makes sense" is only genuine if the automated test can't cover it)
 
 **A good Popper entry describes something only a human can judge:**
-- "Use the extraction workflow on chapter 3 and assess whether the entries match your understanding of the source material" — domain judgment
-- "Navigate the auth flow as a new user and evaluate whether the steps are discoverable without documentation" — usability judgment
+- "Use the extraction workflow on chapter 3 and assess whether the entries match your understanding of the source material" — domain judgment (fails no anti-smuggling test: no automated test can verify domain accuracy)
+- "Navigate the auth flow as a new user and evaluate whether the steps are discoverable without documentation" — usability judgment (reasonable people would disagree about "discoverable")
 - "Read the generated report and assess whether the relationship between X and Y is accurately represented" — interpretation judgment
 - "Use the incident timeline tool against the 2026-03-16 data and judge whether the correlated events tell a coherent story" — analytical judgment
-- "Read the generated guide as a new instructor and assess whether you could complete the setup without asking for help" — completeness judgment
+- "Read the generated guide as a new instructor and assess whether you could complete the setup without asking for help" — completeness judgment (the mechanism "headings exist" is automatable; the surface "I could follow this without help" is genuinely subjective)
 
 **For phases with no user-facing surface** (most foundational phases): there are typically no Popper UAT entries. Instead, the decision's falsification test is either an automated test requirement or a note that human verification is deferred to the phase where the experience exists. The `coherence-review` skill handles the human touchpoint for these phases — checking whether the foundations support the future UAT, not re-running tests by hand.
 
