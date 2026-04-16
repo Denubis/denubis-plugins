@@ -455,12 +455,8 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 
 ### Remaining — needs implementation
 
-- **H7**: Citation requirement for architecture docs
-- **H12**: Popper system redesign (pipeline, quality rubric, template, persistence) -- see updated H12 section above
-- **H2a**: Research and build DoD rubric
-- **H2b** (blocked by H2a): Remove DoD from asking-clarifying-questions
+- **H12**: Popper system redesign (pipeline, quality rubric, template, persistence) -- see updated H12 section above (in progress, separate thread)
 - **M25**: Rename worker skills to {parent}-{action} (do LAST)
-- Critical-peer-review: "all findings to human" rule added but needs version bump/changelog at end
 
 ### Completed — structural changes (sessions 3-4)
 
@@ -474,6 +470,10 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 - **M3**: Orchestrator acceptance rubric (tests ran, verification evidence, commit hash)
 - **M8**: Two mandatory stages (post-implementation cleanup + post-acceptance ADR promotion)
 - **M24**: Split critical-peer-review checklists into progressive disclosure (5 checklist files)
+
+- **H7**: Citation requirement — `(file::symbol, commit_hash)` parenthetical citations in DFD, database, state templates + SKILL.md enforcement
+- **H2a**: DoD quality rubric — three tests (observable, falsifiable, scoped) + anti-patterns + downstream consumption
+- **H2b**: Removed duplicate DoD section from asking-clarifying-questions, fixed phase number references (Phase 3 -> Phase 4)
 
 ### Completed — smaller edits (this session, uncommitted)
 
@@ -500,6 +500,40 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 
 - **M17**: Create using-research-agents skill (new file needed)
 - **M25**: Rename convention (LAST)
+
+### Session 5 — Audit + Real-Plan Testing
+
+**Audit of other session's work:** 4 parallel subagents read actual files. All implementations match agreed designs except:
+- H1 frontmatter still said "major features" — fixed (commit a27a023)
+- M8 Stage 2 positioned before Section 5 (Final Review) despite prose saying "after" — fixed (commit 5f2bf29)
+- H2a missing citations and rejection mechanism — fixed (commit bc4e691)
+- M3 acceptance rubric missing TDD evidence row — fixed (commit 6ac00fd)
+
+**Real-plan testing against PGT corpus:**
+
+DoD rubric (5 plans, 34 entries): 53% correctly accepted, 24% correctly flagged, 9% over-rejected, 15% under-flagged. Three carve-outs needed: test baselines with specific counts, migration DoDs naming mechanisms, performance/regression claims.
+
+Popper sort (4 plans): Works. Most valuable for weak plans. Export Queue 402 independently invented uat-requirements.md. Three things currently lost: file-upload rendering quality, multi-doc-tabs usability, ban-user suspension experience.
+
+Acceptance rubric (3 plans): 40% false rejection rate. Rubric assumes every task is TDD-able. Real plans have test-only, config, migration, documentation, diagnostic tasks. Needs task-type-aware gating.
+
+**New issues from melica session analysis:**
+- H15: Consumer-tracing requirement (every new function must state its call site)
+- H16: Proleptic dismissal requires cited evidence, not reasoning
+- H17: Task-type-aware gating for acceptance rubric
+- H18: DoD rubric carve-outs from real-plan testing
+
+### Remaining tasks
+
+| Task | Description | Status |
+|------|-------------|--------|
+| H12 | Popper system redesign | In progress (separate session) |
+| H15 | Consumer-tracing in writing-implementation-plans | Pending |
+| H16 | Proleptic dismissal requires evidence | Pending |
+| H17 | Task-type-aware acceptance rubric | Pending |
+| H18 | DoD rubric carve-outs | Pending |
+| M25 | Rename worker skills to {parent}-{action} | Pending (LAST) |
+| L8, L12 | Minor fixes not yet verified | Pending |
 
 ## Cross-Cutting Themes Identified
 
