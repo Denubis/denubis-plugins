@@ -450,6 +450,13 @@ Before creating the Finalization task, check if `.ed3d/implementation-plan-guida
       → blocked by: all Phase *D tasks
 ```
 
+**After Finalization, create Test Requirements task:**
+
+```markdown
+- [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
+      → blocked by: Finalization
+```
+
 **Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth-99.md`:**
 
 ```
