@@ -900,18 +900,6 @@ If architecture docs exist (`docs/architecture/`), update them to reflect what w
 
 For decisions made during implementation that were not in the design plan, create ADR files in `docs/architecture/decisions/` with status `Proposed`. These capture the "why" behind implementation choices the design didn't specify.
 
-#### Stage 2: Post-Acceptance
-
-After final review and UAT/coherence review pass:
-
-**4d. ADRs Proposed -> Accepted:**
-
-Any ADRs created in Stage 1 move from `Proposed` to `Accepted` with a timestamp. The implementation is now the accepted approach.
-
-**4e. Final citation pass:**
-
-Architecture docs get a final citation pass -- all citations now point to accepted, reviewed code rather than in-progress work.
-
 ### 5. Final Review Sequence
 
 After all phases complete, run a sequence of specialized agents:
@@ -1022,7 +1010,19 @@ Announce: "Human test plan written to `docs/test-plans/[impl-plan-dir-name].md`"
 
 **Critical peer review:** After all phases are implemented and reviewed, invoke `denubis-plan-and-execute:critical-peer-review` to subject the completed implementation to falsification-first analysis before declaring completion.
 
-### 6. Complete Development
+### 6. Post-Acceptance (Stage 2)
+
+**Only after Section 5 passes — final review complete, UAT/coherence review passed.**
+
+**6a. ADRs Proposed -> Accepted:**
+
+Any ADRs created in Stage 1 (section 4c) move from `Proposed` to `Accepted` with a timestamp. The implementation is now the accepted approach.
+
+**6b. Final citation pass:**
+
+Architecture docs get a final citation pass — all citations now point to accepted, reviewed code rather than in-progress work.
+
+### 7. Complete Development
 
 After final review passes:
 
