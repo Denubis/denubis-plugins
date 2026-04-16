@@ -36,11 +36,15 @@ flowchart LR
 | [Name] | N.1 | [What it does] | [File path or "leaf process"] |
 | [Name] | N.2 | [What it does] | [File path or "leaf process"] |
 
+> **Citation rule:** Every process description must cite the code that implements it — e.g., "Validates incoming webhook payloads (`src/webhooks/validator.py::validate_payload`, `a1b2c3d`)" or cite the design plan if not yet implemented.
+
 ## Data Stores
 
 | Store | Description | Read by | Written by |
 |-------|-------------|---------|------------|
 | [Name] | [What it holds] | [Process numbers] | [Process numbers] |
+
+> **Citation rule:** Each data store must cite its backing implementation — e.g., database table (`migrations/003_create_events.sql::events`, `d4e5f6a`) or in-memory structure (`src/cache.py::EventCache`, `b1c2d3e`).
 
 ## Inputs and Outputs
 

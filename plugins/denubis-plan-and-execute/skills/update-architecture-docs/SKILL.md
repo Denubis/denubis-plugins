@@ -109,6 +109,31 @@ For each doc type, scan the input artifact for context signals. If a signal is f
 2. If a signal is found, read the existing architecture doc for that type and check the corresponding atomic units
 3. If a contradiction pattern matches, HALT immediately — do not continue to the proposal step
 
+## Citation Requirement
+
+Every factual claim about the system in architecture documentation must include a parenthetical citation: `(file::symbol, commit_hash)`.
+
+**Format:** `(path/to/file.py::SymbolName, abc1234)` where:
+- `file::symbol` identifies the source — file path and class, function, or variable name
+- `commit_hash` is the short SHA where the cited content was established or last verified
+- No line numbers — they shift. File + symbol is durable and greppable
+
+**Examples:**
+- "Orders transition from pending to confirmed when payment succeeds (`src/models/order.py::Order.confirm`, `a1b2c3d`)"
+- "The authentication middleware validates JWT tokens (`src/auth/middleware.py::require_login`, `f4e5d6c`)"
+- "User profiles will include avatar support (`docs/design-plans/profile-redesign.md`, `b7a8c9d`)" — prospective content cites the design plan
+
+**Status is implicit in the citation:**
+- Cites code, migration, or config -> exists in the system now
+- Cites a design plan -> planned, not yet implemented
+- No citation -> the claim must gain a citation or be removed
+
+**Applies to:** DFD docs, database docs, state lifecycle docs. Does not apply to glossary, personae, or constraints (these are conceptual, not implementation claims).
+
+**When writing or updating:** Before writing any factual claim, verify the cited file and symbol exist (for code citations) or the design plan exists (for prospective citations). Use `git log --oneline -1 -- <file>` to get the current commit hash for that file.
+
+**When reviewing:** A claim without a citation is an unverified claim. Flag it. A claim citing a design plan in a doc that should reflect implemented code is stale — flag it for update or removal.
+
 ## Contradiction Detection
 
 Finding contradictions is more important than updating. If in doubt about whether something is a contradiction, HALT. False positives are cheap; missed contradictions are expensive.
@@ -181,6 +206,8 @@ Options:
 
 Write only approved changes. Use the templates from this skill directory (`template-dfd-context.md`, `template-dfd-process.md`, etc.) as the starting structure for new files. For modifications to existing files, preserve existing content and add or update the affected sections.
 
+**Citation enforcement:** Every factual claim in written content must include a parenthetical citation. Before writing, verify that cited files and symbols exist (for code) or that the design plan exists (for prospective content). Use `git log --oneline -1 -- <file>` to obtain the commit hash. Claims without citations must not be written.
+
 ## Bootstrap and Greenfield
 
 ### Bootstrap Mode
@@ -225,6 +252,7 @@ The complete flow tying all sections together:
 | "Bootstrap is simple, skip the approval" | Bootstrap creates many files. Human must approve the initial structure. |
 | "Design plan doesn't mention architecture" | Check anyway. Context signals may be implicit. |
 | "I'll update docs after the code is written" | Architecture docs are updated from the design plan, before implementation. |
+| "I'll add citations later" | Citations are verified at write time. A claim without a citation is an unverified claim. |
 
 **All of these mean: STOP. Follow the requirements exactly.**
 

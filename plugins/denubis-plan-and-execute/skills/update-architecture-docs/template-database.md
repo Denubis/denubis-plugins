@@ -36,6 +36,8 @@ flowchart LR
 
 ### [table_name]
 
+> **Citation rule:** Each table must cite its defining migration or model — e.g., (`migrations/002_create_users.sql`, `a1b2c3d`) or (`src/models/user.py::User`, `d4e5f6a`). Column descriptions that reference business logic must cite the implementing code.
+
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | UUID | PK, NOT NULL | [Business meaning] |
@@ -47,7 +49,7 @@ flowchart LR
 ## Design Decisions
 
 ### [Decision Title]
-**Date:** YYYY-MM-DD
+**Commit:** [short SHA where decision was recorded]
 **Status:** Proposed | Accepted | Superseded by [link] | Deprecated
 **Confidence:** High | Medium | Low
 **Reevaluation triggers:** [Conditions under which to revisit]

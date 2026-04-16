@@ -24,6 +24,8 @@ flowchart LR
 |--------|-------------|-----------------|---------------------|
 | [Name] | [What it is] | [Data it sends] | [Data it receives] |
 
+> **Citation rule:** Each external entity must cite where the system interfaces with it — e.g., API client (`src/integrations/stripe.py::StripeClient`, `c3d4e5f`) or config (`config/services.yaml`, `a1b2c3d`).
+
 ## System Boundary
 
 **In scope:** [What the system does]
