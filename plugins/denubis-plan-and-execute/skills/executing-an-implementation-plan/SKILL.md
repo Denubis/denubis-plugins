@@ -422,13 +422,26 @@ Do NOT implement functionality without tests. Missing tests = plan gap, not some
 
 **Acceptance rubric -- check before accepting each task as done:**
 
-The task-implementor's response must contain evidence for each of these. Missing evidence = reject, send back with specific demands.
+The task-implementor's response must contain evidence. Missing evidence = reject, send back with specific demands.
 
-| Check | What to look for | If missing |
+**Which checks apply depends on task type.** Read the phase's `Phase Type:` header and the task's nature:
+
+| Check | Functionality tasks | Infrastructure tasks | Preparatory-refactor | Config/docs tasks |
+|-------|:------------------:|:-------------------:|:-------------------:|:-----------------:|
+| Tests ran (full suite) | Required | Required | Required | Not required |
+| Verification evidence (build/lint/type-check) | Required | Required | Required | Required |
+| TDD evidence (RED-GREEN-REFACTOR) | Required | Not required | Not required | Not required |
+| Tests stay green | N/A | N/A | Required | N/A |
+| Commit made | Required | Required | Required | Required |
+
+**What to look for in each check:**
+
+| Check | Evidence needed | If missing |
 |-------|-----------------|------------|
-| Tests ran | Test command output with pass/fail counts. Must be the project's full suite per CLAUDE.md, not a subset | "Re-run with the full test suite per CLAUDE.md and report output" |
+| Tests ran | Test command output with pass/fail counts. Full suite per CLAUDE.md, not a subset | "Re-run with the full test suite per CLAUDE.md and report output" |
 | Verification evidence | Build/lint/type-check output showing clean state | "Run verification-before-completion and report results" |
-| TDD evidence | RED-GREEN-REFACTOR cycle: test written first, failed, implementation added, test passed. Show the test name and the failure-then-pass sequence | "Show the RED-GREEN sequence: which test did you write first, how did it fail, what did you implement to pass it?" |
+| TDD evidence | RED-GREEN-REFACTOR cycle: test written first, failed, implementation added, test passed | "Show the RED-GREEN sequence: which test did you write first, how did it fail, what did you implement to pass it?" |
+| Tests stay green | Test output showing same pass count as before refactoring | "Show test output before and after refactoring" |
 | Commit made | Commit hash for the work | "Commit your changes and report the hash" |
 
 **Do not accept "Task complete" without evidence.** A claim without output is not evidence. Send the task back.
@@ -899,6 +912,26 @@ If architecture docs exist (`docs/architecture/`), update them to reflect what w
 **4c. Implementation-time ADRs:**
 
 For decisions made during implementation that were not in the design plan, create ADR files in `docs/architecture/decisions/` with status `Proposed`. These capture the "why" behind implementation choices the design didn't specify.
+
+#### Stage 2: Design Conformance Check
+
+Before final review, verify the implementation matches the design plan.
+
+**Compare what was designed against what was built:**
+
+1. Read the design plan's component list, data flows, and acceptance criteria
+2. For each designed component, verify it exists in the implementation (grep for the class/function/file)
+3. For each designed data flow or integration, verify the implementation matches
+4. Flag any deviations:
+   - **Designed but not built:** component in design plan has no corresponding code
+   - **Built but not designed:** code exists that the design plan didn't specify
+   - **Built differently:** implementation diverges from design (different API shape, different data flow, different responsibility split)
+
+**Every deviation must be recorded.** If the deviation was intentional, it should already be captured as an implementation-time ADR (Stage 1, step 4c). If it's not recorded, either:
+- Create the ADR now (if the deviation was a good call)
+- Flag it to the human as unrecorded divergence (if unclear whether it was intentional)
+
+**Present deviations to the human before proceeding to final review.** The human decides whether each deviation is acceptable.
 
 ### 5. Final Review Sequence
 
