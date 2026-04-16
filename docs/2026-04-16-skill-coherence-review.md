@@ -517,21 +517,25 @@ Popper sort (4 plans): Works. Most valuable for weak plans. Export Queue 402 ind
 
 Acceptance rubric (3 plans): 40% false rejection rate. Rubric assumes every task is TDD-able. Real plans have test-only, config, migration, documentation, diagnostic tasks. Needs task-type-aware gating.
 
-**New issues from melica session analysis:**
-- H15: Consumer-tracing requirement (every new function must state its call site)
-- H16: Proleptic dismissal requires cited evidence, not reasoning
-- H17: Task-type-aware gating for acceptance rubric
-- H18: DoD rubric carve-outs from real-plan testing
+**New issues from melica session analysis (three contributing causes):**
+- H15: Consumer-tracing requirement — every new function/class/field must state its call site. No call site = no function. Would have killed the orphaned derive_content_types() at planning time.
+- H16: Proleptic dismissal requires cited evidence — "I think it's fine" is not dismissal. Must cite specific code, design plan line, or test. The challenger correctly found the doc_type tension; the agent dismissed it with reasoning that was wrong.
+- H17: Design conformance check — does the implementation match what the design plan specified? If it deviates, is the deviation recorded as a decision? The design plan said derive_content_types() maps doc_type:*, the implementation plan ignored doc_type:* entirely, nobody compared the two.
+
+**New issues from real-plan testing:**
+- H18: DoD rubric carve-outs — 9% over-rejection (test baselines with specific counts, migration DoDs naming mechanisms, performance/regression claims)
+- H19: Task-type-aware acceptance rubric gating — 40% false rejection rate. Rubric assumes every task is TDD-able. Needs to read task-type signals and apply appropriate checks.
 
 ### Remaining tasks
 
 | Task | Description | Status |
 |------|-------------|--------|
-| H12 | Popper system redesign | In progress (separate session) |
+| H12 | Popper system redesign (pipeline, persistence, template, rubric) | In progress (separate session) |
 | H15 | Consumer-tracing in writing-implementation-plans | Pending |
-| H16 | Proleptic dismissal requires evidence | Pending |
-| H17 | Task-type-aware acceptance rubric | Pending |
-| H18 | DoD rubric carve-outs | Pending |
+| H16 | Proleptic dismissal requires cited evidence | Pending |
+| H17 | Design conformance check — impl matches design plan | Pending |
+| H18 | DoD rubric carve-outs from real-plan testing | Pending |
+| H19 | Task-type-aware acceptance rubric gating | Pending |
 | M25 | Rename worker skills to {parent}-{action} | Pending (LAST) |
 | L8, L12 | Minor fixes not yet verified | Pending |
 
