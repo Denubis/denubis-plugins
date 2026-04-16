@@ -1,5 +1,27 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.27.0
+
+Replace tautological UAT gates with coherence review for foundational phases.
+
+**New:**
+- Coherence-reviewer agent (Opus): checks conformance, traceability, baked-in assumptions, forward fitness, and situated accountability against design intent. Grounded in Perry & Wolf (1992), Gotel & Finkelstein (1994), Ford et al. (2017), Haraway (1988).
+- Coherence-review skill: dispatch and presentation for phases without human-judgment UAT
+- Deterministic routing rubric in execution skill: Phase Type and Popper UAT entry presence determine path (no LLM judgment)
+- Popper three-way sort in implementation planning: automatable predictions → test requirements, human judgment → UAT entries, deferred → future phase with back-reference
+- Worked example for Popper sort (Token Service, 4 decisions across 3 buckets)
+
+**Changed:**
+- Human-uat-gate scoped to phases where human judgment adds signal that automation cannot
+- UAT items reframed as "interact and evaluate" rather than "confirm these / probe boundaries"
+- Execution skill example workflow shows both routing paths (infrastructure→coherence, functionality→UAT)
+- Coherence reviewer's situated accountability check skips with "Nothing to add" for infrastructure phases without domain-encoding decisions
+- No-findings coherence review enumerates what was checked and why nothing stood out
+
+**Fixed:**
+- `.denubis/` → `.ed3d/` path inconsistency for implementation-plan-guidance.md in writing-implementation-plans
+- Knodel & Popescu (2007) attribution clarified (compliance comparison, not reflexion models); added Murphy, Notkin & Sullivan (2001) reference
+
 ## [denubis-extending-claude] 1.7.0
 
 Transcript archiving moved to standalone `transcript-archive` plugin.
