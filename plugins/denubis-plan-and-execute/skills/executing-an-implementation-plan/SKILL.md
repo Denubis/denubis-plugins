@@ -833,11 +833,26 @@ Discard: all subagent output, review details, and fix cycle content — work is 
 
 **Wait for the user to act.** Do not proceed to the next phase until the user either runs the suggested command or explicitly says to continue without it.
 
-#### 3f. Move to Next Phase
+#### 3f. Prepare for Next Phase
 
-Create a fresh task list for the next phase (same structure as section 2), then proceed to the next phase's "Read" step. Repeat 3a-3f for each phase.
+Mark "Prepare for next phase" as in_progress.
 
-**On last phase:** Skip task list creation and proceed to section 4 (Post-Implementation Stages).
+**Assess context pressure** (see section 3e above) and either:
+
+**If /clear needed:**
+1. Construct the self-contained resume prompt (see 3e template)
+2. Present it to the user
+3. Mark task as complete
+4. Wait for user to /clear and paste resume
+
+**If continuing without /clear:**
+1. Create a fresh task list for the next phase (same structure as section 2)
+2. Mark task as complete
+3. Proceed to the next phase's "Read" step
+
+Repeat 3a-3f for each phase.
+
+**On last phase:** The final task is "Invoke post-implementation stages and final review" instead. Mark it in_progress and proceed to section 4.
 
 ### 4. Post-Implementation Stages (Mandatory)
 
