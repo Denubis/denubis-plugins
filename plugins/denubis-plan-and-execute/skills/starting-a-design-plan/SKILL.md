@@ -249,6 +249,16 @@ Present the Definition of Done as a brief statement covering:
 | "All tests pass" | That's verification-before-completion's job, not DoD |
 | No exclusions mentioned | Scope will creep during brainstorming |
 
+**Carve-outs — these pass the rubric despite looking implementation-level:**
+
+| Pattern | Why it's valid |
+|---------|---------------|
+| Test baselines with specific counts ("12 existing tests stay green") | Falsifiable — run the suite, count passes. The number is the observable. |
+| Migration DoDs naming mechanisms ("alembic migration adds column X") | Observable via `alembic history` or schema inspection. The mechanism is the deliverable. |
+| Performance/regression claims ("P95 latency stays under 200ms") | Falsifiable with a benchmark. The threshold is the observable. |
+
+The common thread: these are falsifiable with a specific command or measurement, even though they describe technical artifacts rather than user-facing behaviour.
+
 **How later phases consume the DoD:**
 
 - **Brainstorming (Phase 4):** DoD constrains exploration — proposals must deliver what DoD promises
