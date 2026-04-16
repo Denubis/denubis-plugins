@@ -531,11 +531,11 @@ Acceptance rubric (3 plans): 40% false rejection rate. Rubric assumes every task
 | Task | Description | Status |
 |------|-------------|--------|
 | H12 | Popper system redesign (pipeline, persistence, template, rubric) | In progress (separate session) |
-| H15 | Consumer-tracing in writing-implementation-plans | Pending |
-| H16 | Proleptic dismissal requires cited evidence | Pending |
-| H17 | Design conformance check — impl matches design plan | Pending |
-| H18 | DoD rubric carve-outs from real-plan testing | Pending |
-| H19 | Task-type-aware acceptance rubric gating | Pending |
+| H15 | Consumer-tracing in writing-implementation-plans | Done |
+| H16 | Proleptic dismissal requires cited evidence | Done |
+| H17 | Design conformance check — impl matches design plan | Done |
+| H18 | DoD rubric carve-outs from real-plan testing | Done |
+| H19 | Task-type-aware acceptance rubric gating | Done |
 | M25 | Rename worker skills to {parent}-{action} | Pending (LAST) |
 | L8, L12 | Minor fixes not yet verified | Pending |
 
