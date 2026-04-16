@@ -425,20 +425,31 @@ M10, M14 (absorbed by H5), M20, M23 (absorbed by M17), L3 (merged with M11), L4,
 - **M24**: Split critical-peer-review with progressive disclosure
 - **M25**: Rename worker skills to {parent}-{action} (do LAST)
 
-### Remaining — smaller edits
+### Completed — smaller edits (this session, uncommitted)
 
 - **M5**: Track critical-peer-review as task in starting-an-implementation-plan
-- **M6**: Reconcile mocking rules (TDD + writing-good-tests)
-- **M9**: Deduplicate agent creation guidance
-- **M13**: Anti-tautology guards (coherence-review + code-reviewer)
-- **M15**: Add scale/capacity to clarifying-questions
-- **M17**: Create using-research-agents skill
-- **M18**: Add Test Requirements to writing-implementation-plans Step 0
-- **M21**: Expand maintaining-project-context skill
+- **M6**: Reconcile mocking rules (TDD + writing-good-tests) — "never mock internal, always mock external"
+- **M9**: Deduplicate agent creation guidance — creating-a-plugin cross-refs creating-an-agent
+- **M13**: Anti-tautology guards — coherence-reviewer + code-reviewer both patched
+- **M15**: Add scale/capacity to clarifying-questions (new section 4)
+- **M18**: Add Test Requirements to writing-implementation-plans Step 0 formal spec
+- **M21**: Expand maintaining-project-context — added test pseudocode + permissions cleanup sections
+- **L1**: Fix brainstorming diagram numbering (4.1-4.4 -> Phase 1-3)
+- **L2**: Fix make-pr branch detection (merge-base -> rev-parse --verify)
+- **L8**: Fix arrow characters in creating-a-plugin (replacement chars -> `->`)
+- **L9**: Standardise checklists to `[ ]` (was `☐`) across agents and skills
+- **L10**: DOI format in restate-our-assumptions (bare DOI -> URL)
+- **L11**: Already fixed by H10
+- **L12**: TaskCreate optionality in controlled-dependency-upgrade
+- **L13**: Phase/task/stage glossary in executing-an-implementation-plan
+- **L14**: Disambiguated via glossary (same change as L13)
+- **L15**: Session-naming added to resume prompt template
+- **Unicode cleanup**: Standardised `→` to `->`, `◻` to `[ ]`, `›` to `-` in modified files
+
+### Remaining — smaller edits
+
+- **M17**: Create using-research-agents skill (new file needed)
 - **M25**: Rename convention (LAST)
-- **L1**: Fix brainstorming diagram numbering
-- **L2**: Fix make-pr branch detection command
-- **L8-L15**: Formatting, DOI, glossary, disambiguation
 
 ## Cross-Cutting Themes Identified
 
