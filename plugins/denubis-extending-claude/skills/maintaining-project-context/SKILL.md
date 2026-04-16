@@ -190,6 +190,43 @@ Has code changed?
 | Writing AGENTS.md without reading | Always read existing content before updating |
 | Forgetting companion CLAUDE.md | AGENTS.md repos need both files |
 
+## Test Pseudocode Maintenance
+
+After implementation, verify that test files exist for changed code and that test descriptions match current behaviour.
+
+### Process
+
+1. Identify changed source files from diff
+2. For each changed file with public interfaces, check for corresponding test file
+3. Flag missing test coverage as a finding (do not write tests — that's implementation work)
+4. For existing tests, verify test names/descriptions still match what the code does
+
+### When to Skip
+
+- Changes to test files only (already covered)
+- Internal refactoring with no public interface changes
+- Configuration-only changes
+
+## Permissions Cleanup
+
+After implementation, check that `settings.json` permissions still match actual tool usage.
+
+### Process
+
+1. Read project's `.claude/settings.json` (or `.claude/settings.local.json`)
+2. For each `allow` entry, check whether the permitted command is still used in the project
+3. Flag unused permissions as candidates for removal
+4. Present findings to human — do not remove permissions without approval
+
+### When to Skip
+
+- No settings files exist
+- Changes didn't affect tool usage patterns
+
+## Dependency Rationale
+
+Dependency rationale maintenance is **not** handled by this skill. It requires structured Popper/Lakatos/Haraway analysis via `restate-our-assumptions`, which warrants subagent dispatch. The project-claude-librarian agent dispatches a subagent for this separately.
+
 ## Integration Points
 
 **Called by:**
@@ -199,3 +236,4 @@ Has code changed?
 
 **Uses:**
 - **writing-claude-md-files** - For actual context file creation/updates (works for both CLAUDE.md and AGENTS.md)
+- **restate-our-assumptions** - For dependency rationale (dispatched separately by librarian agent)
