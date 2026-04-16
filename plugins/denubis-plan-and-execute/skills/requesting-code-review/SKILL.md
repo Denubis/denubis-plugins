@@ -12,10 +12,14 @@ Dispatch denubis-plan-and-execute:code-reviewer subagent to catch issues before 
 
 ## When to Request Review
 
-**Mandatory:**
-- After each task in plan execution
-- After completing major feature
-- Before merge to main
+**Two mandatory triggers with different scopes:**
+
+| Trigger | Scope | BASE_SHA | Called by |
+|---------|-------|----------|----------|
+| **Per-phase** | Changes within one implementation phase | Commit before phase started | executing-an-implementation-plan (after each phase) |
+| **Pre-merge** | All changes since branch diverged from main | `git merge-base HEAD main` | finishing-a-development-branch (before presenting options) |
+
+Per-phase reviews catch phase-level issues. Pre-merge reviews catch cross-phase issues, integration problems, and drift that accumulates across phases. Both are mandatory -- neither replaces the other.
 
 **Optional but valuable:**
 - When stuck (fresh perspective)
@@ -49,9 +53,14 @@ The review process is a loop: review → fix → re-review → until zero issues
 
 ## Step 1: Initial Review
 
-**Get git SHAs:**
+**Get git SHAs (scope determines BASE_SHA):**
 ```bash
-BASE_SHA=$(git rev-parse HEAD~1)  # or commit before task
+# Per-phase scope: commit before phase started
+BASE_SHA=<commit before phase started>
+
+# Pre-merge scope: branch divergence point
+BASE_SHA=$(git merge-base HEAD main)
+
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
@@ -335,8 +344,8 @@ HEAD_SHA: [sha]
 ## Integration
 
 **Called by:**
-- executing-an-implementation-plan (after each task)
-- finishing-a-development-branch (final review)
+- executing-an-implementation-plan (per-phase scope, after each phase's tasks complete)
+- finishing-a-development-branch (pre-merge scope, full branch diff before presenting options)
 - Ad-hoc when you need a review
 
 **Leads to:**

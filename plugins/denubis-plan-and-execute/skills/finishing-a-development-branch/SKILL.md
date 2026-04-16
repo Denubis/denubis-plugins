@@ -16,7 +16,29 @@ Guide completion of development work by presenting clear options and handling ch
 
 ## The Process
 
-### Step 1: Present Options
+### Step 1: Full-Branch Code Review
+
+Before presenting options, run a full-branch code review covering ALL changes since the branch diverged from main. Per-phase reviews catch phase-level issues; this catches cross-phase issues, integration problems, and drift that accumulates across phases.
+
+```bash
+# Get the branch divergence point
+BASE_SHA=$(git merge-base HEAD main)
+HEAD_SHA=$(git rev-parse HEAD)
+```
+
+Use the `requesting-code-review` skill with full-branch scope:
+
+- WHAT_WAS_IMPLEMENTED: Summary of all phases completed on this branch
+- PLAN_OR_REQUIREMENTS: Reference to the full implementation plan directory
+- BASE_SHA: `$(git merge-base HEAD main)` (branch divergence point)
+- HEAD_SHA: current HEAD
+- SCOPE: full-branch (all changes since branch creation)
+
+**If review finds issues:** Fix them before presenting options. A branch with outstanding review issues is not ready to merge or PR.
+
+**If review passes:** Proceed to Step 2.
+
+### Step 2: Present Options
 
 Present exactly these 4 options in `AskUserQuestion`.
 
@@ -33,7 +55,7 @@ Which option?
 
 **Don't add explanation** — keep options concise.
 
-### Step 2: Execute Choice
+### Step 3: Execute Choice
 
 #### Option 1: Merge Locally
 
@@ -104,7 +126,7 @@ git worktree remove <worktree-path>
 
 **Why `cd` first:** Claude Code's Bash tool persists CWD between calls. The kernel cannot fully remove a directory that is any process's CWD.
 
-### Step 3: Remind About Test Plan
+### Step 4: Remind About Test Plan
 
 **For Options 1, 2, and 3:**
 
