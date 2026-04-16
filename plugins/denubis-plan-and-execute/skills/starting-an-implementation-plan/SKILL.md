@@ -45,14 +45,16 @@ Use TaskCreate to track the orchestration steps:
 ```
 TaskCreate: "Branch setup"
 (conditional) TaskCreate: "Read project implementation guidance from [absolute path]"
-  → TaskUpdate: addBlockedBy: [Branch setup]
-  → (only if .ed3d/implementation-plan-guidance.md exists)
+  -> TaskUpdate: addBlockedBy: [Branch setup]
+  -> (only if .ed3d/implementation-plan-guidance.md exists)
 TaskCreate: "Create implementation plan"
-  → TaskUpdate: addBlockedBy: [Branch setup] (or [Read guidance] if it exists)
+  -> TaskUpdate: addBlockedBy: [Branch setup] (or [Read guidance] if it exists)
 TaskCreate: "Re-read starting-an-implementation-plan skill (restore context)"
-  → (DO NOT set blockedBy yet - will be updated after granular tasks are created)
+  -> (DO NOT set blockedBy yet - will be updated after granular tasks are created)
+TaskCreate: "Critical peer review of implementation plan"
+  -> TaskUpdate: addBlockedBy: [Re-read skill]
 TaskCreate: "Execution handoff"
-  → TaskUpdate: addBlockedBy: [Re-read skill]
+  -> TaskUpdate: addBlockedBy: [Critical peer review]
 ```
 
 **CRITICAL: The "Re-read skill" task must be re-pointed AFTER writing-implementation-plans creates the Finalization task.** See "After Planning: Update Dependencies" below.
@@ -213,7 +215,7 @@ The granular tasks are now created. Find the Finalization task ID and update dep
 
 ```
 TaskUpdate: "Re-read starting-an-implementation-plan skill"
-  → addBlockedBy: [Finalization task ID]
+  -> addBlockedBy: [Finalization task ID]
 ```
 
 This ensures the task list shows the correct order:
@@ -224,8 +226,9 @@ This ensures the task list shows the correct order:
 ✔ #6 Phase 1B: Investigate codebase for Phase 1
 ...
 ✔ #N Finalization: Run code-reviewer...
-◻ #3 Re-read skill › blocked by #N
-◻ #4 Execution handoff › blocked by #3
+[ ] #3 Re-read skill - blocked by #N
+[ ] #R Critical peer review - blocked by #3
+[ ] #4 Execution handoff - blocked by #R
 ```
 
 ### Restore Context (Before Handoff)
@@ -247,6 +250,14 @@ Or use the Read tool on the skill file path.
 
 Mark "Re-read starting-an-implementation-plan skill" task as completed.
 
+### Critical Peer Review
+
+Mark "Critical peer review of implementation plan" task as in_progress.
+
+Invoke `denubis-plan-and-execute:critical-peer-review` to subject the implementation plan to falsification-first analysis. The review should examine the plan files in `docs/implementation-plans/` for overclaiming, internal inconsistency, and evidence-grade violations.
+
+Mark "Critical peer review of implementation plan" task as completed.
+
 ### Execution Handoff
 
 Mark "Execution handoff" task as in_progress.
@@ -254,8 +265,6 @@ Mark "Execution handoff" task as in_progress.
 After planning is complete, hand off to execution.
 
 **Do NOT invoke execute-plan directly.** The user needs to /clear context first.
-
-**Critical peer review:** Before handing off to execution, invoke `denubis-plan-and-execute:critical-peer-review` to subject the implementation plan to falsification-first analysis. The review should examine the plan files in `docs/implementation-plans/` for overclaiming, internal inconsistency, and evidence-grade violations.
 
 **Step 1: Capture and verify absolute paths**
 
