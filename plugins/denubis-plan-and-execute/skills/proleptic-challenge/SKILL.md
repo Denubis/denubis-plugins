@@ -1,6 +1,6 @@
 ---
 name: proleptic-challenge
-description: Use before phase transitions to generate counterarguments and force deliberate evaluation - fires at design finalisation, between implementation phases, and during UAT
+description: Use before phase transitions to generate counterarguments and force deliberate evaluation - fires at design finalisation, between implementation phases, and before acceptance
 ---
 
 # Proleptic Challenge
@@ -26,8 +26,8 @@ Proleptic challenges fire **before phase transitions**, not at every decision po
 | Trigger | When | What Gets Challenged |
 |---------|------|---------------------|
 | Design finalisation | After writing-design-plans completes, before commit | The design about to be committed |
-| Between implementation phases | After phase code review passes | The completed phase before moving to next |
-| During UAT | Before human-uat-gate presents acceptance criteria | The implementation before declaring complete |
+| Between implementation phases | After phase code review passes, before UAT/coherence routing | The completed phase before moving to next |
+| Before acceptance | After code review passes on final phase, before UAT or coherence review | The implementation before declaring complete |
 
 **DO NOT invoke:**
 - After every user message
