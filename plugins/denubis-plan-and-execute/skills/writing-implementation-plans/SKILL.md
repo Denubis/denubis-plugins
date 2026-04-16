@@ -834,7 +834,7 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Design decisions in this phase:**
 
-### DR1: [Title declares the recommended decision]
+### DR1: [Recommended decision statement] (recommended)
 
 **Options considered:**
 - [Option A — the recommended choice]
