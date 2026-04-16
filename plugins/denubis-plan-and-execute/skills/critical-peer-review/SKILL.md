@@ -331,13 +331,15 @@ The failure mode: author fixes the flagged line, leaves three other places that 
 
 ## Output Contract
 
+**All findings go to the human.** Do not filter, resolve, or dismiss findings on the human's behalf. For each finding, present arguments for and against addressing it, provide your recommendation, but the human decides what action to take. The agent's job is to find and present -- the human's job is to decide.
+
 ### Severity Levels
 
 | Severity | Meaning | Action |
 |----------|---------|--------|
-| **High** | Evidence grade overclaimed, internal inconsistency, provenance failure, impossible step, critical omission, production path not demonstrated, load-bearing assumption unverified, ACH matrix shows favoured hypothesis is not best-supported | Must fix before presenting to human |
-| **Medium** | Weak citation, incomplete enumeration, vague verification path, missing upgrade path, incomplete mitigation, unsupported but non-critical claim, GRADE downgrade not reflected in language, non-diagnostic evidence cited as support | Should fix; flag if not |
-| **Low** | Language could be tighter, minor organisation issues, or small non-blocking precision problems | Fix if convenient |
+| **High** | Evidence grade overclaimed, internal inconsistency, provenance failure, impossible step, critical omission, production path not demonstrated, load-bearing assumption unverified, ACH matrix shows favoured hypothesis is not best-supported | Present to human with arguments for and against. Human decides action. |
+| **Medium** | Weak citation, incomplete enumeration, vague verification path, missing upgrade path, incomplete mitigation, unsupported but non-critical claim, GRADE downgrade not reflected in language, non-diagnostic evidence cited as support | Present to human with recommendation. Human decides action. |
+| **Low** | Language could be tighter, minor organisation issues, or small non-blocking precision problems | Present to human. Human decides whether to address. |
 
 ### Output Format
 
@@ -412,7 +414,7 @@ When invoked as Phase 3d self-audit:
 - The debugging agent writes the analysis to file
 - A clean subagent is dispatched with this skill's audit brief
 - The subagent reviews the file and writes findings
-- The debugging agent must resolve all High findings before presenting
+- The debugging agent presents ALL findings to the human -- the human decides which to address, which to accept, and which to dismiss
 
 When invoked independently:
 - Point the reviewer at the file: "Review `docs/investigations/2026-03-20-slot-deletion.md` using critical-peer-review"
