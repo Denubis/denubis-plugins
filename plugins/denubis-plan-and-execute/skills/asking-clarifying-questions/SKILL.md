@@ -26,7 +26,7 @@ Use this skill:
 Do NOT use for:
 - Exploring design alternatives (that's brainstorming)
 - Proposing architectures (that's brainstorming)
-- Validating completed designs (that's brainstorming Phase 3)
+- Validating completed designs (that's brainstorming Phase 4)
 - Asking for initial requirements (that's starting-a-design-plan Phase 1)
 
 ## Before Clarifying
@@ -198,43 +198,6 @@ User says "use React Router" -> Check:
 
 **Don't do deep research** - save that for brainstorming. Just verify basics.
 
-### 6. Definition of Done (Required Final Step)
-
-**Before handing off to brainstorming, you MUST establish the Definition of Done.**
-
-The Definition of Done answers: "What does success look like? What are the deliverables?"
-
-**After resolving contradictions and clarifying requirements:**
-
-1. **Infer the Definition of Done** from context gathered so far:
-   - What will exist when this is complete?
-   - What will users/systems be able to do?
-   - What are the concrete deliverables?
-
-2. **If you have a firm grasp**, state it back and confirm:
-   ```
-   Use AskUserQuestion:
-   "Based on our discussion, here's what I understand success looks like:
-
-   [State the definition of done in 2-4 bullet points]
-
-   Does this capture what you're trying to achieve?"
-
-   Options:
-   - "Yes, that's right" (proceed to brainstorming)
-   - "Partially, but..." (user will clarify)
-   - "No, let me explain..." (user will reframe)
-   ```
-
-3. **If the deliverables are still ambiguous**, ask targeted questions:
-   - "What should exist when this is done?"
-   - "How will you know this succeeded?"
-   - "What's the minimum viable deliverable?"
-
-**Why this matters:** Brainstorming explores *how* to achieve the goal. The goal must be locked in first. Otherwise you're exploring texture without knowing what shape you're filling.
-
-**The Definition of Done becomes part of the output bundle** and will appear prominently at the top of the final design document.
-
 ## Question Techniques
 
 ### Use AskUserQuestion for Choices
@@ -344,7 +307,7 @@ Clarification (this skill)
   -> Disambiguate: Which OAuth2 flow? What scope? Why OAuth2?
   -> Output: Service accounts, client credentials, PCI compliance
 
-Brainstorming (starting-a-design-plan Phase 3)
+Brainstorming (starting-a-design-plan Phase 4)
   -> Explore: Architecture options, library choices, implementation phases
   -> Uses clarified requirements as foundation
 ```
