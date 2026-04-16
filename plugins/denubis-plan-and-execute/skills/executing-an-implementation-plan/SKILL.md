@@ -76,6 +76,7 @@ After EVERY subagent completes (task-implementor, bug-fixer, code-reviewer), you
 | refactoring-executor | 150 | Post-phase refactoring execution |
 | project-claude-librarian | 150 | Updating project context |
 | test-analyst | 150 | Test coverage analysis |
+| coherence-reviewer | 150 | Design intent verification (coherence review) |
 
 **Why this matters:** Agents that exhaust their turn budget return empty responses, wasting the entire run. These values are set high as circuit breakers for genuinely runaway agents, not as routine constraints on normal work. Do not "optimise" by lowering them.
 
@@ -92,9 +93,10 @@ This is NOT a transient error and retrying with the same budget will produce the
    - Run `rtk git diff --stat HEAD~1..HEAD` to see what work was preserved
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
-2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review):
-   - Check for `review-wip.md`, `test-analysis-wip.md`, or `smell-report-wip.md` in the scratchpad directory
+2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review, coherence-reviewer):
+   - Check for `review-wip.md`, `test-analysis-wip.md`, `smell-report-wip.md`, or `coherence-review-wip.md` in the scratchpad directory
    - For critical-peer-review: check for `reviewed-smell-report.md` — if present, review completed (executor can proceed); if absent, review exhausted with no output
+   - For coherence-reviewer: check for `coherence-review.md` (final) or `coherence-review-wip.md` (partial) — if final exists, review completed; if only WIP exists, read partial findings and report
    - If a checkpoint file exists, read it and report the partial findings
 
 3. **Report to the human** with recovery information:
@@ -501,39 +503,66 @@ This phase is about to be marked complete. The next phase depends on this work.
 
 Present counterarguments to human. Wait for response.
 
-### After Proleptic Challenge: Human UAT Gate
+### After Proleptic Challenge: Human Verification Gate
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:human-uat-gate
+After the human has evaluated proleptic counterarguments, determine which verification path this phase needs using the routing rubric below. **Do not use LLM judgment for this classification — follow the rubric mechanically.**
 
-After human has evaluated proleptic counterarguments, present UAT:
+#### Routing Rubric
+
+**Step 1: Check Phase Type from the phase file header.**
+
+| Phase Type | Route | Rationale |
+|------------|-------|-----------|
+| `infrastructure` | Coherence review | No user-facing surface. Verified operationally. |
+| `preparatory-refactor` | Coherence review | Restructuring existing code. No new behaviour. |
+
+If Phase Type is `infrastructure` or `preparatory-refactor` → coherence review. Stop here.
+
+**Step 2: For `functionality` phases (or unspecified Phase Type), check for Popper UAT entries.**
+
+Search the implementation plan's three-lens analysis (or the phase file's design decisions) for entries marked **"Popper (your UAT):"** — these are items requiring human interaction and judgment.
+
+| Popper UAT entries present? | Route | Rationale |
+|-----------------------------|-------|-----------|
+| Yes — at least one `Popper (your UAT):` entry exists | UAT gate | The planner identified something requiring human judgment. |
+| No — all Popper entries were routed to test-requirements.md or deferred to a future phase | Coherence review | No human-judgment items in this phase. |
+
+**Step 3: If no three-lens analysis exists** (older plans, plans without design-decisions review mode):
+
+Check whether the phase's acceptance criteria include any item where the verification requires human interaction and opinion — not just running a command and comparing output. If yes → UAT gate. If all ACs reduce to automated verification → coherence review.
+
+#### After routing:
+
+**UAT gate path:**
 
 Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
 
-**Locate acceptance criteria:**
-- Primary: **"Popper (your UAT):"** entries from the implementation plan's design decisions
-- Fallback: Phase acceptance criteria from the phase description
-- Overall: Definition of Done from the design document
+Locate Popper UAT entries from the implementation plan. Present using the `human-uat-gate` skill format.
 
-**Triage claims:** Simple items (CRUD, config, display) get quick confirmation. Boundary-rich items (auth, validation, data integrity, external integration) get edge probing. Use the `human-uat-gate` skill's tiered format.
+**Coherence review path:**
 
-**Handle UAT Response:**
+Announce: "I'm using the coherence-review skill to verify this phase's implementation matches the design intent."
+
+Dispatch the coherence-reviewer agent (see `coherence-review` skill for the dispatch template). The reviewer checks conformance, traceability, baked-in assumptions, forward fitness, situated accountability, and architecture doc updates. Present findings to the human.
+
+**Handle response (both paths):**
 
 | Response | Action |
 |----------|--------|
-| Confirmed | Mark phase complete, proceed to next phase |
-| Criterion not met | Fix issue → Re-run code review → Proleptic challenge → UAT (loop) |
+| Confirmed | Proceed to phase refactor |
+| Issue identified | Fix → Re-run code review → Proleptic challenge → Re-present verification (loop) |
 
-**UAT rejection flow:**
+**Rejection flow (same for both paths):**
 ```
-UAT rejected
+Rejected
     → Fix issues
     → Re-run phase code review
     → Proleptic challenge again
-    → Re-present UAT
+    → Re-present verification (UAT gate or coherence review, same path as before)
     → Repeat until confirmed
 ```
 
-**Only after UAT confirmed:** Proceed to phase refactor.
+**Only after human confirms:** Proceed to phase refactor.
 
 #### 3d. Phase Refactor (Red-Green-**Refactor**)
 
@@ -684,9 +713,14 @@ Run tests as final safety net:
 - If green: mark phase complete
 - If tests fail: revert refactoring commit and proceed without. Announce: "Refactoring broke tests despite per-transformation verification. Reverted refactoring commit. Proceeding with implementation as-is."
 
-**Phase completion flow:**
+**Phase completion flow (human-judgment phases):**
 ```
-Code review → Proleptic → UAT → Measure → Assess → [Gate] → Review → [Gate] → Refactor → Verify green → Next phase
+Code review → Proleptic → UAT gate → Measure → Assess → [Gate] → Review → [Gate] → Refactor → Verify green → Next phase
+```
+
+**Phase completion flow (phases serving future UAT):**
+```
+Code review → Proleptic → Coherence review → Measure → Assess → [Gate] → Review → [Gate] → Refactor → Verify green → Next phase
 ```
 
 #### 3e. Context Management Between Phases
@@ -910,25 +944,26 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 [Discover phases: phase_01.md, phase_02.md, phase_03.md]
 [Read first 3 lines of each to get titles]
+[Phase 1: infrastructure, Phase 2: functionality, Phase 3: functionality]
 
 [Create tasks with TaskCreate:]
 - [ ] Phase 1a: Read /path/to/phase_01.md — Project Setup
 - [ ] Phase 1b: Execute tasks
-- [ ] Phase 1c: Code review + UAT
+- [ ] Phase 1c: Code review + verification
 - [ ] Phase 1d: Refactor
 - [ ] Phase 2a: Read /path/to/phase_02.md — Token Service
 - [ ] Phase 2b: Execute tasks
-- [ ] Phase 2c: Code review + UAT
+- [ ] Phase 2c: Code review + verification
 - [ ] Phase 2d: Refactor
-- [ ] Phase 3a: Read /path/to/phase_03.md — API Middleware
+- [ ] Phase 3a: Read /path/to/phase_03.md — Extraction UI
 - [ ] Phase 3b: Execute tasks
-- [ ] Phase 3c: Code review + UAT
+- [ ] Phase 3c: Code review + verification
 - [ ] Phase 3d: Refactor
 
---- Phase 1 ---
+--- Phase 1 (infrastructure → coherence review) ---
 
 [Mark 1a in_progress, read phase_01.md]
-→ Contains 2 tasks: project setup, config files
+→ Phase Type: infrastructure. Contains 2 tasks: project setup, config files
 
 [Mark 1a complete, 1b in_progress]
 
@@ -943,6 +978,16 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Use requesting-code-review skill for phase 1]
 → Zero issues.
 
+[Proleptic challenge for Phase 1]
+→ No genuine counterarguments for scaffolding.
+
+[Routing rubric: Phase Type = infrastructure → coherence review]
+[Dispatch coherence-reviewer]
+→ Conformance: matches design. Traceability: no DRs to trace.
+→ Baked-in assumptions: chose src/ layout over flat (benign).
+→ Forward fitness: Phase 2 needs these imports, confirmed present.
+→ No findings above benign. Announcing and proceeding.
+
 [Mark 1c complete, 1d in_progress]
 
 [Refactor phase 1: minor naming improvements, committed]
@@ -955,10 +1000,11 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [No cross-phase state — suggest /clear]
 [User runs /clear, resumes with "Continue executing the implementation plan"]
 
---- Phase 2 ---
+--- Phase 2 (functionality, no Popper UAT entries → coherence review) ---
 
 [Mark 2a in_progress, read phase_02.md]
-→ Contains 3 tasks: types, service, tests
+→ Phase Type: functionality. Contains 3 tasks: types, service, tests
+→ No Popper (your UAT) entries — all Popper items routed to test-requirements.md
 
 [Mark 2a complete, 2b in_progress]
 
@@ -971,15 +1017,35 @@ You: I'm using the `executing-an-implementation-plan` skill.
 → Dispatch bug-fixer, re-review
 → Zero issues.
 
+[Proleptic challenge for Phase 2]
+→ One counterargument about token expiry edge case. Human evaluates, proceeds.
+
+[Routing rubric: functionality + no Popper UAT entries → coherence review]
+[Dispatch coherence-reviewer]
+→ Baked-in assumption: token refresh uses sliding window (design was silent).
+→ Rating: notable — affects Phase 3's auth flow UI.
+→ Human reviews, confirms the sliding window matches intent.
+
 [Mark 2c complete, 2d in_progress]
 
 [Refactor phase 2: extracted shared validator, committed]
 
 [Mark 2d complete]
 
---- Phase 3 ---
+--- Phase 3 (functionality, has Popper UAT entries → UAT gate) ---
 
-[Similar pattern...]
+[Mark 3a in_progress, read phase_03.md]
+→ Phase Type: functionality. Popper (your UAT) entries present:
+  "Use the extraction UI and assess whether entries match chapter 3's content"
+
+[Execute tasks, code review, proleptic challenge...]
+
+[Routing rubric: functionality + Popper UAT entries → UAT gate]
+[Use human-uat-gate skill]
+→ Human interacts with extraction UI, evaluates output against domain knowledge.
+→ Confirmed.
+
+[Refactor, mark complete]
 
 --- Finalize ---
 

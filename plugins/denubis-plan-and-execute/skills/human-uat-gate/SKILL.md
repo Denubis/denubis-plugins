@@ -1,6 +1,6 @@
 ---
 name: human-uat-gate
-description: Use after code review passes to present acceptance criteria and wait for explicit human verification - stops workflow until human confirms implementation meets requirements
+description: Use after code review passes for phases where human judgment adds signal automation cannot - presents genuinely falsifiable claims for human interaction and verification
 ---
 
 # Human UAT Gate
@@ -9,7 +9,11 @@ description: Use after code review passes to present acceptance criteria and wai
 
 Present acceptance criteria to the human and wait for explicit verification before proceeding. No automatic continuation.
 
-**Core principle:** UAT is human-falsifiable verification. Simple claims get simple confirmation. Claims with real implications — auth, validation, data integrity, external integration — get boundary probing: where does the implementation's model of reality stop holding? The human doesn't re-run automated tests. The human engages with what only a human can judge.
+**Core principle:** UAT is human-falsifiable verification — the human interacts with the built thing and exercises judgment that automated tests cannot capture. The human doesn't re-run automated tests. The human engages with what only a human can judge.
+
+**This skill is ONLY for phases where human judgment adds signal.** If the phase has no user-facing surface — no UI to navigate, no workflow to evaluate, no output to assess against domain knowledge — use the `coherence-review` skill instead. The orchestrator (executing-an-implementation-plan) handles this routing.
+
+**The test:** "Would a human learn something by doing this that the automated test suite cannot already prove?" If yes for any item in the phase, this skill applies. If no for every item, use `coherence-review`.
 
 **Announce at start:** "I'm using the human-uat-gate skill to verify the implementation meets your requirements."
 
@@ -18,9 +22,9 @@ Present acceptance criteria to the human and wait for explicit verification befo
 Invoke the UAT gate:
 - After code review passes (APPROVED status)
 - After proleptic challenge has been presented and addressed
-- Before declaring a phase or feature complete
+- **Only** when the phase produces something a human can interact with and form a judgment about
 
-**The gate is mandatory.** Do not skip it because:
+**The gate is mandatory for qualifying phases.** Do not skip it because:
 - Tests pass
 - Code review approved
 - User seems satisfied
@@ -30,7 +34,7 @@ Invoke the UAT gate:
 
 ### Step 1: Locate Falsification Tests
 
-Find the Popper falsification tests from the implementation plan — these are the "**Popper (your UAT):**" entries that accompany each design decision. They define what the human should be able to observe if the implementation is correct.
+Find the Popper falsification tests from the implementation plan — these are the "**Popper (your UAT):**" entries that describe human interactions requiring judgment. They define what the human should be able to experience and evaluate.
 
 **Sources (in order of preference):**
 - Implementation plan's Popper falsification tests (primary — these ARE the UAT)
@@ -38,43 +42,42 @@ Find the Popper falsification tests from the implementation plan — these are t
 - For design work: Phase 3 of starting-a-design-plan
 - For features: Requirements from the original request
 
-If no formal falsification tests exist, construct them. For each acceptance criterion, decide:
-- **Simple claim** (CRUD, configuration, display): state what to verify and how
-- **Boundary-rich claim** (auth, validation, data integrity, concurrency, external integration): identify where the claim stops holding and what to test at the edges
+If no formal falsification tests exist, construct them from the acceptance criteria. Every UAT item must describe a human interaction where judgment is required — not a command to run and output to compare.
 
 ### Step 2: Present UAT to Human
-
-Use this exact format:
 
 ```markdown
 ## User Acceptance Testing
 
-Code review passed. Automated tests cover the happy paths. Below: simple items to confirm, then boundary-rich items to probe.
+Code review passed. Automated tests cover correctness. Below: items where your judgment is needed — things you can interact with, evaluate, and form an opinion about that tests cannot capture.
 
-### Confirm These
+### Interact and Evaluate
 
-[Straightforward claims — CRUD, config, display. Quick verification.]
+- [ ] **Try:** [Human interaction — use the UI, run the workflow, read the output]
+  **Judge:** [What requires human assessment — does it make sense? Is the workflow natural? Does the output look right for the domain?]
+  **If wrong:** [What you'd expect to see instead, and what that would mean about the design]
 
-- [ ] [Claim]: [How to verify — command, UI action, expected result]
-- [ ] [Claim]: [How to verify]
+- [ ] **Try:** [Another interaction]
+  **Judge:** [What requires human assessment]
+  **If wrong:** [What that would mean]
 ...
 
 ### Probe These Boundaries
 
-[Claims with real implications — auth, validation, data integrity, external integration. Where does it stop working?]
+[For claims with real implications — auth, external integration, data integrity. Where does it stop working?]
 
 - [ ] **Claim:** [What the implementation handles]
   **Border:** [Where valid input/state ends]
-  **Probe:** [What to try at and beyond the edge — empty input, malformed data, expired state, concurrent access]
-  **Should see:** [Graceful failure — error message, rejection, safe fallback. NOT crash, data leak, silent corruption]
+  **Probe:** [What to try at and beyond the edge]
+  **Should see:** [Graceful failure — NOT crash, data leak, silent corruption]
 - [ ] **Claim:** [...]
   ...
 
 ### Your Verification Required
 
-Please confirm the simple items and probe the boundaries. Respond:
-- **"Confirmed"** - Everything holds
-- **"[Claim] broke at [boundary]: [what you observed]"** - Will fix and re-verify
+Interact with the items above and exercise your judgment. Respond:
+- **"Confirmed"** — Everything holds
+- **"[Item] doesn't meet expectations: [what you observed vs what you expected]"** — Will fix and re-verify
 
 I'll wait for your response before proceeding.
 ```
@@ -146,7 +149,9 @@ If no formal Popper tests exist in the implementation plan:
 | "User already knows it works" | Working ≠ knowing where it stops working. Boundaries are invisible until probed. |
 | "We're running late" | Skipped UAT = shipped bugs |
 | "Code review was thorough" | Code review checks quality, UAT checks fitness |
-| "All claims are simple, no boundaries" | If nothing has auth, validation, or data integrity implications, fine — but verify that's actually true. |
+| "All claims are simple, no boundaries" | If no item in this phase requires human judgment, this skill shouldn't have been invoked — use coherence-review instead. But verify that's actually true. |
+| "Run this command and see OK" | That's re-running the test suite by hand. If automated tests already verify it, the human gains nothing. This is a sign the phase doesn't qualify for UAT — use coherence-review. |
+| "Curl this endpoint and check the response" | Unless the human is evaluating something subjective about the response, that's an integration test. Write the test instead. |
 
 ## Integration with Workflow
 
