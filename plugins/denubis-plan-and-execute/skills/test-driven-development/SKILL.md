@@ -106,7 +106,7 @@ Vague name, tests mock not code
 **Requirements:**
 - One behavior
 - Clear name
-- Real code (no mocks unless unavoidable)
+- Never mock internal code — build scaffolding for isolation. Always mock external boundaries (network, shell, filesystem, third-party APIs)
 
 ### Verify RED - Watch It Fail
 
@@ -325,7 +325,7 @@ Before marking work complete:
 - [ ] Wrote minimal code to pass each test
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
-- [ ] Tests use real code (mocks only if unavoidable)
+- [ ] Internal code never mocked — scaffolding used for isolation. Only external boundaries mocked
 - [ ] Edge cases and errors covered
 
 Can't check all boxes? You skipped TDD. Start over.

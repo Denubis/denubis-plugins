@@ -170,12 +170,14 @@ def mock_registry(mocker):
     return mocker.patch.object(RegistryClient, 'get_repos')
 ```
 
-### Managed vs Unmanaged Dependencies
+### Internal vs External Boundaries
 
-| Type | Example | Strategy |
-|------|---------|----------|
-| **Managed** (you control) | Your database, your files | Use REAL instances |
-| **Unmanaged** (external) | Third-party APIs, SMTP | Use MOCKS |
+**Never mock internal code** — build scaffolding for isolation. **Always mock external boundaries** — network, shell, filesystem, third-party APIs. Tests must be isolated.
+
+| Boundary | Example | Strategy |
+|----------|---------|----------|
+| **Internal** (your code) | Your database, your modules, your files | Use REAL instances — build scaffolding if needed |
+| **External** (system boundary) | Third-party APIs, SMTP, network, shell | Use MOCKS |
 
 ### Anti-Pattern: Testing Mock Behaviour
 
