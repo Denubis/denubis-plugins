@@ -8,6 +8,8 @@ description: Use when writing or reviewing code - orchestrates sub-skills for FC
 ## Required Sub-Skills
 
 **ALWAYS load when coding:**
+- `test-driven-development` - RED-GREEN-REFACTOR: write tests first, always
+- `verification-before-completion` - Evidence before assertions: run and show output before claiming done
 - `functional-core-imperative-shell` - Separate pure logic from I/O
 - `defense-in-depth` - Validate at system boundaries
 - `python-idioms` - Python 3.14+ patterns, security, tooling
