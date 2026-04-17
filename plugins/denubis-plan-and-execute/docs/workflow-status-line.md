@@ -6,7 +6,7 @@ Two-line status bar for Claude Code. Line 1 shows location, git changes, and age
 
 ```
 ed3d@feat +2~3 | +156/-23
-████████████████▒▒▒▒ 80% | 5h:23% ~1h12m 7d:41% ~3d | $4.56 | 12m 0s
+████████████████▒▒▒▒ 80% | 5h:23% 3pm | 7d:48% Fri 8pm | DayStop:9pm | $4.56 | 12m 0s
 ```
 
 When on main/master outside a worktree, line 1 shows a red `✗MAIN` warning instead of the location.
@@ -23,7 +23,8 @@ When an agent is active: `ed3d@feat +2~3 | agt:researcher`
 ### Line 2: Resource Usage
 
 - **Boss HP bar + used %** — 20-char progress bar followed by percentage consumed. For 1M context (>=500k tokens): segment colours at 20% boundaries (green → cyan → yellow → magenta → red). For smaller contexts: simple green → yellow (70%) → red (90%) gradient
-- **Rate limits** — `5h:23% ~1h12m 7d:41% ~3d` with burn-rate projection via linear regression on cached samples. Shown red with `!` suffix when projected to exhaust before reset
+- **Rate limits** — `5h:23% 3pm` and `7d:48% Fri 8pm` report each Anthropic window's used percentage and the projected clock-time of 100% ("when *they* stop you"). Projection uses an idle-trimmed active-time rate, blended between a short window (10 min for 5h, 1 h for 7d) and a long window (5 h and 24 h respectively). Red when both windows agree the window will exhaust before reset (Google SRE multi-window gate); green when ETA is defined and the SRE gate is cool; yellow when there is no defined ETA yet
+- **DayStop** — derived from the 7d window: "when *should I* stop today". Target is `(day_in_window / 7) × 100%` anchored to the reset hour. Shows the clock-time your current burn rate will cross today's pace target. Displays `DayStop:go to sleep!` when already past the target
 - **Cost** — session API cost in USD
 - **Duration** — wall-clock time since session start
 
@@ -33,7 +34,7 @@ Automatically renames the tmux window to `Cl:<location>`. Skipped when unchanged
 
 ### Session Naming
 
-The `session-naming` skill (invoked by design plan, implementation plan, execution, and debugging skills) spawns a Haiku subagent to generate a domain-specific slug, renames the tmux window to `Cl:<slug>`, writes a lock file to prevent statusline from overwriting the name, and prompts the user with `/rename <slug>`.
+The `exec-session-naming` skill (invoked by design plan, implementation plan, execution, and debugging skills) spawns a Haiku subagent to generate a domain-specific slug, renames the tmux window to `Cl:<slug>`, writes a lock file to prevent statusline from overwriting the name, and prompts the user with `/rename <slug>`.
 
 ## Setup
 
@@ -43,10 +44,13 @@ Add to `~/.claude/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow_statusline workflow-statusline"
+    "command": "uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow_statusline workflow-statusline",
+    "refreshInterval": 30
   }
 }
 ```
+
+`refreshInterval: 30` re-runs the statusline every 30 seconds. Without it, the script only fires on Claude Code redraw events (tool calls, messages), so rate-limit samples are collected irregularly — making burn-rate forecasts unreliable across idle stretches. The 30 s cadence matches the minimum sample interval used by `append_rate_sample`.
 
 ### Migration from v1
 
@@ -72,7 +76,7 @@ Located at `scripts/workflow_statusline/`. Modules:
 | `cache` | File-based caching (read/write with TTL) |
 | `colours` | ANSI colour constants |
 | `git` | Location detection (worktree-aware) and change counts |
-| `ratelimit` | Burn-rate projection via linear regression |
+| `ratelimit` | Idle-trimmed multi-window burn-rate forecasting (SRE multi-window gate, DayStop pace target, clock-time formatter) |
 | `tmux` | Window rename with lock file deference |
 
 ## Requires

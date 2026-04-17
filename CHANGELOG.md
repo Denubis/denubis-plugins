@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.30.0
+
+Rate-limit statusline: persistent per-user cache, active-hours pace display, Theil–Sen forecast.
+
+- Persistent cache at `$XDG_CACHE_HOME/claude-statusline/rate-{window}` with `fcntl.flock` + atomic rename; each line records `timestamp|used_pct|pid|session_id` for provenance.
+- Display `5h:22% < 20%` (under pace, green) or `7d:19% ≮ 14%` (not-less-than pace, red). Pace = elapsed fraction of *active hours* (07:00–22:00 local); 7d budget = 7 × 15h = 105h.
+- Theil–Sen median-of-pairwise-slopes estimator over last 24h (cap 500 for O(n²) bound); unfiltered so the slope is %/clock-second and composes directly with clock-time.
+- DayStop cell: ETA to end-of-today's active-pace target, or `DayStop:go to sleep!` when already past. WeekStop cell: ETA to 100%; suppressed when reset comes first.
+- Setup: add `"refreshInterval": 30` to the `statusLine` block in `~/.claude/settings.json` so samples accumulate on a timer rather than only on redraw events.
+
 ## [denubis-plan-and-execute] 2.27.0
 
 Replace tautological UAT gates with coherence review for foundational phases.
