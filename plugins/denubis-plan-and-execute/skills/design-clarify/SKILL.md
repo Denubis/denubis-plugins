@@ -1,5 +1,6 @@
 ---
-name: asking-clarifying-questions
+name: design-clarify
+family: starting-a-design-plan
 description: Use after initial design context is gathered, before brainstorming - resolves contradictions in requirements, disambiguates terminology, clarifies scope boundaries, and verifies assumptions to prevent building the wrong solution
 user-invocable: false
 ---
@@ -12,7 +13,7 @@ Bridge the gap between raw user input and structured brainstorming by understand
 
 **Core principle:** Resolve contradictions first, then disambiguate. Conflicting goals must be reconciled before technical clarification - otherwise you're precisely defining the wrong thing.
 
-**Announce at start:** "I'm using the asking-clarifying-questions skill to make sure I understand your requirements correctly."
+**Announce at start:** "I'm using the design-clarify skill to make sure I understand your requirements correctly."
 
 ## When to Use
 

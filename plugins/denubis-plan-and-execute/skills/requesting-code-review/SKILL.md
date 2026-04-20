@@ -1,5 +1,6 @@
 ---
 name: requesting-code-review
+family: executing-an-implementation-plan,finishing-a-development-branch,make-pr,merge-to-main
 description: Use after each implementation phase and before merging to verify work meets requirements - dispatches code-reviewer subagent, handles retries and timeouts, manages review-fix loop until zero issues
 user-invocable: false
 ---
@@ -172,7 +173,7 @@ This code is about to be accepted as complete for this phase.
 
 Present counterarguments to human. Wait for response before proceeding.
 
-**After human evaluates counterarguments:** Proceed to human-uat-gate skill for acceptance verification.
+**After human evaluates counterarguments:** Proceed to exec-uat-gate skill for acceptance verification.
 
 ### If Any Issues Found
 Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
@@ -350,6 +351,6 @@ HEAD_SHA: [sha]
 
 **Leads to:**
 - proleptic-challenge (after zero issues)
-- human-uat-gate (after proleptic challenge addressed)
+- exec-uat-gate (after proleptic challenge addressed)
 
 **Template location:** requesting-code-review/code-reviewer.md

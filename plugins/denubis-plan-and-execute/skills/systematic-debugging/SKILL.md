@@ -1,5 +1,6 @@
 ---
 name: systematic-debugging
+family: standalone
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - seven-phase framework (causal investigation, pattern analysis, hypothesis testing, execution path audit, Toulmin claim verification, self-audit against overclaiming, implementation with hardening) that ensures understanding before attempting solutions
 user-invocable: true
 ---
@@ -181,7 +182,7 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
-**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the bug investigation context.
+**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:exec-session-naming` to generate a domain-specific session name from the bug investigation context.
 
 ### Phase 2: Pattern Analysis
 
@@ -550,7 +551,7 @@ Multiple contributing factors, not a single "root cause."]
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - **REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:test-driven-development for writing proper failing tests
+   - **REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:coding-tdd for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the causal mechanism identified
@@ -720,12 +721,12 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 ## Integration with Other Skills
 
 **This skill requires using:**
-- **test-driven-development** - REQUIRED for creating failing test case (see Phase 4, Step 1)
+- **coding-tdd** - REQUIRED for creating failing test case (see Phase 4, Step 1)
 - **critical-peer-review** - REQUIRED for Phase 3d self-audit via clean subagent
 
 **Complementary skills:**
 - **coding-effectively** - Includes `defense-in-depth` for adding validation at multiple layers
-- **verification-before-completion** - Verify fix worked before claiming success
+- **coding-verify** - Verify fix worked before claiming success
 
 ## Real-World Impact
 

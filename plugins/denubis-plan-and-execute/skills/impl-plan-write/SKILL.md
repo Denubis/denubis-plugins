@@ -1,5 +1,6 @@
 ---
-name: writing-implementation-plans
+name: impl-plan-write
+family: starting-an-implementation-plan
 description: Use when design is complete and you need detailed implementation tasks for engineers with zero codebase context - creates comprehensive implementation plans with exact file paths, complete code examples, and verification steps assuming engineer has minimal domain knowledge
 user-invocable: false
 ---
@@ -12,7 +13,7 @@ Write comprehensive implementation plans assuming the engineer has zero context 
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-**Announce at start:** "I'm using the writing-implementation-plans skill to create the implementation plan."
+**Announce at start:** "I'm using the impl-plan-write skill to create the implementation plan."
 
 **Save plans to:** `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
 
@@ -522,7 +523,7 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - Python code? Activate python-idioms/coding-effectively skills
+     - Python code? Activate coding-python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - **Structural readiness check (for phases modifying existing files):**
@@ -631,7 +632,7 @@ Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - Python code? Activate python-idioms/coding-effectively skills
+     - Python code? Activate coding-python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - **Structural readiness check (for phases modifying existing files):**
@@ -692,7 +693,7 @@ Every design decision gets a falsification test. But the *output* of that test d
 | Answer | What to write | Where it goes |
 |--------|--------------|---------------|
 | **Automatable** — the prediction reduces to "run X, compare output to Y" | Write it as a test requirement | `test-requirements.md` — the test-analyst validates coverage during execution |
-| **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry using the falsification template below | `uat-requirements.md` — the `human-uat-gate` skill uses it during execution. **These entries MUST be persisted.** |
+| **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry using the falsification template below | `uat-requirements.md` — the `exec-uat-gate` skill uses it during execution. **These entries MUST be persisted.** |
 | **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | `uat-requirements.md` under the future phase's section, with a back-reference to the decision (DR[N]) made here |
 
 **Quality rubric — Carnap's "Mark I eyeball" test:**
@@ -748,7 +749,7 @@ The developer uses the system for its purpose and asks: does this match what I m
 - "Use the incident timeline tool against the 2026-03-16 data and judge whether the correlated events tell a coherent story" — analytical judgment
 - "Read the generated guide as a new instructor and assess whether you could complete the setup without asking for help" — completeness judgment (the mechanism "headings exist" is automatable; the surface "I could follow this without help" is genuinely subjective)
 
-**For phases with no user-facing surface** (most foundational phases): there are typically no Popper UAT entries. Instead, the decision's falsification test is either an automated test requirement or a note that human verification is deferred to the phase where the experience exists. The `coherence-review` skill handles the human touchpoint for these phases — checking whether the foundations support the future UAT, not re-running tests by hand.
+**For phases with no user-facing surface** (most foundational phases): there are typically no Popper UAT entries. Instead, the decision's falsification test is either an automated test requirement or a note that human verification is deferred to the phase where the experience exists. The `exec-coherence-review` skill handles the human touchpoint for these phases — checking whether the foundations support the future UAT, not re-running tests by hand.
 
 **Worked example — sorting a phase's decisions across the three buckets:**
 
@@ -759,7 +760,7 @@ Phase 2 (Token Service, functionality, no UI) has 4 design decisions:
 3. "The auth flow feels discoverable to a new user without documentation" → **Human judgment, but not in this phase.** The UI doesn't exist until Phase 4. Persisted to `uat-requirements.md` under Phase 4, back-reference DR2 from Phase 2.
 4. "Concurrent refresh requests don't create duplicate tokens" → **Automatable.** Write test: `test_concurrent_refresh_deduplicates`. Goes to test-requirements.md.
 
-Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends it to coherence-review, not the UAT gate. The one human-judgment item lands in Phase 4's UAT where it belongs.
+Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends it to exec-coherence-review, not the UAT gate. The one human-judgment item lands in Phase 4's UAT where it belongs.
 
 **Lakatos discipline:**
 - The hard core = design plan's architectural commitments (inherited, not questioned here)
@@ -781,7 +782,7 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
    - Dispatch codebase-investigator with design assumptions for this phase
    - Review investigator findings for discrepancies
    - **Activate relevant skills** based on findings (if not already active):
-     - Python code? Activate python-idioms/coding-effectively skills
+     - Python code? Activate coding-python-idioms/coding-effectively skills
      - Database work? Activate howto-develop-with-postgres skill
      - Match skills to the technologies this phase involves
    - **Structural readiness check (for phases modifying existing files):**
@@ -1287,7 +1288,7 @@ Write to `[PLAN_DIR]/test-requirements.md`. Mark task completed. Proceed to UAT 
 
 Mark in_progress after Test Requirements completes.
 
-UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `human-uat-gate` skill reads this file during execution.
+UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `exec-uat-gate` skill reads this file during execution.
 
 **For design decisions mode:** UAT entries were already generated per-phase during step 8 (Task ND). Collate them into a single file.
 
@@ -1322,7 +1323,7 @@ Quality gate: every entry must have (1) what the human DOES (an action, not insp
 ...
 ```
 
-**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
 
 **Step: Write and complete**
 

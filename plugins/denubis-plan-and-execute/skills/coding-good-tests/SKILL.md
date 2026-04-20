@@ -1,5 +1,6 @@
 ---
-name: writing-good-tests
+name: coding-good-tests
+family: coding-effectively
 description: Use when writing or reviewing tests - covers pytest patterns, mock strategy, condition-based waiting, and test isolation with focus on testing behavior not implementation
 ---
 
@@ -313,4 +314,4 @@ async def test_process_order(db_session, sample_order):
 
 ## Property-Based Testing
 
-For serialisation, validation, and pure functions, see `property-based-testing` skill.
+For serialisation, validation, and pure functions, see `coding-property-testing` skill.

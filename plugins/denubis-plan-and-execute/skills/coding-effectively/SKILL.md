@@ -8,15 +8,15 @@ description: Use when writing or reviewing code - orchestrates sub-skills for FC
 ## Required Sub-Skills
 
 **ALWAYS load when coding:**
-- `test-driven-development` - RED-GREEN-REFACTOR: write tests first, always
-- `verification-before-completion` - Evidence before assertions: run and show output before claiming done
-- `functional-core-imperative-shell` - Separate pure logic from I/O
+- `coding-tdd` - RED-GREEN-REFACTOR: write tests first, always
+- `coding-verify` - Evidence before assertions: run and show output before claiming done
+- `coding-fcis` - Separate pure logic from I/O
 - `defense-in-depth` - Validate at system boundaries
-- `python-idioms` - Python 3.14+ patterns, security, tooling
+- `coding-python-idioms` - Python 3.14+ patterns, security, tooling
 
 **CONDITIONAL - load when applicable:**
-- `writing-good-tests` - When writing or reviewing tests
-- `property-based-testing` - For serialisation, validation, pure functions
+- `coding-good-tests` - When writing or reviewing tests
+- `coding-property-testing` - For serialisation, validation, pure functions
 - `howto-develop-with-postgres` - When working with PostgreSQL
 
 ## Property-Driven Design

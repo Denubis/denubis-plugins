@@ -25,7 +25,7 @@ Proleptic challenges fire **before phase transitions**, not at every decision po
 
 | Trigger | When | What Gets Challenged |
 |---------|------|---------------------|
-| Design finalisation | After writing-design-plans completes, before commit | The design about to be committed |
+| Design finalisation | After design-write completes, before commit | The design about to be committed |
 | Between implementation phases | After phase code review passes, before UAT/coherence routing | The completed phase before moving to next |
 | Before acceptance | After code review passes on final phase, before UAT or coherence review | The implementation before declaring complete |
 
@@ -119,7 +119,7 @@ Both the proposal AND the counterarguments may be flawed:
 
 ## Integration with Other Skills
 
-**writing-design-plans:** Invoke proleptic challenge before committing design document.
+**design-write:** Invoke proleptic challenge before committing design document.
 
 **executing-an-implementation-plan:** Invoke proleptic challenge after each phase's code review passes, before proceeding to next phase or UAT.
 

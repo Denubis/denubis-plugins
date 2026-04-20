@@ -13,12 +13,12 @@ Main orchestrator skill references sub-skills:
 ```
 skills/
   coding-effectively/SKILL.md        # Orchestrator, general principles
-  functional-core-imperative-shell/  # FCIS pattern
+  coding-fcis/  # FCIS pattern
   defense-in-depth/                  # Validation at boundaries
-  writing-good-tests/                # pytest patterns, mock strategy
-  property-based-testing/            # Hypothesis patterns
+  coding-good-tests/                # pytest patterns, mock strategy
+  coding-property-testing/            # Hypothesis patterns
   howto-develop-with-postgres/       # SQL/transaction patterns
-  python-idioms/                     # Python 3.14+, t-strings, ty, security
+  coding-python-idioms/                     # Python 3.14+, t-strings, ty, security
 ```
 
 ## Key Decisions
@@ -92,7 +92,7 @@ Cascade for checking assumptions:
 
 ### Security
 
-Inline critical prevention in python-idioms:
+Inline critical prevention in coding-python-idioms:
 - T-strings for SQL/HTML/shell (injection prevention)
 - Never use dynamic code evaluation on untrusted input
 - Never deserialize untrusted binary data (use JSON instead)
@@ -122,7 +122,7 @@ Patterns drawn from:
 
 ## Sub-skill Content Notes
 
-### functional-core-imperative-shell
+### coding-fcis
 
 - Upstream already has Python examples
 - Keep language-agnostic core
@@ -134,14 +134,14 @@ Patterns drawn from:
 - Four layers: Entry, Business, Environment, Debug
 - EAFP is fine within validated boundaries
 
-### writing-good-tests
+### coding-good-tests
 
 - pytest with parametrize, fixtures
 - `uv run pytest` not `python -m pytest`
 - Mock strategy: don't mock what you don't own
 - Condition-based waiting, not arbitrary sleeps
 
-### property-based-testing
+### coding-property-testing
 
 - Hypothesis patterns
 - Roundtrip, idempotence, invariants
@@ -156,7 +156,7 @@ Patterns drawn from:
 - Type JSONB columns
 - Proactive indexing
 
-### python-idioms
+### coding-python-idioms
 
 - T-strings for security-sensitive interpolation
 - Deferred annotations (PEP 649)

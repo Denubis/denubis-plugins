@@ -13,8 +13,8 @@ You are **read-only analysis**. You do not edit source files.
 
 Before starting assessment, complete these steps in order:
 
-1. Load the `refactoring-rubric` skill (Mantyla taxonomy, Fowler mapping, evidence grading criteria)
-2. Load the `coding-effectively` skill (FCIS, python-idioms, defence-in-depth coding standards)
+1. Load the `exec-refactoring-rubric` skill (Mantyla taxonomy, Fowler mapping, evidence grading criteria)
+2. Load the `coding-effectively` skill (FCIS, coding-python-idioms, defence-in-depth coding standards)
 3. Read measurement data from `${MEASUREMENT_DATA_PATH}` (complexipy output, ast-grep structural smell results, wc -l line counts)
 4. Read all files listed in `${PHASE_FILES}` (the code being assessed)
 5. If `${DESIGN_PLAN_PATH}` is provided, read it (needed for Speculative Generality checks)
@@ -82,7 +82,7 @@ For each measurement source, map findings to Mantyla categories:
 For each finding:
 - Evidence grade: **Demonstrated** (tool output is direct evidence)
 - Location: exact file:line from tool output
-- Suggested refactoring: from Fowler mapping table in refactoring-rubric skill
+- Suggested refactoring: from Fowler mapping table in exec-refactoring-rubric skill
 
 Write checkpoint after Pass 1.
 
@@ -177,7 +177,7 @@ Smells requiring cross-file or historical analysis (not assessed):
 
 ## What You MUST Do
 
-- Load refactoring-rubric and coding-effectively skills before starting assessment
+- Load exec-refactoring-rubric and coding-effectively skills before starting assessment
 - Read ALL measurement data before making findings
 - Write checkpoint file after each assessment pass
 - Grade every finding using the evidence scale from the rubric

@@ -1,5 +1,6 @@
 ---
-name: coherence-review
+name: exec-coherence-review
+family: executing-an-implementation-plan
 description: Use after code review and proleptic challenge for phases without human-judgment UAT - verifies implementation coheres with design intent, surfaces baked-in assumptions, and assesses forward fitness for future acceptance testing
 user-invocable: false
 ---
@@ -12,11 +13,11 @@ Verify that an implementation phase coheres with its design intent and will supp
 
 **When to use:** After code review passes and proleptic challenge is presented, for phases where human judgment does not add signal that automation cannot provide. Most implementation phases fall into this category — data models, validators, infrastructure, internal services, APIs without a client to exercise them.
 
-**When NOT to use:** When the phase produces something a human can interact with and form a judgment about — a UI to navigate, a workflow to evaluate, extracted data to assess against domain knowledge, a report to read. Those phases use the `human-uat-gate` skill instead.
+**When NOT to use:** When the phase produces something a human can interact with and form a judgment about — a UI to navigate, a workflow to evaluate, extracted data to assess against domain knowledge, a report to read. Those phases use the `exec-uat-gate` skill instead.
 
-**The test:** For each potential verification item, ask: "Would a human learn something by doing this that the automated test suite cannot already prove?" If the answer is no for every item in the phase, use this skill. If yes for any item, use `human-uat-gate`.
+**The test:** For each potential verification item, ask: "Would a human learn something by doing this that the automated test suite cannot already prove?" If the answer is no for every item in the phase, use this skill. If yes for any item, use `exec-uat-gate`.
 
-**Announce at start:** "I'm using the coherence-review skill to verify this phase's implementation matches the design intent."
+**Announce at start:** "I'm using the exec-coherence-review skill to verify this phase's implementation matches the design intent."
 
 ## The Dispatch
 
@@ -46,7 +47,7 @@ Check all six dimensions:
 5. Situated accountability — whose perspective shaped these decisions? who's absent?
 6. Architecture doc updates — do the docs need updating based on this phase's work?
 
-Write findings to ${SCRATCHPAD_DIR}/coherence-review.md
+Write findings to ${SCRATCHPAD_DIR}/exec-coherence-review.md
 </parameter>
 </invoke>
 ```
@@ -121,7 +122,7 @@ Proceeding to refactoring.
 
 ## Integration with Execution Flow
 
-This skill is invoked by `executing-an-implementation-plan` in place of `human-uat-gate` when the phase has no human-judgment UAT.
+This skill is invoked by `executing-an-implementation-plan` in place of `exec-uat-gate` when the phase has no human-judgment UAT.
 
 **Phase completion flow (phases without human-judgment UAT):**
 ```
@@ -130,7 +131,7 @@ Code review → Proleptic → Coherence review → Human confirms → Refactor �
 
 **Phase completion flow (phases with human-judgment UAT):**
 ```
-Code review → Proleptic → UAT gate (human-uat-gate skill) → Human confirms → Refactor → Next phase
+Code review → Proleptic → UAT gate (exec-uat-gate skill) → Human confirms → Refactor → Next phase
 ```
 
 The orchestrator determines which path to take using the deterministic routing rubric in executing-an-implementation-plan (based on Phase Type and Popper UAT entry presence, not LLM judgment).

@@ -1,5 +1,6 @@
 ---
 name: brainstorming
+family: starting-a-design-plan
 description: Use when creating or developing anything, before writing code or implementation plans - refines rough ideas into fully-formed designs through structured Socratic questioning, alternative exploration, and incremental validation
 user-invocable: false
 ---
@@ -397,10 +398,10 @@ When Phase 3 is complete, announce:
 
 "Design is validated and ready for documentation."
 
-**Next step:** The orchestrating skill (starting-a-design-plan) will invoke writing-design-plans to document this design.
+**Next step:** The orchestrating skill (starting-a-design-plan) will invoke design-write to document this design.
 
 **You do NOT:**
-- Write design document (that's writing-design-plans)
+- Write design document (that's design-write)
 - Set up worktrees (that's later in workflow)
 - Create implementation plans (that's writing-plans)
 

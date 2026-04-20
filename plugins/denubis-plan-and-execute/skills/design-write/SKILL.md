@@ -1,5 +1,6 @@
 ---
-name: writing-design-plans
+name: design-write
+family: starting-a-design-plan
 description: Use after brainstorming completes - writes validated designs to docs/design-plans/ with structured format and discrete implementation phases required for creating detailed implementation plans
 user-invocable: false
 ---
@@ -12,7 +13,7 @@ Complete the design document by appending validated design from brainstorming to
 
 **Core principle:** Append body to existing document. Generate Summary and Glossary. Commit for permanence.
 
-**Announce at start:** "I'm using the writing-design-plans skill to complete the design document."
+**Announce at start:** "I'm using the design-write skill to complete the design document."
 
 **Context:** Design document already exists with Title, Summary placeholder, confirmed Definition of Done, and Glossary placeholder. This skill appends the body and fills in placeholders.
 
@@ -160,7 +161,7 @@ Break implementation into discrete phases (<=8 recommended).
 
 ...continue for each phase...
 
-**Why markers:** These enable writing-implementation-plans to parse phases individually, reducing context usage and enabling granular task tracking across compaction boundaries.
+**Why markers:** These enable impl-plan-write to parse phases individually, reducing context usage and enabling granular task tracking across compaction boundaries.
 
 ## Additional Considerations
 [Error handling, edge cases, future extensibility - only if relevant]
@@ -741,9 +742,9 @@ This design will guide implementation. Once committed, changes require revisitin
 
 **After proleptic challenge is resolved,** invoke the architecture documentation skill.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:update-architecture-docs
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:architecture-update
 
-Announce: "I'm using the update-architecture-docs skill to assess architecture documentation."
+Announce: "I'm using the architecture-update skill to assess architecture documentation."
 
 Pass the design plan file path as the artifact:
 

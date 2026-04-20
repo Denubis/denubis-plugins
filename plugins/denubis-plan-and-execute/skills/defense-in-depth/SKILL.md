@@ -1,5 +1,6 @@
 ---
 name: defense-in-depth
+family: coding-effectively
 description: Use when fixing bugs caused by invalid data or designing validation - enforces validation at system boundaries to make bugs structurally impossible rather than temporarily fixed
 ---
 

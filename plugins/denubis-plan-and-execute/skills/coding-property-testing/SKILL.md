@@ -1,5 +1,6 @@
 ---
-name: property-based-testing
+name: coding-property-testing
+family: coding-effectively
 description: Use when writing tests for serialisation, validation, normalisation, or pure functions - provides property catalog, Hypothesis patterns, and strategy guidance
 ---
 

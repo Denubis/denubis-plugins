@@ -1,5 +1,6 @@
 ---
-name: session-naming
+name: exec-session-naming
+family: executing-an-implementation-plan,starting-an-implementation-plan,starting-a-design-plan,systematic-debugging
 description: Generate domain-specific session name via Haiku subagent, rename tmux window, write lock file
 user-invocable: false
 ---
@@ -13,7 +14,7 @@ Generate a short, domain-specific slug for the current session. Rename the tmux 
 Collect the following before spawning the subagent:
 
 - **User prompt summary:** Summarise the user's initial prompt from conversation context (one sentence).
-- **Invoking skill name:** The skill that triggered session-naming.
+- **Invoking skill name:** The skill that triggered exec-session-naming.
 - **Repo name:** Basename of `git rev-parse --show-toplevel`.
 - **Branch name:** Output of `git branch --show-current`.
 - **Tmux pane ID:** Read `$TMUX_PANE` from the environment and strip the `%` prefix.

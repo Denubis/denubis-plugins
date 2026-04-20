@@ -10,7 +10,7 @@ _SKILLS_DIR = Path(__file__).resolve().parents[3] / "skills"
 
 
 # ---------------------------------------------------------------------------
-# AC6.1 — Each of 4 target skills invokes session-naming
+# AC6.1 — Each of 4 target skills invokes exec-session-naming
 # ---------------------------------------------------------------------------
 _SESSION_NAMING_SKILLS = [
     "starting-a-design-plan",
@@ -24,8 +24,8 @@ class TestSessionNamingInvocation:
     @pytest.mark.parametrize("skill", _SESSION_NAMING_SKILLS)
     def test_skill_invokes_session_naming(self, skill: str) -> None:
         md = (_SKILLS_DIR / skill / "SKILL.md").read_text()
-        assert "denubis-plan-and-execute:session-naming" in md, (
-            f"{skill}/SKILL.md does not invoke session-naming"
+        assert "denubis-plan-and-execute:exec-session-naming" in md, (
+            f"{skill}/SKILL.md does not invoke exec-session-naming"
         )
 
 

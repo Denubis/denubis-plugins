@@ -32,7 +32,7 @@ A build fails. You change something without reading the error properly. It fails
 | Term | Meaning |
 |------|---------|
 | **Design plan** | The document in `docs/design-plans/` describing *what* to build and *why* (output of brainstorming/design process) |
-| **Implementation plan** | The document(s) in `docs/implementation-plans/` describing *how* to build it (output of writing-implementation-plans) |
+| **Implementation plan** | The document(s) in `docs/implementation-plans/` describing *how* to build it (output of impl-plan-write) |
 | **Phase** | A numbered unit of implementation work (e.g. Phase 1, Phase 2). Each phase has its own file (`phase_01.md`) and contains multiple tasks |
 | **Task** | A single unit of work within a phase, executed by a subagent (task-implementor) |
 | **Stage** | A mandatory workflow step outside the phase numbering (e.g. post-implementation cleanup, post-acceptance) |
@@ -40,7 +40,7 @@ A build fails. You change something without reading the error properly. It fails
 ## Overview
 
 **When NOT to use:**
-- No implementation plan exists yet (use writing-implementation-plans first)
+- No implementation plan exists yet (use impl-plan-write first)
 - Plan needs revision (brainstorm first)
 
 ## Precondition: Worktree Required
@@ -129,9 +129,9 @@ This is NOT a transient error and retrying with the same budget will produce the
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
 2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review, coherence-reviewer):
-   - Check for `review-wip.md`, `test-analysis-wip.md`, `smell-report-wip.md`, or `coherence-review-wip.md` in the scratchpad directory
+   - Check for `review-wip.md`, `test-analysis-wip.md`, `smell-report-wip.md`, or `exec-coherence-review-wip.md` in the scratchpad directory
    - For critical-peer-review: check for `reviewed-smell-report.md` — if present, review completed (executor can proceed); if absent, review exhausted with no output
-   - For coherence-reviewer: check for `coherence-review.md` (final) or `coherence-review-wip.md` (partial) — if final exists, review completed; if only WIP exists, read partial findings and report
+   - For coherence-reviewer: check for `exec-coherence-review.md` (final) or `exec-coherence-review-wip.md` (partial) — if final exists, review completed; if only WIP exists, read partial findings and report
    - If a checkpoint file exists, read it and report the partial findings
 
 3. **Report to the human** with recovery information:
@@ -254,7 +254,7 @@ ls [plan-directory]/test-requirements.md
 
 If the file exists, note its **absolute path** for use during final review. The test requirements document specifies what automated tests must exist for each acceptance criterion.
 
-**Session naming:** After discovering phases, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the implementation plan context.
+**Session naming:** After discovering phases, invoke `denubis-plan-and-execute:exec-session-naming` to generate a domain-specific session name from the implementation plan context.
 
 ### 2. Create Task List for Current Phase Only
 
@@ -448,7 +448,7 @@ The task-implementor's response must contain evidence. Missing evidence = reject
 | Check | Evidence needed | If missing |
 |-------|-----------------|------------|
 | Tests ran | Test command output with pass/fail counts. Full suite per CLAUDE.md, not a subset | "Re-run with the full test suite per CLAUDE.md and report output" |
-| Verification evidence | Build/lint/type-check output showing clean state | "Run verification-before-completion and report results" |
+| Verification evidence | Build/lint/type-check output showing clean state | "Run coding-verify and report results" |
 | TDD evidence | RED-GREEN-REFACTOR cycle: test written first, failed, implementation added, test passed | "Show the RED-GREEN sequence: which test did you write first, how did it fail, what did you implement to pass it?" |
 | Tests stay green | Test output showing same pass count as before refactoring | "Show test output before and after refactoring" |
 | Commit made | Commit hash for the work | "Commit your changes and report the hash" |
@@ -612,15 +612,15 @@ Check whether the phase's acceptance criteria include any item where the verific
 
 **UAT gate path:**
 
-Announce: "I'm using the human-uat-gate skill to verify this phase meets your requirements."
+Announce: "I'm using the exec-uat-gate skill to verify this phase meets your requirements."
 
-Read this phase's entries from `uat-requirements.md`. Present using the `human-uat-gate` skill format.
+Read this phase's entries from `uat-requirements.md`. Present using the `exec-uat-gate` skill format.
 
 **Coherence review path:**
 
-Announce: "I'm using the coherence-review skill to verify this phase's implementation matches the design intent."
+Announce: "I'm using the exec-coherence-review skill to verify this phase's implementation matches the design intent."
 
-Dispatch the coherence-reviewer agent (see `coherence-review` skill for the dispatch template). The reviewer checks conformance, traceability, baked-in assumptions, forward fitness, situated accountability, and architecture doc updates. Present findings to the human.
+Dispatch the coherence-reviewer agent (see `exec-coherence-review` skill for the dispatch template). The reviewer checks conformance, traceability, baked-in assumptions, forward fitness, situated accountability, and architecture doc updates. Present findings to the human.
 
 **Handle response (both paths):**
 
@@ -663,9 +663,9 @@ wc -l ${PHASE_FILES} > "${SCRATCHPAD_DIR}/line-counts.txt"
 # 2. Cognitive complexity
 uvx complexipy ${PHASE_FILES} --max-complexity-allowed 15 > "${SCRATCHPAD_DIR}/complexipy-output.txt" 2>&1 || true
 
-# 3. Structural smell detection (ast-grep rules from refactoring-rubric)
+# 3. Structural smell detection (ast-grep rules from exec-refactoring-rubric)
 # Write one JSON file per rule to avoid concatenated/malformed JSON
-RULES_DIR="$(git rev-parse --show-toplevel)/plugins/denubis-plan-and-execute/skills/refactoring-rubric/rules"
+RULES_DIR="$(git rev-parse --show-toplevel)/plugins/denubis-plan-and-execute/skills/exec-refactoring-rubric/rules"
 for rule in "${RULES_DIR}"/*.yaml; do
   rulename=$(basename "$rule" .yaml)
   ast-grep scan --rule "$rule" ${PHASE_FILES} --json > "${SCRATCHPAD_DIR}/structural-smells-${rulename}.json" 2>&1 || true
@@ -824,7 +824,7 @@ The git history has everything. The resume prompt below is self-contained -- it 
 Suggest: /clear then paste this to resume:
 
 ---
-/session-naming
+/exec-session-naming
 
 /executing-an-implementation-plan
 
@@ -1184,7 +1184,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 [Execute tasks, code review, proleptic challenge...]
 
 [Routing rubric: functionality + uat-requirements.md entries → UAT gate]
-[Use human-uat-gate skill]
+[Use exec-uat-gate skill]
 → Human interacts with extraction UI, evaluates output against domain knowledge.
 → Confirmed.
 
@@ -1205,7 +1205,7 @@ You: I'm using the `executing-an-implementation-plan` skill.
 
 **Required workflow skills:**
 - **denubis-plan-and-execute:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
-- **denubis-plan-and-execute:writing-implementation-plans** - Creates the plan this skill executes
+- **denubis-plan-and-execute:impl-plan-write** - Creates the plan this skill executes
 - **denubis-plan-and-execute:finishing-a-development-branch** - Complete development after all tasks
 
 ## Common Rationalizations - STOP

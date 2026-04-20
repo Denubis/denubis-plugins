@@ -1,6 +1,6 @@
 ---
 name: maintain-architecture
-description: Use for standalone architecture documentation maintenance - computes git diff baselines, dispatches subagents to read code and docs, asks targeted questions, and invokes update-architecture-docs to propose changes
+description: Use for standalone architecture documentation maintenance - computes git diff baselines, dispatches subagents to read code and docs, asks targeted questions, and invokes architecture-update to propose changes
 user-invocable: true
 ---
 
@@ -14,7 +14,7 @@ Orchestrate standalone architecture documentation maintenance sessions through f
 
 **Announce at start:** "I'm using the maintain-architecture skill to review and update architecture documentation."
 
-This skill orchestrates maintenance sessions by dispatching subagents for investigation and calling the `update-architecture-docs` inner skill for proposals.
+This skill orchestrates maintenance sessions by dispatching subagents for investigation and calling the `architecture-update` inner skill for proposals.
 
 ## Scope Determination
 
@@ -49,7 +49,7 @@ After scope is chosen, compute the git diff baseline. Use Bash to run the approp
 | Full sweep | N/A — no diff, investigate everything | Complete review |
 | Specific area | User provides files/features | Targeted investigation |
 
-**Save the diff output.** You will pass it to `update-architecture-docs` later.
+**Save the diff output.** You will pass it to `architecture-update` later.
 
 ### Error Handling
 
@@ -161,9 +161,9 @@ Stop asking questions when:
 
 After the question loop, invoke the inner skill to propose and apply documentation changes.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:update-architecture-docs
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:architecture-update
 
-**Announce:** "I'm using the update-architecture-docs skill to assess and propose changes."
+**Announce:** "I'm using the architecture-update skill to assess and propose changes."
 
 Pass the git diff output as the artifact. The inner skill operates in wrapper mode when given diff output.
 
@@ -195,7 +195,7 @@ Summarise the session:
 | "Diff is small, skip investigation" | Small diffs can have large architecture impact. Always investigate. |
 | "I can read the docs myself, no need for subagents" | Dispatch subagents. Keep your context clean for questions. |
 | "No questions needed, I understand everything" | If investigation revealed gaps, ask. If not, proceed — but don't skip the check. |
-| "I'll update docs directly without the inner skill" | Always use `update-architecture-docs`. It handles contradiction detection and approval. |
+| "I'll update docs directly without the inner skill" | Always use `architecture-update`. It handles contradiction detection and approval. |
 | "User didn't ask for full review, skip some doc types" | The inner skill checks all doc types against the diff. Don't pre-filter. |
 | "Architecture docs appear current" without checking | Only say this after computing baseline AND confirming the diff is empty. |
 
@@ -211,13 +211,13 @@ User invokes /maintain-architecture
   -> Compute git diff baseline
   -> Dispatch investigation subagents
   -> Question loop (one question at a time)
-  -> Invoke update-architecture-docs with diff
+  -> Invoke architecture-update with diff
      -> Inner skill reads docs, detects contradictions, proposes changes
      -> Human approves/modifies
      -> Inner skill writes changes
   -> Summarise and suggest commit
 
-writing-design-plans (after proleptic challenge)
-  -> calls update-architecture-docs with design plan path
+design-write (after proleptic challenge)
+  -> calls architecture-update with design plan path
   -> separate invocation path, not through this wrapper
 ```

@@ -1,5 +1,6 @@
 ---
-name: human-uat-gate
+name: exec-uat-gate
+family: executing-an-implementation-plan
 description: Use after code review passes for phases where human judgment adds signal automation cannot - presents genuinely falsifiable claims for human interaction and verification
 ---
 
@@ -11,11 +12,11 @@ Present acceptance criteria to the human and wait for explicit verification befo
 
 **Core principle:** UAT is human-falsifiable verification — the human interacts with the built thing and exercises judgment that automated tests cannot capture. The human doesn't re-run automated tests. The human engages with what only a human can judge.
 
-**This skill is ONLY for phases where human judgment adds signal.** If the phase has no user-facing surface — no UI to navigate, no workflow to evaluate, no output to assess against domain knowledge — use the `coherence-review` skill instead. The orchestrator (executing-an-implementation-plan) handles this routing.
+**This skill is ONLY for phases where human judgment adds signal.** If the phase has no user-facing surface — no UI to navigate, no workflow to evaluate, no output to assess against domain knowledge — use the `exec-coherence-review` skill instead. The orchestrator (executing-an-implementation-plan) handles this routing.
 
-**The test:** "Would a human learn something by doing this that the automated test suite cannot already prove?" If yes for any item in the phase, this skill applies. If no for every item, use `coherence-review`.
+**The test:** "Would a human learn something by doing this that the automated test suite cannot already prove?" If yes for any item in the phase, this skill applies. If no for every item, use `exec-coherence-review`.
 
-**Announce at start:** "I'm using the human-uat-gate skill to verify the implementation meets your requirements."
+**Announce at start:** "I'm using the exec-uat-gate skill to verify the implementation meets your requirements."
 
 ## When to Invoke
 
@@ -161,8 +162,8 @@ If no formal Popper tests exist in the implementation plan:
 | "User already knows it works" | Working ≠ knowing where it stops working. Boundaries are invisible until probed. |
 | "We're running late" | Skipped UAT = shipped bugs |
 | "Code review was thorough" | Code review checks quality, UAT checks fitness |
-| "All claims are simple, no boundaries" | If no item in this phase requires human judgment, this skill shouldn't have been invoked — use coherence-review instead. But verify that's actually true. |
-| "Run this command and see OK" | That's re-running the test suite by hand. If automated tests already verify it, the human gains nothing. This is a sign the phase doesn't qualify for UAT — use coherence-review. |
+| "All claims are simple, no boundaries" | If no item in this phase requires human judgment, this skill shouldn't have been invoked — use exec-coherence-review instead. But verify that's actually true. |
+| "Run this command and see OK" | That's re-running the test suite by hand. If automated tests already verify it, the human gains nothing. This is a sign the phase doesn't qualify for UAT — use exec-coherence-review. |
 | "Curl this endpoint and check the response" | Unless the human is evaluating something subjective about the response, that's an integration test. Write the test instead. |
 
 ## Integration with Workflow

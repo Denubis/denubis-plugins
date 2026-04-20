@@ -127,9 +127,9 @@ If architecture docs don't exist:
 
 ## Checkpoint Protocol
 
-**Write findings incrementally.** After completing each check (steps 2-7), append to `${SCRATCHPAD_DIR}/coherence-review-wip.md`. If you exhaust your turn budget, the partial review is preserved.
+**Write findings incrementally.** After completing each check (steps 2-7), append to `${SCRATCHPAD_DIR}/exec-coherence-review-wip.md`. If you exhaust your turn budget, the partial review is preserved.
 
-After completing all checks, write the final report to `${SCRATCHPAD_DIR}/coherence-review.md`.
+After completing all checks, write the final report to `${SCRATCHPAD_DIR}/exec-coherence-review.md`.
 
 ## Severity Levels
 

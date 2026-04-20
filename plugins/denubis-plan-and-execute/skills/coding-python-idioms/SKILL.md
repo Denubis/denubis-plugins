@@ -1,5 +1,6 @@
 ---
-name: python-idioms
+name: coding-python-idioms
+family: coding-effectively
 description: Use when writing Python code - covers Python 3.14+ patterns, t-strings, type checking with ty, security practices, and modern tooling (uv, ruff, typer, pydantic-settings)
 ---
 
@@ -403,7 +404,7 @@ Standard invocation:
 uv run pytest --depper --depper-run-all-on-error -n auto --dist=loadfile -x --ff --durations=10 --tb=short
 ```
 
-See `writing-good-tests` skill for patterns.
+See `coding-good-tests` skill for patterns.
 
 ## Avoid Power Features
 

@@ -27,8 +27,8 @@ Non-obvious failures include:
 **BEFORE starting work:**
 
 1. **Load all relevant skills** - Check for and use:
-   - `test-driven-development` (REQUIRED for new code)
-   - `verification-before-completion` (REQUIRED always)
+   - `coding-tdd` (REQUIRED for new code)
+   - `coding-verify` (REQUIRED always)
    - Language-specific skills (Python 3.14 idioms if Python work)
    - Any other skills relevant to the task
 

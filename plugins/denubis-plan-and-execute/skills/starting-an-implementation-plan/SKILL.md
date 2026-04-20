@@ -57,9 +57,9 @@ TaskCreate: "Execution handoff"
   -> TaskUpdate: addBlockedBy: [Critical peer review]
 ```
 
-**CRITICAL: The "Re-read skill" task must be re-pointed AFTER writing-implementation-plans creates the Finalization task.** See "After Planning: Update Dependencies" below.
+**CRITICAL: The "Re-read skill" task must be re-pointed AFTER impl-plan-write creates the Finalization task.** See "After Planning: Update Dependencies" below.
 
-The "Create implementation plan" task wraps the granular tasks created by writing-implementation-plans. The "Re-read skill" step ensures context is restored after potential compaction before handoff.
+The "Create implementation plan" task wraps the granular tasks created by impl-plan-write. The "Re-read skill" step ensures context is restored after potential compaction before handoff.
 
 ### Branch Setup
 
@@ -148,7 +148,7 @@ gh label create "implementation-planned" --description "Implementation plan exis
 gh issue edit <number> [--repo org/repo] --add-label "implementation-planned" --remove-label "design-planned"
 ```
 
-Parse the issue reference the same way as writing-design-plans:
+Parse the issue reference the same way as design-write:
 
 | Format | `--repo` flag |
 |--------|--------------|
@@ -190,13 +190,13 @@ Proceed directly to Planning. Do not create a task or mention the missing file.
 
 Mark "Create implementation plan" task as in_progress.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:writing-implementation-plans
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:impl-plan-write
 
-Announce: "I'm using the writing-implementation-plans skill to create the detailed implementation plan."
+Announce: "I'm using the impl-plan-write skill to create the detailed implementation plan."
 
-**Session naming:** Before starting planning, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the design document context.
+**Session naming:** Before starting planning, invoke `denubis-plan-and-execute:exec-session-naming` to generate a domain-specific session name from the design document context.
 
-The writing-implementation-plans skill will:
+The impl-plan-write skill will:
 - Verify scope (<=8 phases from design plan)
 - Verify codebase state with investigator
 - Create phase-by-phase implementation tasks
@@ -358,7 +358,7 @@ Starting Implementation Plan (this skill)
     -> If no: ask which branch, create if needed
 
   -> Planning [tracked task wrapping granular tasks]
-    -> Invoke writing-implementation-plans
+    -> Invoke impl-plan-write
     -> Creates granular tasks per phase (NA, NB, NC, ND)
     -> Creates Finalization task (code review, fix ALL issues)
     -> Write to docs/implementation-plans/

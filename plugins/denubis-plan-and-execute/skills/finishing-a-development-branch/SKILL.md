@@ -1,5 +1,6 @@
 ---
 name: finishing-a-development-branch
+family: executing-an-implementation-plan,make-pr,merge-to-main
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
 user-invocable: false
 ---

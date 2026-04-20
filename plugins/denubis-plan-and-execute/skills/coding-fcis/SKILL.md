@@ -1,5 +1,6 @@
 ---
-name: functional-core-imperative-shell
+name: coding-fcis
+family: coding-effectively
 description: Use when writing or refactoring code - enforces separation of pure business logic (Functional Core) from side effects (Imperative Shell) for testability and clarity
 ---
 

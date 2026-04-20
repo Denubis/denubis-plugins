@@ -83,10 +83,10 @@ Each gate is a hard checkpoint — the process cannot advance until the gate con
 | Phase | Key Activities | Output |
 |-------|---------------|--------|
 | **1. Context Gathering** | Ask for freeform description, constraints, goals, URLs, files | Initial context bundle |
-| **2. Clarification** | Invoke asking-clarifying-questions skill | Disambiguated requirements |
+| **2. Clarification** | Invoke design-clarify skill | Disambiguated requirements |
 | **3. Definition of Done** | Synthesize and confirm deliverables before brainstorming | Confirmed success criteria |
 | **4. Brainstorming** | Invoke brainstorming skill | Validated design (in conversation) |
-| **5. Design Documentation** | Invoke writing-design-plans skill | Committed design document |
+| **5. Design Documentation** | Invoke design-write skill | Committed design document |
 | **6. Planning Handoff** | Offer to invoke writing-plans skill | Implementation plan (optional) |
 
 ## The Process
@@ -145,7 +145,7 @@ Share whatever details you have. We'll clarify anything unclear in the next step
 
 Mark Phase 1 as completed when you have initial context.
 
-**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:session-naming` to generate a domain-specific session name from the gathered context.
+**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:exec-session-naming` to generate a domain-specific session name from the gathered context.
 
 ### Between Phase 1 and Phase 2: Check for Project Guidance
 
@@ -182,9 +182,9 @@ The guidance informs what questions you ask during clarification.
 
 Use TaskUpdate to mark Phase 2 as in_progress.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:asking-clarifying-questions
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:design-clarify
 
-Announce: "I'm using the asking-clarifying-questions skill to make sure I understand your requirements correctly."
+Announce: "I'm using the design-clarify skill to make sure I understand your requirements correctly."
 
 The clarification skill will:
 - Use subagents to try to disambiguate before raising questions to the user
@@ -246,7 +246,7 @@ Present the Definition of Done as a brief statement covering:
 |---------|---------|
 | "X is implemented" | Implementation is the means, not the goal. What can the user *do*? |
 | "X works correctly" | Unfalsifiable — what does "correctly" look like? |
-| "All tests pass" | That's verification-before-completion's job, not DoD |
+| "All tests pass" | That's coding-verify's job, not DoD |
 | No exclusions mentioned | Scope will creep during brainstorming |
 
 **Carve-outs — these pass the rubric despite looking implementation-level:**
@@ -344,7 +344,7 @@ The `GitHub Issue` field records the linked issue reference from Phase 1. Use `N
 - Captures Definition of Done at peak resolution (right after user confirmation)
 - Prevents fidelity loss during brainstorming conversation
 - Creates working document that grows incrementally
-- Acceptance Criteria, Summary, and Glossary filled in later by writing-design-plans skill
+- Acceptance Criteria, Summary, and Glossary filled in later by design-write skill
 
 Mark Phase 3 as completed when user confirms the Definition of Done AND the file is created.
 
@@ -380,9 +380,9 @@ Append the validated design to the document created in Phase 3.
 
 Use TaskUpdate to mark Phase 5 as in_progress.
 
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:writing-design-plans
+**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:design-write
 
-Announce: "I'm using the writing-design-plans skill to complete the design document."
+Announce: "I'm using the design-write skill to complete the design document."
 
 **Important:** The design document already exists from Phase 3 with:
 - Title
@@ -391,7 +391,7 @@ Announce: "I'm using the writing-design-plans skill to complete the design docum
 - Acceptance Criteria placeholder
 - Glossary placeholder
 
-The writing-design-plans skill will:
+The design-write skill will:
 - Append body sections (Architecture, Existing Patterns, Implementation Phases, Additional Considerations) to the existing file
 - Structure with implementation phases (<=8 recommended)
   - DO NOT pad out phases in order to reach the number of 8. 8 is the maximum, not the target.
@@ -464,7 +464,7 @@ You can and should go backward when:
 | "Requirements are clear, skip clarification" | Clarification prevents misunderstandings. Always run Phase 2. |
 | "I know what done looks like, skip confirmation" | Confirm Definition of Done explicitly. Always run Phase 3. |
 | "Simple idea, skip brainstorming" | Brainstorming explores alternatives. Always run Phase 4. |
-| "Design is in conversation, don't need documentation" | Documentation is contract with writing-implementation-plans. Always run Phase 5. |
+| "Design is in conversation, don't need documentation" | Documentation is contract with impl-plan-write. Always run Phase 5. |
 | "Can invoke implementation planning directly" | Must /clear first. Provide copy-then-clear workflow. |
 | "I can combine phases for efficiency" | Each phase has distinct purpose. Run all six. |
 | "User knows what they want, less structure needed" | Structure ensures nothing is missed. Follow all phases. |

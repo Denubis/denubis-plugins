@@ -1,5 +1,6 @@
 ---
-name: refactoring-rubric
+name: exec-refactoring-rubric
+family: executing-an-implementation-plan
 description: Use when assessing code for refactoring opportunities — provides Mantyla smell taxonomy, Fowler refactoring patterns, evidence grading criteria, and structural detection rules. Loaded by smell-assessor agent as its evaluation rubric.
 user-invocable: false
 ---

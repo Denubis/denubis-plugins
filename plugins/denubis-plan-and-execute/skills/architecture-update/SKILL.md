@@ -1,5 +1,6 @@
 ---
-name: update-architecture-docs
+name: architecture-update
+family: maintain-architecture
 description: Use when design or implementation work may affect architecture documentation - reads current docs, detects contradictions, and proposes changes for human approval before writing
 user-invocable: false
 ---
@@ -12,13 +13,13 @@ Read current state, detect contradictions, propose changes, write approved chang
 
 This skill operates on concrete artifacts only: a design plan file path (sub-skill mode) or git diff output (wrapper mode). It never operates on conversation context alone.
 
-**Announce at start:** "I'm using the update-architecture-docs skill to assess architecture documentation."
+**Announce at start:** "I'm using the architecture-update skill to assess architecture documentation."
 
 ## Input Modes
 
 | Mode | Input | Called by |
 |------|-------|----------|
-| Sub-skill | Design plan file path | `writing-design-plans` after proleptic challenge |
+| Sub-skill | Design plan file path | `design-write` after proleptic challenge |
 | Wrapper | Git diff output (from baseline) | `maintain-architecture` during maintenance |
 
 **Sub-skill mode:** Read the design plan at the given file path and extract architecture-relevant content — entities, processes, data flows, constraints, terms, actors, and state transitions.
@@ -261,14 +262,14 @@ The complete flow tying all sections together:
 Where this skill sits in the broader workflow:
 
 ```
-writing-design-plans (after proleptic challenge)
-  -> calls update-architecture-docs with design plan path
+design-write (after proleptic challenge)
+  -> calls architecture-update with design plan path
   -> proposals presented to human
   -> approved changes written
   -> changes included in design plan commit
 
 maintain-architecture (standalone sessions)
-  -> calls update-architecture-docs with git diff output
+  -> calls architecture-update with git diff output
   -> proposals presented to human
   -> approved changes committed separately
 ```
