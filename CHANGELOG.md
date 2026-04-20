@@ -1,5 +1,23 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.30.1
+
+Complete the M25 skill-rename ripple. Internal refactor; no behaviour change.
+
+**Changed:**
+- Frontmatter `name:` fields aligned with prefixed directory names across 20+ worker skills (`coding-tdd`, `coding-verify`, `design-clarify`, `exec-session-naming`, etc.). Directory renames + most cross-references landed in e180b55; the `name:` field inside SKILL.md frontmatter had been missed.
+- `family:` taxonomy field added to every worker skill, grouping into `coding-effectively` / `starting-a-design-plan` / `starting-an-implementation-plan` / `executing-an-implementation-plan`.
+- Agent / command / doc / test cross-references swept for old skill names (`test-driven-development`, `verification-before-completion`, `asking-clarifying-questions`, `session-naming`).
+- Root `CLAUDE.md`: `ed3d-plugins` → `denubis-plugins` identity + `ed3d-basic-agents:` → `denubis-basic-agents:` prefix updates; "HALT When Things Feel Sideways" working-philosophy section added.
+- `scripts/m25-rename-skills.sh` committed as the tool that produced the ripple (two-pass placeholder replacement, frontmatter `family:` addition after replacements).
+
+## [denubis-extending-claude] 1.7.1
+
+Internal refactor ripple; no behaviour change.
+
+**Changed:**
+- Cross-reference updates inside `creating-a-plugin/SKILL.md` and `testing-skills-with-subagents/SKILL.md` swept for old `denubis-plan-and-execute` skill names affected by M25 (primarily `test-driven-development` → `coding-tdd`).
+
 ## [denubis-plan-and-execute] 2.30.0
 
 Rate-limit statusline: persistent per-user cache, active-hours pace display, Theil–Sen forecast.
