@@ -461,13 +461,13 @@ If the last three commits from Tasks 1-3 already capture the skill, Task 4 does 
 
 ## Done when (phase-level)
 
-- [ ] `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md` exists, frontmatter validates, four rubric H2 sections present in design order (Task 1 Steps 3-4)
-- [ ] `absencejudgement-citations.md` present with all required line-number references and all required verbatim phrases (Task 2 Steps 2-3)
-- [ ] `self-application.md` present with four H2 walk-through sections and at least one explicit honesty-note (Task 3 Step 2)
-- [ ] Fabricated-codes grep-audit (TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN) returns zero hits outside SKILL.md's explicit rejection context (Task 4 Step 1)
-- [ ] Forward cross-references to Phases 2-4's orchestrators are named in SKILL.md (Task 4 Step 2)
-- [ ] File-set is exactly three files (Task 4 Step 3)
-- [ ] Three commits land on branch (one per Task 1-3; Task 4 is audit-only, produces no new commit)
+- [x] `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md` exists, frontmatter validates, four rubric H2 sections present in design order (Task 1 Steps 3-4) — commit `518c80a`
+- [x] `absencejudgement-citations.md` present with all required line-number references and all required verbatim phrases (Task 2 Steps 2-3) — commit `448f3de`
+- [x] `self-application.md` present with four H2 walk-through sections and at least one explicit honesty-note (Task 3 Step 2) — commit `4d5a5ab` (**provisional pending independent self-application check per C4 of 2026-04-20 proleptic challenge**)
+- [x] Fabricated-codes grep-audit (TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN) returns zero hits outside SKILL.md's explicit rejection context (Task 4 Step 1) — two explicit rejection contexts used (SKILL.md:106, citations.md:138); no hits elsewhere
+- [x] Forward cross-references to Phases 2-4's orchestrators are named in SKILL.md (Task 4 Step 2)
+- [x] File-set is exactly three files (Task 4 Step 3)
+- [x] Three commits land on branch (one per Task 1-3; Task 4 is audit-only, produces no new commit) — three task commits `518c80a`, `448f3de`, `4d5a5ab` landed as planned. Two additional commits landed outside the Task 1-3 scope: `a08dda4` (pyyaml dep, unstated plan requirement) and `ebcf606` (post-review typo fix "you art"→"thou art"). Rationale recorded in `phase-01-code-review-2026-04-20.md`.
 
 **Not in scope for Phase 1:**
 - Resolving the forward cross-references (Phases 2-4 author the targets)
