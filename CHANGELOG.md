@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.31.0
+
+Revise `exec-session-naming` skill: structured slug format with project code, verb-noun slot, issue number, and phase; anti-drift pane targeting so tmux window names no longer get schmeared onto the focused window.
+
+**Changed:**
+- Slug format is now `<Person>/<p3>:<verb>-<noun>:#<issue>:P<phase>` (e.g. `Adela/mel:design-ontology:#19:P2`). Components drop when unavailable; `<p3>:<verb>-<noun>` is always present.
+- Project code (`p3`) strips leading `<$USER>-` or `<Person>-` prefix before taking the first 3 alphanumeric chars, so `brian-ed3d-plugins` → `ed3`, not `bri`.
+- Slot is now `<verb>-<noun>`. For canonical skills (`starting-a-design-plan`, `starting-an-implementation-plan`, `executing-an-implementation-plan`, `systematic-debugging`) the verb is fixed (`design`/`plan`/`exec`/`debug`) and Haiku picks the noun. For non-canonical skills, Haiku picks both verb and noun. Haiku is fed the full conversation up to the skill invocation.
+- `tmux rename-window` now uses `-t "$TMUX_PANE"` to pin the rename to the window containing Claude's own pane (anti-drift). Previously the rename targeted whichever window the user was focused on, which caused names to land on the wrong window.
+- `$TMUX_PANE` is now re-read at apply time rather than during context gathering, to ensure the lock file key and rename target reflect the current pane.
+
 ## [denubis-plan-and-execute] 2.30.1
 
 Complete the M25 skill-rename ripple. Internal refactor; no behaviour change.
