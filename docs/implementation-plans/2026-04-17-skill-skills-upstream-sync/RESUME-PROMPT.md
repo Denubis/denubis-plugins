@@ -1,20 +1,31 @@
-# Resume Prompt — Skill-Skills Upstream Sync — Plan Fully Revised, Ready for Execution
+# Resume Prompt — Skill-Skills Upstream Sync — Worktree Ready, Execution Entry Point
 
 **Copy this prompt verbatim into a fresh Claude Code session after `/clear`.**
 
+**BEFORE PASTING:** Ensure your session is rooted in the worktree:
+
+```bash
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
+git branch --show-current   # must print: skill-skills-upstream-sync
+```
+
+If the branch is `main` or anything other than `skill-skills-upstream-sync`, STOP. Do not paste this prompt. Either `cd` into the worktree first or create a new session rooted there (`claude` from inside the worktree path).
+
 ---
 
-I'm resuming work on the skill-skills upstream sync plan at `/home/brian/people/Brian/brian-ed3d-plugins/docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`.
+I'm resuming work on the skill-skills upstream sync plan at `/home/brian/people/Brian/brian-ed3d-plugins/docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`. Execution takes place in the feature-branch worktree at `.worktrees/skill-skills-upstream-sync/` on branch `skill-skills-upstream-sync`. The branch was created from `main` at commit 9e11497.
 
-**State (2026-04-19, post-full-revision-commit):** All 15 findings from `critical-peer-review-2026-04-18.md` are now addressed across two revision sessions (8 in 2026-04-19a, 7 in 2026-04-19b). The plan is committed on `main` and the working tree is clean. The plan has not yet been executed.
+**State (2026-04-19, worktree ready, not yet executed):** All 15 findings from `critical-peer-review-2026-04-18.md` are addressed; the plan is committed on `main`; the worktree is set up with clean baselines; execution has not started. Invoke `denubis-plan-and-execute:executing-an-implementation-plan` to begin.
 
-## Commits landed since 24a7848
+## Commits landed on `main` since 24a7848
 
+- **9e11497** `chore: patch bumps for M25 rename ripple (plan-and-execute 2.30.1, extending-claude 1.7.1)` — version + marketplace + CHANGELOG updates for the M25 ripple. Minor-bump targets (2.31.0 / 1.8.0) reserved for this plan's Phase 5.
+- **f594ea5** `docs(plan): update RESUME-PROMPT to post-revision-complete state` — superseded by this version.
 - **5cad1df** `docs: add local issue tracker for deferred threads` — `docs/issues.md` with ten deferred threads (ISSUE-01 through ISSUE-10).
 - **1a77fa8** `docs: add skill-skills upstream sync implementation plan (twice-revised)` — the full `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/` directory (phases 01-06, test-requirements, uat-requirements, both critical-peer-review records, and this RESUME-PROMPT).
 - **b9bed28** `refactor: complete M25 skill-rename ripple + HALT philosophy + design-plan H/M revisions` — backlog that was co-resident on main since 2026-04-17: frontmatter `name:`/`family:` fixes for the M25 rename, CLAUDE.md ed3d→denubis + HALT working-philosophy, design plan H1-H7 + M1-M7 revision text.
 
-Working tree is clean as of commit 5cad1df.
+Worktree baseline (verified 2026-04-19): 113 root tests + 140 workflow_statusline tests = **253 passing, 0 failing**. `uv sync` resolved clean; no `.env`/`.worktreeinclude`/`.ed3d/worktree-setup.md` setup needed; LFS configured but no dirty files.
 
 ## Read first
 
@@ -45,38 +56,50 @@ Working tree is clean as of commit 5cad1df.
 - **L3** — Same-plugin CHANGELOG ordering assertion added (2.31.0 must precede existing 2.30.0). AC5.7 description updated.
 - **Meta M7** — 30-match sitting cap (fatigue-floor) + blinded 9-sample recategorisation (calibration) added to Task 4.5 Step 3. Step 4 verdict handles `audit-flags (calibration failed)` outcome. DR-P5-FRUST-1 + test-requirements.md + phase-level DoD updated.
 
-## First concrete action for the next session
+## First concrete action for this session
 
-The plan is ready to execute. The next step requires a decision:
+1. **Run post-resume verification** per `denubis-plan-and-execute:executing-an-implementation-plan`'s "Post-Resume Verification" section:
 
-1. **Proceed to execution.** Create a feature branch via `denubis-plan-and-execute:using-git-worktrees`, then invoke `denubis-plan-and-execute:executing-an-implementation-plan`. Execution dispatches task-implementor subagents per phase; the plan's AC5.5/5.6 branch-discipline guard (M5) asserts `HEAD != main/master` before the commit-count runs — the branch must exist before Phase 5 is executed.
+   ```bash
+   pwd                         # must end with .worktrees/skill-skills-upstream-sync
+   git worktree list           # confirm this worktree appears
+   git branch --show-current   # must print: skill-skills-upstream-sync (NOT main/master)
+   git log --oneline -1        # should show 9e11497 as the branch base
+   ```
 
-2. **Request a third `critical-peer-review`** before executing. The second review cycle's 15 findings are all addressed (verified by the revision summary above), but a third review would catch any regressions introduced by the revision text itself. Reviewer guidance: focus on the M3 / M4 / M5 / Meta-M7 revision blocks specifically, since those introduced the most new text.
+   If any check fails, STOP and report. Do not proceed.
 
-3. **Work a deferred thread first.** If ISSUE-01 (xref-audit tool promotion) or ISSUE-06 (execution blocking items) has become more pressing, invoke `denubis-plan-and-execute:starting-a-design-plan` for it before returning to this plan's execution.
+2. **Invoke** `denubis-plan-and-execute:executing-an-implementation-plan`. The skill dispatches task-implementor subagents per phase. Phase order for this plan is pre-set by the design: Phase 1 (epistemic-humility) → Phase 2 (writing-claude-directives) → Phase 2.5 (prep refactor) → Phase 3 (testing-skills-with-subagents) → Phase 4 (writing-skills cornerstone) → Phase 6 (impl-plan-write hardening) → Phase 5 (cross-reference audit + version bumps + frustration audit). Phase 6 lands before Phase 5 per execution-order in phase_05.md DoD.
 
-Do NOT default to executing. The user may want path 2 (third review) before committing to execution, given the substantial revision text. Ask before proceeding.
+3. **If any phase returns surprising results** — tests failing, reviewer flagging structural issues, subagent empty response — HALT per the repo CLAUDE.md "HALT When Things Feel Sideways" discipline. Don't work around the anomaly; report and ask.
+
+## Alternate paths (if the user changes direction)
+
+- **Third `critical-peer-review` before executing.** The second review cycle's 15 findings are all addressed, but a third review would catch regressions introduced by the revision text itself. Focus on the M3 / M4 / M5 / Meta-M7 revision blocks since those introduced the most new text. If the user asks for this, invoke `denubis-plan-and-execute:critical-peer-review` against the plan directory before launching execution.
+
+- **Work a deferred thread first.** If ISSUE-01 (xref-audit tool promotion) or another ISSUE has become more pressing, return to `main` (`cd` back to the main checkout), invoke `denubis-plan-and-execute:starting-a-design-plan` for that thread, and come back to this worktree later.
 
 ## What NOT to do without explicit direction
 
-- Do not execute the plan without first creating a feature branch. The plan is on `main` but execution cannot happen on `main` — see `denubis-plan-and-execute:executing-an-implementation-plan`'s "Precondition: Worktree Required" and phase_05.md Task 4 Step 2's M5 guard.
+- Do not execute the plan on `main`. You must be in the worktree on branch `skill-skills-upstream-sync`. The executing-an-implementation-plan skill's precondition enforces this, and phase_05.md Task 4 Step 2's M5 branch-discipline guard hard-fails if run on `main` (by design).
 - Do not re-edit the revision-history notes inside the plan files (H1-H7 + M1-M7 + L1-L3 + Meta-M7 markers are the audit trail — preserve them).
-- Do not commit additional work to `main` without a feature branch; all further execution work belongs on the execution branch.
-- Do not push `main` to `origin` without checking with the user; the three landed commits are local-only at the time this RESUME-PROMPT was written.
+- Do not commit additional work to `main` during this execution; all execution commits belong on the feature branch.
+- Do not push `main` or the feature branch to `origin` without checking with the user; commits are local-only at the time this RESUME-PROMPT was written.
 - Do not delete `docs/issues.md` or any ISSUE-NN entries.
 - Do not try to re-run `cc-search-chats` with apostrophes, hyphens, or regex — ISSUE-10 remains unfixed upstream; stick to the safe query set.
+- Do not `git worktree remove` this worktree while the current working directory is inside it. The `finishing-a-development-branch` skill handles safe cleanup.
 
 ## Task-list state at handoff
 
 - Phases 1-6 planning: committed (1a77fa8).
 - Both critical-peer-review cycles: addressed + committed (1a77fa8).
-- Finalization code-reviewer: not yet run post-second-revision. Path 2 above would dispatch this.
+- Finalization code-reviewer: not yet run post-second-revision. An alternate path (third review) would dispatch it.
 - test-requirements.md: 43 ACs; AC5.8 covered by cc-search-chats + joint review; AC6.4 cut during M2 revision.
 - uat-requirements.md: 8 DR entries; DR-P4-INT-1 deleted during H3 revision; DR-P5-FRUST-1 added as replacement; M3-Meta-M7 revisions landed.
-- Execution handoff: NOT started; path 1 above is the entry point.
-- Feature branch: does NOT exist yet. First action on path 1 is `denubis-plan-and-execute:using-git-worktrees`.
+- Execution: NOT started; entry point is `denubis-plan-and-execute:executing-an-implementation-plan` invoked from this worktree.
+- Feature branch + worktree: CREATED — `.worktrees/skill-skills-upstream-sync/` on branch `skill-skills-upstream-sync`, branched from `main@9e11497`. Baseline 253/253 tests passing.
 
-When resuming, start with `git status` and `git log --oneline -5` to verify the three commits are still present, read this RESUME-PROMPT.md in full, then ask the user which path.
+When resuming, run the post-resume verification block above, confirm branch + commits are in place, then invoke `denubis-plan-and-execute:executing-an-implementation-plan`.
 
 ## Key conventions established this revision cycle
 
