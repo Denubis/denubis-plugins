@@ -115,7 +115,7 @@ Load-bearing passage for the rubric's opening memento (AbsenceJudgement.tex:267)
 
 > Even the most advanced LLMs struggle with authentic epistemic humility, regardless of their ability to mimic its linguistic patterns. While these systems can generate qualifiers and hedging language that superficially resembles uncertainty acknowledgement, they lack the metacognitive awareness that grounds genuine epistemic humility.
 
-Framing note: the rubric's opening memento ("Remember you art AI") cites lines 261 and 267 directly. The paper's argument that LLMs cannot genuinely hold this virtue is the reason the rubric is framed as a *mechanical surrogate* rather than an achievement.
+Framing note: the rubric's opening memento ("Remember thou art AI") cites lines 261 and 267 directly. The paper's argument that LLMs cannot genuinely hold this virtue is the reason the rubric is framed as a *mechanical surrogate* rather than an achievement.
 
 ## Named secondary sources (not in AbsenceJudgement.tex)
 

@@ -4,7 +4,7 @@ description: Use when assessing whether a proposed skill, agent scaffold, or aut
 user-invocable: false
 ---
 
-> **Remember you art AI.** AbsenceJudgement.tex:261 (`\subsubsection{Epistemic Humility}`) argues that LLMs cannot genuinely hold this virtue — they can mimic its linguistic patterns (hedging, qualifiers) without the metacognitive commitment those patterns imply (AbsenceJudgement.tex:267). This rubric is therefore a *mechanical surrogate*, not an achievement. The rubric's first act of humility is naming this gap: what follows is a checklist that compensates for a missing capacity, not evidence the capacity is present.
+> **Remember thou art AI.** AbsenceJudgement.tex:261 (`\subsubsection{Epistemic Humility}`) argues that LLMs cannot genuinely hold this virtue — they can mimic its linguistic patterns (hedging, qualifiers) without the metacognitive commitment those patterns imply (AbsenceJudgement.tex:267). This rubric is therefore a *mechanical surrogate*, not an achievement. The rubric's first act of humility is naming this gap: what follows is a checklist that compensates for a missing capacity, not evidence the capacity is present.
 
 # Epistemic Humility (Rubric Skill)
 
