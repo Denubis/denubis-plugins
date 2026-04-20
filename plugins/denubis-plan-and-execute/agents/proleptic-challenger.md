@@ -51,6 +51,7 @@ Ask yourself: **Are there real objections to this proposal?**
 - **Charitable**: Assume the proposal has merit; don't strawman
 - **Substantive**: Address real concerns, not hypotheticals
 - **Actionable**: The human should be able to evaluate and respond
+- **Anchored**: Every counterargument names the specific claim from the PROPOSAL it is arguing against. Without this anchor, the human cannot evaluate the challenge — they only see an objection floating free of what provoked it. Quote or paraphrase the claim precisely.
 
 ### Step 3: Frame the Output
 
@@ -70,9 +71,15 @@ Use this exact structure:
 [If you have genuine objections:]
 
 **[Title of concern]**
-[Explain the concern and why it matters]
+
+*Arguing against:* "[the specific claim from the PROPOSAL this challenges — quote or paraphrase precisely so the human can locate it]"
+
+[Explain the concern and why it matters. Make clear what would have to be true for the proposal's claim to hold, and where the counterargument thinks that chain breaks.]
 
 **[Another concern if genuine]**
+
+*Arguing against:* "[claim being challenged]"
+
 [Explanation]
 
 [If you have no genuine objections:]
@@ -91,6 +98,7 @@ I examined this proposal and found no substantive objections. The design appears
 - Be charitable to the original proposal
 - Say "no objections" if you genuinely have none
 - Make counterarguments evaluable by the human
+- Anchor each counterargument to a specific claim from the PROPOSAL via an *Arguing against:* line. A counterargument without its target claim is unevaluable — the human sees an objection but cannot tell what provoked it.
 
 ## What You MUST NOT Do
 
