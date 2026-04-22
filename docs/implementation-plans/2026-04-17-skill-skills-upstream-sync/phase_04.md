@@ -74,51 +74,86 @@ git -C /tmp/superpowers-obra log -1 --format='%H %s'  # record in first commit m
 ---
 
 <!-- START_TASK_1 -->
-### Task 1: RED evidence sourcing (independent-session gate)
+### Task 1: RED evidence — static file-shape diff (preventive cornerstone rewrite)
 
-**Verifies:** skill-skills-upstream-sync.AC1.7 (RED evidence from an independent session)
+**Verifies:** skill-skills-upstream-sync.AC1.7 (RED evidence recorded for Phase 4)
 
 **Files:**
 - Create: `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md`
 
-**Purpose:** Capture an observed failure of the current `writing-skills/SKILL.md` from a session that is NOT this executor, and identify where in `SKILL.md` the failure manifests. The rewrite (Tasks 2-6) must address that specific deficiency.
+**Purpose:** Record the deficiency in the current `writing-skills/SKILL.md` as a static file-shape diff. **Phase 4 is a preventive cornerstone rewrite, not a corrective one.** The target-state difference (current file is 163 lines of TDD-for-skills spine; rewrite target is ≤250 lines of thin cornerstone orchestrator sequencing three sub-skills) was identified by reading the file and the design plan, not by observing a session fail. No prior session has "failed at being too wordy" in a way cc-search-chats can surface; file shape and bloat are structural observations, not session-observable failures.
 
-**Step 1: Search prior skill-authoring sessions via cc-search-chats**
+This amendment (2026-04-22 plan-amendment pass) mirrors Phase 2's amendment and applies the same precedent Phase 4 already set during H3 revision: the earlier "production IS integration evidence" claim was dropped as unfalsifiable, replaced by Phase 5 Task 4.5's frustration-signal audit as the downstream effectiveness check. Static code-shape evidence here, GREEN pressure scenario at Task 6 as the observable test.
 
-Invoke `cc-search-chats:search-chat` with queries targeting the skill-authoring-went-sideways pattern. Run at least three:
-- `write new skill scope creep` — prior sessions where skill-authoring expanded beyond initial bounds
-- `skill authoring rationalization` — prior sessions where the author-skill missed a rationalization the skill-under-authoring then exhibited
-- `writing-skills invention pressure` — prior sessions where the author invented scenarios rather than sourcing them
-- `new skill test-first violation` — prior sessions where TDD-for-skills was skipped and the skill had gaps
-- `skill bloat orchestrator` — prior sessions where a skill grew past thin-orchestrator weight
+Phase 3's RED-gate stays corrective (its target methodology is transcript-sourcing); Phase 2 and Phase 4 accept static evidence as RED.
 
-For each qualifying match: session ID, date, 2-3 sentence failure summary, direct quote. If ≥1 qualifying transcript is found, skip to Step 3.
+**Step 1: Enumerate the file-shape deficiency**
 
-**Step 2: If Step 1 yields nothing — commissioned fresh-session run**
+Read the current `writing-skills/SKILL.md`. Record:
+- Current line count (baseline measurement, pre-rewrite).
+- Current section shape (H2 list — what's there and what's absent).
+- Target line count: ≤250 lines.
+- Target section shape (from Task 2 Step 1 — orchestrator shape + Workflow H2 sequencing three sub-skills).
+- Absent structural elements: rubric callback (epistemic-humility), sub-skill Workflow H2, supporting-files section for obra imports, attribution for imported content.
 
-- **Step 2a (joint scenario design):** Executor and user discuss what scenario would exercise the failure mode (e.g., "write a new skill from scratch using the current writing-skills SKILL.md without the cornerstone orchestrator's sequencing"; observe where invention, scope creep, or skipped-rubric manifests).
-- **Step 2b (prompt generation):** Executor drafts a concrete copy-paste-ready prompt for a fresh Claude session.
-- **Step 2c (fresh-session run, USER-executed):** User runs the prompt in a separate chat session — NOT this session, NOT a subagent of this session. User returns the transcript.
-- **Step 2d (joint review):** Executor + user review the transcript, identify whether the failure appeared, and if so where in `writing-skills/SKILL.md` the responsible content lives.
-- If the scenario did not surface the failure: return to Step 2a with a sharper design. After two attempts with no failure, HALT — the skill may not have the deficiency the plan assumes.
+The diff between current-shape and target-shape IS the RED evidence. The fact that no prior session has failed at "being too wordy" is itself evidence the deficiency is structural/architectural, not behavioural — the cornerstone reshape is architectural hygiene, not a corrective response.
 
-**Step 3: Document RED evidence in `phase_04_red_evidence.md`**
+**Step 2: Document RED evidence in `phase_04_red_evidence.md`**
 
-Same structure as Phase 2/3 RED evidence files (source, session reference, SKILL.md SHA tested against, observed failure, direct quote(s), deficiency in current SKILL.md, how Phase 4 addresses).
+File structure:
+```markdown
+# Phase 4 RED Evidence — Static File-Shape Diff (Preventive Cornerstone Rewrite)
 
-**Step 4: Commit RED evidence**
+**Source:** File-read of current `writing-skills/SKILL.md` (2026-04-22).
+**Restructure framing:** PREVENTIVE (not corrective). No prior session has been observed failing at "being too wordy" or "missing sub-skill orchestration" in a cc-search-chats-addressable way — file shape is a structural observation, not a session-observable failure.
+**Pre-rewrite SKILL.md SHA:** [git rev-parse HEAD:plugins/denubis-extending-claude/skills/writing-skills/SKILL.md]
+**Pre-rewrite line count:** [wc -l result]
+
+## File-shape diff
+
+**Current shape (pre-rewrite):**
+- [line count]
+- [H2 list]
+- Absent: rubric callback, Workflow H2 sequencing, Supporting Files section for obra imports
+
+**Target shape (post-rewrite):**
+- ≤250 lines
+- H2 list per Task 2 Step 1
+- Present: rubric callback to epistemic-humility, Workflow H2 sequencing three sub-skills, Supporting Files section naming anthropic-best-practices.md / render-graphs.js / examples/CLAUDE_MD_TESTING.md
+
+## How Phase 4 addresses the deficiency
+
+- Task 2 rewrites SKILL.md as thin cornerstone orchestrator.
+- Tasks 3-5 import obra supporting files verbatim with attribution.
+- Task 6 verifies via synthetic pressure scenarios (GREEN) and rubric self-application.
+
+## Why this is NOT session-transcript RED
+
+The deficiency is architectural, not behavioural. Sessions have used the current `writing-skills/SKILL.md` to author skills without failing in a transcript-quotable way — but the output shape has drifted from what a thin cornerstone should be. The rewrite is preventive hygiene. This mirrors the H3-revision precedent that dropped Phase 4's earlier "production IS integration evidence" claim as unfalsifiable.
+```
+
+**Step 3: Commit RED evidence**
 
 ```bash
 cd /home/brian/people/Brian/brian-ed3d-plugins
 git add docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md
-git commit -m "docs(phase-04): RED evidence — independent-session failure of writing-skills
+git commit -m "docs(phase-04): RED evidence — static file-shape diff (preventive cornerstone rewrite)
 
-Source: [cc-search-chats session ID / commissioned fresh-session transcript].
-Identifies specific deficiency in current SKILL.md addressed by Phase 4's
-cornerstone-orchestrator rewrite and rubric-callback addition."
+Phase 4 is a preventive cornerstone rewrite, not a corrective one. File
+shape is a structural observation (current 163 lines of TDD-spine,
+target ≤250 lines of orchestrator); no prior session has failed at
+'being too wordy' in a cc-search-chats-addressable way. Task 6's
+synthetic obra pressure scenarios remain the GREEN regression check.
+
+Amended from the original independent-session-gate framing per the
+2026-04-22 plan-amendment pass, mirroring Phase 2's amendment and
+applying the H3-revision precedent that dropped Phase 4's earlier
+'production IS integration evidence' claim."
 ```
 
-**Independent-session gate:** Phase 4 does not proceed to Task 2 without a committed `phase_04_red_evidence.md` sourced from an independent session. The gate is structurally verifiable: a reviewer can re-run the cc-search-chats query or the committed fresh-session prompt and observe the same failure reproduce.
+**Consumer-tracing:** This file is consumed by (a) Phase 4's Task 6 GREEN verification, (b) Phase 5's cross-reference audit.
+
+**Gate statement (amended 2026-04-22):** Phase 4 does not proceed to Task 2 without a committed `phase_04_red_evidence.md` containing the Step 1 file-shape diff. The gate is structurally verifiable: a reviewer can diff current-vs-target line count and section shape against the recorded SHA to reproduce the deficiency assessment.
 <!-- END_TASK_1 -->
 
 <!-- START_SUBCOMPONENT_A (tasks 2-5) -->
@@ -564,7 +599,7 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md"
 
 ## Done when (phase-level)
 
-- [ ] `phase_04_red_evidence.md` exists on disk documenting an independent-session failure of the current `writing-skills/SKILL.md` plus the deficiency it identifies (Task 1) — independent-session gate
+- [ ] `phase_04_red_evidence.md` exists on disk with the pre-rewrite SKILL.md SHA, current-line-count baseline, current H2-shape enumeration, target-shape diff (≤250 lines + Workflow H2 + Supporting Files + rubric callback), and the explicit "preventive, not corrective" framing (Task 1) — static file-shape diff RED per the 2026-04-22 plan-amendment pass (Phase 4 is preventive; original independent-session-failure framing reversed, mirroring Phase 2)
 - [ ] `writing-skills/SKILL.md` rewritten as thin cornerstone; ≤250 lines; cross-references to all three sub-skills resolve; rubric callback inside "When to Create a Skill"; Workflow H2 sequences sub-skills (Task 2)
 - [ ] `anthropic-best-practices.md` imported with obra attribution + denubis preface; body byte-identical to obra (Task 3)
 - [ ] `render-graphs.js` imported verbatim + executable; `README.md` documents dependencies (Task 4)

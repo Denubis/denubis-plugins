@@ -72,12 +72,12 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** The Phase 5 audit script walks each imported file and every cross-reference in the five touched skills; exits 1 if any unresolved reference is found. The ~5 phase commits landing without a clean audit run would surface here.
 - **Run command:** `python3 docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05_cross_ref_audit.py` — exit code 0 required.
 
-### AC1.7 — `test-requirements.md` for Phase 4 documents RED evidence from an independent session
+### AC1.7 — `test-requirements.md` for Phase 4 documents RED evidence (static file-shape diff)
 
-- **Type:** Operational check (file existence) + content presence + independent-session provenance
-- **Test location:** `phase_04.md` Task 1 Step 4 (phase_04_red_evidence.md committed). This document (test-requirements.md) covers the mapping; the evidence file itself is the primary artefact.
-- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` exists; documents an observed failure of the current `writing-skills/SKILL.md` from a session that is NOT the implementing executor (cc-search-chats transcript OR user-run fresh-session transcript) with session reference, SKILL.md SHA tested against, observed failure, direct quote(s), and deficiency-location analysis per the Phase 2/3/4 RED evidence template.
-- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` and inspection for independent-session provenance (session ID resolves in cc-search-chats, OR fresh-session prompt is committed and re-runnable).
+- **Type:** Operational check (file existence) + content presence + file-shape baseline
+- **Test location:** `phase_04.md` Task 1 Step 3 (phase_04_red_evidence.md committed).
+- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` exists; Phase 4 is a preventive cornerstone rewrite (amended 2026-04-22 plan-amendment pass — original independent-session-failure framing reversed, mirroring Phase 2). Evidence content includes (a) the pre-rewrite `writing-skills/SKILL.md` SHA and line-count baseline, (b) current H2-shape enumeration, (c) target-shape description per Task 2 (≤250 lines, Workflow H2 sequencing three sub-skills, Supporting Files section, rubric callback), and (d) explicit "preventive, not corrective" framing (file shape is a structural observation, not a session-observable failure).
+- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` and inspection for (i) pre-rewrite SHA + line-count baseline, (ii) file-shape diff with current vs target H2 list, (iii) preventive-restructure framing statement.
 
 ---
 
