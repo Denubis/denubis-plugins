@@ -324,6 +324,42 @@ Two independent paths:
 
 ---
 
+### ISSUE-11: Reflective session-history pass as part of finalisation
+
+- **Status:** open
+- **Opened:** 2026-04-22
+- **Origin:** Migrated from GitHub issue #1 (opened 2026-02-08). Inspired by Martin Alderson's "Self-Improving CLAUDE.md Files".
+
+**Description:**
+
+The auto-memory system already captures per-session feedback, user, and project patterns. The remaining gap is **cross-session recurrence detection** — patterns that only become visible when you search multiple sessions for the same kind of friction (repeated corrections, recurring setup instructions, consistent user overrides of defaults, frustration signals). Currently this signal is latent in chat history and is never surfaced.
+
+The natural home is a *reflective pass* invoked as part of finalisation — at phase boundaries or when finishing a development branch — that reviews the relevant session range for cross-session patterns and proposes CLAUDE.md or memory additions for user approval.
+
+**Proposed approach:**
+
+New user-invocable skill (tentatively `review-session-patterns`) in `denubis-extending-claude`:
+
+- Uses `cc-search-chats` as a soft dependency (detect at runtime; instruct user to install if missing, do not crash).
+- Two-pass: signal-search (pattern queries across N most recent sessions) → context-extraction on hits.
+- Recurrence threshold: only surface patterns appearing in 2+ separate sessions. One-off corrections are noise.
+- Groups findings by category (conventions, commands, gotchas, frustration markers).
+- Presents proposals for user approval; never auto-writes.
+- Optional invocation hook from `finishing-a-development-branch` and/or `maintaining-project-context` (only if `cc-search-chats` is available; fail gracefully otherwise).
+
+Interaction with existing auto-memory: complementary, not redundant. Auto-memory captures signals within a session; this skill detects them across sessions.
+
+**Related:**
+
+- GitHub issue #1 (original, now closed as migrated)
+- `cc-search-chats` plugin (out-of-repo; installed)
+- `plugins/denubis-extending-claude/skills/writing-claude-md-files/SKILL.md`
+- `plugins/denubis-extending-claude/skills/maintaining-project-context/SKILL.md`
+- `plugins/denubis-plan-and-execute/skills/finishing-a-development-branch/SKILL.md`
+- ISSUE-10 (cc-search-chats FTS5 fragility — must be resolved or worked around before this skill is reliable)
+
+---
+
 ## Closed
 
 *(No closed issues yet.)*
