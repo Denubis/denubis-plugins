@@ -74,7 +74,7 @@ Record the obra SHA used in the phase's first commit message so a later reviewer
 **Anthropic-docs guidance crystallised (2026-04):**
 - Opus 4.7: literal instruction-following ("will not silently generalize"), new `xhigh` effort level ("Start with xhigh for coding and agentic use cases"), uses tools less / reasoning more than 4.6, long-horizon agentic focus.
 - Sonnet 4.6: more steerable than Opus 4.6, proactive default, parallel tool-calling at ~100% with prompting guidance, agentic overtriggering possible in GUI but steerable.
-- Haiku 4.5: "more consistent instruction following for nuanced tasks", 200k context / 128k extended-thinking budget, statistically safest among recent models for misaligned behaviours (vs Sonnet 4.5, Opus 4.1). **The claim that Haiku "struggles with judgement calls" is NOT supported by current docs — it lives in Phase 3's testing-skills-with-subagents and is softened there.**
+- Haiku 4.5: Anthropic's 2026-04 description is "more consistent instruction following for nuanced tasks", 200k context / 128k extended-thinking budget, statistically safest among recent models for misaligned behaviours (vs Sonnet 4.5, Opus 4.1). **Operator-empirical position (2026-04-22 plan-amendment pass): Haiku 4.5 is unsuitable for any task requiring judgement, regardless of the Anthropic marketing framing. The project's Haiku-no-judgement guidance is retained and strengthened (not retired). Phase 2 Task 3 documents the operator-empirical position in `model-tier-notes.md`; Phase 3 Task 2 reframes the corresponding passage in `testing-skills-with-subagents/SKILL.md` with the same framing rather than removing it. See `feedback_haiku-no-judgement.md` in project-local memory for the standing operator position.**
 - **Aggressive language guidance has EVOLVED but still applies.** Direct quote from current prompting best practices: *"The fix is to dial back any aggressive language. Where you might have said 'CRITICAL: You MUST use this tool when...', you can use more normal prompting like 'Use this tool when...'"* Our existing claim (lines 96, 237) is directionally correct but needs the anchor updated from generic "Claude 4.x" to "Opus 4.7 / Sonnet 4.6 / Haiku 4.5" with the current source URL.
 
 **Current file state (Phase 2B investigator; long-running-state-patterns.md assessment updated during H6 revision):**
@@ -86,65 +86,64 @@ Record the obra SHA used in the phase's first commit message so a later reviewer
 <!-- START_SUBCOMPONENT_A (tasks 1-2) -->
 
 <!-- START_TASK_1 -->
-### Task 1: RED evidence sourcing (independent-session gate)
+### Task 1: RED evidence — static code-smell inventory (preventive restructure)
 
-**Verifies:** skill-skills-upstream-sync.AC3.8 (RED evidence from an independent session)
+**Verifies:** skill-skills-upstream-sync.AC3.8 (RED evidence recorded for Phase 2)
 
 **Files:**
-- Create: `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md` (independent-session transcript reference + deficiency analysis)
+- Create: `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md`
 
-**Purpose:** Capture an observed failure of the current `writing-claude-directives/SKILL.md` from a session that is NOT this executor, and identify where in `SKILL.md` the failure manifests. The restructure (Tasks 2-4) must address that specific deficiency. Synthetic obra pressure scenarios at Task 5 are post-restructure regression checks — not the RED source.
+**Purpose:** Record the deficiencies in the current `writing-claude-directives/SKILL.md` and its supporting files as a static RED evidence inventory. **Phase 2 is a preventive restructure, not a corrective one.** The deficiencies (stale `Opus 4.5` section, undifferentiated `Claude 4.x` anchors, stale `Opus 4.5` / `Sonnet 4.5` refs in `long-running-state-patterns.md`) were identified by reading the files in Phase 2B investigation, not by observing a session fail. A 2026-04-22 independent-session search returned 0 qualifying transcripts across 30+ FTS5-safe queries in 6 projects — confirming the deficiencies have not measurably misled sessions in the chat index. The restructure is preemptive hygiene; the code-smell inventory is the RED evidence. Task 5's synthetic obra pressure scenarios remain the GREEN regression check.
 
-**Step 1: Search prior conversations via cc-search-chats**
+**History:** The original Task 1 required an independent-session transcript (cc-search-chats match or user-commissioned fresh-session run) as RED. That framing was reversed during the 2026-04-22 plan-amendment pass after the independent-session search confirmed no such transcripts exist for Phase 2's deficiencies. The amendment follows the H3 revision precedent that dropped Phase 4's earlier "production IS integration evidence" claim as unfalsifiable and replaced it with the Phase 5 Task 4.5 frustration-signal audit as the downstream effectiveness check. Phase 3 retains the independent-session gate because Phase 3's restructure is corrective (its target methodology is explicitly about sourcing from real prior transcripts); Phase 4 also moves to static-evidence RED under the same precedent.
 
-Invoke `cc-search-chats:search-chat` with queries targeting directive-writing-under-model-ambiguity failures. Run at least three:
-- `"Opus 4.5" AND directive` — prior sessions where the Opus-4.5-specific framing caused drift
-- `"aggressive language" AND overtriggering` — prior sessions where the warning was applied (or should have been)
-- `"Haiku" AND "judgement calls"` — prior sessions relying on the unsupported claim
-- `skill directive CRITICAL YOU MUST` — prior sessions writing directives with aggressive imperatives
-- `"model-specific" AND prompt` — prior sessions where model-tier ambiguity tripped authoring
+**Step 1: Enumerate the code-smell inventory**
 
-For each qualifying match: session ID, date, 2-3 sentence failure summary, direct quote. If ≥1 qualifying transcript is found, skip to Step 3.
+Read the current `writing-claude-directives/SKILL.md` and its supporting files. Record every location where the Phase 2 deficiencies appear:
 
-**Step 2: If Step 1 yields nothing — commissioned fresh-session run**
+- `SKILL.md` lines 215-220: `### Opus 4.5: "Think" Sensitivity` subsection — stale model-version anchor; Opus 4.7 is current (2026-04).
+- `SKILL.md` lines approx 69, 96, 99, 237: `Claude 4.x` generic anchors — must become per-model (`Opus 4.7 / Sonnet 4.6 / Haiku 4.5`).
+- `long-running-state-patterns.md` lines 15, 114, 119, 132, 133: `Opus 4.5` / `Sonnet 4.5` / `Claude 4.5+` anchors — both `Opus 4.5` and `Sonnet 4.5` are superseded; `Haiku 4.5` stays (current 2026-04 shipping model).
+- `graphviz-conventions.dot`: byte-identical to obra, attribution comment absent.
 
-- **Step 2a (joint scenario design):** Executor and user discuss what scenario would exercise the failure mode (e.g., asking a fresh Claude to write a directive for a skill under model-version ambiguity, or restructuring a section with scattered Opus 4.5 anchors). Scenario is documented briefly.
-- **Step 2b (prompt generation):** Executor drafts a concrete copy-paste-ready prompt for a fresh Claude session. The prompt should be realistic (matches how the skill would actually be invoked) and surface the failure mode cleanly.
-- **Step 2c (fresh-session run, USER-executed):** User runs the prompt in a separate chat session — NOT this session, NOT a subagent of this session. User returns the transcript.
-- **Step 2d (joint review):** Executor + user review the transcript, identify whether the failure appeared, and if so where in `writing-claude-directives/SKILL.md` the responsible content lives (line or section reference).
-- If the scenario did not surface the failure: return to Step 2a with a sharper design. After two attempts with no failure, HALT — the skill may not have the deficiency the plan assumes, and the restructure scope needs to be reconsidered.
+**Step 2: Record the independent-session search result**
+
+The 2026-04-22 independent-session search (orchestrator plus dispatched subagent) covered:
+
+- FTS5-safe single-term queries including `directive`, `Opus`, `Sonnet`, `Haiku`, `judgement`, `aggressive`, `overtriggering`, `CRITICAL`, `rationalize`, `rationalise`, `bypass`, `loophole`, `YOU`, `MUST`, `Sensitivity`, `think`, `mate`, `fuck` (the last two as frustration-signal proxies per `feedback_haiku-no-judgement.md` + project-wide memory).
+- 6+ projects with meaningful chat indices: `brian-ed3d-plugins`, `PromptGrimoireTool`, `marketplaces/denubis-plugins`, `pretix`, `INTS1301`, `LLM-History-Paper`.
+- 0 qualifying transcripts — no session was observed failing at directive-authoring in a way traceable to the deficiencies listed in Step 1.
+
+Interpretation: Phase 2 restructures a skill whose deficiencies have not measurably misled authors in-the-wild. The restructure is preemptive hygiene. Record this explicitly so a future reader is not surprised that `phase_02_red_evidence.md` contains static evidence rather than a transcript quote.
 
 **Step 3: Document RED evidence in `phase_02_red_evidence.md`**
 
 File structure:
 ```markdown
-# Phase 2 RED Evidence
+# Phase 2 RED Evidence — Static Code-Smell Inventory
 
-**Source:** [cc-search-chats / commissioned fresh-session run]
-**Session reference:** [session ID + date, OR path to committed transcript file]
-**SKILL.md SHA tested against:** [git SHA of writing-claude-directives/SKILL.md at RED time]
+**Source:** Phase 2B investigator file-read findings (2026-04-17) + 2026-04-22 independent-session search confirming no in-chat RED candidates exist.
+**Restructure framing:** PREVENTIVE (not corrective). No prior session has been observed failing at the listed deficiencies.
+**Pre-restructure SKILL.md SHA:** [git rev-parse HEAD:plugins/denubis-extending-claude/skills/writing-claude-directives/SKILL.md]
+**Pre-restructure long-running-state-patterns.md SHA:** [git rev-parse HEAD:plugins/denubis-extending-claude/skills/writing-claude-directives/long-running-state-patterns.md]
 
-## Observed failure
+## Code-smell inventory
 
-[2-4 sentences describing what the session attempted and what failed —
-specific behaviour, not abstract pattern]
+[file + line + deficiency triple per location listed in Task 1 Step 1]
 
-## Direct quote(s) from transcript
+## Independent-session search (2026-04-22)
 
-> [exact quotations demonstrating the failure]
+**Queries run (FTS5-safe single-term):** [list actual queries]
+**Projects searched:** [list with chat-index path for each]
+**Qualifying transcripts:** 0
+**Interpretation:** deficiencies are preemptive hygiene; restructure is preventive.
 
-## Deficiency in current SKILL.md
+## How Phase 2 addresses the deficiencies
 
-- **Location:** [file path + line number / section header]
-- **What the current text says:** [quote from SKILL.md]
-- **Why it led to the observed failure:** [2-3 sentences]
-
-## How Phase 2 addresses this deficiency
-
-[2-3 sentences mapping the deficiency to specific restructure tasks —
-e.g., "Task 2 drops the stale Opus 4.5 section at lines 215-220; Task 3
-creates model-tier-notes.md with per-model anchors, removing the ambiguity
-that caused failure X"]
+- Task 2 drops the stale `Opus 4.5: "Think" Sensitivity` subsection and updates per-model anchors in SKILL.md.
+- Task 3 creates `model-tier-notes.md` as the per-model companion file (refresh-cycles decouple).
+- Task 3.5 updates `long-running-state-patterns.md` anchors (Opus 4.5 / Sonnet 4.5 → Opus 4.7 / Sonnet 4.6; Haiku 4.5 preserved).
+- Task 4 adds obra attribution to `graphviz-conventions.dot` (content byte-identical).
 ```
 
 **Step 4: Commit RED evidence**
@@ -152,15 +151,22 @@ that caused failure X"]
 ```bash
 cd /home/brian/people/Brian/brian-ed3d-plugins
 git add docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md
-git commit -m "docs(phase-02): RED evidence — independent-session failure of writing-claude-directives
+git commit -m "docs(phase-02): RED evidence — static code-smell inventory (preventive restructure)
 
-Source: [cc-search-chats session ID / commissioned fresh-session transcript].
-Identifies specific deficiency in current SKILL.md addressed by the Phase 2 restructure."
+Phase 2 is a preventive restructure, not a corrective one. Deficiencies
+were identified by file-read in Phase 2B investigation (2026-04-17);
+2026-04-22 independent-session search returned 0 qualifying transcripts
+across 30+ FTS5-safe queries in 6 projects. The code-smell inventory is
+the RED evidence; Task 5's synthetic obra pressure scenarios remain the
+GREEN regression check.
+
+Amended from the original independent-session-gate framing per the
+2026-04-22 plan-amendment pass."
 ```
 
-**Consumer-tracing:** This file is consumed by (a) Phase 2's Task 5 GREEN verification, which re-tests the failure pattern against the restructured SKILL.md using the synthetic obra pressure scenarios, and (b) Phase 5's cross-reference audit, which verifies every phase has a RED evidence file.
+**Consumer-tracing:** This file is consumed by (a) Phase 2's Task 5 GREEN verification, which tests the restructured SKILL.md against synthetic obra pressure scenarios, and (b) Phase 5's cross-reference audit, which verifies every phase has a RED evidence file.
 
-**Independent-session gate:** Phase 2 does not proceed to Task 2 without a committed `phase_02_red_evidence.md` sourced from an independent session (cc-search-chats transcript OR user-run fresh session). This satisfies the design plan's "independent-session gate, not optional fallback" from Additional Considerations (terminology updated during H2 revision from the earlier "binary gate / by-hand run" framing). The gate is structurally verifiable: a reviewer can re-run the cc-search-chats query or the committed fresh-session prompt and observe the same failure reproduce against the recorded pre-restructure SKILL.md SHA.
+**Gate statement (amended 2026-04-22):** Phase 2 does not proceed to Task 2 without a committed `phase_02_red_evidence.md` containing the Step 1 code-smell inventory and the Step 2 independent-session search record. The gate is still structurally verifiable: a reviewer can re-run the 2026-04-22 search (FTS5-safe queries against the same projects) and reproduce the 0-qualifying-transcripts result, and can diff-audit the listed line numbers against the pre-restructure SHAs.
 <!-- END_TASK_1 -->
 
 <!-- START_TASK_2 -->
@@ -290,11 +296,11 @@ Structure (design DR4: per-model organisation, NOT per-feature):
    - Aggressive-language guidance: dial back "CRITICAL / YOU MUST" phrasing (see SKILL.md aggressive-language section for the primary discussion). Cite `https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices`.
    - Model ID for API use: `claude-sonnet-4-6`.
 
-5. **`## Haiku 4.5`** — Contents (DR3 explicitly removes unsupported "struggles with judgement calls" claim):
-   - Instruction-following: *"Claude Haiku 4.5 has more consistent instruction following for nuanced tasks."* Cite `https://www.anthropic.com/news/claude-haiku-4-5`.
+5. **`## Haiku 4.5`** — Contents (amended 2026-04-22: operator-empirical position on judgement retained and strengthened, not retired):
+   - Instruction-following for mechanical tasks: *"Claude Haiku 4.5 follows detailed mechanical instructions well — data extraction, structured output generation, tool-call loops, summarisation."* Anthropic's 2026-04 announcement describes it as *"more consistent instruction following for nuanced tasks"* — cite `https://www.anthropic.com/news/claude-haiku-4-5` for the Anthropic framing, but see the operator-empirical note below for the scope under which that framing applies.
    - Context and extended thinking: 200k total context, up to 128k extended-thinking budget, up to 64k output tokens. Cite `https://platform.claude.com/docs/en/build-with-claude/extended-thinking`.
    - Safety profile: statistically lower rate of misaligned behaviours than Sonnet 4.5 or Opus 4.1 per Anthropic announcement. Cite `https://www.anthropic.com/news/claude-haiku-4-5`.
-   - **Explicit note on retired claim:** the older denubis claim that "Haiku follows detailed instructions well but struggles with judgement calls" is NOT supported by current (2026-04) Anthropic documentation. That claim is retired. Structural testing principle (weakest-tier-tests-clarity) is preserved in `testing-skills-with-subagents` with the specific Haiku-judgement claim removed — see Phase 3 of the upstream-sync plan.
+   - **Operator-empirical note on judgement:** *"Haiku 4.5 is unsuitable for any task requiring judgement. This is the project's empirical position based on operator experience (2026-04-22), overriding Anthropic's 2026-04 marketing framing of 'more consistent instruction following for nuanced tasks' — that framing describes mechanical instruction-following, not evaluative or reflective judgement. Route judgement-heavy work (code review, proleptic challenge, coherence review, rubric application, scope decisions) to Sonnet 4.6 or Opus 4.7. Haiku 4.5 is appropriate for mechanical, bounded, low-judgement tasks only — which aligns with AbsenceJudgement.tex:868's three success conditions for AI-assisted work."* This note retains and strengthens the structural principle encoded in `testing-skills-with-subagents` — see Phase 3 of the upstream-sync plan, which keeps the Haiku-judgement guidance with the same operator-empirical framing.
    - Model ID for API use: `claude-haiku-4-5-20251001`.
 
 6. **`## Cross-model patterns`** — one short subsection calling out what's common:
@@ -339,27 +345,21 @@ for u in urls:
     assert u in content, f'missing primary-source URL: {u}'
 # xhigh effort-level mention (DR5)
 assert 'xhigh' in content, 'xhigh effort level not mentioned (DR5 violation)'
-# Retired Haiku-judgement claim (DR3) — must be a RETIREMENT NOTE, not the
-# retired phrase itself. L2 revision: earlier check accepted the retired
-# phrase "struggles with judgement" as satisfying the retirement requirement
-# (arms matched the thing the retirement was supposed to remove). Narrowed
-# to require explicit retirement-note language mentioning Haiku.
-# L2 revision 2026-04-19: tightened further — prior check accepted
-# 'retired' + 'Haiku' anywhere in the file, which could pass on unrelated
-# prose mentioning a retired earlier model (e.g., "Haiku 3.5 retired"). The
-# retirement note specifically concerns the judgement claim about Haiku 4.5,
-# so the check now requires all three: 'Haiku 4.5', a judgement term, and
-# either 'retired' or 'not supported'.
-has_haiku_retirement = (
+# Haiku-no-judgement operator-empirical guidance (amended 2026-04-22) —
+# reversed from the earlier retirement framing. The project's empirical
+# position is that Haiku 4.5 is unsuitable for judgement tasks regardless
+# of Anthropic's 2026-04 marketing description of "more consistent
+# instruction following for nuanced tasks". The check verifies the
+# operator-empirical guidance is present, so a future reader auditing the
+# framing can spot it without needing to trace this plan amendment.
+has_haiku_no_judgement_guidance = (
     'Haiku 4.5' in content
     and ('judgement' in content.lower() or 'judgment' in content.lower())
-    and ('retired' in content.lower() or 'not supported' in content.lower())
+    and ('operator' in content.lower() or 'empirical' in content.lower())
+    and ('unsuitable' in content.lower() or 'never' in content.lower())
 )
-assert has_haiku_retirement, \
-    'retirement note for old Haiku claim missing — need an explicit retraction citing "Haiku 4.5" together with a judgement term ("judgement"/"judgment") and either "retired" or "not supported". Do NOT satisfy this check by leaving the old "struggles with judgement" phrase in the file, and do NOT rely on "Haiku" + "retired" appearing in unrelated prose.'
-# Belt-and-braces: the retired phrase itself must be ABSENT (L2 revision)
-assert 'struggles with judgement' not in content, 'old Haiku judgement claim still present (British spelling) — should be removed per DR3'
-assert 'struggles with judgment' not in content, 'old Haiku judgement claim still present (American spelling) — should be removed per DR3'
+assert has_haiku_no_judgement_guidance, \
+    'operator-empirical Haiku-no-judgement guidance missing — need a passage citing Haiku 4.5 together with a judgement term (judgement/judgment), an operator/empirical anchor, and a strong negation (unsuitable/never). Operator-empirical framing is required per the 2026-04-22 plan-amendment pass; do not satisfy the check by repeating only Anthropic marketing language.'
 # Model IDs
 for model_id in ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']:
     assert model_id in content, f'missing model ID: {model_id}'
@@ -377,9 +377,12 @@ git commit -m "feat(writing-claude-directives): add model-tier-notes.md for Opus
 
 Per-model behavioural specifics with citation URLs to current (2026-04)
 Anthropic documentation. Foregrounds new xhigh effort level for Opus 4.7.
-Explicitly retires the unsupported 'Haiku struggles with judgement calls'
-claim (deprecation note visible in the file so future readers know why
-that framing is absent).
+Retains the operator-empirical Haiku-no-judgement guidance (strengthened
+per the 2026-04-22 plan-amendment pass) against Anthropic's 2026-04
+marketing framing of 'more consistent instruction following for nuanced
+tasks' — that framing describes mechanical instruction-following, not
+evaluative judgement; operator position is that Haiku 4.5 is unsuitable
+for any task requiring judgement.
 
 Dated header enables staleness auditing. System card PDF consumed as
 supplementary cross-verification per design plan Additional Considerations.
@@ -632,9 +635,9 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md"
 
 ## Done when (phase-level)
 
-- [ ] `phase_02_red_evidence.md` exists on disk documenting an independent-session failure of the current `writing-claude-directives/SKILL.md` plus the deficiency it identifies (Task 1) — independent-session gate per design plan
+- [ ] `phase_02_red_evidence.md` exists on disk with the Phase 2B code-smell inventory + the 2026-04-22 independent-session search record (0 qualifying transcripts across 30+ FTS5-safe queries in 6 projects) — static-evidence RED per the 2026-04-22 plan-amendment pass (Phase 2 is preventive, not corrective; original independent-session-failure framing reversed)
 - [ ] `writing-claude-directives/SKILL.md` restructured: no Opus 4.5 section, per-model anchors, NO Cialdini/Meincke/persuasion section, rubric callback resolving to `denubis-extending-claude:epistemic-humility` (Task 2)
-- [ ] `model-tier-notes.md` exists with three per-model H2s, dated header, xhigh effort-level mention, retired Haiku-judgement claim documented, model IDs present, URL citations per section (Task 3)
+- [ ] `model-tier-notes.md` exists with three per-model H2s, dated header, xhigh effort-level mention, operator-empirical Haiku-no-judgement guidance documented (amended 2026-04-22: retained and strengthened, not retired), model IDs present, URL citations per section (Task 3)
 - [ ] `long-running-state-patterns.md` model anchors updated: Opus 4.5 / Sonnet 4.5 / Claude 4.5+ removed; Opus 4.7 / Sonnet 4.6 present; Haiku 4.5 preserved (current); dated header + source URL added (Task 3.5 — H6 scope expansion)
 - [ ] `graphviz-conventions.dot` gains obra attribution comment; content otherwise unchanged (Task 4)
 - [ ] GREEN verification passes pressure scenario; rubric self-application walk-through committed with any surfaced vulnerabilities acknowledged by user before GREEN (Task 5)
@@ -643,5 +646,5 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md"
 
 **Not in scope for Phase 2:**
 - Phase 5's version bumps / CHANGELOG entries (cross-plugin scope per AC5.7 handled in Phase 5/6)
-- Phase 3's testing-skills-with-subagents restructure (Haiku-judgement claim lives there, not here)
+- Phase 3's testing-skills-with-subagents restructure (SKILL.md-level Haiku-judgement wording lives there; Phase 3 reframes with the same operator-empirical guidance per the 2026-04-22 plan-amendment pass)
 - Phase 6's impl-plan-write template change (covered separately per design plan Phase 6)

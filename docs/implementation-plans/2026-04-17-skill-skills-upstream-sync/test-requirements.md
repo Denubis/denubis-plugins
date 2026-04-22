@@ -190,12 +190,12 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** `Opus 4.5` and `Sonnet 4.5` ABSENT across restructured SKILL.md, `model-tier-notes.md`, AND `long-running-state-patterns.md`; `Opus 4.7` + `Sonnet 4.6` + `Haiku 4.5` PRESENT as the current model anchors; supporting files have dated headers + source URLs.
 - **Run command:** Inlined Python in `phase_02.md` Task 2 Step 5 + Task 3 Step 3 + Task 3.5 Step 3.
 
-### AC3.8 — `test-requirements.md` for Phase 2 documents RED evidence from an independent session and the Anthropic PDF consumption
+### AC3.8 — `test-requirements.md` for Phase 2 documents RED evidence (static code-smell inventory) and the Anthropic PDF consumption
 
-- **Type:** Operational check (file existence) + independent-session provenance + system-card cross-verification narrative in phase_02_red_evidence.md and implicitly in model-tier-notes.md authoring
+- **Type:** Operational check (file existence) + content presence + system-card cross-verification narrative in phase_02_red_evidence.md and implicitly in model-tier-notes.md authoring
 - **Test location:** `phase_02.md` Task 1 Step 4 (phase_02_red_evidence.md); `phase_02.md` Task 3 Step 2 (system-card PDF consumption)
-- **What it verifies:** `phase_02_red_evidence.md` exists; source is a session that is NOT the implementing executor (cc-search-chats transcript OR user-run fresh-session transcript); file contains observed-failure + deficiency-location analysis per template; system-card PDF was consumed during authoring (`pdftotext` or `Read` tool with `pages` parameter invoked per Step 2) and no claim in `model-tier-notes.md` contradicts the system card.
-- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md` and inspection for independent-session provenance; system-card consumption recorded as inspection step during Task 3 execution.
+- **What it verifies:** `phase_02_red_evidence.md` exists; Phase 2 is a preventive restructure (amended 2026-04-22 plan-amendment pass — original independent-session-failure framing reversed). Evidence content includes (a) the Phase 2B investigator code-smell inventory (SKILL.md line 215-220 stale Opus 4.5 section, lines 69/96/99/237 generic 4.x anchors, long-running-state-patterns.md stale 4.5 anchors) with file-SHA anchors and (b) the 2026-04-22 independent-session search record (FTS5-safe queries, projects covered, 0 qualifying transcripts found). System-card PDF was consumed during authoring (`pdftotext` or `Read` tool with `pages` parameter invoked per Step 2) and no claim in `model-tier-notes.md` contradicts the system card.
+- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md` and inspection for (i) code-smell inventory with file-SHA anchors, (ii) independent-session search record with FTS5-safe query list and 0-result finding; system-card consumption recorded as inspection step during Task 3 execution.
 
 ---
 
