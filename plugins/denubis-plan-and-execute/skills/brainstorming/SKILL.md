@@ -100,7 +100,7 @@ Action: Dispatch codebase-investigator with: "Find authentication implementation
 
 ### When to Use internet-researcher
 
-**Use @agent-denubis-research-agents:internet-researcher when available. Otherwise use WebSearch/WebFetch aggressively.**
+**Prefer dispatching to the `denubis-research-agents:internet-researcher` subagent when available. Otherwise use WebSearch/WebFetch aggressively.**
 
 **Use internet research when you need to:**
 - Find current API documentation for external services
