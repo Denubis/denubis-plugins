@@ -82,14 +82,30 @@ git -C /tmp/superpowers-obra log -1 --format='%H %s'  # record in first commit m
 
 **Step 1: Search prior skill-testing sessions via cc-search-chats**
 
-Invoke `cc-search-chats:search-chat` with queries targeting skill-testing-going-off-the-rails. Run at least three:
-- `pressure scenario skill test rationalization` — prior sessions using pressure scenarios, looking for cases where the scenario missed
-- `"Haiku" AND skill test` — prior sessions invoking Haiku for skill-clarity testing (material for whether the old claim held up)
-- `synthetic scenario pressure test` — prior sessions specifically using synthetic pressures
-- `skill ambiguous agent rationalized` — prior sessions where a skill's ambiguity surfaced
-- `testing skills subagent pressure` — broad query for the subject
+Invoke `cc-search-chats:search-chat` with queries targeting skill-testing-going-off-the-rails.
 
-For each qualifying match: session ID, date, 2-3 sentence failure summary, direct quote. If ≥1 qualifying transcript is found, skip to Step 3.
+**cc-search-chats FTS5 constraint (ISSUE-10, enforced 2026-04-22):** single literal term per query — no AND/OR, no quotes, no hyphens, no regex. The queries below are a semantic target list; each is an FTS5-safe single-term query. Union results across queries in Python; do not try to shell-aggregate. This mirrors M2's treatment of Phase 5 frustration-audit queries.
+
+Run at least these single-term queries (translated from prior semantic targets):
+
+| Semantic target | FTS5-safe single-term query |
+|-----------------|-----------------------------|
+| pressure-scenario rationalisation | `rationalize`, `rationalise`, `rationalisation` |
+| bypass / skip / loophole patterns | `bypass`, `skipped`, `loophole` |
+| aggressive-imperative overtriggering | `CRITICAL`, `overtriggering`, `aggressive` |
+| tautological / self-proving gates | `tautology`, `tautological` |
+| synthetic vs real pressure scenarios | `synthetic`, `pressure` |
+| skill ambiguity under subagent | `ambiguous`, `subagent` |
+| defeat / pressure-defeat | `defeated`, `defeat` |
+| frustration markers (operator signal) | `mate`, `fuck` |
+
+Invocation form: `cc-search-chats search "TERM" --project PATH --json` (path form = `/` + project-dir-name with leading `-` stripped and remaining `-` converted to `/`). Project-directory indices live in `/home/brian/.claude/projects/` — enumerate and search across all with a hit count > 0 on any term.
+
+For each qualifying match: session ID, date, 2-3 sentence failure summary, direct quote. Use `cc-search-chats context UUID --json --depth 10` to inspect context around promising hits; use `cc-search-chats extract SESSION_ID --json` if you need full session context to judge whether the failure is genuinely about skill-testing rather than unrelated frustration.
+
+**Qualifying-hit criteria:** the session was engaged in testing a skill (not just using one), exhibited a failure mode the current `testing-skills-with-subagents/SKILL.md` would address (synthetic-scenario over-fitting, rationalisation under pressure, ambiguous skill clarity), the failure is quotable, and the skill's responsible section can be named. Frustration-only hits without a skill-testing-failure context do not qualify.
+
+If ≥1 qualifying transcript is found, skip to Step 3.
 
 **Step 2: If Step 1 yields nothing — commissioned fresh-session run**
 
@@ -143,15 +159,17 @@ Phase 2.5's refactor created a basic-baseline-checklist H3 subsection within the
 >
 > **Synthetic scenarios still have a job** — but it's REFACTOR-phase completeness coverage (see the REFACTOR phase below), not RED baseline. They check whether the skill, once green against real failures, holds up against hypothesised failure modes too.
 
-**Step 2: Remove the Haiku-judgement specific claim; keep the tier-test structural principle**
+**Step 2: Reframe the Haiku-judgement passage with operator-empirical framing (amended 2026-04-22)**
 
-At the current lines 59-60 (or wherever Phase 2.5's refactor left them), the passage reads: *"The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough."*
+At the current lines 59-60 (or wherever Phase 2.5's refactor left them), the existing passage reads: *"The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough."*
 
-Edit to remove ONLY the Haiku-judgement specific claim. The structural principle stays. Target result:
+**Amended 2026-04-22 plan-amendment pass:** the original Phase 3 edit removed the Haiku-judgement specific claim on the basis that current Anthropic docs don't support it. That framing is reversed. The operator-empirical position (user-stated 2026-04-22, captured in project-local memory `feedback_haiku-no-judgement.md`) is that Haiku 4.5 is unsuitable for any task requiring judgement, regardless of Anthropic's 2026-04 marketing description of "more consistent instruction following for nuanced tasks." That marketing describes mechanical instruction-following, not evaluative judgement. The passage is retained and strengthened, not removed.
 
-> The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. If your skill keeps the weakest tier on-rails, stronger tiers will follow it easily. If the weakest tier can't follow the skill, your instructions aren't explicit enough.
+Target result (edit-in-place, preserving the surrounding paragraph shape):
 
-The specific change: remove "Haiku follows detailed instructions well but struggles with judgement calls —" (and the "if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily" clause, replacing with the model-tier-agnostic "If your skill keeps the weakest tier on-rails, stronger tiers will follow it easily"). The structural principle — weakest-that-follows = strongest clarity test — is retained verbatim in spirit.
+> The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but **operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement** — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, Sonnet 4.6 and Opus 4.7 will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough. Structural principle retained: weakest-model-tier-that-follows = strongest-clarity-test.
+
+**Specific changes from the pre-amendment text:** (a) "struggles with judgement calls" replaced by "unsuitable for any task requiring judgement" with operator-empirical anchor; (b) add the contrast to Anthropic's 2026-04 framing so a future reader can audit the provenance; (c) update model anchors (Sonnet → Sonnet 4.6, Opus → Opus 4.7) consistent with Phase 2's model-tier-notes.md; (d) explicitly keep the tier-test structural principle.
 
 **Step 3: Verify the edits**
 
@@ -160,9 +178,22 @@ Run:
 cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
 with open('plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md') as f:
     content = f.read()
-# AC2.6: Haiku-judgement specific claim removed
-assert 'struggles with judgement' not in content, 'Haiku judgement claim (British spelling) still present'
-assert 'struggles with judgment' not in content, 'Haiku judgement claim (American spelling) still present'
+# AC2.6 (amended 2026-04-22): Haiku-no-judgement operator-empirical guidance
+# retained and strengthened. Check for operator/empirical framing with
+# Haiku 4.5 and a judgement term plus a negation. The pre-amendment check
+# required the 'struggles with judgement' phrase to be ABSENT; under the
+# amendment, the guidance is PRESENT but reframed — the specific pre-
+# amendment phrase may still be absent (because the edit reworded), or
+# the reframed passage may retain it in a contextualised form. The check
+# therefore verifies the operator-empirical framing rather than absence.
+has_haiku_no_judgement_guidance = (
+    'Haiku 4.5' in content
+    and ('judgement' in content.lower() or 'judgment' in content.lower())
+    and ('operator' in content.lower() or 'empirical' in content.lower())
+    and ('unsuitable' in content.lower() or 'never' in content.lower())
+)
+assert has_haiku_no_judgement_guidance, \
+    'operator-empirical Haiku-no-judgement guidance missing from testing-skills-with-subagents/SKILL.md — need a passage citing Haiku 4.5 together with a judgement term, an operator/empirical anchor, and a strong negation. Operator-empirical framing is required per the 2026-04-22 plan-amendment pass; do not satisfy by keeping only the pre-amendment phrasing.'
 # AC2.3 partial: tier-test structural principle retained
 assert 'weakest' in content, 'tier-test structural principle lost — weakest-tier phrasing missing'
 # AC2.1: conversation-precedent protocol prepended
@@ -170,7 +201,7 @@ assert 'Conversation-Precedent' in content or 'conversation-precedent' in conten
 assert 'cc-search-chats:search-chat' in content, 'cc-search-chats cross-reference missing'
 assert 'fresh-session' in content.lower() or 'separate chat session' in content.lower(), 'fresh-session fallback missing'
 assert 'independent-session' in content.lower(), 'independent-session gate framing missing'
-print('RED conversation-precedent + Haiku edit structural checks passed')
+print('RED conversation-precedent + Haiku reframe structural checks passed')
 "
 ```
 
@@ -179,21 +210,26 @@ print('RED conversation-precedent + Haiku edit structural checks passed')
 ```bash
 cd /home/brian/people/Brian/brian-ed3d-plugins
 git add plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md
-git commit -m "refactor(testing-skills-with-subagents): prepend conversation-precedent protocol; remove unsupported Haiku-judgement claim
+git commit -m "refactor(testing-skills-with-subagents): prepend conversation-precedent protocol; reframe Haiku-judgement guidance with operator-empirical anchor
 
 - Add new H3 'Conversation-Precedent Protocol' at top of RED phase, per
   design DR3 (independent-session gate: cc-search-chats:search-chat OR
   user-run fresh chat session; no third path — executor does not self-attest)
-- Remove 'Haiku follows detailed instructions well but struggles with
-  judgement calls' passage (not supported by 2026-04 Anthropic docs per
-  Phase 2C research)
-- Reframe surrounding tier-test principle in model-tier-agnostic terms
-  (weakest-tier = strongest clarity test stands independently)
+- Retain and strengthen the Haiku-no-judgement guidance (amended
+  2026-04-22 plan-amendment pass — the original pre-amendment plan removed
+  the claim on the basis of 2026-04 Anthropic docs). Operator-empirical
+  position: Haiku 4.5 is unsuitable for any task requiring judgement; the
+  Anthropic marketing framing of 'more consistent instruction following
+  for nuanced tasks' describes mechanical instruction-following, not
+  evaluative judgement. Passage reworded to name the contrast explicitly.
+- Preserve tier-test structural principle (weakest-tier = strongest
+  clarity test) with updated model anchors (Sonnet 4.6, Opus 4.7)
 - Denubis-specific strengths preserved byte-identical (model-tier guidance,
   No Blaming the Model, flaky-result discipline) — verification in Task 5
 
 Part of skill-skills upstream sync (Phase 3).
-Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (DR3, DR1)"
+Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (DR3, DR1);
+feedback_haiku-no-judgement.md (project-local memory)"
 ```
 <!-- END_TASK_2 -->
 
@@ -475,8 +511,8 @@ re-run with sharper honesty — specify)."
 
 ## Done when (phase-level)
 
-- [ ] `phase_03_red_evidence.md` exists on disk documenting an independent-session failure of the current `testing-skills-with-subagents/SKILL.md` plus the deficiency it identifies (Task 1) — independent-session gate
-- [ ] SKILL.md: conversation-precedent H3 prepended into RED; Haiku-judgement specific claim removed; tier-test structural principle preserved (Task 2)
+- [ ] `phase_03_red_evidence.md` exists on disk documenting an independent-session failure of the current `testing-skills-with-subagents/SKILL.md` plus the deficiency it identifies (Task 1) — independent-session gate. Queries are FTS5-safe single-term (2026-04-22 plan-amendment pass: AND/quotes/hyphens translated to single terms per ISSUE-10, mirroring M2's Phase 5 treatment). Phase 3 remains corrective (unlike Phase 2/4, which went to static-evidence RED in the same amendment pass) — transcripts are expected to land.
+- [ ] SKILL.md: conversation-precedent H3 prepended into RED; Haiku-judgement passage reframed with operator-empirical anchor (amended 2026-04-22: retained and strengthened, not removed — operator position overrides Anthropic's 2026-04 marketing framing); tier-test structural principle preserved (Task 2)
 - [ ] SKILL.md: synthetic pressure-scenario content moved from RED to REFACTOR as `Pressure-Scenario Completeness Coverage` H3; obra's 7-pressure table + Key Elements list + 3+ pressures guidance absorbed (Task 3)
 - [ ] SKILL.md: letter-vs-spirit promoted to foundational H3; meta-testing three-category framing verified+filled; Rubric Callback H2 added between When to Use and TDD Mapping (Task 4)
 - [ ] Preservation audit passes: model-tier guidance, No Blaming the Model, flaky-result discipline all intact (Task 5)

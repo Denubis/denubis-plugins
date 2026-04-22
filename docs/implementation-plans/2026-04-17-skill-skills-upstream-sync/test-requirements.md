@@ -118,18 +118,18 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** `## Rubric Callback` H2 exists; `denubis-extending-claude:epistemic-humility` cross-reference present; position is between `## When to Use` and `## TDD Mapping`; cross-reference resolves via Phase 5 audit.
 - **Run command:** Inlined Python in `phase_03.md` Task 4 Step 4; plus `phase_05_cross_ref_audit.py`.
 
-### AC2.6 — "Haiku follows detailed instructions well but struggles with judgement calls" claim absent; tier-test structural principle preserved
+### AC2.6 — Haiku-no-judgement operator-empirical guidance PRESENT in `testing-skills-with-subagents/SKILL.md`; tier-test structural principle preserved (amended 2026-04-22)
 
-- **Type:** Grep-audit (negative + positive assertion)
+- **Type:** Grep-audit (positive assertion for operator-empirical framing; positive assertion for tier-test principle)
 - **Test location:** `phase_03.md` Task 2 Step 3 (inline Python)
-- **What it verifies:** `struggles with judgement` and `struggles with judgment` both ABSENT; `weakest` tier-phrasing PRESENT.
+- **What it verifies:** A passage citing `Haiku 4.5` together with a judgement term (`judgement`/`judgment`), an operator/empirical anchor, and a strong negation (`unsuitable`/`never`) is PRESENT. `weakest` tier-phrasing PRESENT. Amended 2026-04-22 plan-amendment pass — prior framing required the pre-amendment phrase "struggles with judgement" to be ABSENT; the amended framing requires the operator-empirical guidance to be PRESENT (pre-amendment phrasing may also be retained inside the reframed passage, which is fine). Operator position overrides Anthropic's 2026-04 marketing framing.
 - **Run command:** Inlined Python assertion block in `phase_03.md` Task 2 Step 3.
 
 ### AC2.7 — `test-requirements.md` for Phase 3 documents RED evidence from an independent session
 
 - **Type:** Operational check (file existence) + content presence + independent-session provenance
 - **Test location:** `phase_03.md` Task 1 Step 4 (phase_03_red_evidence.md committed)
-- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` exists on disk with the RED evidence structure (source, session reference, SKILL.md SHA tested against, observed failure, direct quote(s), deficiency-location analysis, how Phase 3 addresses). Source must be a session that is NOT the implementing executor — either a cc-search-chats transcript or a user-run fresh-session transcript.
+- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` exists on disk with the RED evidence structure (source, session reference, SKILL.md SHA tested against, observed failure, direct quote(s), deficiency-location analysis, how Phase 3 addresses). Source must be a session that is NOT the implementing executor — either a cc-search-chats transcript or a user-run fresh-session transcript. cc-search-chats queries are FTS5-safe single-term (2026-04-22 plan-amendment pass: ISSUE-10 constraints applied, mirroring M2's Phase 5 treatment). Phase 3 remains corrective (Phase 2 and Phase 4 went to static-evidence RED in the same amendment pass; Phase 3 did not) — the skill's target methodology is explicitly transcript-sourcing, so transcripts are expected to land.
 - **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` and inspection for independent-session provenance.
 
 ---
