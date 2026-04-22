@@ -2,11 +2,14 @@
 name: writing-claude-md-files
 description: Use when creating or updating CLAUDE.md files for projects or subdirectories - covers top-level vs domain-level organization, capturing architectural intent and contracts, and mandatory freshness dates
 user-invocable: false
+last-reviewed: 2026-04-22
 ---
 
 # Writing CLAUDE.md Files
 
 **REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure.
+
+**Review cadence:** This skill itself should be re-checked against current Claude Code guidance on CLAUDE.md structure quarterly. When reviewing, update the `last-reviewed` date in the frontmatter even if no content changes — that is the signal that someone actually checked.
 
 ## Core Principle
 
