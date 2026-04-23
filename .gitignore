@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Research PDFs (large, fetched on demand)
+docs/papers/
