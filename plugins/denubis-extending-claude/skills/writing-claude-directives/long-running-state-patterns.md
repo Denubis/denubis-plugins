@@ -1,5 +1,7 @@
 # Long-Running State Patterns
 
+_Last verified: 2026-04-17. Model anchors: Opus 4.7 / Sonnet 4.6 / Haiku 4.5. Source: https://platform.claude.com/docs/en/about-claude/models/overview_
+
 Patterns for managing Claude agents across extended multi-context-window workflows. This is optional reference content for when you need to design long-running agent systems.
 
 ## Core Challenge
@@ -12,7 +14,7 @@ Long-running agents work in discrete sessions. Each new session starts without m
 
 **Auto-Compact**: Triggers at ~95% context capacity. Claude Code summarizes history, preserving architectural decisions and unresolved bugs. Manually trigger with `/compact` at logical breakpoints.
 
-**Token Budget Awareness**: Claude 4.5+ receives updates on remaining context after tool calls. Enables better task persistence and strategy adjustment.
+**Token Budget Awareness**: Claude 4.x (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) receives updates on remaining context after tool calls. Enables better task persistence and strategy adjustment.
 
 ### Compression Strategies (Karpathy Framework)
 
@@ -111,12 +113,12 @@ Explicit feature lists prevent premature completion and duplicate work.
 ### Orchestrator-Worker Pattern
 
 ```
-Orchestrator (Opus 4.5)
+Orchestrator (Opus 4.7)
 ├── Holds plan, routes tasks
 ├── No implementation work
 └── Context reserved for coordination
 
-Subagents (Sonnet/Haiku 4.5)
+Subagents (Sonnet 4.6 / Haiku 4.5)
 ├── Focused expertise
 ├── Own context window
 ├── Returns condensed results
@@ -129,8 +131,8 @@ Subagents (Sonnet/Haiku 4.5)
 
 | Model | Use For | Cost |
 |-------|---------|------|
-| Opus 4.5 | Orchestration, complex planning | $15/M output |
-| Sonnet 4.5 | Focused implementation | $15/M output |
+| Opus 4.7 | Orchestration, complex planning | $15/M output |
+| Sonnet 4.6 | Focused implementation | $15/M output |
 | Haiku 4.5 | Simple tasks (90% of Sonnet capability) | $5/M output |
 
 Haiku 4.5 makes multi-agent orchestration economically viable.
