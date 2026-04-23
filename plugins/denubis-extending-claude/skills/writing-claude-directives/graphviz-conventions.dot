@@ -1,7 +1,8 @@
+// Source: obra/superpowers/skills/writing-skills/graphviz-conventions.dot
+// Verified byte-identical 2026-04-17 during skill-skills upstream sync (Phase 2).
+// Upstream repo: https://github.com/obra/superpowers
+
 digraph STYLE_GUIDE {
-    // Source: obra/superpowers/skills/writing-skills/graphviz-conventions.dot
-    // Verified byte-identical 2026-04-17 during skill-skills upstream sync (Phase 2).
-    // Upstream repo: https://github.com/obra/superpowers
 
     // The style guide for our process DSL, written in the DSL itself
 
