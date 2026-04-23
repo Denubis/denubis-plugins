@@ -12,6 +12,8 @@ This file carries per-model behavioural specifics (effort levels, steerability n
 
 ## Opus 4.7
 
+These are vendor-guidance summaries; no operator-empirical override is active for this model tier as of 2026-04-22.
+
 **Literal instruction-following:** Opus 4.7 interprets prompts more literally than Opus 4.6, particularly at lower effort levels. It will not silently generalize an instruction from one item to another — if the directive says "for tool X, do Y", the model will not extend "do Y" to tool Z without being told. Authors must enumerate cases explicitly rather than rely on the model to infer intent. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
 
 **Effort levels (first-class control):** Opus 4.7 supports five effort levels: `low`, `medium`, `high`, `xhigh` (new in 4.7), and `max`. Anthropic's current guidance: "Start with the new `xhigh` effort level for coding and agentic use cases." At `low` and `medium` the model scopes tightly and finishes sooner; at `xhigh` and `max` it reasons more, explores more alternatives, and uses tools less per unit of work. Directive authors writing prompts for Opus 4.7 should pick an effort level deliberately rather than leaving it to the default — the behavioural spread between `low` and `xhigh` is large enough to change how a directive reads in practice. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
@@ -23,6 +25,8 @@ This file carries per-model behavioural specifics (effort levels, steerability n
 **Model ID (API):** `claude-opus-4-7`
 
 ## Sonnet 4.6
+
+These are vendor-guidance summaries; no operator-empirical override is active for this model tier as of 2026-04-22.
 
 **Steerability:** Sonnet 4.6 is more steerable than Opus 4.6. Corrective instructions — "do not do X", "always do Y after Z" — are more effective than on prior Sonnets. Directive authors can lean on corrective phrasing rather than scaffolding elaborate workarounds. Source: <https://www.anthropic.com/news/claude-sonnet-4-6> (verified 2026-04-17).
 
