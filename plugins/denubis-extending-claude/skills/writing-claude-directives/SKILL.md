@@ -93,7 +93,7 @@ Use structure to make compliance the path of least resistance:
 
 ### Escalation: Imperatives (Use Sparingly)
 
-For current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5), Anthropic's prompting best practices explicitly recommend dialling back aggressive language. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X` — the more responsive current generation overtriggers on imperative phrasing that older models needed. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+Imperatives divide into two cases, and the distinction is load-bearing. **Rhetorical emphasis** — stacking `CRITICAL` / `YOU MUST` / `NEVER` onto ordinary instructions to signal importance — should be dialled back. Current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5) overtrigger on these markers, reading urgency as content-signal rather than emphasis. **True boundaries** — irreversibility, safety-critical operations, unconditional prohibitions — retain the imperative; they earn it. The cost of misfire differs between the two cases: rhetorical overtrigger degrades instruction-following in nearby unrelated contexts, while a missed true-boundary gate destroys work, rewrites shared history, or leaks secrets. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X`; but leave `Never commit secrets to version control` alone. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
 
 Concrete before/after:
 
