@@ -5,6 +5,8 @@ last-verified: 2026-04-17
 ---
 
 _Last verified: 2026-04-17_
+_Amended 2026-04-22: operator-empirical Haiku-no-judgement framing added (see Haiku 4.5 section)._
+_Amended 2026-04-23: Haiku-no-judgement assertion tightened with V4 constructs (Route judgement-heavy work / mechanical instruction-following)._
 
 This file carries per-model behavioural specifics (effort levels, steerability notes, instruction-following characteristics, extended-thinking behaviour) for the current 2026-04 Claude tier: Opus 4.7, Sonnet 4.6, Haiku 4.5. It is a supporting file for [`SKILL.md`](SKILL.md) in this skill — refresh cycles for model-specific claims decouple from the orchestrator file so model notes can be updated without touching the directive-writing guidance itself. If the dated header above is more than one model release behind current, treat every claim below as unverified and re-verify against the cited URLs.
 

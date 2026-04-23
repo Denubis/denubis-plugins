@@ -1,6 +1,6 @@
 # Long-Running State Patterns
 
-_Last verified: 2026-04-17. Model anchors: Opus 4.7 / Sonnet 4.6 / Haiku 4.5. Source: https://platform.claude.com/docs/en/about-claude/models/overview_
+_Last verified: 2026-04-23. Model anchors: Opus 4.7 / Sonnet 4.6 / Haiku 4.5. Source: https://platform.claude.com/docs/en/about-claude/models/overview_
 
 Patterns for managing Claude agents across extended multi-context-window workflows. This is optional reference content for when you need to design long-running agent systems.
 
