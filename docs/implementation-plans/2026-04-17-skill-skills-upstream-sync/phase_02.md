@@ -357,9 +357,20 @@ has_haiku_no_judgement_guidance = (
     and ('judgement' in content.lower() or 'judgment' in content.lower())
     and ('operator' in content.lower() or 'empirical' in content.lower())
     and ('unsuitable' in content.lower() or 'never' in content.lower())
+    # Reasoned-guidance tightening (V4 fix, 2026-04-23, from Codex triage of
+    # the Task 5 rubric walkthrough). A file containing only the keyword
+    # clauses above could satisfy the check with an incoherent paragraph;
+    # the next two clauses require specific reasoned constructs that
+    # distinguish genuine guidance from keyword-stringing. Both phrases
+    # appear verbatim in the 2026-04-22 amendment's operator-empirical
+    # passage. If a future author reframes the guidance, the assertions
+    # should be updated alongside the prose — making the re-framing a
+    # conscious edit rather than a silent drift.
+    and 'Route judgement-heavy work' in content
+    and 'mechanical instruction-following' in content.lower()
 )
 assert has_haiku_no_judgement_guidance, \
-    'operator-empirical Haiku-no-judgement guidance missing — need a passage citing Haiku 4.5 together with a judgement term (judgement/judgment), an operator/empirical anchor, and a strong negation (unsuitable/never). Operator-empirical framing is required per the 2026-04-22 plan-amendment pass; do not satisfy the check by repeating only Anthropic marketing language.'
+    'operator-empirical Haiku-no-judgement guidance missing — need a passage citing Haiku 4.5 together with a judgement term (judgement/judgment), an operator/empirical anchor, a strong negation (unsuitable/never), a concrete routing instruction (the exact phrase "Route judgement-heavy work"), and a contrast anchor (the phrase "mechanical instruction-following"). Operator-empirical framing is required per the 2026-04-22 plan-amendment pass; do not satisfy the check by repeating only Anthropic marketing language.'
 # Model IDs
 for model_id in ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']:
     assert model_id in content, f'missing model ID: {model_id}'
