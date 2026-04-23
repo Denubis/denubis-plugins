@@ -66,7 +66,7 @@ description: Use when tests have race conditions or timing dependencies - replac
 
 ## Compliance Techniques
 
-Claude 4.x models are highly responsive to instructions. Lead with context and motivation; reserve imperatives for critical boundaries.
+Current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5) are highly responsive to instructions, with per-model specifics in [`model-tier-notes.md`](model-tier-notes.md). Lead with context and motivation; reserve imperatives for critical boundaries.
 
 ### Primary: Context + Motivation
 
@@ -93,10 +93,20 @@ Use structure to make compliance the path of least resistance:
 
 ### Escalation: Imperatives (Use Sparingly)
 
-For Claude 4.x, aggressive language ("YOU MUST", "CRITICAL") can cause overtriggering. Use normal language first:
+For current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5), Anthropic's prompting best practices explicitly recommend dialling back aggressive language. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X` — the more responsive current generation overtriggers on imperative phrasing that older models needed. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+
+Concrete before/after:
 
 ```markdown
-# Often sufficient for 4.x
+# Before (overtriggers current models)
+CRITICAL: You MUST run tests before committing. NEVER skip this step.
+
+# After (current Anthropic guidance)
+Run tests before committing. Untested commits break CI for the whole team.
+```
+
+```markdown
+# Often sufficient for current models
 Use this tool when searching for files.
 
 # Reserve imperatives for true boundaries
@@ -117,6 +127,10 @@ Write the test first. Code written before its test tends to test the implementat
 | Discipline (TDD, verification) | Context + structural enforcement + loophole closure |
 | Technique (patterns, how-to) | Clear steps, "we want quality" framing |
 | Reference (documentation) | Clarity only, no persuasion needed |
+
+## Rubric Callback
+
+Before writing a new directive, check whether the underlying agent-task-or-skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement). If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
 
 ## Structure Patterns
 
@@ -212,12 +226,7 @@ Don't create helpers, utilities, or abstractions for one-time operations. Don't 
 
 ## Model-Specific Notes
 
-### Opus 4.5: "Think" Sensitivity
-
-When extended thinking is disabled, Opus 4.5 is sensitive to the word "think" and variants. Replace with:
-- "consider" instead of "think about"
-- "evaluate" instead of "think through"
-- "determine" instead of "think whether"
+Per-model behavioural specifics (effort levels, steerability, instruction-following characteristics, extended-thinking budgets) live in [`model-tier-notes.md`](model-tier-notes.md) as a supporting file so they can be refreshed without touching this orchestrator. Consult that file when a directive's target model matters — e.g. choosing effort level, calibrating aggressive-language dial-back, or deciding whether to route judgement-heavy work away from Haiku 4.5.
 
 ## Naming (for Skills)
 
@@ -234,7 +243,7 @@ When extended thinking is disabled, Opus 4.5 is sensitive to the word "think" an
 | Vague triggers | Specific symptoms: "tests flaky", "race condition" |
 | Deeply nested references | Keep one level deep from main file |
 | Windows paths | Always forward slashes |
-| Aggressive language for 4.x | Lead with context, reserve imperatives for boundaries |
+| Aggressive language for current models | Lead with context, reserve imperatives for boundaries (see Compliance Techniques section) |
 
 ## Anti-Rationalization
 
