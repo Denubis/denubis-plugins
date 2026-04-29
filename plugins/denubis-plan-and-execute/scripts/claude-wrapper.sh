@@ -19,9 +19,12 @@
 #
 # Post-session transcript:
 #   Fresh interactive sessions get a pre-assigned --session-id. After exit,
-#   prompts "Press Enter to archive transcript" which launches a new interactive
-#   session running /transcript <uuid>. Ctrl-C skips. Resumed/print/bare
-#   sessions are excluded (resumed sessions get a reminder instead).
+#   prompts "Press Enter to archive transcript" only if the project already
+#   does transcripting (ai_transcripts/ or .ai-transcripts/ exists in PWD or
+#   git root). On Enter, invokes claude-research-transcript directly — no
+#   second claude session. Ctrl-C skips. Resumed/print/bare sessions are
+#   excluded (resumed sessions get the reminder only when in a transcripting
+#   project).
 #
 # Usage:
 #   Fish: alias claude '~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh'
@@ -68,19 +71,49 @@ for arg in "$@"; do
     esac
 done
 
+# True when the current project already does transcripting.
+has_transcripts_dir() {
+    local dir
+    for dir in "$PWD/ai_transcripts" "$PWD/.ai-transcripts"; do
+        [[ -d "$dir" ]] && return 0
+    done
+    local git_root
+    git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    [[ -n "$git_root" ]] || return 1
+    for dir in "$git_root/ai_transcripts" "$git_root/.ai-transcripts"; do
+        [[ -d "$dir" ]] && return 0
+    done
+    return 1
+}
+
 "$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@"
 EXIT_CODE=$?
 
-if [[ "$SHOULD_TRANSCRIPT" == true ]]; then
-    echo ""
-    echo "Press Enter to archive transcript, or Ctrl-C to skip."
-    if read -r 2>/dev/null; then
-        # Launch a fresh interactive session with /transcript and the session UUID.
-        # The transcript skill reads the JSONL directly — no --resume needed.
-        "$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" "/transcript $SESSION_ID"
+if [[ "$SHOULD_TRANSCRIPT" == true ]] && has_transcripts_dir; then
+    # Locate the JSONL by exact session_id match — deterministic against
+    # concurrent sessions in other worktrees.
+    TRANSCRIPT_PATH=""
+    for f in "$HOME"/.claude/projects/*/"$SESSION_ID".jsonl; do
+        if [[ -f "$f" ]]; then
+            TRANSCRIPT_PATH="$f"
+            break
+        fi
+    done
+
+    if [[ -n "$TRANSCRIPT_PATH" ]]; then
+        echo ""
+        echo "Press Enter to archive transcript, or Ctrl-C to skip."
+        if read -r 2>/dev/null; then
+            if command -v claude-research-transcript >/dev/null 2>&1; then
+                claude-research-transcript archive \
+                    --transcript "$TRANSCRIPT_PATH" \
+                    --session-id "$SESSION_ID"
+            else
+                echo "warning: claude-research-transcript not on PATH; skipping archive." >&2
+            fi
+        fi
     fi
-elif [[ "$IS_RESUMED" == true ]]; then
-    # TODO: resume-aware archiving — extract session ID from args or use --continue's session
+elif [[ "$IS_RESUMED" == true ]] && has_transcripts_dir; then
     echo ""
     echo "Reminder: resumed sessions aren't auto-archived. Run /transcript before exiting next time."
 fi
