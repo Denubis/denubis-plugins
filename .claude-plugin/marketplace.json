@@ -22,7 +22,7 @@
         {
             "name": "denubis-plan-and-execute",
             "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-            "version": "2.31.0",
+            "version": "2.32.0",
             "source": "./plugins/denubis-plan-and-execute",
             "author": {
                 "name": "Brian Ballsun-Stanton",

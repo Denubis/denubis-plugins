@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.32.0
+
+Bound the code-review fix loop to a single re-review cycle, then HALT for user direction. The previous unbounded "review → fix → re-review until zero issues" loop generated runaway agent ceremony for tiny edits.
+
+**Changed:**
+- `requesting-code-review` skill: at most one fix-then-re-review cycle, then HALT. Four user-resolution options on HALT: fix-now (user-authorised), defer to a future phase plan (mark review complete and append issues to the named plan file), accept remaining issues, or halt for discussion.
+- `code-reviewer` agent: writes findings to `code-review-findings-{SCOPE}.md` (e.g. `phase-2`, `pre-merge`, `plan-validation`) in the plan directory so per-scope findings coexist rather than clobbering each other. Re-review mode reads `PRIOR_FINDINGS_FILE` and reports each prior issue as Resolved / Partially resolved / Unresolved.
+- `code-reviewer` agent: Python tooling MUST be wrapped in `uv run` (e.g. `uv run pytest`, `uv run ruff check`); bare invocations are forbidden.
+- `executing-an-implementation-plan` skill: per-phase and pre-merge review sections updated to call the bounded skill with `SCOPE: phase-N` / `SCOPE: pre-merge`. Removed the now-unreachable three-strike rule. Test analysis (5b) gates on terminal outcome rather than strict zero-issues so accept/defer paths still proceed to test coverage.
+- `impl-plan-write` skill: plan-validation finalization uses the bounded one-cycle behaviour with `SCOPE: plan-validation`. Step 3 finalization completes on terminal outcome rather than strict zero-issues.
+
 ## [denubis-plan-and-execute] 2.31.0
 
 Revise `exec-session-naming` skill: structured slug format with project code, verb-noun slot, issue number, and phase; anti-drift pane targeting so tmux window names no longer get schmeared onto the focused window.

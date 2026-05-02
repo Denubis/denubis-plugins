@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 family: executing-an-implementation-plan,finishing-a-development-branch,make-pr,merge-to-main
-description: Use after each implementation phase and before merging to verify work meets requirements - dispatches code-reviewer subagent, handles retries and timeouts, manages review-fix loop until zero issues
+description: Use after each implementation phase and before merging to verify work meets requirements - dispatches code-reviewer subagent, writes per-scope findings file, performs at most one fix-then-re-review cycle, then HALTs for user direction
 user-invocable: false
 ---
 
@@ -27,17 +27,19 @@ Per-phase reviews catch phase-level issues. Pre-merge reviews catch cross-phase 
 - Before refactoring (baseline check)
 - After fixing complex bug
 
-## The Review Loop
+## The Review Loop (Bounded — One Fix Cycle, Then HALT)
 
-The review process is a loop: review → fix → re-review → until zero issues.
+The review process is **at most one fix-then-re-review cycle**, then HALT for human direction.
 
 ```
 ┌──────────────────────────────────────────────────┐
 │                                                  │
 │   Dispatch code-reviewer                         │
+│   (writes code-review-findings-{SCOPE}.md        │
+│    to the plan directory)                        │
 │         │                                        │
 │         ▼                                        │
-│   Issues found? ──No──► Done (proceed)           │
+│   Issues found? ──No──► Proceed                  │
 │         │                                        │
 │        Yes                                       │
 │         │                                        │
@@ -45,12 +47,25 @@ The review process is a loop: review → fix → re-review → until zero issues
 │   Dispatch bug-fixer                             │
 │         │                                        │
 │         ▼                                        │
-│   Re-review with prior issues ◄──────────────────┘
-│
+│   Re-review (verifies against findings file)    │
+│         │                                        │
+│         ▼                                        │
+│   All resolved & no new issues? ──Yes──► Proceed │
+│         │                                        │
+│        No                                        │
+│         │                                        │
+│         ▼                                        │
+│   HALT — present result to user, ask direction   │
+│                                                  │
 └──────────────────────────────────────────────────┘
 ```
 
-**Exit condition:** Zero issues, or issues accepted per your workflow's policy.
+**Exit conditions (only these — never auto-dispatch a third review):**
+- Zero issues on initial review → proceed.
+- Zero issues on first re-review (all prior findings resolved, no new issues) → proceed.
+- Any unresolved or new issues after the first re-review → **HALT** and ask the user.
+
+**Why bounded:** Multi-cycle review loops compound agent ceremony for diminishing returns. The findings file makes review state inspectable, so the user can decide whether further cycles are warranted, accept remaining issues, or change approach.
 
 ## Step 1: Initial Review
 
@@ -80,12 +95,15 @@ HEAD_SHA=$(git rev-parse HEAD)
   BASE_SHA: [commit before work]
   HEAD_SHA: [current commit]
   DESCRIPTION: [brief summary]
+  SCOPE: [phase-N, pre-merge, task-N — used to name code-review-findings-{SCOPE}.md so per-phase findings don't clobber each other]
   SCRATCHPAD_DIR: [path from caller, if provided]
 </parameter>
 </invoke>
 ```
 
-**Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment
+**Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment.
+
+**Side effect:** The reviewer writes its full findings to `code-review-findings-{SCOPE}.md` in the plan/design-doc directory (e.g. `code-review-findings-phase-2.md`). This file is the persistent record for that scope — re-review consults it instead of re-deriving issues from scratch, and per-phase files coexist rather than clobbering each other.
 
 ## Step 1b: Parallel DBA Review (Conditional)
 
@@ -212,14 +230,14 @@ Regardless of category (Critical, Important, or Minor), dispatch bug-fixer:
 
 After fixes, proceed to Step 3.
 
-## Step 3: Re-Review After Fixes
+## Step 3: Re-Review After Fixes (One Cycle Only)
 
-**CRITICAL:** Track prior issues across review cycles.
+**This is the only re-review the skill performs automatically. After this, HALT.**
 
 ```
 <invoke name="Task">
 <parameter name="subagent_type">denubis-plan-and-execute:code-reviewer</parameter>
-<parameter name="description">Re-reviewing after fixes (cycle N)</parameter>
+<parameter name="description">Re-reviewing after fixes</parameter>
 <parameter name="max_turns">150</parameter>
 <parameter name="prompt">
   Use template at requesting-code-review/code-reviewer.md
@@ -228,27 +246,35 @@ After fixes, proceed to Step 3.
   PLAN_OR_REQUIREMENTS: [original task/requirements]
   BASE_SHA: [commit before this fix cycle]
   HEAD_SHA: [current commit after fixes]
-  DESCRIPTION: Re-review after bug fixes (review cycle N)
+  DESCRIPTION: Re-review after bug fixes
+  SCOPE: [same SCOPE used in initial review — e.g. phase-2]
+  PRIOR_FINDINGS_FILE: [absolute path to code-review-findings-{SCOPE}.md from the initial review]
 
-  PRIOR_ISSUES_TO_VERIFY_FIXED:
-  [list all outstanding issues from previous reviews]
-
-  Verify:
-  1. Each prior issue listed above is actually resolved
-  2. No regressions introduced by the fixes
-  3. Any new issues in the changed code
-
-  Report which prior issues are now fixed and which (if any) remain.
+  This is a re-review. Read the prior findings file first, then for each prior issue
+  report Resolved / Partially resolved / Unresolved with evidence. Then surface any
+  new issues in the changed code. Overwrite code-review-findings-{SCOPE}.md with the
+  new structured review.
 </parameter>
 </invoke>
 ```
 
-**Tracking prior issues:**
-- When re-reviewer explicitly confirms fixed → remove from list
-- When re-reviewer doesn't mention an issue → keep on list (silence ≠ fixed)
-- When re-reviewer finds new issues → add to list
+### Step 3a: HALT — Decide With the User
 
-Loop back to Step 2 if any issues remain.
+**Do NOT auto-loop back to Step 2.** Read the updated `code-review-findings-{SCOPE}.md` and present its summary to the user.
+
+| Re-review outcome | Action |
+|-------------------|--------|
+| All prior issues resolved, no new issues | Proceed to proleptic challenge (zero-issues path) |
+| Anything else (unresolved, partial, or new issues) | **HALT and ask the user**, offering the options below |
+
+**Options to present to the user when halting:**
+
+1. **Fix now** — dispatch bug-fixer for another cycle (user-authorised — the skill itself never auto-dispatches a second fix cycle).
+2. **Defer to a future phase** — the issues are real but belong to a later phase. Ask the user *which* implementation plan file should record them. With user approval, append the deferred issues to that plan file (under a clearly labelled "Deferred from {SCOPE} review" section, with file:line references and the reviewer's suggested fix). Once the plan is updated, **the current code review is considered complete** and you proceed to proleptic challenge.
+3. **Accept the remaining issues** — user explicitly accepts them as out-of-scope or false positives; document the acceptance and proceed.
+4. **Halt for discussion** — substantial revision needed; stop the workflow and reopen at the next session.
+
+The findings file remains on disk regardless of which option is chosen, so the audit trail survives.
 
 ## Handling Failures
 
