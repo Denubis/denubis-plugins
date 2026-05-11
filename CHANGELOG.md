@@ -1,5 +1,23 @@
 # Changelog
 
+## [denubis-bibliography] 0.1.0
+
+New plugin. Renders PDFs from a Zotero corpus to per-page markdown so future Claude sessions can engage with paper content via verified, page-keyed blockquotes. WIP — documents only what has been proven end-to-end.
+
+**New:**
+- `using-bibliography` skill: cite-key → BBT lookup → PDF file path → per-page markdown render under `~/zettelkasten/papers/<citekey>/`. Hard preconditions documented (Zotero running, BBT loaded, config + zettelkasten present, `pymupdf4llm` installed).
+- `ingest.py`: PEP 723 self-contained CLI. Takes DOIs, resolves first-author surname via Crossref (BBT search does not index DOIs), filters BBT search results by exact DOI, exports BibLaTeX, parses the `file = {…}` field, renders idempotently with SHA-prefix cache. `--force` to re-render. Verified end-to-end on 8 methodology DOIs (Keshav 2007, Scherbakov 2025, Wohlin 2014, Arksey 2005, Levac 2010, Tricco 2018, Naeem 2024, Magesh 2025).
+- `render.py` and `blockquote.py`: standalone single-purpose utilities. `blockquote.py` exits non-zero with `NO MATCH` rather than fabricating a quote, per Magesh & Scherbakov span-verification grounding.
+- Documented note-creation process: literature-note template (per-project, in git) and permanent-note template (central zettelkasten, in git). Wikilinks for note↔note, pandoc cite syntax for note→source. Two-bib resolution at pandoc render time.
+- Bootstrap-in-fresh-project section: skill prompts user with the BBT auto-export setup steps rather than silently creating directories.
+
+**Known gaps (explicit in SKILL.md):**
+- No paper fetching — Zotero is the only thing that talks to publishers.
+- No auto-build of central `~/zettelkasten/references.bib` (designed only).
+- No `note new` command — literature notes are written by hand from the template.
+- No post-hoc quote verification across an existing note.
+- No SSL bypass for EZProxy (designed: dated stamp file in project dir).
+
 ## [denubis-git-commit] 1.2.1
 
 Tune commit-splitting guidance to concern-driven rather than file-count.

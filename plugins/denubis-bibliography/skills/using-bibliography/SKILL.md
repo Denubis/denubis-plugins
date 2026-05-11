@@ -1,0 +1,396 @@
+---
+name: using-bibliography
+description: Use when the user wants to render a PDF from their Zotero corpus into per-page markdown, or surface page-keyed blockquotes from an already-rendered paper. Consumes Zotero output via Better BibTeX JSON-RPC; never fetches papers itself.
+user-invocable: true
+last-reviewed: 2026-05-11
+---
+
+# Using Bibliography
+
+Render PDFs from the user's Zotero corpus into per-page markdown stored under
+`~/zettelkasten/papers/<citekey>/`, and emit page-keyed blockquotes that future
+Claude sessions (or pandoc) can use as verified citations.
+
+**Status:** WIP. Documents only the path proven end-to-end on
+`yimTeachersPerceptionsAttitudes2024` on 2026-05-11. Anything not here is not
+yet validated.
+
+## When to use
+
+- "Render this paper to markdown" — given a cite key in Zotero.
+- "Find this quote in <paper> with a page number" — span verification against
+  rendered output.
+- "Make a permanent note from <quote> in <paper>" — emit the blockquote;
+  human (or human-supervised agent) writes the surrounding atomic note in
+  `~/zettelkasten/permanent/`.
+
+**When NOT to use:**
+
+- Fetching papers from the internet — not implemented. The user adds papers
+  via the Zotero connector (which handles EZProxy, SSL, publisher quirks).
+  Only invoke this skill once the paper is in Zotero with a PDF attached.
+- Editing the user's permanent notes without explicit instruction — the
+  zettelkasten's `AGENTS.md` rules apply (treat permanent notes as user IP;
+  draft, don't assert).
+
+## Hard preconditions (verify before acting)
+
+1. **Zotero is running** and Better BibTeX is installed:
+   ```bash
+   curl -sS --max-time 3 http://localhost:23119/connector/ping
+   ```
+   Expects `<!DOCTYPE html><html><body>Zotero is running</body></html>`.
+   If not running, ask the user to start Zotero (`flatpak run org.zotero.Zotero`
+   on this machine; on first run from SSH set `XDG_RUNTIME_DIR` and
+   `WAYLAND_DISPLAY=wayland-0` to put it on the existing graphical session).
+
+2. **Config exists** at `~/.config/denubis-academic-research/config.toml`.
+   If missing, halt and instruct the user to create it (see `bootstrap`
+   section below).
+
+3. **Zettelkasten root exists** at the path in config (default `~/zettelkasten/`).
+   If missing, halt — do not create it silently. The user owns this directory.
+
+4. **`pymupdf4llm` is installed** in a usable venv (see Dependencies below).
+
+## Quickstart: ingest a list of DOIs
+
+For batch ingest from DOIs (the most common case):
+
+```bash
+uv run plugins/denubis-bibliography/skills/using-bibliography/ingest.py \
+    10.1145/1273445.1273458 \
+    10.1111/jels.12413 \
+    ...
+```
+
+Or pipe DOIs from a file:
+
+```bash
+cat dois.txt | uv run .../ingest.py -
+```
+
+PEP 723 inline metadata in the script handles dependency installation. Output
+lands in `<zettelkasten_root>/papers/<citekey>/`. The script is idempotent —
+re-runs skip cite keys whose SHA-prefix matches; pass `--force` to re-render.
+
+Verified end-to-end on 2026-05-11 against 8 methodology DOIs (Keshav 2007,
+Scherbakov 2025, Wohlin 2014, Arksey 2005, Levac 2010, Tricco 2018, Naeem
+2024, Magesh 2025). 8/8 succeeded.
+
+## The proven workflow
+
+### 1. Resolve cite key → PDF file path
+
+```python
+import requests
+
+# (a) Find the item — fulltext or DOI search
+resp = requests.post(
+    "http://localhost:23119/better-bibtex/json-rpc",
+    json={"jsonrpc": "2.0", "method": "item.search",
+          "params": ["<citekey or DOI or fragment>"], "id": 1},
+).json()
+hit = resp["result"][0]
+citekey = hit["citation-key"]
+library_name = hit["library"]   # e.g. "My Library" or "2025-MQ-EALD_Vocab"
+
+# (b) Map library name → numeric library_id (cache once per session)
+groups = requests.post(
+    "http://localhost:23119/better-bibtex/json-rpc",
+    json={"jsonrpc": "2.0", "method": "user.groups", "params": [], "id": 2},
+).json()["result"]
+library_id = next(g["id"] for g in groups if g["name"] == library_name)
+
+# (c) Export the bib entry — file = {...} field gives the PDF path
+bib = requests.post(
+    "http://localhost:23119/better-bibtex/json-rpc",
+    json={"jsonrpc": "2.0", "method": "item.export",
+          "params": [[citekey], "Better BibLaTeX", library_id], "id": 3},
+).json()["result"][0]
+# Parse `file = {<absolute path>}` from the bib string.
+```
+
+**Gotchas verified empirically (2026-05-11):**
+
+- **`item.search` is AND-style across tokens.** Multi-word queries like
+  `"Wohlin snowballing"` require BOTH terms to appear in the same searchable
+  field — and no field combines author surname with title-word, so multi-token
+  searches across these silently return zero hits even when the item exists.
+  **Use single-token searches** (just an author surname OR just a title
+  fragment) and refine programmatically.
+- **`item.search` does NOT index the DOI field.** Searching `"10.1111/jels.12413"`
+  returns zero hits even for the exact item with that DOI. To resolve a DOI to
+  a Zotero item, look up the DOI's first-author surname via Crossref
+  (`https://api.crossref.org/works/<doi>`, free, no auth), then search BBT
+  by that surname, then filter results by `DOI` field exact-match. This is
+  what `ingest.py` does.
+- **Cite keys must be read from `item.search` results — never constructed.**
+  BBT cite-key formats are deterministic but longer than they look. Tried
+  `mageshHallucinationFreeAssessing2025` (truncated guess) → "not found."
+  Actual key was `mageshHallucinationFreeAssessingReliability2025`. Always
+  copy the `citation-key` field from the search response verbatim.
+- **`item.export` needs the correct `library_id`.** My Library is `id: 1`.
+  Group libraries get higher IDs. The library name in the search response
+  maps to a numeric `id` via `user.groups`. Without the library_id, export
+  returns "not found" even with a valid cite key.
+- The directory name in `~/Zotero/storage/<KEY>/` is the **attachment** key,
+  not the parent item key. Don't try to look items up by storage dir name.
+- Some items may have multiple `file` entries (`Full Text:/path.pdf;` + a
+  snapshot). Filter to paths ending `.pdf`. The format is
+  `<label>:<path>:<mime>` separated by `;`.
+
+### 2. Render PDF → per-page markdown
+
+Use the bundled `render.py`:
+
+```bash
+python render.py "<absolute-pdf-path>" ~/zettelkasten/papers/<citekey>/
+```
+
+Output (verified on 28-page Yim 2024):
+
+```
+~/zettelkasten/papers/<citekey>/
+├── full.md            # combined, page boundaries marked `<!-- page:N -->`
+├── pages/
+│   ├── 001.md
+│   └── ... (one per page)
+└── meta.json          # page_count, sha256_prefix, source_pdf path
+```
+
+### 3. Surface a page-keyed blockquote
+
+Use the bundled `blockquote.py`:
+
+```bash
+python blockquote.py ~/zettelkasten/papers/<citekey>/pages "<citekey>" "<verbatim quote substring>"
+```
+
+Emits markdown like:
+
+```markdown
+> teachers face challenges such as insufficient CK and experience with AI
+
+[@yimTeachersPerceptionsAttitudes2024, p. 1]
+```
+
+The script normalises whitespace for fuzzy matching but emits the original
+text from the page. **If no match is found, it exits non-zero and prints
+NO MATCH** — do not invent a quote. Per the zettelkasten `AGENTS.md` rule,
+unverified quotes are flagged with `> [unverified] ...` for human review.
+
+## Adding notes to the zettelkasten
+
+Two note types, two locations, two purposes (per `~/zettelkasten/AGENTS.md`).
+This section adds the operational steps; the conventions live in AGENTS.md.
+
+### Literature notes — one per cite key, in the project
+
+Path: `<project>/notes/literature/<citekey>.md`
+
+After `ingest.py` renders a paper, scaffold a literature note. If Claude
+drafts it, set `ai-generated: true` until the human reviews:
+
+```markdown
+---
+citekey: <citekey>
+title: <paper title>
+authors: <surnames>
+year: <year>
+ai-generated: true   # remove after human review
+---
+
+# <Paper title>
+
+## TL;DR
+<your own paraphrase, NOT the abstract>
+
+## Key claims
+- <claim 1> [@<citekey>, p. N]
+- <claim 2> [@<citekey>, p. N]
+
+## Verified quotes
+
+> <verified blockquote from blockquote.py>
+
+[@<citekey>, p. N]
+
+## Questions / critique / connections
+- ...
+
+## Linked permanent notes
+- [[<id>]] - <slug>
+```
+
+**Verify every blockquote with `blockquote.py`** before writing it:
+
+```bash
+python plugins/denubis-bibliography/skills/using-bibliography/blockquote.py \
+    ~/zettelkasten/papers/<citekey>/pages \
+    <citekey> \
+    "<verbatim substring>"
+```
+
+If it returns `NO MATCH`, do not invent a quote. Mark `> [unverified] ...`
+and flag for the human, per AGENTS.md rule 1.
+
+### Permanent notes — atomic ideas, in the central zettelkasten
+
+Path: `~/zettelkasten/permanent/<YYYYMMDDHHMM>-<slug>.md`
+
+Generate the timestamp ID with `date +%Y%m%d%H%M`. The slug is human-readable
+and may change later; the ID never does.
+
+```markdown
+---
+id: <YYYYMMDDHHMM>
+title: <slug>
+created: <YYYY-MM-DD>
+tags: [t1, t2]
+ai-generated: true   # remove after human review
+---
+
+# <slug>
+
+<one atomic idea, 100-400 words, in the user's own voice>
+
+> <verified blockquote, if any>
+
+[@<citekey>, p. N]
+
+Related: [[<other-id>]]
+```
+
+A permanent note **never** references project-local files. Project notes link
+*to* permanent notes; permanent notes link only to other permanent notes
+(by ID) and to stable cite keys (`[@key]`). Projects move and disappear;
+the central zettelkasten survives them.
+
+## Cross-reference between project and central
+
+Three resolution paths, each handled by a different layer:
+
+1. **Project literature note → Permanent note** — wikilink `[[<id>]]`.
+   Resolves when both project and `~/zettelkasten/` are open in your editor
+   (Obsidian, Foam, etc.). For pandoc rendering of a project draft, use a
+   relative markdown link instead:
+   ```markdown
+   See [three-pass reading](../../../zettelkasten/permanent/202605111512-three-pass-reading.md).
+   ```
+
+2. **Note → Source citation** — pandoc cite syntax `[@citekey, p. N]`.
+   Resolves at pandoc render time against whichever `.bib` you pass via
+   `--bibliography`. Two bibs in play:
+   - `<project>/references.bib` — BBT auto-export of the project's Zotero
+     collection. Covers in-project citations.
+   - `~/zettelkasten/references.bib` — auto-built union of cite keys
+     appearing across `permanent/`. Covers cross-zettelkasten citations
+     when rendering the zettelkasten as a standalone document.
+
+3. **Permanent note → Permanent note** — wikilinks `[[<id>]]` only.
+
+**For pandoc projects:** include both bibs:
+```bash
+pandoc draft.md \
+    --bibliography=<project>/references.bib \
+    --bibliography=~/zettelkasten/references.bib \
+    --citeproc -o draft.pdf
+```
+
+## Bootstrap a project (first invocation in a fresh project dir)
+
+When the skill is invoked from a project that does not yet have
+`references.bib` or `notes/literature/`, halt and prompt the user with the
+following setup steps. **Do not silently create these directories** — the
+user owns the project layout.
+
+> This project does not yet have a `references.bib` or notes scaffolding.
+> To wire up Zotero auto-export and create the notes layout:
+>
+> 1. In Zotero, right-click the collection that backs this project →
+>    **Export Collection…**
+> 2. Translator: **Better BibLaTeX**
+> 3. Check **Keep updated**, leave Export Files / Notes unchecked
+> 4. Save to: `<absolute path to project>/references.bib`
+> 5. In **Preferences → Export → Fields to omit**, add `file` (so absolute
+>    `~/Zotero/storage/...` paths don't leak into git)
+> 6. In **Preferences → Better BibTeX → Automatic Exports**, confirm the
+>    trigger is **On change**
+> 7. Create the notes layout: `mkdir -p notes/literature notes/structure`
+>
+> Once that's done, re-invoke the skill.
+
+The Zotero collection name is the user's choice; the SKILL does not assume
+a naming convention.
+
+## Bootstrap (when config or zettelkasten missing)
+
+If the user has not yet set up the central zettelkasten or config:
+
+1. Halt with a clear error explaining what's missing.
+2. Direct them to create `~/.config/denubis-academic-research/config.toml`
+   with at minimum:
+   ```toml
+   zettelkasten_root = "~/zettelkasten"
+   ```
+3. Direct them to create `~/zettelkasten/` (and ideally `git init` it for
+   cross-machine sync). The conventions live in
+   `~/zettelkasten/AGENTS.md` once it exists.
+
+Do **not** create the zettelkasten silently. The user owns it.
+
+## Dependencies
+
+A Python venv with `pymupdf4llm`. Verified install:
+
+```bash
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python pymupdf4llm
+```
+
+`pymupdf4llm` is **AGPL-3** — propagates to anything that ships it. For a
+plugin distributed under CC-BY-SA-4.0, do not bundle it; require the user to
+install it locally. Document the dependency in the project where the skill
+runs (e.g. each research project's `pyproject.toml`).
+
+Alternatives surveyed but not yet validated in this skill: Marker (MIT) and
+Docling (Apache-2.0). See the design conversation for context.
+
+## What this skill does NOT do (yet)
+
+- **Does not fetch papers.** Zotero is the only thing that talks to publishers.
+- **Does not build the central `references.bib`.** The zettelkasten's
+  auto-build of `references.bib` from `[@key]` tokens in `permanent/` is
+  designed but not implemented here.
+- **Does not auto-generate literature notes** in `<project>/notes/literature/`.
+  The template and process are documented above (see "Adding notes to the
+  zettelkasten") but you write the file by hand or have Claude scaffold it
+  marked `ai-generated: true`. There is no `note new` command yet.
+- **Does not verify quotes against source PDFs after-the-fact.** The
+  `note verify` operation is designed but not implemented; for now use
+  `blockquote.py` at quote-creation time as the verification step.
+- **Does not handle SSL bypass for EZProxy.** Designed (dated stamp file in
+  project) but not implemented.
+
+When asked to do any of these, halt and say so explicitly. Do not improvise.
+
+## Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Calling `item.export` without `library_id` | Always look up `library_id` via `user.groups`. My Library = 1; groups vary. |
+| Constructing cite keys by hand or truncating them | Copy `citation-key` verbatim from `item.search` response. BBT keys are longer than they look. |
+| Multi-token `item.search` queries returning zero hits | Search is AND-style. Use single tokens (author surname OR title fragment), then refine. |
+| Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | DOI field is not indexed for fulltext search. Resolve DOI → surname via Crossref, then search by surname, then filter results by exact DOI match. |
+| Using the storage directory name (e.g. `2367YXMF`) as the item key | That's the attachment key. The parent item has a different key; use cite-key based lookups. |
+| Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
+| Asserting "I rendered N papers" without showing the file paths | Verify by `ls ~/zettelkasten/papers/<citekey>/`. Don't claim success without checking. |
+| Treating research-agent suggestions as verified options | They're inputs, not conclusions. Verify with a real call before asserting capability. |
+
+## Provenance
+
+This skill documents the path demonstrated end-to-end on 2026-05-10–11 in
+the academic-bibliography design conversation. The render and blockquote
+scripts are the same scripts used in that demo, lightly cleaned. Anything
+beyond what the demo proved is marked explicitly above.
