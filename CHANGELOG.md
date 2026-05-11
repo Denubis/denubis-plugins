@@ -1,5 +1,33 @@
 # Changelog
 
+## [denubis-git-commit] 1.2.1
+
+Tune commit-splitting guidance to concern-driven rather than file-count.
+
+**Changed:**
+- `commit` skill: replaced file-count splitting table (1-2 = 1 commit, 3-4 = 2 commits, 5+ = 3+ commits) with concern-driven guidance. A 30-file refactor doing one thing is one commit; two unrelated fixes in one file are two commits.
+
+## [denubis-extending-claude] 1.7.2
+
+Shorten skill descriptions to reduce skill-listing budget pressure.
+
+**Changed:**
+- 6 skill descriptions tightened to ~110-170 chars: `creating-a-plugin`, `maintaining-a-marketplace`, `maintaining-project-context`, `testing-skills-with-subagents`, `writing-claude-md-files`, `writing-skills`. Triggers preserved; trailing rationale clauses dropped.
+
+## [denubis-plan-and-execute] 2.32.1
+
+Shorten skill descriptions to reduce skill-listing budget pressure; remove scholar name-drops and parenthetical enumerations.
+
+**Changed:**
+- 22 skill descriptions tightened. Notable cuts: `using-ast-grep` (378→176), `systematic-debugging` (345→120, drops Toulmin), `critical-peer-review` (310→159), `impl-plan-write` (273→148), `restate-our-assumptions` (258→162, drops Popper/Lakatos/Haraway), `exec-refactoring-rubric` (drops Mantyla/Fowler). Triggers preserved; trailing rationale and technique-name dropping removed since user-side trigger words don't include scholar surnames.
+
+## [denubis-research-agents] 1.1.1
+
+Shorten skill descriptions to reduce skill-listing budget pressure.
+
+**Changed:**
+- 3 skill descriptions tightened: `investigating-a-codebase` (309→136), `researching-on-the-internet` (297→138), `using-research-agents` (226→171, fixes parenthetical enumeration).
+
 ## [denubis-plan-and-execute] 2.32.0
 
 Bound the code-review fix loop to a single re-review cycle, then HALT for user direction. The previous unbounded "review → fix → re-review until zero issues" loop generated runaway agent ceremony for tiny edits.

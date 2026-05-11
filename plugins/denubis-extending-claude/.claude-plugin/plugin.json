@@ -1,19 +1,19 @@
 {
-    "name": "denubis-extending-claude",
-    "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md",
-    "version": "1.7.1",
-    "author": {
-        "name": "Brian Ballsun-Stanton",
-        "github": "denubis"
-    },
-    "homepage": "https://github.com/denubis/denubis-plugins",
-    "repository": "https://github.com/denubis/denubis-plugins",
-    "license": "CC-BY-SA-4.0",
-    "keywords": [
-        "plugins",
-        "skills",
-        "documentation",
-        "reference",
-        "meta"
-    ]
+  "name": "denubis-extending-claude",
+  "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md",
+  "version": "1.7.2",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "plugins",
+    "skills",
+    "documentation",
+    "reference",
+    "meta"
+  ]
 }
