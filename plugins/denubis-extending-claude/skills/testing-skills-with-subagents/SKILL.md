@@ -1,6 +1,6 @@
 ---
 name: testing-skills-with-subagents
-description: Use when creating or editing skills, before deployment, to verify they work under pressure and resist rationalization - applies RED-GREEN-REFACTOR cycle to process documentation by running baseline without skill, writing to address failures, iterating to close loopholes
+description: Use when creating or editing skills to verify they work under pressure - applies RED-GREEN-REFACTOR with subagents to find rationalisation loopholes
 user-invocable: false
 ---
 

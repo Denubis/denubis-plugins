@@ -1,6 +1,6 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation, before executing implementation plans, or when the user asks for a worktree — sets up worktrees with project-specific configuration, LFS handling, and baseline verification
+description: Use when starting isolated feature work or when the user asks for a worktree - sets up worktrees with project-specific config and LFS handling
 user-invocable: true
 ---
 

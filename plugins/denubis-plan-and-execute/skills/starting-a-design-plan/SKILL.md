@@ -1,6 +1,6 @@
 ---
 name: starting-a-design-plan
-description: Use when beginning any design process - orchestrates gathering context, clarifying requirements, brainstorming solutions, and documenting validated designs to create implementation-ready design documents
+description: Use when beginning any design process - orchestrates context gathering, clarification, brainstorming, and design documentation
 user-invocable: true
 ---
 

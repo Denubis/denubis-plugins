@@ -1,6 +1,6 @@
 ---
 name: critical-peer-review
-description: Use when reviewing debugging analyses, postmortems, incident investigations, design plans, implementation plans, generated artifacts, or another agent's technical reasoning for overclaiming, internal inconsistency, and evidence-grade violations - falsification-first audit that treats prior output as untrusted
+description: Use when reviewing another agent's technical reasoning, debugging analyses, or design plans for overclaiming and inconsistency - falsification-first audit
 user-invocable: true
 ---
 

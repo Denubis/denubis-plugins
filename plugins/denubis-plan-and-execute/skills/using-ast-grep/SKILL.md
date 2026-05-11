@@ -1,6 +1,6 @@
 ---
 name: using-ast-grep
-description: Use when searching for code patterns by structure rather than text — function definitions, class hierarchies, decorator usage, import shapes, call sites with arguments. Also use for structural rewrites — renaming functions, migrating APIs, replacing patterns across a codebase. Provides decision guidance for ast-grep vs text Grep and command examples for Python and TypeScript.
+description: Use when searching code by structure rather than text, or for structural rewrites like renaming functions or migrating APIs - ast-grep guide with Python and TypeScript examples
 user-invocable: false
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: requesting-code-review
 family: executing-an-implementation-plan,finishing-a-development-branch,make-pr,merge-to-main
-description: Use after each implementation phase and before merging to verify work meets requirements - dispatches code-reviewer subagent, writes per-scope findings file, performs at most one fix-then-re-review cycle, then HALTs for user direction
+description: Use after each implementation phase and before merging - dispatches the code-reviewer subagent, writes a findings file, runs at most one fix-then-re-review cycle
 user-invocable: false
 ---
 

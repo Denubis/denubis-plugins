@@ -1,7 +1,7 @@
 ---
 name: systematic-debugging
 family: standalone
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - seven-phase framework (causal investigation, pattern analysis, hypothesis testing, execution path audit, Toulmin claim verification, self-audit against overclaiming, implementation with hardening) that ensures understanding before attempting solutions
+description: Use when encountering bugs, test failures, or unexpected behaviour, before proposing fixes - structured causal investigation
 user-invocable: true
 ---
 

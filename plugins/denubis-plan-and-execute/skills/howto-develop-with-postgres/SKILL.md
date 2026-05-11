@@ -1,6 +1,6 @@
 ---
 name: howto-develop-with-postgres
-description: Use when writing database access code, creating schemas, designing tables, or managing transactions with PostgreSQL - enforces schema design principles, normalisation, key selection, transaction safety, ACID compliance, type safety, and naming conventions
+description: Use when writing PostgreSQL access code, schemas, or transactions - enforces normalisation, key selection, transaction safety, type safety, and naming conventions
 ---
 
 # PostgreSQL Development Patterns

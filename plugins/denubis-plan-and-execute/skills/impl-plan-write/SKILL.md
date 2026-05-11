@@ -1,7 +1,7 @@
 ---
 name: impl-plan-write
 family: starting-an-implementation-plan
-description: Use when design is complete and you need detailed implementation tasks for engineers with zero codebase context - creates comprehensive implementation plans with exact file paths, complete code examples, and verification steps assuming engineer has minimal domain knowledge
+description: Use when design is complete and you need detailed implementation tasks - produces plans with exact file paths, code examples, and verification steps
 user-invocable: false
 ---
 

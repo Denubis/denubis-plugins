@@ -1,6 +1,6 @@
 ---
 name: writing-claude-md-files
-description: Use when creating or updating CLAUDE.md files for projects or subdirectories - covers top-level vs domain-level organization, capturing architectural intent and contracts, and mandatory freshness dates
+description: Use when creating or updating CLAUDE.md files - covers top-level vs domain-level scope, architectural intent and contracts, and freshness stamps
 user-invocable: false
 last-reviewed: 2026-04-22
 ---
