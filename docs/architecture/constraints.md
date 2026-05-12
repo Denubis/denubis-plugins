@@ -31,8 +31,21 @@ Measurable limits on the behaviour of `brian-ed3d-plugins` and the disciplines i
 | Single bundled review pass | At most one fix-then-re-review cycle per phase before halting for user direction. | `requesting-code-review` skill body (per commit `9f7fab9` — *"bound code-review loop to one cycle, then HALT"*). |
 | Plugin manifest description shape | Every plugin's `plugin.json` description is QA-tested for shape (length, content). | Top-level `tests/` directory test (per commit `8498518` — *"enforce and apply skill description shape"*). |
 
+## Crash-Recovery Discipline (planned)
+
+These constraints govern the `crash-recovery` plugin currently in design. They are not yet enforced by code. Each cites the design plan as its source of authority until implementation lands.
+
+| Constraint | Requirement | Verification |
+|------------|-------------|-------------|
+| Deterministic classification | Given a fixed SQLite database state, `crash-recovery render` produces byte-identical markdown output. No LLM judgement participates in classification — every classification value is produced by a parametrised rule table. | Snapshot tests planned at `plugins/crash-recovery/scripts/crash_recovery/tests/` (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
+| Idempotent scan | Repeated `crash-recovery scan` invocations against an unchanged filesystem state produce identical DB rows (`last_scanned` timestamp aside). `first_seen` is preserved across upserts; no duplicate `classification_history` rows accumulate. | Fixture-driven test in the scan module (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
+| Boot-aware liveness | A liveness file whose `boot_id` does not match `/proc/sys/kernel/random/boot_id` is classified as a casualty regardless of whether its PID is currently alive. This prevents post-reboot PID-recycling false positives. | Manual UAT in Phase 8: reboot the machine, confirm `crash-recovery scan` classifies stale liveness files as `hard_crash` (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
+| No auto-prune | `crash-recovery prune` only deletes rows when invoked with `--confirm` AND a three-condition guard holds: classification is `concluded` AND `user_notes IS NULL` AND `jsonl_path` is no longer on disk. Re-running triage never silently removes entries. | Per-condition test fixture; user's standing directive to never auto-prune (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
+| Classifier version forward-compat | Each scan stamps the current `CLASSIFIER_VERSION` onto every row it touches. When the rule table changes, scan re-classifies version-stale rows before render or prune queries see them. Prune therefore always operates against rules currently in force. | Fixture: seed DB at version N-1, run scan with version N, assert all rows upgraded (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
+
 ## Constraint History
 
 | Date | Constraint | Change | Reason |
 |------|------------|--------|--------|
 | 2026-05-11 | — | Initial bootstrap of `docs/architecture/constraints.md`. | Document the current state of repo conventions and hook-enforced disciplines. |
+| 2026-05-12 | Crash-Recovery Discipline (planned) | Added prospective constraints for crash-recovery: deterministic classification, idempotent scan, boot-aware liveness, no auto-prune, classifier version forward-compat. | Track the design-plan-stage constraints so reviewers and implementers see the contract before code lands (`docs/design-plans/2026-05-08-crash-recovery.md`, uncommitted). |
