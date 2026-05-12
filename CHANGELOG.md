@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-bibliography] 0.1.1
+
+Documentation patch from the BJET-RR 42-paper rendering pass on 2026-05-12. No behaviour changes; closes a workflow gap that was sending the user to the Zotero UI when the on-disk bib looked stale.
+
+**New:**
+- `SKILL.md` — "Refreshing the on-disk bib" section. Documents BBT's HTTP pull-export endpoint (`curl http://localhost:23119/better-bibtex/library?/<libraryID>/library.biblatex`) as the on-demand refresh path. Explicit note that BBT JSON-RPC has no `autoexport.run`-style method, verified against the published method list at <https://retorque.re/zotero-better-bibtex/exporting/json-rpc/>. Output is byte-identical to BBT's auto-export — verified against `2026-bbs-jt-em-bjet-AI-metacognitive-1` (libraryID 27, 42 entries, 47 KB).
+- `SKILL.md` — four new Common-mistakes rows: bouncing the user to the Zotero UI for a stale auto-export refresh; assuming the first `item.search` hit is the canonical copy when items live in multiple libraries; Wiley chapter DOIs (`10.1002/<book>.chN`) failing `ingest.py` because Crossref returns empty `author` for them; giving up on `blockquote.py` NO MATCH without trying adjusted substrings (Unicode apostrophes, HTML-rendered table cells, paraphrases).
+- `SKILL.md` — Provenance addendum noting the 2026-05-12 BJET-RR session and the empirical scope (35 articles + 8 burst chapter PDFs + 7 late adds = 42 papers, 0 render failures).
+
 ## [denubis-bibliography] 0.1.0
 
 New plugin. Renders PDFs from a Zotero corpus to per-page markdown so future Claude sessions can engage with paper content via verified, page-keyed blockquotes. WIP — documents only what has been proven end-to-end.

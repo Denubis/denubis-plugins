@@ -324,6 +324,40 @@ user owns the project layout.
 The Zotero collection name is the user's choice; the SKILL does not assume
 a naming convention.
 
+## Refreshing the on-disk bib
+
+BBT's "Automatic Exports" feature writes the project bib on every change, but
+the debounce is opaque: the on-disk file can lag Zotero state by anything from
+seconds to many minutes after edits/syncs. BBT JSON-RPC exposes **no method**
+to force a configured auto-export to run on demand (verified empirically
+against `system.listMethods`, `autoexport.list`, `autoexport.run`, and the
+published method list at <https://retorque.re/zotero-better-bibtex/exporting/json-rpc/>
+on 2026-05-12 — only `autoexport.add` exists, for adding new auto-export
+configurations).
+
+**To force a fresh bib on disk without bouncing the user to the Zotero UI**,
+use BBT's HTTP pull-export endpoint:
+
+```bash
+curl -sS "http://localhost:23119/better-bibtex/library?/<libraryID>/library.biblatex" \
+     -o <project>/references.bib
+```
+
+- `<libraryID>` is the numeric ID from `user.groups` (My Library = 1; group
+  libraries get higher IDs).
+- Output is byte-identical to BBT's auto-export — verified against
+  `2026-bbs-jt-em-bjet-AI-metacognitive-1` (libraryID = 27, 42 entries,
+  47 KB BibLaTeX) on 2026-05-12.
+- Alternative translator suffixes work too: `.bibtex` for classic BibTeX,
+  `.csljson` for CSL-JSON, etc. — same pattern.
+
+The URL pattern is *not* documented in the JSON-RPC reference; it lives in
+BBT's CGI-style HTTP export server, which the JSON-RPC docs do not cover.
+
+Use this whenever you'd otherwise ask the user to open Zotero → Preferences
+→ Better BibTeX → Automatic Exports → "Reset" / "Force run". That UI roundtrip
+is never necessary for a bib refresh.
+
 ## Bootstrap (when config or zettelkasten missing)
 
 If the user has not yet set up the central zettelkasten or config:
@@ -387,6 +421,10 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
 | Asserting "I rendered N papers" without showing the file paths | Verify by `ls ~/zettelkasten/papers/<citekey>/`. Don't claim success without checking. |
 | Treating research-agent suggestions as verified options | They're inputs, not conclusions. Verify with a real call before asserting capability. |
+| Bouncing the user to the Zotero UI to trigger a stale auto-export refresh | Use the HTTP pull-export URL: `curl "http://localhost:23119/better-bibtex/library?/<id>/library.biblatex" -o <path>`. See "Refreshing the on-disk bib" above. |
+| Searching for an item that lives in multiple libraries and assuming the first `item.search` hit is the canonical copy | The same paper can exist in My Library AND a group library as separate Zotero items with the same cite key. Always pass the explicit `library_id` to `item.attachments` / `item.export` for the library you actually want. |
+| Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so the surname-search step has nothing to query and lookup fails. Bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
+| Verifying a quote with `blockquote.py` and giving up at the first NO MATCH | Try adjusted substrings before flagging unverified: strip Unicode apostrophes, drop fragments that fall inside an HTML-rendered table cell, check whether the "quote" is actually a paraphrase of source text. The real text is usually present — match logic is brittle. |
 
 ## Provenance
 
@@ -394,3 +432,16 @@ This skill documents the path demonstrated end-to-end on 2026-05-10–11 in
 the academic-bibliography design conversation. The render and blockquote
 scripts are the same scripts used in that demo, lightly cleaned. Anything
 beyond what the demo proved is marked explicitly above.
+
+**2026-05-12 addenda** (BJET-RR project, 42-paper rendering pass):
+
+- "Refreshing the on-disk bib" section added — HTTP pull-export URL pattern
+  discovered after the BBT JSON-RPC method-list probe confirmed no
+  `autoexport.run`-style trigger exists.
+- Common-mistakes additions: stale-bib UI bounce; multi-library item
+  disambiguation; Wiley chapter DOIs failing in `ingest.py`; brittle
+  `blockquote.py` matching on Unicode apostrophes, HTML-rendered table cells,
+  and paraphrased "quotes".
+- Confirmed `ingest.py` end-to-end on the BJET methodology corpus (35
+  journal articles + 8 burst chapter PDFs + 7 late adds → 42 papers; 0
+  render failures with the HTTP-pull-export-driven workflow).
