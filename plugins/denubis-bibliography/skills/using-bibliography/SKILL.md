@@ -1,6 +1,6 @@
 ---
 name: using-bibliography
-description: Use when the user wants to render a PDF from their Zotero corpus into per-page markdown, or surface page-keyed blockquotes from an already-rendered paper. Consumes Zotero output via Better BibTeX JSON-RPC; never fetches papers itself.
+description: Use when rendering a Zotero-sourced PDF into per-page markdown, or surfacing page-keyed blockquotes from an already-rendered paper. Consumes Better BibTeX JSON-RPC; never fetches papers itself.
 user-invocable: true
 last-reviewed: 2026-05-11
 ---
