@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-bibliography] 0.2.0
+
+Auto-escalating renderer cascade. PDFs that pymupdf4llm can't handle — Unicode-replacement-character output (Stephens 2000) or no-text-layer scans (Schraw 1994) — now fall back automatically to docling, then docling+OCR, without the user dropping into one-off shell scripts.
+
+**New:**
+- `renderer.py` — shared rendering module with quality heuristic (>50% near-empty pages or >0.5% U+FFFD chars triggers escalation) and cascade orchestrator `render_pdf_with_fallback`. `render.py` and `ingest.py` both delegate to it, removing the previously duplicated render block.
+- docling+EasyOCR fallback path. `EasyOcrOptions(lang=["en"])` pinned explicitly because recent docling builds default to RapidOCR (downloads ONNX models from `modelscope.cn`; unreliable outside China).
+- `meta.json` schema additions: `renderer` (`pymupdf4llm` or `docling`), `ocr` (bool), and `renderer_note` (only when escalation fired; records the chain). Pre-existing fields (`source_pdf`, `page_count`, `sha256_prefix`) are unchanged.
+- `SKILL.md` — "auto-escalating cascade" section under Render. New Dependencies subsection documents docling + easyocr install (~1-2 GB first run; cached afterward), Apache-2.0 licence summary, and the EasyOCR pin rationale.
+- `SKILL.md` — three new Common-mistakes rows: treating OCR substitutions as faithful transcription, assuming docling defaults to EasyOCR, bypassing the cascade and silently rendering empty pages.
+
+**Changed:**
+- `ingest.py` PEP 723 dependency block adds `docling`.
+- `render.py` is now a thin CLI entry into `renderer.render_pdf_with_fallback`.
+- Render-failure semantics: previously, a PDF with no text layer silently produced 16 empty `.md` files. Now, if every renderer fails the quality check, `render.py` exits non-zero and `ingest.py` logs the paper as a per-paper failure.
+
+**Verified:**
+- Schraw 1994 (`schrawAssessingMetacognitiveAwareness1994`) — 1980s Acrobat PDFWriter PDF, no embedded text layer. pymupdf4llm and docling-no-OCR both produced 16/16 empty pages; docling+OCR produced 43 KB of clean text across 16 pages, structurally usable for quote location.
+- Regression: Arksey & O'Malley 2005 still renders via pymupdf4llm on the first try (`renderer: pymupdf4llm`, `ocr: false` in `meta.json`); no spurious escalation.
+
 ## [denubis-bibliography] 0.1.1
 
 Documentation patch from the BJET-RR 42-paper rendering pass on 2026-05-12. No behaviour changes; closes a workflow gap that was sending the user to the Zotero UI when the on-disk bib looked stale.
