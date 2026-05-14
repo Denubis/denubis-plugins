@@ -18,7 +18,7 @@ Per the using-bibliography SKILL.md and ~/zettelkasten/AGENTS.md:
 
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pymupdf4llm", "httpx", "docling"]
+# dependencies = ["pymupdf4llm", "httpx", "docling", "easyocr"]
 # ///
 
 import argparse

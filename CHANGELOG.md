@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-bibliography] 0.2.1
+
+Patch: `ingest.py`'s PEP 723 dependency block was missing `easyocr`, so the docling+OCR fallback path crashed with `ImportError: EasyOCR is not installed` whenever the cascade escalated past docling-no-OCR. Caught when `ingest.py 10.1006/ceps.1994.1033` (Schraw 1994) reached the OCR step in a fresh uv environment.
+
+**Fixed:**
+- `ingest.py` — `dependencies = [..., "easyocr"]` added to the PEP 723 block. Verified by re-running the Schraw DOI end-to-end through ingest.py: `1 rendered, 0 cached, 0 failed`.
+
+The 0.2.0 release was only manually verified via `render.py` invoked with `--with easyocr` explicitly; the ingest.py path was not exercised end-to-end before release.
+
 ## [denubis-bibliography] 0.2.0
 
 Auto-escalating renderer cascade. PDFs that pymupdf4llm can't handle — Unicode-replacement-character output (Stephens 2000) or no-text-layer scans (Schraw 1994) — now fall back automatically to docling, then docling+OCR, without the user dropping into one-off shell scripts.
