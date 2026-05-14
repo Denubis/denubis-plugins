@@ -24,7 +24,6 @@ Per the using-bibliography SKILL.md and ~/zettelkasten/AGENTS.md:
 import argparse
 import hashlib
 import json
-import re
 import sys
 import tomllib
 from pathlib import Path
@@ -32,6 +31,7 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bbt import parse_pdf_paths  # noqa: E402
 from renderer import render_pdf_with_fallback  # noqa: E402
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
@@ -136,26 +136,6 @@ def find_by_doi(doi: str) -> dict | None:
             if (h.get("DOI") or "").lower() == doi.lower():
                 return h
     return None
-
-
-def parse_pdf_paths(bib: str) -> list[Path]:
-    """Extract PDF file paths from a BibLaTeX entry's `file = {...}` field.
-
-    BBT format: `<label>:<path>:<mime>` separated by `;`. We pick entries
-    whose path ends `.pdf`, regardless of label or mime.
-    """
-    m = re.search(r"file\s*=\s*\{([^}]*)\}", bib)
-    if not m:
-        return []
-    paths: list[Path] = []
-    for entry in m.group(1).split(";"):
-        parts = entry.strip().split(":")
-        if len(parts) < 2:
-            continue
-        path_str = parts[1].strip() if len(parts) >= 3 else ":".join(parts[1:]).strip()
-        if path_str.lower().endswith(".pdf"):
-            paths.append(Path(path_str))
-    return paths
 
 
 def resolve_pdf(item: dict, library_map: dict[str, int]) -> Path | None:
