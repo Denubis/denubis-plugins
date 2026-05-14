@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -32,7 +33,25 @@ EMPTY_PAGE_CHAR_THRESHOLD = 50
 EMPTY_PAGE_FRACTION_THRESHOLD = 0.5
 REPLACEMENT_CHAR_RATIO_THRESHOLD = 0.005
 
+# pymupdf4llm emits this placeholder for pages whose only content is an image
+# (no text layer). Example: `**==> picture [480 x 720] intentionally omitted <==**`.
+# The marker is ~50 chars - right at the EMPTY_PAGE_CHAR_THRESHOLD edge - so a
+# page containing only one of these markers can sneak above the threshold and
+# avoid escalation. Strip these before measuring "real" content length.
+# Levenson 1973 (10.1037/h0035357) was the first paper that exposed this gap.
+_PYMUPDF_PICTURE_MARKER_RE = re.compile(
+    r"\*{0,2}\s*==>\s*picture\s*\[[^\]]*\]\s*intentionally\s*omitted\s*<==\s*\*{0,2}",
+    re.IGNORECASE,
+)
+
 Progress = Callable[[str], None]
+
+
+def _strip_structural_markers(page_text: str) -> str:
+    """Remove renderer-emitted placeholders so the quality heuristic counts
+    real content, not bookkeeping. Currently only pymupdf4llm's
+    `==> picture [WxH] intentionally omitted <==` marker."""
+    return _PYMUPDF_PICTURE_MARKER_RE.sub("", page_text)
 
 
 def _render_with_pymupdf4llm(pdf: Path) -> list[str]:
@@ -73,7 +92,13 @@ def quality_assessment(pages: list[str]) -> dict:
             "fffd_count": 0,
             "total_chars": 0,
         }
-    empty_count = sum(1 for p in pages if len(p.strip()) < EMPTY_PAGE_CHAR_THRESHOLD)
+    # Empty-page count uses content after stripping renderer markers, so a
+    # marker-only page (image-only PDF page) correctly registers as empty.
+    # FFFD count uses raw page text - the marker doesn't contain U+FFFD.
+    empty_count = sum(
+        1 for p in pages
+        if len(_strip_structural_markers(p).strip()) < EMPTY_PAGE_CHAR_THRESHOLD
+    )
     empty_fraction = empty_count / len(pages)
     total_chars = sum(len(p) for p in pages)
     fffd_count = sum(p.count("�") for p in pages)
