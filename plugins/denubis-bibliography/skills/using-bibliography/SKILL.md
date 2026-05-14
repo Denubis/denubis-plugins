@@ -1,8 +1,8 @@
 ---
 name: using-bibliography
-description: Use when the user wants to render a PDF from their Zotero corpus into per-page markdown, or surface page-keyed blockquotes from an already-rendered paper. Consumes Zotero output via Better BibTeX JSON-RPC; never fetches papers itself.
+description: Use when the user wants to render a Zotero PDF into per-page markdown, or surface page-keyed blockquotes from a rendered paper. Reads from Zotero via Better BibTeX; never fetches papers.
 user-invocable: true
-last-reviewed: 2026-05-11
+last-reviewed: 2026-05-14
 ---
 
 # Using Bibliography
@@ -51,7 +51,9 @@ yet validated.
 3. **Zettelkasten root exists** at the path in config (default `~/zettelkasten/`).
    If missing, halt — do not create it silently. The user owns this directory.
 
-4. **`pymupdf4llm` is installed** in a usable venv (see Dependencies below).
+4. **`pymupdf4llm` is installed** in a usable venv. `docling` is also
+   required for the fallback path when pymupdf4llm produces empty or
+   garbage output (see "Render cascade" and Dependencies below).
 
 ## Quickstart: ingest a list of DOIs
 
@@ -140,15 +142,38 @@ bib = requests.post(
   snapshot). Filter to paths ending `.pdf`. The format is
   `<label>:<path>:<mime>` separated by `;`.
 
-### 2. Render PDF → per-page markdown
+### 2. Render PDF → per-page markdown (auto-escalating cascade)
 
 Use the bundled `render.py`:
 
 ```bash
-python render.py "<absolute-pdf-path>" ~/zettelkasten/papers/<citekey>/
+uv run --with pymupdf4llm --with docling --with easyocr \
+    python render.py "<absolute-pdf-path>" ~/zettelkasten/papers/<citekey>/
 ```
 
-Output (verified on 28-page Yim 2024):
+`render.py` and `ingest.py` both delegate to `renderer.py`, which tries
+renderers in cost order and uses the first whose output passes a quality
+check:
+
+1. `pymupdf4llm` (AGPL-3, fast) — handles most papers with embedded text.
+2. `docling` no-OCR (Apache-2.0, slower) — handles broken text layers
+   and U+FFFD-saturated PDFs (e.g. Stephens 2000).
+3. `docling` + EasyOCR (Apache-2.0, slowest, GPU-friendly) — handles
+   scanned PDFs and old PDFWriter output with no text layer (e.g.
+   Schraw 1994).
+
+Quality check fails a render if either:
+
+- more than 50% of pages have <50 stripped chars (no-text-layer case), or
+- U+FFFD ('replacement character') covers more than 0.5% of all chars
+  (broken-encoding case).
+
+If every renderer fails the quality check (unlikely outside corrupt PDFs),
+`render.py` exits non-zero and `ingest.py` logs the paper as a per-paper
+failure rather than writing empty pages.
+
+Output (verified on 28-page Yim 2024 via pymupdf4llm and 16-page Schraw
+1994 via docling+OCR):
 
 ```
 ~/zettelkasten/papers/<citekey>/
@@ -156,8 +181,31 @@ Output (verified on 28-page Yim 2024):
 ├── pages/
 │   ├── 001.md
 │   └── ... (one per page)
-└── meta.json          # page_count, sha256_prefix, source_pdf path
+└── meta.json          # page_count, sha256_prefix, source_pdf, renderer,
+                       # ocr, and renderer_note when escalation fired
 ```
+
+`meta.json` records which renderer + OCR flag produced the file, plus a
+`renderer_note` describing the escalation chain. Example for Schraw 1994:
+
+```json
+{
+  "renderer": "docling",
+  "ocr": true,
+  "renderer_note": "escalated: pymupdf4llm(fail) -> docling(fail) -> docling+ocr(pass)"
+}
+```
+
+**OCR performance and quality notes:**
+
+- EasyOCR uses GPU if available (~500 MiB VRAM per concurrent doc). Force
+  CPU by exporting `CUDA_VISIBLE_DEVICES=` (empty) before invoking.
+- Approximate timing on a 16-page paper: <30 s pymupdf4llm, ~30-60 s
+  docling no-OCR, ~1-3 min docling+OCR on a modern GPU.
+- OCR output has expected substitutions (`0`↔`o`, `S`↔`5`, dropped short
+  words like `to`/`of`). Use the rendered text to *locate* a quote, then
+  re-verify against the source PDF before pasting verbatim. `blockquote.py`
+  normalises whitespace but is brittle on OCR substitutions.
 
 ### 3. Surface a page-keyed blockquote
 
@@ -376,20 +424,31 @@ Do **not** create the zettelkasten silently. The user owns it.
 
 ## Dependencies
 
-A Python venv with `pymupdf4llm`. Verified install:
+A Python venv with `pymupdf4llm` (primary) and `docling` + `easyocr`
+(fallback). `ingest.py`'s PEP 723 header pulls all three via `uv run`.
+For standalone invocation of `render.py`:
 
 ```bash
-uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python pymupdf4llm
+uv run --with pymupdf4llm --with docling --with easyocr python render.py \
+    "<pdf>" "<out>"
 ```
 
-`pymupdf4llm` is **AGPL-3** — propagates to anything that ships it. For a
-plugin distributed under CC-BY-SA-4.0, do not bundle it; require the user to
-install it locally. Document the dependency in the project where the skill
-runs (e.g. each research project's `pyproject.toml`).
+First docling install is heavy (~1-2 GB: torch + CUDA wheels + EasyOCR
+models) and cached afterward in `~/.cache/uv/`. EasyOCR English models
+download from JaidedAI on first OCR run (~50 MB).
 
-Alternatives surveyed but not yet validated in this skill: Marker (MIT) and
-Docling (Apache-2.0). See the design conversation for context.
+License summary:
+
+- `pymupdf4llm` is **AGPL-3** — propagates to anything that ships it. Do
+  not bundle in CC-BY-SA-4.0 distributions; require user-side install.
+- `docling` is **Apache-2.0**. Safe to depend on.
+- `easyocr` is **Apache-2.0**. Safe to depend on.
+
+**docling OCR-engine pin:** `renderer.py` pins
+`EasyOcrOptions(lang=["en"])` explicitly. Recent docling builds default to
+RapidOCR, which downloads ONNX models from `modelscope.cn` at first use —
+that endpoint fails behind some firewalls / outside China. If you bypass
+`renderer.py` (e.g. one-off scripts), pin EasyOCR the same way.
 
 ## What this skill does NOT do (yet)
 
@@ -425,6 +484,9 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Searching for an item that lives in multiple libraries and assuming the first `item.search` hit is the canonical copy | The same paper can exist in My Library AND a group library as separate Zotero items with the same cite key. Always pass the explicit `library_id` to `item.attachments` / `item.export` for the library you actually want. |
 | Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so the surname-search step has nothing to query and lookup fails. Bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
 | Verifying a quote with `blockquote.py` and giving up at the first NO MATCH | Try adjusted substrings before flagging unverified: strip Unicode apostrophes, drop fragments that fall inside an HTML-rendered table cell, check whether the "quote" is actually a paraphrase of source text. The real text is usually present — match logic is brittle. |
+| Treating docling+OCR output as faithful transcription | OCR introduces substitutions (`0`/`o`, `S`/`5`, dropped short words). For a paper rendered via docling+OCR (`meta.json: "renderer": "docling", "ocr": true`), use the markdown to *locate* a quote, then verify the exact wording against the source PDF before pasting verbatim. |
+| Assuming docling defaults to EasyOCR | Recent docling builds default to RapidOCR, which downloads ONNX models from `modelscope.cn` at first OCR use — that endpoint is unreliable outside China. `renderer.py` pins `EasyOcrOptions(lang=["en"])` explicitly. Match that in any one-off script that calls docling directly. |
+| Bypassing the cascade by hand-running pymupdf4llm and missing the empty-page case | The render functions in `renderer.py` quality-check output (>50% empty pages, or >0.5% U+FFFD) and escalate. If you skip the cascade, you silently get empty pages on no-text-layer PDFs (Schraw 1994 case) or U+FFFD-saturated text (Stephens 2000 case). Use `render_pdf_with_fallback` rather than calling `pymupdf4llm.to_markdown` directly. |
 
 ## Provenance
 
@@ -445,3 +507,24 @@ beyond what the demo proved is marked explicitly above.
 - Confirmed `ingest.py` end-to-end on the BJET methodology corpus (35
   journal articles + 8 burst chapter PDFs + 7 late adds → 42 papers; 0
   render failures with the HTTP-pull-export-driven workflow).
+
+**2026-05-14 addenda** (docling+OCR fallback integration):
+
+- Auto-escalating renderer cascade landed in `renderer.py`:
+  `pymupdf4llm` → `docling` (no OCR) → `docling`+OCR. Quality heuristic
+  (>50% near-empty pages or >0.5% U+FFFD chars) decides escalation.
+  `render.py` and `ingest.py` both delegate to `renderer.py`; the
+  previously duplicated render logic is now single-sourced.
+- Verified end-to-end on Schraw 1994
+  (`schrawAssessingMetacognitiveAwareness1994`) — 1980s Acrobat PDFWriter
+  output with no embedded text layer. pymupdf4llm and docling-no-OCR each
+  produced 16/16 empty pages; docling+OCR produced 43 KB of clean text
+  across 16 pages, structurally usable for quote location.
+- Regression-tested on Arksey & O'Malley 2005 — pymupdf4llm path still
+  fires on the first try; no spurious escalation.
+- `EasyOcrOptions(lang=["en"])` pinned explicitly because recent docling
+  builds default to RapidOCR (downloads models from `modelscope.cn` at
+  first use; unreliable outside China).
+- `meta.json` schema additions: `renderer`, `ocr`, and `renderer_note`
+  (only set when escalation fired). The pre-2026-05-14 fields
+  (`source_pdf`, `page_count`, `sha256_prefix`) are unchanged.
