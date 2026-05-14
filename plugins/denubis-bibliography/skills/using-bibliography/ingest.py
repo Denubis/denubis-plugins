@@ -18,7 +18,7 @@ Per the using-bibliography SKILL.md and ~/zettelkasten/AGENTS.md:
 
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pymupdf4llm", "httpx"]
+# dependencies = ["pymupdf4llm", "httpx", "docling"]
 # ///
 
 import argparse
@@ -30,7 +30,9 @@ import tomllib
 from pathlib import Path
 
 import httpx
-import pymupdf4llm
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from renderer import render_pdf_with_fallback  # noqa: E402
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -183,30 +185,13 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
     return m.get("sha256_prefix") == expected
 
 
-def render_pdf(pdf: Path, out_dir: Path) -> int:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pages_dir = out_dir / "pages"
-    pages_dir.mkdir(exist_ok=True)
-    pages = pymupdf4llm.to_markdown(str(pdf), page_chunks=True)
-    full_parts: list[str] = []
-    for i, page in enumerate(pages, start=1):
-        text = page["text"] if isinstance(page, dict) else page
-        full_parts.append(f"\n\n<!-- page:{i} -->\n\n{text}")
-        (pages_dir / f"{i:03d}.md").write_text(text, encoding="utf-8")
-    (out_dir / "full.md").write_text("".join(full_parts), encoding="utf-8")
-    sha = hashlib.sha256(pdf.read_bytes()).hexdigest()[:16]
-    (out_dir / "meta.json").write_text(
-        json.dumps(
-            {
-                "source_pdf": str(pdf),
-                "page_count": len(pages),
-                "sha256_prefix": sha,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    return len(pages)
+def render_pdf(pdf: Path, out_dir: Path) -> dict:
+    """Render PDF -> markdown with auto-escalation (pymupdf4llm -> docling -> +OCR).
+
+    Returns the meta dict written to meta.json. Raises RuntimeError if every
+    renderer's output fails the quality check.
+    """
+    return render_pdf_with_fallback(pdf, out_dir)
 
 
 def main() -> int:
@@ -264,8 +249,9 @@ def main() -> int:
                 print(f"  cache current — skipped (use --force to re-render)", flush=True)
                 skipped += 1
                 continue
-            n = render_pdf(pdf, out)
-            print(f"  rendered {n} pages → {out}", flush=True)
+            meta = render_pdf(pdf, out)
+            label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
+            print(f"  rendered {meta['page_count']} pages via {label} → {out}", flush=True)
             successes += 1
         except Exception as e:
             print(f"  ERROR: {e}", flush=True)
