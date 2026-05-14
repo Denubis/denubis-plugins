@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-bibliography] 0.2.2
+
+Defensive Windows hardening ahead of a colleague's first run on Windows. No behaviour change on Linux/macOS.
+
+**Fixed:**
+- `parse_pdf_paths` did not handle Windows drive-letter colons. The BBT `file = {label:path:mime}` field on Windows contains `C:\Users\...`, whose colon collided with the previous naive `split(":")`. Symptom on 0.2.0–0.2.1: `ingest.py` reported `no PDF attachment in this item` for items that clearly had a PDF. Parser now handles both unescaped (`C:\...`) and BibLaTeX-escaped (`C\:\...`) forms, plus forward-slash variants (`C:/...`).
+
+**New:**
+- `bbt.py` — Better BibTeX parsing helpers, extracted from `ingest.py` so the parser is unit-testable without httpx or a running Zotero. Single public function so far (`parse_pdf_paths`); add to it when BBT formats change.
+- `tests/test_bibliography_bbt.py` — 14 unit tests covering Linux/macOS, Windows unescaped, Windows escaped, forward-slash variants, multi-attachment entries (PDF + HTML snapshot), multiple PDFs per item, case variations, and negative cases.
+- `SKILL.md` — new **Platform notes** section documenting PowerShell quirks (`curl.exe`/`Invoke-RestMethod` instead of BSD `curl`; `Get-Content` for stdin batch DOIs; drive-letter colon handling), plus two new Common-mistakes rows for the PowerShell `curl` alias and the 0.2.1-on-Windows symptom.
+
+**Untested:**
+- Windows is still not exercised end-to-end. Hardening done defensively from the Linux side based on parser mental-simulation. If Windows BBT emits a shape the tests don't cover, add it to `tests/test_bibliography_bbt.py` before re-tuning the parser.
+
 ## [denubis-bibliography] 0.2.1
 
 Patch: `ingest.py`'s PEP 723 dependency block was missing `easyocr`, so the docling+OCR fallback path crashed with `ImportError: EasyOCR is not installed` whenever the cascade escalated past docling-no-OCR. Caught when `ingest.py 10.1006/ceps.1994.1033` (Schraw 1994) reached the OCR step in a fresh uv environment.
