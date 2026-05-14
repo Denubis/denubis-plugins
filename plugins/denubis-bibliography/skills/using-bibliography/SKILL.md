@@ -450,6 +450,34 @@ RapidOCR, which downloads ONNX models from `modelscope.cn` at first use —
 that endpoint fails behind some firewalls / outside China. If you bypass
 `renderer.py` (e.g. one-off scripts), pin EasyOCR the same way.
 
+## Platform notes
+
+Linux is the primary development platform; macOS should behave the same.
+The skill is portable on Windows from 0.2.2 onward but has some PowerShell
+quirks worth knowing:
+
+- **`curl` in PowerShell is an alias for `Invoke-WebRequest`**, not the BSD
+  `curl` with `-sS`/`--max-time` flags. Use either:
+  ```powershell
+  curl.exe -sS --max-time 3 http://localhost:23119/connector/ping
+  Invoke-RestMethod -Uri http://localhost:23119/connector/ping -TimeoutSec 3
+  ```
+  …or just open the URL in a browser.
+- **Paths.** Config and zettelkasten live at `$HOME\.config\denubis-academic-research\config.toml` and `$HOME\zettelkasten\` respectively. These are
+  outside Windows app-data conventions (`%APPDATA%`) but the path is shared
+  across platforms by design so cross-machine sync stays simple. Don't move
+  them.
+- **Zotero storage paths** on Windows include a drive-letter colon
+  (`C:\Users\...\Zotero\storage\KEY\paper.pdf`). `bbt.parse_pdf_paths`
+  handles this from 0.2.2 onward — both unescaped (`C:\...`) and
+  BibLaTeX-escaped (`C\:\...`) forms. If 0.2.1 or earlier ever surfaces,
+  the symptom is `no PDF attachment in this item` for items that clearly
+  have a PDF.
+- **stdin pattern for batch DOIs.** Linux/macOS: `cat dois.txt | uv run
+  ingest.py -`. PowerShell: `Get-Content dois.txt | uv run ingest.py -`.
+- **Git Bash / WSL** are reasonable alternatives if PowerShell quoting and
+  alias quirks pile up — they accept the Linux-style commands verbatim.
+
 ## What this skill does NOT do (yet)
 
 - **Does not fetch papers.** Zotero is the only thing that talks to publishers.
@@ -487,6 +515,8 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Treating docling+OCR output as faithful transcription | OCR introduces substitutions (`0`/`o`, `S`/`5`, dropped short words). For a paper rendered via docling+OCR (`meta.json: "renderer": "docling", "ocr": true`), use the markdown to *locate* a quote, then verify the exact wording against the source PDF before pasting verbatim. |
 | Assuming docling defaults to EasyOCR | Recent docling builds default to RapidOCR, which downloads ONNX models from `modelscope.cn` at first OCR use — that endpoint is unreliable outside China. `renderer.py` pins `EasyOcrOptions(lang=["en"])` explicitly. Match that in any one-off script that calls docling directly. |
 | Bypassing the cascade by hand-running pymupdf4llm and missing the empty-page case | The render functions in `renderer.py` quality-check output (>50% empty pages, or >0.5% U+FFFD) and escalate. If you skip the cascade, you silently get empty pages on no-text-layer PDFs (Schraw 1994 case) or U+FFFD-saturated text (Stephens 2000 case). Use `render_pdf_with_fallback` rather than calling `pymupdf4llm.to_markdown` directly. |
+| Reaching for PowerShell's `curl` to ping Zotero on Windows | `curl` in PowerShell is `Invoke-WebRequest` with different syntax; the `-sS --max-time` flags don't exist. Use `curl.exe ...` (real curl, shipped with Windows 10+) or `Invoke-RestMethod -Uri ... -TimeoutSec 3`. |
+| Running 0.2.1 or earlier on Windows and getting "no PDF attachment" for items that clearly have one | `parse_pdf_paths` in 0.2.1 and earlier collided with the Windows drive-letter colon (`C:\...`) and returned no path. Upgrade to 0.2.2+. |
 
 ## Provenance
 
@@ -528,3 +558,22 @@ beyond what the demo proved is marked explicitly above.
 - `meta.json` schema additions: `renderer`, `ocr`, and `renderer_note`
   (only set when escalation fired). The pre-2026-05-14 fields
   (`source_pdf`, `page_count`, `sha256_prefix`) are unchanged.
+
+**2026-05-14 second pass** (Windows hardening for Jodie's BJET project):
+
+- `parse_pdf_paths` extracted into `bbt.py` and hardened for Windows
+  drive-letter colons (`C:\Users\...`). Both unescaped and `\:`-escaped
+  BibLaTeX forms now parse correctly; 14 new unit tests under
+  `tests/test_bibliography_bbt.py` cover Linux/macOS, Windows in both
+  forms, multi-attachment entries, mixed PDF+HTML attachments, case
+  variations, and negative cases.
+- 0.2.1 -> 0.2.2: parser hardening + SKILL.md Platform-notes section
+  documenting PowerShell quirks (`curl.exe`/`Invoke-RestMethod`, `Get-Content`
+  stdin pattern, drive-letter colon handling). No behaviour change on
+  Linux/macOS; previously broken Windows path becomes the no-op happy
+  case there.
+- Still untested live on Windows. Hardening done defensively from the
+  Linux side based on mental simulation of the parser against
+  `<label>:C:\path:application/pdf` shape; if Windows BBT emits something
+  unexpected, the unit tests under `tests/test_bibliography_bbt.py` are
+  the place to add the new case before another parser change.
