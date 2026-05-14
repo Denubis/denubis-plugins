@@ -164,7 +164,11 @@ check:
 
 Quality check fails a render if either:
 
-- more than 50% of pages have <50 stripped chars (no-text-layer case), or
+- more than 50% of pages have <50 chars of *real content* (no-text-layer
+  case). "Real content" is measured after stripping pymupdf4llm's
+  `==> picture [WxH] intentionally omitted <==` image placeholder, so a
+  page whose only content is one or more such markers correctly registers
+  as empty (Levenson 1973 case, added in 0.2.3).
 - U+FFFD ('replacement character') covers more than 0.5% of all chars
   (broken-encoding case).
 
@@ -558,6 +562,24 @@ beyond what the demo proved is marked explicitly above.
 - `meta.json` schema additions: `renderer`, `ocr`, and `renderer_note`
   (only set when escalation fired). The pre-2026-05-14 fields
   (`source_pdf`, `page_count`, `sha256_prefix`) are unchanged.
+
+**2026-05-14 third pass** (image-only page detection, Levenson 1973
+discovery):
+
+- Quality heuristic now strips pymupdf4llm's `==> picture [WxH]
+  intentionally omitted <==` placeholder before measuring page content
+  length. The marker is ~50 chars - right at the empty-page threshold -
+  so previously a marker-only page (image-only PDF, no text layer)
+  appeared "non-empty" and the cascade did not escalate. Levenson 1973
+  (10.1037/h0035357) exposed this; a manual one-off docling+OCR pass
+  was needed to render it under 0.2.2.
+- Renderer module's `quality_assessment` is now covered by 14 unit tests
+  under `tests/test_bibliography_renderer.py` (empty pages, marker-only,
+  marker+content, multi-marker, U+FFFD ratio, threshold edges).
+- Renderer-emitted placeholders are renderer-specific; only
+  pymupdf4llm's is stripped (docling and EasyOCR don't emit one for
+  image-only pages - they produce actual empty pages, which the existing
+  heuristic catches).
 
 **2026-05-14 second pass** (Windows hardening for Jodie's BJET project):
 
