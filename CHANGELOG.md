@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-bibliography] 0.2.3
+
+Cascade now catches image-only pages that pymupdf4llm renders as placeholder markers. Discovered when Levenson 1973 (`10.1037/h0035357`, J. Consulting and Clinical Psychology) needed a manual `docling+OCR` one-off under 0.2.2 — the paper's 8 pages were emitted as `**==> picture [W x H] intentionally omitted <==**` markers, which are ~50 chars and slipped just above the empty-page threshold, so the cascade did not escalate.
+
+**Fixed:**
+- `renderer.quality_assessment` now strips pymupdf4llm's `==> picture [WxH] intentionally omitted <==` placeholder before measuring page content length. A page whose only content is one or more such markers correctly registers as empty and triggers cascade escalation. Real pages with embedded image markers (e.g. Vanlissa 2024 page 1, with three markers in 1908 chars of real content) still pass — only the marker-only case changes behaviour.
+
+**New:**
+- `tests/test_bibliography_renderer.py` — 14 unit tests covering empty pages, marker-only pages, marker+content pages, multi-marker pages, U+FFFD ratio (Stephens 2000 regression), and threshold edges.
+- `SKILL.md` — quality-check description updated to explain the marker-stripping; provenance addendum records the discovery.
+
+**Verified:**
+- Existing unit tests for `bbt.parse_pdf_paths` and skill descriptions still pass (485 tests in the python suite).
+- Heuristic is renderer-specific: docling and EasyOCR don't emit image placeholders for image-only pages (they produce actual empty pages, which the existing heuristic catches).
+
 ## [denubis-bibliography] 0.2.2
 
 Defensive Windows hardening ahead of a colleague's first run on Windows. No behaviour change on Linux/macOS.
