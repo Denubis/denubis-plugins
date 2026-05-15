@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-crash-recovery] 0.1.0
+
+New plugin. Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders `~/llm-resume.md`. This release ships the plugin scaffold, SQLite schema, and `crash-recovery init` subcommand. Subsequent phases land the classification rule table, scan/render/note/prune subcommands, the triage skill, and the wrapper patch in `denubis-plan-and-execute`.
+
+**New:**
+- `plugins/denubis-crash-recovery/` plugin scaffold (plugin.json, LICENSE, README).
+- `crash-recovery` CLI (typer-based) with `init` subcommand creating `~/.claude/crash-recovery.db` (overridable via `CRASH_RECOVERY_DB`).
+- SQLite schema for `sessions`, `scan_runs`, `classification_history` tables; WAL journal mode set persistently in init.
+
 ## [denubis-bibliography] 0.1.0
 
 New plugin. Renders PDFs from a Zotero corpus to per-page markdown so future Claude sessions can engage with paper content via verified, page-keyed blockquotes. WIP — documents only what has been proven end-to-end.
