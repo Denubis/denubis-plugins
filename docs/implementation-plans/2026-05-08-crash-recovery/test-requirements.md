@@ -11,15 +11,21 @@ and `<SRC>` = `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_r
 
 ## How to run the tests
 
-The crash-recovery plugin owns a self-contained uv project; run its pytest suite with the per-plugin invocation:
+The repo is a uv workspace (commit `56bd7cd`). The crash-recovery plugin and the workflow_statusline plugin are both workspace members, so a single invocation from the worktree root collects everything:
 
 ```bash
-uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
+uv run pytest -q          # 615 tests: 457 root + 140 workflow_statusline + 18 crash_recovery
 ```
 
-This matches the convention used by `plugins/denubis-plan-and-execute/scripts/workflow_statusline/`. The repo-root `uv run pytest -q` runs only `tests/` (skill descriptions and similar repo-level checks) — it does not collect plugin-package tests and is unaffected by this plan.
+For plugin-only iteration, both equivalent forms still work:
+
+```bash
+cd plugins/denubis-crash-recovery/scripts/crash_recovery && uv run pytest -q   # 18 tests
+```
 
 Bats tests for the wrapper patch live in the repo-root `tests/` directory and are run by `bats tests/test_claude_wrapper_liveness.bats` (Phase 8).
+
+*(Earlier drafts of this plan documented `uv run --project <plugin-path> pytest -q` from the repo root as the convention. That invocation does not actually collect the plugin's tests — pytest finds the root `pyproject.toml` first and uses its `testpaths`. Superseded by the workspace setup in commit `56bd7cd`. See `critical-peer-review-findings.md` M4 annotation.)*
 
 ---
 

@@ -10,15 +10,17 @@
 
 **Codebase verified:** 2026-05-12 (Phase 1B investigator report).
 
-## Per-plugin test invocation convention
+## Test invocation convention
 
-The root `pyproject.toml` keeps `testpaths = ["tests"]`. Each uv-managed plugin package owns its own test suite and is invoked at its own project root, matching the precedent set by `plugins/denubis-plan-and-execute/scripts/workflow_statusline/`. Run tests for this plugin with:
+The repo is a uv workspace (commit `56bd7cd`). The root `pyproject.toml` declares each uv-managed plugin (`plugins/denubis-plan-and-execute/scripts/workflow_statusline`, `plugins/denubis-crash-recovery/scripts/crash_recovery`) as a workspace member, and a single `uv run pytest -q` from the worktree root collects every test:
 
 ```bash
-uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
+uv run pytest -q          # 615 tests: 457 root + 140 workflow_statusline + 18 crash_recovery
 ```
 
-Why not a uv workspace or wider `testpaths`: the plugin install model copies each plugin directory standalone — users invoke the CLI via `uv run --project <plugin-path>/scripts/<pkg>`, which requires a self-contained `pyproject.toml` per plugin. A wider repo-root `testpaths` would attempt to collect plugin tests under the root environment, which does not have the per-plugin dependencies synced. Empirical check: running the workflow_statusline tests from the repo root fails on import; the existing per-plugin convention is what works.
+Each plugin keeps its own `pyproject.toml`, so the install model is unchanged: `uv run --project <plugin-path>/scripts/<pkg> <cmd>` and `cd <plugin-path>/scripts/<pkg> && uv run pytest` both still work standalone for plugin-specific work.
+
+**Why not the earlier "per-plugin invocation from repo root" convention** (e.g., `uv run --project plugins/.../crash_recovery pytest -q` run from the worktree root): empirically that invocation does **not** collect the plugin's tests — pytest walks up from `cwd` to find the first `pyproject.toml` (the root one) and uses its `testpaths`. The `--project` flag scopes uv's dependency resolution, not pytest's rootdir detection. The workspace convention sidesteps this: one root, one rootdir, one `uv run pytest -q`. This supersedes the critical-peer-review M4 → 4b decision recorded in `critical-peer-review-findings.md` (the rationale there rested on the empirically-false premise that `workflow_statusline` already followed a working per-plugin convention from the worktree root).
 
 **Phase Type:** infrastructure
 
@@ -163,7 +165,7 @@ The `__main__` module exposes `main()` as the entry point declared in `[project.
 
 Verification: `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery --help` exits 0 and prints typer's default help (no subcommands listed yet — that's expected at this task's boundary).
 
-**Step 4: `tests/__init__.py`** — empty file, exists so pytest treats `tests/` as a package.
+**Step 4: tests directory** — do **not** add a `tests/__init__.py`. An `__init__.py` in the tests dir makes pytest treat it as a package requiring its parent on `sys.path`, which breaks workspace-wide collection from the worktree root. The plugin's tests directory stays a non-package dir; pytest's rootdir-based collection handles imports through the installed workspace.
 
 **Step 5: `tests/conftest.py`**
 
@@ -478,18 +480,10 @@ git commit -m "feat(crash-recovery): add init subcommand to crash-recovery CLI"
 **Step: Verify operationally**
 
 ```bash
-uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
-```
-
-Expected: all tests pass. (This is the per-plugin invocation convention documented at the top of this phase; the repo-root `uv run pytest -q` still runs only `tests/` and is unaffected.)
-
-**Step: Confirm repo-root pytest is unaffected**
-
-```bash
 uv run pytest -q
 ```
 
-Expected: pre-existing 457 tests still pass; count does NOT increase (per-plugin tests live under their own project and are not collected by the repo-root invocation).
+Expected: 615 tests pass (457 root + 140 workflow_statusline + 18 crash_recovery). The new crash_recovery tests are part of the workspace's combined collection from the worktree root — see the workspace convention at the top of this phase.
 
 **Step: Commit**
 
@@ -505,11 +499,10 @@ git commit -m "test(crash-recovery): cover init schema, idempotency, CLI surface
 
 ## Phase 1 Done When
 
-- `uv sync --project plugins/denubis-crash-recovery/scripts/crash_recovery` succeeds.
+- `uv sync --all-packages` at the worktree root succeeds and installs both workspace members (`workflow_statusline`, `crash_recovery`) into the shared `.venv`.
 - `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery --help` exits 0 and lists `init`.
 - `CRASH_RECOVERY_DB=/tmp/cr.db crash-recovery init` creates the DB with the three documented tables; re-running is a no-op.
-- `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q` passes for the new package's tests.
-- `uv run pytest -q` at the repo root still passes (pre-existing 457 tests; root invocation is unaffected by this phase).
+- `uv run pytest -q` at the worktree root passes 615 tests (457 root + 140 workflow_statusline + 18 crash_recovery; the new plugin's tests are collected as part of the workspace).
 - `plugin.json` and `marketplace.json` agree on version `0.1.0`; CHANGELOG carries the `[denubis-crash-recovery] 0.1.0` entry.
 
 ## Outstanding for later phases

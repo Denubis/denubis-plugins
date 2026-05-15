@@ -4,6 +4,8 @@ Reviewed commit: `03c6526 docs(crash-recovery): apply critical-peer-review findi
 Branch: `crash-recovery`
 Scope: light structural sweep of the 12-fix editing pass across 11 files.
 
+> **Note — 2026-05-15:** Task #11 (M4 testpaths reversal → "per-plugin convention") was subsequently superseded during Phase 1 execution. The per-plugin invocation `uv run --project <plugin> pytest -q` from the worktree root does not actually collect the plugin's tests — pytest finds the root `pyproject.toml` first; `--project` only scopes uv's deps. Resolution: uv workspace at the root (commit `56bd7cd`). The Task #11 ✓ tick below was right that the editing pass implemented option 4b correctly; the option itself was wrong on its premise. Falsification anchor #4 ("Root `pyproject.toml` testpaths unchanged") no longer holds — it has now been widened, deliberately, as part of the workspace.
+
 ## Status: CHANGES REQUIRED
 
 **Critical: 0 | Important: 0 | Minor: 2**
