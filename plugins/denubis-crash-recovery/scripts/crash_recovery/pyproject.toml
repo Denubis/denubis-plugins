@@ -1,0 +1,24 @@
+[project]
+name = "crash-recovery"
+version = "0.1.0"
+description = "Deterministic triage of Claude Code sessions"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.12",
+]
+
+[project.scripts]
+crash-recovery = "crash_recovery.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crash_recovery"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
