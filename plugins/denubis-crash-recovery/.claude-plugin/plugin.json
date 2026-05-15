@@ -1,0 +1,17 @@
+{
+    "name": "denubis-crash-recovery",
+    "description": "Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders ~/llm-resume.md.",
+    "version": "0.1.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "claude-code",
+        "session-recovery",
+        "triage",
+        "sqlite",
+        "resume"
+    ]
+}
