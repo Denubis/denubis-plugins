@@ -98,6 +98,19 @@ SQLite WAL mode serialises concurrent writers at the database level. The design'
 | FK → scan_runs(id) ON DELETE RESTRICT | classification_history | scan_id | FK | Yes |
 | CHECK (classification) | classification_history | classification | CHECK | Yes — via `CLASSIFICATION_VALUES` |
 
+## Schema Migration Strategy
+
+Schema changes are coupled to `CLASSIFIER_VERSION` (defined in Phase 2's `crash_recovery/classify.py`). When a future classifier_version introduces a new classification value:
+
+1. Add the new value to `db.py::CLASSIFICATION_VALUES`.
+2. Provide an `ALTER TABLE` migration that recreates the CHECK constraint from the updated `_CLASSIFICATION_CHECK`. SQLite supports CHECK changes only via table-rebuild (create temp table with the new CHECK, copy rows, drop original, rename) — `init()` is not the migration mechanism.
+3. Bump `CLASSIFIER_VERSION`; existing rows stamped with the old version are flagged stale by Phase 4's orphan sweep and re-classified on next `scan`.
+4. `schema_hash()` will change after the migration — any consumer comparing against a baseline must be updated as part of the bump.
+
+`init()` itself remains idempotent across re-runs of the same schema version. Migrations are a separate code path tied to version bumps and live alongside the version that introduces them.
+
+**Known v0.1.0 gap (CLASSIFIER_VERSION ↔ CHECK decoupling)**: `classifier_version` is logically coupled to the CHECK list — a future version may introduce new values — but the schema does not enforce that coupling. A row with `(classifier_version=1, classification="value_only_valid_in_v2")` would pass the CHECK as long as the value is in `CLASSIFICATION_VALUES` at write time. Only the classifier code prevents this. Accepted because nothing in v0.1.0 produces rows of that shape; the orphan sweep + classifier rule table together preserve the invariant in practice.
+
 ## Future Tuning (Explicit Non-Goals for v0.1.0)
 
 **Secondary indexes:** At current expected scale (hundreds to thousands of sessions), no secondary indexes are needed. Full-table scans on `sessions` and `classification_history` are fast. Revisit at 100k+ rows using `EXPLAIN QUERY PLAN` on the Phase 4 stale-row query and the Phase 6 prune query.
