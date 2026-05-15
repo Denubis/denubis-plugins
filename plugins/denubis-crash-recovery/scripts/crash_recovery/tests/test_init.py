@@ -240,7 +240,6 @@ class TestConstraints:
                         1_000_000,
                     ),
                 )
-                conn.commit()
         finally:
             conn.close()
 
@@ -279,7 +278,6 @@ class TestConstraints:
                     """,
                     ("test-uuid-2", scan_id, "LIVE", 1),  # wrong case
                 )
-                conn.commit()
         finally:
             conn.close()
 
@@ -318,6 +316,5 @@ class TestConstraints:
 
             with pytest.raises(sqlite3.IntegrityError):
                 conn.execute("DELETE FROM scan_runs WHERE id = ?", (scan_id,))
-                conn.commit()
         finally:
             conn.close()

@@ -65,7 +65,15 @@ SQLite does not enable foreign key enforcement by default. It is a per-connectio
 
 ### Classification values
 
-Allowed values for `sessions.classification` and `classification_history.classification` are defined in `db.py::CLASSIFICATION_VALUES`. Both `SESSIONS_DDL` and `CLASSIFICATION_HISTORY_DDL` reference this constant to generate their CHECK constraints. Phase 2's `classify` module re-exports this constant so the classifier and the schema share one source of truth.
+Allowed values for `sessions.classification` and `classification_history.classification` are defined in `db.py::CLASSIFICATION_VALUES`:
+
+```
+"live", "hard_crash", "borderline", "concluded", "irrecoverable"
+```
+
+Both `SESSIONS_DDL` and `CLASSIFICATION_HISTORY_DDL` reference this constant to generate their CHECK constraints. Phase 2's `classify` module re-exports this constant so the classifier and the schema share one source of truth.
+
+The rendered markdown output groups sessions into sections whose headings combine classification and reason (e.g. `borderline+ambiguous_match`, `borderline+malformed_tail`). These compound section keys are a rendering concept only — they are derived at render time from `(classification, reason)` tuples stored in separate columns. The DB stores only the bare classification value; the `reason` column holds the distinguishing reason string.
 
 ## Denormalisation Rationale
 

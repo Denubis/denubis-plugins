@@ -30,10 +30,9 @@ from pathlib import Path
 CLASSIFICATION_VALUES: tuple[str, ...] = (
     "live",
     "hard_crash",
+    "borderline",
     "concluded",
     "irrecoverable",
-    "borderline+ambiguous_match",
-    "borderline+malformed_tail",
 )
 
 _CLASSIFICATION_CHECK = (

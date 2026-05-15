@@ -117,7 +117,6 @@ git commit -m "feat(crash-recovery): scaffold plugin directory with LICENSE, REA
 - Create: `plugins/denubis-crash-recovery/scripts/crash_recovery/pyproject.toml`
 - Create: `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/__init__.py`
 - Create: `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/__main__.py`
-- Create: `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/__init__.py`
 - Create: `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/conftest.py`
 
 **Step 1: pyproject.toml (complete contents)**
@@ -311,10 +310,9 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
    CLASSIFICATION_VALUES: tuple[str, ...] = (
        "live",
        "hard_crash",
+       "borderline",
        "concluded",
        "irrecoverable",
-       "borderline+ambiguous_match",
-       "borderline+malformed_tail",
    )
 
    SESSIONS_DDL = f"""

@@ -147,7 +147,7 @@ sessions
   jsonl_path            TEXT                -- absolute path; NULL if no JSONL ever written
   jsonl_mtime           INTEGER             -- unix epoch; for cache invalidation
   jsonl_last_ts         INTEGER             -- last-entry timestamp inside the JSONL
-  classification        TEXT NOT NULL       -- CHECK: live | hard_crash | concluded | irrecoverable | borderline+ambiguous_match | borderline+malformed_tail
+  classification        TEXT NOT NULL       -- CHECK: live | hard_crash | borderline | concluded | irrecoverable
   classification_reason TEXT                -- short machine-generated reason
   classifier_version    INTEGER NOT NULL    -- version of the rule table used; scan re-classifies stale rows
   state_summary         TEXT                -- 1-line render of the last few entries
