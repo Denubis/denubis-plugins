@@ -31,6 +31,7 @@ Meta + utility:
 - [`glossary.md`](glossary.md) — ubiquitous language for the marketplace.
 - [`personae.md`](personae.md) — single human persona.
 - [`constraints.md`](constraints.md) — repo conventions (version sync, HALT-when-sideways, per-plugin scope, version-bump cadence).
+- [`database.md`](database.md) — schema, relationships, and migration strategy for the `denubis-crash-recovery` SQLite database.
 
 ## Conventions
 

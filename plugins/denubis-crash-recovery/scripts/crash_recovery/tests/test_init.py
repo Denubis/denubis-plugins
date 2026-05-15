@@ -318,3 +318,66 @@ class TestConstraints:
                 conn.execute("DELETE FROM scan_runs WHERE id = ?", (scan_id,))
         finally:
             conn.close()
+
+    def test_classification_history_cascades_on_session_delete(
+        self, tmp_db_path: Path
+    ) -> None:
+        """ON DELETE CASCADE on uuid removes history rows when the parent session is deleted."""
+        db.init(tmp_db_path)
+        conn = db.open_db(tmp_db_path)
+        try:
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, classification,
+                    classifier_version, first_seen, last_scanned
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "11111111-1111-1111-1111-111111111111",
+                    "/p",
+                    "/c",
+                    "concluded",
+                    1,
+                    1_000_000,
+                    1_000_000,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO scan_runs (ts, classifier_version) VALUES (?, ?)",
+                (1_000_000, 1),
+            )
+            scan_id = conn.execute(
+                "SELECT id FROM scan_runs ORDER BY id DESC LIMIT 1"
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO classification_history
+                    (uuid, scan_id, classification, classifier_version)
+                VALUES (?, ?, ?, ?)
+                """,
+                ("11111111-1111-1111-1111-111111111111", scan_id, "concluded", 1),
+            )
+            conn.commit()
+
+            # Sanity check: the history row is present.
+            row = conn.execute(
+                "SELECT uuid FROM classification_history WHERE uuid = ?",
+                ("11111111-1111-1111-1111-111111111111",),
+            ).fetchone()
+            assert row is not None, "history row must exist before CASCADE test"
+
+            conn.execute(
+                "DELETE FROM sessions WHERE uuid = ?",
+                ("11111111-1111-1111-1111-111111111111",),
+            )
+            conn.commit()
+
+            # CASCADE must have removed the history row.
+            row = conn.execute(
+                "SELECT uuid FROM classification_history WHERE uuid = ?",
+                ("11111111-1111-1111-1111-111111111111",),
+            ).fetchone()
+            assert row is None, "CASCADE on sessions.uuid must delete child history rows"
+        finally:
+            conn.close()

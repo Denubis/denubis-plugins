@@ -139,10 +139,14 @@ def open_db(path: Path) -> sqlite3.Connection:
 
 
 def schema_hash(conn: sqlite3.Connection) -> str:
-    """Return the SHA-256 hex digest of ``(name, sql)`` rows of sqlite_master.
+    """Test-time helper. Returns SHA-256 hex of (name, sql) pairs from sqlite_master.
 
-    Rows are ordered by ``name`` for deterministic output. Used by the
-    idempotency test (AC2.4) to detect any schema drift across init runs.
+    Rows are ordered by ``name`` and joined by null bytes for a deterministic
+    digest. Used by ``test_init_is_idempotent`` to assert that re-running
+    ``init()`` against an existing DB does not perturb the schema.
+
+    Not a production invariant — no runtime code compares ``schema_hash()``
+    against a stored baseline.
     """
     rows = conn.execute(
         "SELECT name, sql FROM sqlite_master ORDER BY name"

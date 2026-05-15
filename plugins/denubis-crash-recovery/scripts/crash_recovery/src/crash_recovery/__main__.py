@@ -19,6 +19,10 @@ from crash_recovery import db
 app = typer.Typer(no_args_is_help=True)
 
 
+# Typer 0.25.1 requires either a command or a callback to dispatch the app.
+# This no-op callback preserves `crash-recovery --help` exit-0 behaviour during
+# phases that have not yet added @app.command() subcommands. Coexists with
+# @app.command() decorators added in Task 5 and later phases.
 @app.callback()
 def _root() -> None:
     """Deterministic triage of Claude Code sessions.

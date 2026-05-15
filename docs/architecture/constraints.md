@@ -31,17 +31,23 @@ Measurable limits on the behaviour of `brian-ed3d-plugins` and the disciplines i
 | Single bundled review pass | At most one fix-then-re-review cycle per phase before halting for user direction. | `requesting-code-review` skill body (per commit `9f7fab9` — *"bound code-review loop to one cycle, then HALT"*). |
 | Plugin manifest description shape | Every plugin's `plugin.json` description is QA-tested for shape (length, content). | Top-level `tests/` directory test (per commit `8498518` — *"enforce and apply skill description shape"*). |
 
-## Crash-Recovery Discipline (planned)
-
-These constraints govern the `crash-recovery` plugin currently in design. They are not yet enforced by code. Each cites the design plan as its source of authority until implementation lands.
+## Workspace Discipline
 
 | Constraint | Requirement | Verification |
 |------------|-------------|-------------|
-| Deterministic classification | Given a fixed SQLite database state, `crash-recovery render` produces byte-identical markdown output. No LLM judgement participates in classification — every classification value is produced by a parametrised rule table. | Snapshot tests planned at `plugins/crash-recovery/scripts/crash_recovery/tests/` (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
-| Idempotent scan | Repeated `crash-recovery scan` invocations against an unchanged filesystem state produce identical DB rows (`last_scanned` timestamp aside). `first_seen` is preserved across upserts; no duplicate `classification_history` rows accumulate. | Fixture-driven test in the scan module (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
+| Workspace test collection | A single `uv run pytest -q` from the worktree root must collect every test across root + all plugin packages. Each plugin keeps its own `pyproject.toml`; the workspace declaration in root `pyproject.toml` shares the `.venv`. No plugin `tests/__init__.py` may exist (it makes pytest treat the dir as a package requiring `sys.path` setup that defeats workspace collection). | 615 baseline → 618 after Phase 1 tests → 619 after M1 cascade test. Source: `pyproject.toml::tool.uv.workspace`. |
+
+## Crash-Recovery Discipline (implemented in Phase 1)
+
+These constraints govern the `crash-recovery` plugin. Phase 1 implements the database schema and `init` subcommand; the constraints below are enforced by code as of Phase 1 (schema / init) with remaining phases cited where enforcement is deferred.
+
+| Constraint | Requirement | Verification |
+|------------|-------------|-------------|
+| Deterministic classification | Given a fixed SQLite database state, `crash-recovery render` produces byte-identical markdown output. No LLM judgement participates in classification — every classification value is produced by a parametrised rule table. | CHECK constraint on `classification` enforced by `db.py::CLASSIFICATION_HISTORY_DDL`; invalid values rejected: `tests/test_init.py::TestConstraints::test_classification_history_classification_check_rejects_invalid_value`. Snapshot tests for render output deferred to Phase 5. |
+| Idempotent scan | Repeated `crash-recovery scan` invocations against an unchanged filesystem state produce identical DB rows (`last_scanned` timestamp aside). `first_seen` is preserved across upserts; no duplicate `classification_history` rows accumulate. | Schema idempotency (re-running `init()` on existing DB) verified by `tests/test_init.py::TestInitIdempotent::test_init_is_idempotent`. Scan-level idempotency deferred to Phase 4. |
 | Boot-aware liveness | A liveness file whose `boot_id` does not match `/proc/sys/kernel/random/boot_id` is classified as a casualty regardless of whether its PID is currently alive. This prevents post-reboot PID-recycling false positives. | Manual UAT in Phase 8: reboot the machine, confirm `crash-recovery scan` classifies stale liveness files as `hard_crash` (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
-| No auto-prune | `crash-recovery prune` only deletes rows when invoked with `--confirm` AND a three-condition guard holds: classification is `concluded` AND `user_notes IS NULL` AND `jsonl_path` is no longer on disk. Re-running triage never silently removes entries. | Per-condition test fixture; user's standing directive to never auto-prune (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
-| Classifier version forward-compat | Each scan stamps the current `CLASSIFIER_VERSION` onto every row it touches. When the rule table changes, scan re-classifies version-stale rows before render or prune queries see them. Prune therefore always operates against rules currently in force. | Fixture: seed DB at version N-1, run scan with version N, assert all rows upgraded (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
+| No auto-prune | `crash-recovery prune` only deletes rows when invoked with `--confirm` AND a three-condition guard holds: classification is `concluded` AND `user_notes IS NULL` AND `jsonl_path` is no longer on disk. Re-running triage never silently removes entries. | Per-condition test fixture deferred to Phase 6. User's standing directive to never auto-prune (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
+| Classifier version forward-compat | Each scan stamps the current `CLASSIFIER_VERSION` onto every row it touches. When the rule table changes, scan re-classifies version-stale rows before render or prune queries see them. Prune therefore always operates against rules currently in force. | Fixture: seed DB at version N-1, run scan with version N, assert all rows upgraded. Deferred to Phase 4 (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
 
 ## Constraint History
 
@@ -49,3 +55,5 @@ These constraints govern the `crash-recovery` plugin currently in design. They a
 |------|------------|--------|--------|
 | 2026-05-11 | — | Initial bootstrap of `docs/architecture/constraints.md`. | Document the current state of repo conventions and hook-enforced disciplines. |
 | 2026-05-12 | Crash-Recovery Discipline (planned) | Added prospective constraints for crash-recovery: deterministic classification, idempotent scan, boot-aware liveness, no auto-prune, classifier version forward-compat. | Track the design-plan-stage constraints so reviewers and implementers see the contract before code lands (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`). |
+| 2026-05-16 | Crash-Recovery Discipline (implemented in Phase 1) | Flipped section from "(planned)" to "(implemented in Phase 1)". Updated verification cells for deterministic classification and idempotent scan to cite Phase 1 tests; remaining constraints note their deferred phase. Added workspace test-collection constraint (L3). | Phase 1 implementation landed: schema, `init` subcommand, and constraint tests are in place. |
+| 2026-05-16 | Workspace test collection | Added new constraint row under a new "Workspace Discipline" section. | Enforce that `uv run pytest -q` from the worktree root collects all plugin tests; no plugin `tests/__init__.py` may exist. |
