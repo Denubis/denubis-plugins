@@ -35,7 +35,7 @@ Bats tests for the wrapper patch live in the repo-root `tests/` directory and ar
 ### crash-recovery.AC1.3 — plugin.json + marketplace.json version-sync, required fields present
 - **Test type:** AUTOMATED (unit)
 - **Test file:** `<TESTS>test_plugin_manifest.py`
-- **Test name:** `test_plugin_json_is_valid` (asserts required fields); Phase 1 Task 3 Step 5 inline verification (asserts version equality across plugin.json and marketplace.json)
+- **Test name:** `test_plugin_json_is_valid` (asserts required fields); Phase 1 Task 3 Step 4 inline verification (asserts version equality across plugin.json and marketplace.json)
 - **Phase:** Phase 1 Task 6
 - **Status:** covered
 
@@ -102,7 +102,7 @@ Bats tests for the wrapper patch live in the repo-root `tests/` directory and ar
 ### crash-recovery.AC3.3 — Each session row records non-empty `classification_reason`
 - **Test type:** AUTOMATED (unit; parametrised)
 - **Test file:** `<TESTS>test_classify.py`
-- **Test names:** `test_every_rule_classifies_its_fixture` (asserts `.reason` matches per row); `test_defensive_fallback_returns_borderline_unmatched` (asserts non-empty reason even when no rule matches); `test_rules_have_unique_reasons`
+- **Test names:** `test_every_rule_classifies_its_fixture` (asserts `.reason` matches per row); `test_unmatched_route_returns_borderline_unmatched` (asserts non-empty reason for the deliberate review-queue route — AC3.3 guard); `test_rules_have_unique_reasons`
 - **Phase:** Phase 2 Task 5
 - **Status:** covered
 
