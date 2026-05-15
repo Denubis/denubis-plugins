@@ -9,6 +9,18 @@ AC has a passing test by the time the relevant phase completes.
 Test-file paths are abbreviated as `<TESTS>` = `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/`
 and `<SRC>` = `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/`.
 
+## How to run the tests
+
+The crash-recovery plugin owns a self-contained uv project; run its pytest suite with the per-plugin invocation:
+
+```bash
+uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
+```
+
+This matches the convention used by `plugins/denubis-plan-and-execute/scripts/workflow_statusline/`. The repo-root `uv run pytest -q` runs only `tests/` (skill descriptions and similar repo-level checks) — it does not collect plugin-package tests and is unaffected by this plan.
+
+Bats tests for the wrapper patch live in the repo-root `tests/` directory and are run by `bats tests/test_claude_wrapper_liveness.bats` (Phase 8).
+
 ---
 
 ## Phase 1: Plugin scaffold and database schema
@@ -332,7 +344,7 @@ and `<SRC>` = `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_r
 ### Bucket counts
 
 - **AUTOMATED:** 31 ACs
-- **HUMAN_JUDGEMENT (UAT-only):** 2 ACs — `crash-recovery.AC6.4`, plus Phase 7 DR2 prune-prompt-clarity check (not an AC; called out in plan)
+- **HUMAN_JUDGEMENT (UAT-only):** 2 ACs — `crash-recovery.AC6.4`, plus the Phase 7 prune-prompt-clarity check (not an AC; called out in plan)
 - **MIXED (both test + UAT):** 1 AC — `crash-recovery.AC5.6` (rule-wiring automated, post-reboot scenario human-judged)
 
 Total ACs enumerated: **34** (matches design plan: AC1.1–AC1.4, AC2.1–AC2.5, AC3.1–AC3.6, AC4.1–AC4.5, AC5.1–AC5.6, AC6.1–AC6.4, AC7.1–AC7.7, AC8.1–AC8.3).

@@ -13,13 +13,13 @@ verifications between phase completion and merge approval.
 
 ## Phase 7: Skill file and skill ↔ CLI integration
 
-### DR2 — Prune-gate prompt clarity
+### Prune-gate prompt clarity
 
 **This decision assumes:** the AskUserQuestion prompt text in the triage skill's prune flow makes the destructiveness of `crash-recovery prune --confirm` clear enough that a user pressing "yes" understands what will be deleted.
 
 **To shatter it:** invoke `/denubis-crash-recovery:triage` against a fixture DB containing 5 prune candidates (concluded sessions with vanished JSONLs). Walk the skill's prompts to the point where it surfaces the prune dry-run output and asks for confirmation. Read the prompt as if you were encountering the skill for the first time, without recourse to the README or design plan.
 
-**It's wrong if:** you later say "I didn't realise that would delete sessions" or "I thought it would archive them somewhere", OR you ask "where are the deleted entries now?", OR the prompt's wording leaves ambiguity about whether the deletion is reversible (it isn't — there is no audit trail in v0.1.0 per Phase 6 DR3).
+**It's wrong if:** you later say "I didn't realise that would delete sessions" or "I thought it would archive them somewhere", OR you ask "where are the deleted entries now?", OR the prompt's wording leaves ambiguity about whether the deletion is reversible (it isn't — Phase 6's prune flow does not log deletions and there is no audit trail in v0.1.0).
 
 **Acceptance threshold:** the human evaluator can articulate, after reading the prompt only, that (a) the deletion is permanent, (b) the affected rows can be enumerated from the dry-run output above the prompt, (c) user-annotated sessions are excluded.
 
@@ -56,7 +56,7 @@ verifications between phase completion and merge approval.
 ## Coverage Summary
 
 - **Total UAT entries: 3.**
-  - Phase 7 DR2: prune-prompt clarity (genuinely subjective — usability judgement).
+  - Phase 7: prune-prompt clarity (genuinely subjective — usability judgement).
   - Phase 8 AC5.6: post-reboot mismatch (mixed — automated rule plus manual reboot proof).
   - Phase 8 AC6.4: idle-kill detection (manual real-machine reproduction).
 

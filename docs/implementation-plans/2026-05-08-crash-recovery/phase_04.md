@@ -90,11 +90,24 @@ The module exposes:
    ```
 
    Walk strategy:
+   - **Cache the current kernel boot_id once at the start of the walk:** `current_bid = current_boot_id()` (from Phase 3). The read is cheap but reading it N times under load is wasteful and would also create a race window if the kernel value somehow changed mid-walk (it cannot — boot_id is stable per kernel uptime — but caching once also makes the test fixture-mocking story simpler).
    - Iterate `list_liveness_files(ctx.run_dir)`. For each `Liveness`, call `correlate(liveness, ctx.projects_root)`:
-     - `DIRECT_MATCH` or `MTIME_MATCH`: produce one `SessionFact` for that UUID.
-     - `AMBIGUOUS`: produce one `SessionFact` per candidate UUID, marked with `ambiguity_candidates: tuple[str, ...]` (the full candidate list). These facts get a special classification override in `_classify_fact` (see Task 1 below) — they bypass Phase 2's `classify()` and emit `Classification(BORDERLINE, "ambiguous_match")` directly per AC6.3.
+     - `DIRECT_MATCH` or `MTIME_MATCH`: produce one `SessionFact` for that UUID. Compute the per-fact liveness-dependent fields explicitly at construction:
+       ```python
+       facts.append(SessionFact(
+           uuid=resolved_uuid,
+           ...,
+           tail_summary=parse_tail(jsonl_path),
+           liveness=liveness,
+           pid_alive_value=pid_alive(liveness.pid),
+           boot_id_current=(liveness.boot_id == current_bid),
+           ambiguity_candidates=(),
+           ...,
+       ))
+       ```
+     - `AMBIGUOUS`: produce one `SessionFact` per candidate UUID, marked with `ambiguity_candidates: tuple[str, ...]` (the full candidate list). These facts also compute `pid_alive_value=pid_alive(liveness.pid)` and `boot_id_current=(liveness.boot_id == current_bid)` so an ambiguous candidate whose liveness file is on a stale boot still routes correctly even though the classification override fires. They bypass Phase 2's `classify()` and emit `Classification(BORDERLINE, "ambiguous_match")` directly per AC6.3 (the classification override is in `_classify_fact` below).
      - `NO_MATCH`: skip (the liveness file describes a wrapper whose session we cannot identify; no DB row to write).
-   - Iterate `ctx.projects_root.glob("*/*.jsonl")` and collect any UUIDs NOT already produced by the liveness walk. For each, produce a `SessionFact` with `liveness=None`, `pid_alive_value=None`, `boot_id_current=False`, `ambiguity_candidates=()`.
+   - Iterate `ctx.projects_root.glob("*/*.jsonl")` and collect any UUIDs NOT already produced by the liveness walk. For each, produce a `SessionFact` with `liveness=None`, `pid_alive_value=None`, `boot_id_current=False`, `ambiguity_candidates=()`. (`boot_id_current=False` for JSONL-only facts is correct by definition: with no liveness file there is no recorded boot_id to compare, and the field is consulted by `classify()` only when `LivenessState.present=True`.)
 
    The walk does NOT touch the DB.
 
@@ -102,7 +115,9 @@ The module exposes:
 
    ```python
    from crash_recovery.classify import classify, Classification, ClassificationValue
-   from crash_recovery.liveness import LivenessState
+   from crash_recovery.liveness import LivenessState, current_boot_id, pid_alive
+   from crash_recovery.jsonl import TailSummary, TailKind, parse_tail
+   from crash_recovery.correlate import CorrelationKind, correlate
 
    def _classify_fact(fact: SessionFact) -> Classification:
        # AC6.3: ambiguous correlation gets a hardcoded BORDERLINE/ambiguous_match.
@@ -381,11 +396,13 @@ Add a `scan` typer subcommand. It must:
 
 ```python
 import os
+import sys
 import time
 from pathlib import Path
 
 from crash_recovery import scan as _scan
 from crash_recovery import db
+from crash_recovery import liveness as _liveness
 
 
 def _resolve(option_value: Path | None, env_var: str, default: str) -> Path:
@@ -401,12 +418,25 @@ def scan(
     projects_root: Path = typer.Option(None, "--projects-root"),
 ) -> None:
     """Walk the filesystem, classify each session, upsert to the DB."""
+    if sys.platform != "linux":
+        typer.echo(
+            "crash-recovery scan requires Linux: reboot detection reads "
+            "/proc/sys/kernel/random/boot_id, which only exists on Linux. "
+            f"Detected platform: {sys.platform}.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     ctx = _scan.ScanContext(
         db_path=_resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db"),
         run_dir=_resolve(run_dir, "CRASH_RECOVERY_RUN_DIR", "~/.claude/run"),
         projects_root=_resolve(projects_root, "CRASH_RECOVERY_PROJECTS_ROOT", "~/.claude/projects"),
         now=int(time.time()),
     )
+    try:
+        _liveness.assert_local_filesystem(ctx.run_dir)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     result = _scan.run_scan(ctx)
     typer.echo(
         f"Scanned {result.sessions_scanned} sessions; "
@@ -414,6 +444,8 @@ def scan(
         f"scan_run_id={result.scan_run_id}"
     )
 ```
+
+The `sys.platform == "linux"` guard at the top of `scan` is what makes the plugin Linux-only as a design choice: every other subcommand (`init`, `render`, `triage`, `note`, `history`, `prune`, `list-live`) is filesystem/DB-only and runs on any platform, but `scan` is the only command that reads `/proc/sys/kernel/random/boot_id` (via Phase 3's `current_boot_id()`). Exiting with code 2 and a clear error to stderr means non-Linux users get a useful diagnostic instead of a `FileNotFoundError` traceback. `triage` invokes `scan` internally so it inherits the guard.
 
 Also update the `EXPECTED_SUBCOMMANDS` constant in tests (introduced in Phase 1 Task 6) to include `"scan"`.
 
@@ -479,12 +511,16 @@ class FixtureSession:
 
 - **`test_scan_atomic_on_simulated_failure`** — monkey-patch `_upsert_session` to raise after the second of three calls. Run scan, catch the exception. Assert NO rows were written to `sessions` (transaction rolled back) AND no `scan_runs` row was created.
 
+- **`test_scan_cli_refuses_to_run_on_non_linux`** — invoke `crash-recovery scan` as a subprocess with `sys.platform` monkey-patched (or run a pytest-conditional skip on non-Linux that still asserts the import path doesn't raise). On non-Linux: assert exit code 2 and stderr contains `requires Linux`. On Linux: parametrise with `monkeypatch.setattr(sys, "platform", "darwin")` invoking the CLI function directly (subprocess won't propagate the monkeypatch), assert `typer.Exit` raised with code 2.
+
+- **`test_scan_cli_refuses_when_run_dir_is_on_network_fs`** — monkey-patch `crash_recovery.liveness._detect_fstype` to return `"nfs4"`. Invoke the scan CLI function directly with a valid temp `run_dir`; assert `typer.Exit` raised with code 2 and stderr mentions `CRASH_RECOVERY_RUN_DIR` and `nfs4`. Mirror test with `"fuse.sshfs"` to confirm prefix matching.
+
 - **`test_scan_classifies_ambiguous_correlation_as_borderline_ambiguous_match`** (AC6.3) — fixture with one liveness file whose argv lacks `--resume`, pointing to a cwd whose project directory contains TWO JSONLs both within the mtime window. Run scan. Assert TWO sessions rows produced (one per candidate UUID), both with `classification == "borderline"` and `classification_reason == "ambiguous_match"`, both with `state_summary` containing the other candidate's UUID.
 
 - **`test_scan_two_concurrent_invocations_do_not_corrupt_db`** (design Additional Considerations — concurrency requirement) — fixture with three synthetic sessions on disk. Spawn two `subprocess.Popen([sys.executable, "-m", "crash_recovery", "scan", "--db", path, "--run-dir", run_dir, "--projects-root", projects_root])` invocations against the same DB simultaneously; `wait()` both. Assert:
   - Both subprocesses exit 0 (no SQLite locked errors leaked out — the default 5s busy timeout under WAL absorbs the contention).
   - `sessions` row count is exactly 3 (no duplicates, no missing rows).
-  - Either one `scan_runs` row (one scan won the race and ran the orphan sweep; the other saw nothing new) or two `scan_runs` rows (both scans completed in sequence) — both outcomes are valid; the assertion is that the count is `1` or `2`, never `0` or `>2`.
+  - **`scan_runs` row count is exactly 2.** Both scans hold their own `with conn:` transaction; SQLite WAL serialises the writes; each transaction writes its own `scan_runs` row via `_write_scan_run`. There is no "skip if another scan is running" path, so the count is `== 2` by design (anything else signals a regression: 0 means both crashed, 1 means one rolled back silently, > 2 means duplicate scan_run rows).
   - Every `sessions` row's `classifier_version` equals `CLASSIFIER_VERSION`.
   - Every `sessions` row's `last_scanned` equals one of the two scan_runs timestamps.
 

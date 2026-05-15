@@ -59,6 +59,7 @@ SKILL.md must include:
    - **Announce at start** — instruction: "I'm using the denubis-crash-recovery:triage skill to inspect session state."
    - **Step 1: Run triage** — invoke `uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery triage` via Bash; show output verbatim to the user.
    - **Step 2: Annotate borderline entries (optional)** — if the report has rows under "Ambiguous correlation", "Needs investigation", or "Idle-live killed" that the user wants to mark, use AskUserQuestion to prompt for each: "Add a note to <uuid-short> (cwd: <cwd>)? (yes/no/skip all)". If yes, prompt for text, then invoke `crash-recovery note <uuid> "<text>"`.
+     - **Manual-review tag:** entries whose classification reason is `unmatched` (rendered with the `Something fucky — let's go look` warning) get a `[manual review]` tag in the prompt and are surfaced *first* in the iteration order. These are the combinations Phase 2's rule table doesn't cover; the user is the only signal for what they mean.
    - **Step 3: Prune (optional, gated)** — if there are concluded entries with vanished JSONLs, offer a prune flow:
      1. Run `crash-recovery prune --dry-run`; show output.
      2. If candidates exist, AskUserQuestion: "Delete N concluded sessions whose JSONLs are gone? This permanently removes their DB rows. (yes / no / show me again)"
@@ -128,8 +129,10 @@ Replace the Phase 1 skeleton's "TBD-PHASE-8" placeholder and add full skill docu
    - **AC5.6 (boot_id mismatch after reboot):** start a wrapped Claude session; let it run long enough that liveness file exists; reboot the machine; after reboot, run `crash-recovery scan`; assert the pre-reboot session is classified `hard_crash` with reason `liveness_boot_id_mismatch`, regardless of whether the recorded PID has been recycled.
    - **AC6.4 (idle-kill):** start a wrapped Claude session in a known cwd; leave idle 5+ minutes; `kill -9 $(pgrep -f 'claude' | head -1)` to kill the wrapper PID; run `crash-recovery scan`; assert the session is classified `hard_crash` despite a stale JSONL.
 6. **Troubleshooting:**
+   - "`scan` exits with `requires Linux` on macOS/BSD" → the `scan` subcommand reads `/proc/sys/kernel/random/boot_id` and is Linux-only by design. The other subcommands (`init`, `render`, `note`, `history`, `prune`, `list-live`) work cross-platform against an existing DB, but the scan/triage flow needs Linux.
+   - "`scan` exits with `does not provide reliable atomic-rename semantics`" → `~/.claude/run/` is on a network or union filesystem (NFS, CIFS, sshfs, FUSE, etc.) that cannot guarantee atomic `rename(2)` for liveness-file writes. Set `CRASH_RECOVERY_RUN_DIR` to a path on a local filesystem (ext4, btrfs, xfs, zfs, tmpfs).
    - "`scan` runs but reports 0 sessions" → check `CRASH_RECOVERY_RUN_DIR` and `CRASH_RECOVERY_PROJECTS_ROOT` env vars; check `~/.claude/run/` exists and `denubis-plan-and-execute`'s wrapper has been invoked at least once after install.
-   - "Pruned a session I wanted to keep" → no audit trail in v0.1.0 by design (DR3 in Phase 6); preserve future sessions by adding `note <uuid>` before they get pruned.
+   - "Pruned a session I wanted to keep" → there is no audit trail in v0.1.0 by design (the prune flow does not log deletions); preserve future sessions by adding `note <uuid>` before they get pruned.
    - "Schema corruption" → `rm ~/.claude/crash-recovery.db && crash-recovery init && crash-recovery scan` rebuilds from filesystem state.
 
 **Step: Verify**

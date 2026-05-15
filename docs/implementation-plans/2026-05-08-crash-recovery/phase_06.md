@@ -349,6 +349,7 @@ Critical invariants:
 - `survey()` opens a read-only-style connection (Phase 1's `open_db` is read/write, but `survey` never writes — code review enforces no writes here).
 - `delete_candidates` is the ONLY function that mutates rows. The caller must pass the survey's UUIDs verbatim; the survey already applied the four-condition guard.
 - `survey().stale_version_concluded_rows` lets the CLI surface the AC7.7 warning text.
+- The `DELETE FROM sessions` triggers a cascade to `classification_history` rows for the same UUID via Phase 1's `FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE` constraint. `PRAGMA foreign_keys = ON` is set by `db.open_db` so the cascade fires inside the same transaction; there is no separate `DELETE FROM classification_history` to write. `history <uuid>` for a pruned UUID consequently returns zero rows.
 
 **Step: Verify operationally**
 
@@ -440,6 +441,7 @@ Update `EXPECTED_SUBCOMMANDS` to include `"prune"`.
 - **`test_prune_confirm_does_not_delete_stale_rows`** (AC7.7) — same as above; invoke `--confirm`. Assert the current-version row deleted, stale row remains.
 - **`test_prune_dry_run_and_confirm_mutually_exclusive`** — invoke `crash-recovery prune --dry-run --confirm`. Assert exit code != 0 (typer.BadParameter).
 - **`test_prune_empty_db`** — empty DB. Invoke `--dry-run`. Assert "No prune candidates." printed. Invoke `--confirm`. Assert "Deleted 0 session(s).".
+- **`test_prune_cascades_classification_history_deletion`** — seed DB with one prune-eligible row (concluded, no note, no JSONL, current version) AND seed `classification_history` with two history rows for the same `uuid` (e.g. from two prior scans). Assert pre-prune: `classification_history` row count = 2. Invoke `prune --confirm`. Assert post-prune: the `sessions` row is gone AND the two `classification_history` rows are gone (cascade fired via the `FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE` on the `classification_history` table; `PRAGMA foreign_keys = ON` is set by `db.open_db`). This locks Phase 1's schema decision against silent regression and confirms `history <uuid>` on a pruned UUID naturally returns no rows.
 
 **Step: Verify operationally**
 

@@ -125,6 +125,8 @@ The module exposes:
 
    ```python
    def _reduced_confidence_text(reason: str) -> str | None:
+       if reason == "unmatched":
+           return "Something fucky — let's go look"
        if reason in NO_LIVENESS_REASONS:
            return "no liveness file recorded (pre-installation session or wrapper bypass)"
        if reason in JSONL_ONLY_REASONS and reason != "ambiguous_match":
@@ -132,7 +134,7 @@ The module exposes:
        return None
    ```
 
-   `ambiguous_match` does not get a reduced-confidence warning — the ambiguity itself is the warning, surfaced in its own section.
+   `ambiguous_match` does not get a reduced-confidence warning — the ambiguity itself is the warning, surfaced in its own section. `unmatched` gets its own distinct message because it routes through the deliberate review-queue path (Phase 2's `classify()` fallback): the rule table didn't speak to this combination and the user should look at it manually.
 
 **Step: Verify operationally**
 
@@ -145,6 +147,7 @@ assert _section_for_row('borderline', 'malformed_tail') is SectionKey.NEEDS_INVE
 assert _reduced_confidence_text('no_liveness_clean_end_turn') is not None
 assert _reduced_confidence_text('live_pid_present_boot_current') is None
 assert _reduced_confidence_text('ambiguous_match') is None
+assert _reduced_confidence_text('unmatched') == \"Something fucky — let's go look\"
 print('OK')
 "
 ```
@@ -513,7 +516,9 @@ The helper inserts the rows directly into a freshly-initialised DB (bypassing sc
 
 - **`test_regenerate_preserves_concluded_rows`** (AC7.1) — fixture DB with two concluded rows. Call `regenerate`. Assert the rendered file still contains both concluded entries (no auto-pruning side-effect).
 
-- **`test_reason_prefix_partition_is_exhaustive`** — collect every `reason` string from Phase 2's `RULES` plus `"ambiguous_match"` (Phase 4's override reason) plus `"unmatched"` (Phase 2's defensive fallback emitted when no row matches). Assert each is in exactly one of (LIVENESS_REASONS, NO_LIVENESS_REASONS, JSONL_ONLY_REASONS) sets. Without including `"unmatched"` explicitly, removing it from `JSONL_ONLY_REASONS` would not fail any test — defeats the partition guarantee. Catches drift if a new rule is added without updating the partition constants.
+- **`test_reason_prefix_partition_is_exhaustive`** — collect every `reason` string from Phase 2's `RULES` plus `"ambiguous_match"` (Phase 4's override reason) plus `"unmatched"` (Phase 2's deliberate review-queue route). Assert each is in exactly one of (LIVENESS_REASONS, NO_LIVENESS_REASONS, JSONL_ONLY_REASONS) sets. Without including `"unmatched"` explicitly, removing it from `JSONL_ONLY_REASONS` would not fail any test — defeats the partition guarantee. Catches drift if a new rule is added without updating the partition constants.
+
+- **`test_unmatched_reason_emits_review_queue_message`** — render a fixture with a `borderline / unmatched` row; assert the entry's reduced-confidence line is exactly `⚠ Reduced confidence: Something fucky — let's go look`. Render a fixture with a `borderline / malformed_tail` row; assert its reduced-confidence line uses the generic "session data is incomplete or corrupted" message. Locks the two-message split.
 
 - **`test_reduced_confidence_emitted_for_no_liveness_only`** — render a fixture with a `no_liveness_clean_end_turn` row; assert the warning line is present. Render a fixture with a `live_pid_present_boot_current` row; assert the warning line is absent.
 

@@ -309,13 +309,16 @@ Add to `classify.py`:
            if rule.boot_id_current is not None and rule.boot_id_current is not liveness_state.boot_id_current:
                continue
            return Classification(value=rule.classification, reason=rule.reason)
-       # Defensive: if no rule matched, return a borderline with reason "unmatched"
-       # so AC3.3 (non-empty reason) is preserved. Phase 4's scan should treat this
-       # as a programmer-error signal worth logging.
+       # No rule matched: deliberate review-queue route. The rule table covers
+       # common cases; `unmatched` is the explicit "go look at this manually"
+       # signal for realistic combinations the rules don't speak to (e.g., a
+       # concluded JSONL paired with a liveness file whose PID is dead but boot
+       # is still current — possible during scan/kill race conditions).
+       # AC3.3 (non-empty classification_reason) is preserved.
        return Classification(value=ClassificationValue.BORDERLINE, reason="unmatched")
    ```
 
-   The defensive fallback is required to honour AC3.3 ("each session row records a non-empty classification_reason"). The rule table is intended to be exhaustive; the fallback only fires if the table is misconfigured, and tests in Task 5 assert it never fires for any reasonable input combination.
+   The `unmatched` route is a deliberate output of the rule table, not a programmer-error fallback. Phase 5's render surfaces it with a distinct "Something fucky — let's go look" message, and Phase 7's triage skill tags such entries for manual review. Task 5 includes a partition-documenting test that enumerates the realistic combinations expected to land here.
 
 **Step: Verify operationally**
 
@@ -369,7 +372,12 @@ Required tests:
 
 - **`test_empty_jsonl_maps_to_borderline_empty_file`** — same shape for `EMPTY`. Covers AC3.5.
 
-- **`test_defensive_fallback_returns_borderline_unmatched`** — synthesise an input combination not covered by any rule (this requires temporarily constructing an impossible state, e.g., `LivenessState(present=False, boot_id_current=False)` paired with `pid_alive=True` — combinations that the real scanner wouldn't produce). Assert the fallback fires only when no row matches and that its reason is non-empty (AC3.3 guard).
+- **`test_unmatched_route_returns_borderline_unmatched`** — synthesise a realistic input combination that no rule covers, e.g., `TailKind.CONCLUDED + LivenessState(present=True, boot_id_current=True) + pid_alive=False` (a concluded session whose liveness file still records a now-dead PID on a still-current boot — a scan/kill race). Assert the result is `Classification(value=BORDERLINE, reason="unmatched")` with non-empty reason (AC3.3 guard).
+
+- **`test_rules_table_partition_documents_unmatched_cases`** — enumerate the input combinations expected to route to `unmatched`. For v0.1.0 the documented set is:
+  - `TailKind.CONCLUDED + LivenessState(present=True, boot_id_current=True) + pid_alive=False` (scan/kill race on a concluded session).
+  - `TailKind.UNKNOWN + LivenessState(present=True, boot_id_current=True) + pid_alive=False` is covered by `borderline_unknown_tail` — INCLUDED here only as a negative example to assert it does NOT land in `unmatched`.
+  - Any other combinations encountered during integration testing are added to this list; the test is the documentation. For each entry, parametrise: assert `classify(...)` returns `Classification(value=BORDERLINE, reason="unmatched")` for the positive cases, and the rule-specified reason for the negative cases. When a new rule is added that covers a previously-unmatched combination, remove it from the positive set in the same commit.
 
 - **`test_classify_returns_classification_value_strenum`** — assert `classify(...).value` is a member of `ClassificationValue` (a `StrEnum`) and serialises as the documented strings (`"live"`, `"hard_crash"`, etc.). Protects against silent enum renames.
 

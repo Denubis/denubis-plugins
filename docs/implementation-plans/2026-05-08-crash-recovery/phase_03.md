@@ -105,6 +105,64 @@ The module exposes:
    - Iterate `run_dir.glob("*.live")` in lexicographic order (deterministic test ordering).
    - For each, attempt `read_liveness(path)`. On `ValueError`, log a warning (use Python's `warnings.warn` with `UserWarning`) and skip — a malformed file should not abort the whole iteration.
 
+6. **`assert_local_filesystem(path: Path) -> None`** — refuses to operate on network or union filesystems where `rename(2)` atomicity is not guaranteed (NFS write+rename races, FUSE/sshfs latency, overlayfs union semantics). Raises `RuntimeError` with a clear message pointing at the `CRASH_RECOVERY_RUN_DIR` env var as the local-path override.
+
+   ```python
+   import shutil
+   import subprocess
+
+   _REFUSED_FSTYPES_EXACT = frozenset({
+       "nfs", "nfs4", "cifs", "smb3", "smbfs", "sshfs", "davfs",
+       "glusterfs", "ceph", "beegfs", "lustre", "afs", "fuse",
+   })
+   _REFUSED_FSTYPE_PREFIXES = ("fuse.",)  # fuse.<anything> — fuseiso, fuse.gvfsd, etc.
+
+   def _detect_fstype(path: Path) -> str | None:
+       """Return the filesystem type for `path` (e.g. 'ext4', 'nfs4', 'tmpfs'),
+       or None if it cannot be determined. Uses `findmnt -no FSTYPE -T <path>`
+       when available; falls back to parsing /proc/mounts."""
+       if shutil.which("findmnt"):
+           result = subprocess.run(
+               ["findmnt", "-no", "FSTYPE", "-T", str(path)],
+               capture_output=True, text=True, check=False,
+           )
+           if result.returncode == 0:
+               return result.stdout.strip() or None
+       # Fallback: longest-prefix match against /proc/mounts.
+       try:
+           mounts = Path("/proc/mounts").read_text().splitlines()
+       except OSError:
+           return None
+       resolved = str(path.resolve())
+       best_mount, best_fstype = "", None
+       for line in mounts:
+           parts = line.split()
+           if len(parts) < 3:
+               continue
+           mount_point, fstype = parts[1], parts[2]
+           if resolved == mount_point or resolved.startswith(mount_point.rstrip("/") + "/"):
+               if len(mount_point) > len(best_mount):
+                   best_mount, best_fstype = mount_point, fstype
+       return best_fstype
+
+   def assert_local_filesystem(path: Path) -> None:
+       fstype = _detect_fstype(path)
+       if fstype is None:
+           return  # Can't determine — allow; better UX than spurious refusals.
+       if fstype in _REFUSED_FSTYPES_EXACT or any(
+           fstype.startswith(p) for p in _REFUSED_FSTYPE_PREFIXES
+       ):
+           raise RuntimeError(
+               f"crash-recovery refuses to operate on {path}: filesystem type "
+               f"{fstype!r} does not provide reliable atomic-rename semantics "
+               f"(network or union filesystem). Liveness files require POSIX "
+               f"rename(2) atomicity on a local filesystem. Set CRASH_RECOVERY_RUN_DIR "
+               f"to a path on a local filesystem (ext4, btrfs, xfs, zfs, tmpfs)."
+           )
+   ```
+
+   Phase 4's `scan` CLI subcommand calls `assert_local_filesystem(ctx.run_dir)` immediately after the platform guard, so the error surfaces at the entry point with a useful diagnostic rather than during a half-completed walk.
+
 **Step: Verify operationally**
 
 ```bash
@@ -155,6 +213,12 @@ Tests (all unit):
 - **`test_list_liveness_files_tolerates_missing_directory`** — pass a `Path` that doesn't exist; assert `list(list_liveness_files(...))` is empty (no exception).
 - **`test_list_liveness_files_enumerates_distinct_pids`** — write 3 `.live` files (PIDs 100, 200, 300); assert iteration yields all three with distinct PIDs. (AC5.4)
 - **`test_list_liveness_files_skips_malformed_with_warning`** — write 1 well-formed and 1 malformed (missing key) `.live` file; assert iteration yields only 1 record and `pytest.warns(UserWarning)` fires.
+
+- **`test_assert_local_filesystem_accepts_tmp_path`** — call `assert_local_filesystem(tmp_path)`; assert no exception (tmpfs / ext4 / btrfs / xfs / zfs all acceptable). Smoke test that the happy path is silent.
+
+- **`test_assert_local_filesystem_refuses_simulated_nfs`** — monkey-patch `_detect_fstype` to return `"nfs4"`; assert `assert_local_filesystem(tmp_path)` raises `RuntimeError` whose message contains `CRASH_RECOVERY_RUN_DIR` and the fstype `nfs4`. Parametrise over the refused set: `["nfs", "nfs4", "cifs", "smb3", "sshfs", "fuse.gvfsd", "fuse.sshfs"]`.
+
+- **`test_assert_local_filesystem_silent_when_fstype_undetectable`** — monkey-patch `_detect_fstype` to return `None`; assert no exception. Documents the deliberate choice to allow rather than spuriously refuse.
 
 **Step: Verify operationally**
 

@@ -8,7 +8,17 @@
 
 **Scope:** Phase 1 of 8 from `docs/design-plans/2026-05-08-crash-recovery.md`.
 
-**Codebase verified:** 2026-05-12 (Phase 1B investigator report — crash-recovery design plan rename committed in 8c10b95; testpaths widening confirmed pending).
+**Codebase verified:** 2026-05-12 (Phase 1B investigator report).
+
+## Per-plugin test invocation convention
+
+The root `pyproject.toml` keeps `testpaths = ["tests"]`. Each uv-managed plugin package owns its own test suite and is invoked at its own project root, matching the precedent set by `plugins/denubis-plan-and-execute/scripts/workflow_statusline/`. Run tests for this plugin with:
+
+```bash
+uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
+```
+
+Why not a uv workspace or wider `testpaths`: the plugin install model copies each plugin directory standalone — users invoke the CLI via `uv run --project <plugin-path>/scripts/<pkg>`, which requires a self-contained `pyproject.toml` per plugin. A wider repo-root `testpaths` would attempt to collect plugin tests under the root environment, which does not have the per-plugin dependencies synced. Empirical check: running the workflow_statusline tests from the repo root fails on import; the existing per-plugin convention is what works.
 
 **Phase Type:** infrastructure
 
@@ -194,11 +204,10 @@ git commit -m "feat(crash-recovery): add Python package skeleton with typer entr
 <!-- END_TASK_2 -->
 
 <!-- START_TASK_3 -->
-### Task 3: Marketplace registration + testpaths widening + CHANGELOG
+### Task 3: Marketplace registration + CHANGELOG
 
 **Files:**
 - Modify: `.claude-plugin/marketplace.json` (add new entry)
-- Modify: `pyproject.toml` (repo root — widen testpaths)
 - Modify: `CHANGELOG.md` (repo root — add denubis-crash-recovery 0.1.0 section)
 
 **Step 1: Add marketplace.json entry**
@@ -230,25 +239,7 @@ Insertion point: alphabetically after `denubis-bibliography`. Preserve existing 
 
 **Verifies AC1.3:** `name`, `version`, `source`, `author`, `license` present and version string matches `plugin.json` exactly (`0.1.0`).
 
-**Step 2: Widen repo-root `pyproject.toml` testpaths**
-
-Edit `pyproject.toml` at the repo root. Change:
-
-```toml
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-```
-
-to:
-
-```toml
-[tool.pytest.ini_options]
-testpaths = ["tests", "plugins/*/scripts/*/tests"]
-```
-
-This is the change the design plan and DR2 authorised; it lets a single `uv run pytest` at the repo root pick up both `tests/test_skill_descriptions.py` and any plugin-package tests, including the ones Task 6 will add.
-
-**Step 3: Add CHANGELOG entry**
+**Step 2: Add CHANGELOG entry**
 
 Insert at the top of `CHANGELOG.md` (after the `# Changelog` heading, before the existing `## [denubis-bibliography] 0.1.0` entry):
 
@@ -261,20 +252,16 @@ New plugin. Identify and resume Claude Code sessions that ended abnormally; clas
 - `plugins/denubis-crash-recovery/` plugin scaffold (plugin.json, LICENSE, README).
 - `crash-recovery` CLI (typer-based) with `init` subcommand creating `~/.claude/crash-recovery.db` (overridable via `CRASH_RECOVERY_DB`).
 - SQLite schema for `sessions`, `scan_runs`, `classification_history` tables; WAL journal mode set persistently in init.
-
-**Changed:**
-- Repo-root `pyproject.toml` `testpaths` widened to `["tests", "plugins/*/scripts/*/tests"]` so plugin-package tests are discovered by a single repo-root `uv run pytest`. Side effect: `workflow_statusline` tests are now also collected by the root pytest invocation.
 ```
 
-**Step 4: Verify operationally**
+**Step 3: Verify operationally**
 
 ```bash
 python -c "import json; m = json.load(open('.claude-plugin/marketplace.json')); names = [p['name'] for p in m['plugins']]; assert 'denubis-crash-recovery' in names, names"
-uv run pytest --collect-only -q 2>&1 | grep -c "test_" || true   # nonzero count expected
 grep -q '^## \[denubis-crash-recovery\] 0.1.0' CHANGELOG.md
 ```
 
-**Step 5: Verify version-sync invariant (AC1.3)**
+**Step 4: Verify version-sync invariant (AC1.3)**
 
 ```bash
 python -c "
@@ -287,11 +274,11 @@ print(f'OK: version {plugin_version} matches across plugin.json and marketplace.
 "
 ```
 
-**Step 6: Commit**
+**Step 5: Commit**
 
 ```bash
-git add .claude-plugin/marketplace.json pyproject.toml CHANGELOG.md
-git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in marketplace, widen testpaths"
+git add .claude-plugin/marketplace.json CHANGELOG.md
+git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in marketplace"
 ```
 <!-- END_TASK_3 -->
 
@@ -351,7 +338,8 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
        classification        TEXT NOT NULL,
        reason                TEXT,
        classifier_version    INTEGER NOT NULL,
-       PRIMARY KEY (uuid, scan_id)
+       PRIMARY KEY (uuid, scan_id),
+       FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
    )
    """
 
@@ -490,18 +478,18 @@ git commit -m "feat(crash-recovery): add init subcommand to crash-recovery CLI"
 **Step: Verify operationally**
 
 ```bash
-uv run pytest plugins/denubis-crash-recovery/scripts/crash_recovery/tests/ -q
+uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q
 ```
 
-Expected: all tests pass.
+Expected: all tests pass. (This is the per-plugin invocation convention documented at the top of this phase; the repo-root `uv run pytest -q` still runs only `tests/` and is unaffected.)
 
-**Step: Run the full repo-root pytest to confirm testpaths widening picked these up**
+**Step: Confirm repo-root pytest is unaffected**
 
 ```bash
 uv run pytest -q
 ```
 
-Expected: the count increases by the number of tests added in this task; pre-existing tests still pass.
+Expected: pre-existing 457 tests still pass; count does NOT increase (per-plugin tests live under their own project and are not collected by the repo-root invocation).
 
 **Step: Commit**
 
@@ -520,7 +508,8 @@ git commit -m "test(crash-recovery): cover init schema, idempotency, CLI surface
 - `uv sync --project plugins/denubis-crash-recovery/scripts/crash_recovery` succeeds.
 - `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery --help` exits 0 and lists `init`.
 - `CRASH_RECOVERY_DB=/tmp/cr.db crash-recovery init` creates the DB with the three documented tables; re-running is a no-op.
-- `uv run pytest -q` at the repo root passes (pre-existing 457 + Phase 1 additions), confirming the widened testpaths picked up the new package's tests.
+- `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q` passes for the new package's tests.
+- `uv run pytest -q` at the repo root still passes (pre-existing 457 tests; root invocation is unaffected by this phase).
 - `plugin.json` and `marketplace.json` agree on version `0.1.0`; CHANGELOG carries the `[denubis-crash-recovery] 0.1.0` entry.
 
 ## Outstanding for later phases

@@ -333,7 +333,7 @@ Plugin layout follows the conventions seen in `denubis-plan-and-execute` and `de
 
 CHANGELOG entries follow the per-plugin section format `## [plugin-name] X.Y.Z` with **New:** / **Changed:** / **Fixed:** subsections — both denubis-crash-recovery's debut entry and denubis-plan-and-execute's wrapper-patch bump entry follow this format. The version-sync rule from the repo's CLAUDE.md applies: every `plugin.json` version change must update `marketplace.json` and add a CHANGELOG entry in the same commit.
 
-Tests follow the workflow_statusline precedent: pytest tests in `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/`. The repo's top-level `pyproject.toml` currently sets `testpaths = ["tests"]`, which does NOT discover nested plugin tests. Phase 1 widens this to `testpaths = ["tests", "plugins/*/scripts/*/tests"]` so a single `uv run pytest` at the repo root picks up both root tests and plugin tests (workflow_statusline tests start running as a side-effect — acceptable). Bats tests for the wrapper patch live in the repo-root `tests/` directory alongside existing wrapper tests.
+Tests follow the workflow_statusline precedent: pytest tests in `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/`, run via the per-plugin invocation `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q`. The repo's top-level `pyproject.toml` keeps `testpaths = ["tests"]`; each uv-managed plugin owns its own test suite and is invoked at its own project root. The plugin install model copies plugin directories standalone (users invoke each CLI via `uv run --project <plugin-path>/scripts/<pkg>`), so a self-contained `pyproject.toml` per plugin is required; a wider repo-root `testpaths` would attempt to collect plugin tests under the root environment, which does not have the per-plugin dependencies synced. Bats tests for the wrapper patch live in the repo-root `tests/` directory alongside existing wrapper tests.
 
 The skill ↔ CLI invocation pattern is hardcoded absolute paths, matching how workflow_statusline is configured. The skill body invokes the CLI as `uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery <subcommand>` (plugin directory is prefixed; CLI binary name remains bare).
 
@@ -355,7 +355,7 @@ The skill ↔ CLI invocation pattern is hardcoded absolute paths, matching how w
 
 **Dependencies:** None (first phase).
 
-**Done when:** `uv sync --project plugins/denubis-crash-recovery/scripts/crash_recovery` succeeds, `crash-recovery --help` lists subcommands (binary name remains bare `crash-recovery`), `crash-recovery init` creates `~/.claude/crash-recovery.db` with the documented schema, and the widened `testpaths` config in repo-root `pyproject.toml` discovers tests under `plugins/*/scripts/*/tests/`. Re-running `init` is a no-op (verified by row-count and schema-hash check).
+**Done when:** `uv sync --project plugins/denubis-crash-recovery/scripts/crash_recovery` succeeds, `crash-recovery --help` lists subcommands (binary name remains bare `crash-recovery`), `crash-recovery init` creates `~/.claude/crash-recovery.db` with the documented schema, and `uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery pytest -q` passes for the new package. Re-running `init` is a no-op (verified by row-count and schema-hash check).
 <!-- END_PHASE_1 -->
 
 <!-- START_PHASE_2 -->

@@ -70,15 +70,15 @@ Key invariants:
 - `CRASH_RECOVERY_RUN_DIR` env-var override exists so bats tests can point at a fixture directory.
 - `$$` is the wrapper's PID; guarantees per-invocation uniqueness (AC5.4 writer side).
 - `printf` (not `echo`) avoids shell-interpretation surprises in argv strings.
-- `$*` (not `$@`) records the user's argv as a single space-joined string — matches Phase 3's `_extract_resume_uuid` expectation.
-- Write goes to a `.tmp` file first; `mv` is atomic (POSIX `rename(2)` semantics) — Phase 3's parser never sees a half-written file (DR2).
-- `cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown` is defensive: on non-Linux hosts the `cat` would fail, and we'd write `boot_id=unknown`. Phase 3's `current_boot_id()` would never match, so the session would always classify as boot-mismatch — but this is the Linux-only path; non-Linux is out of design scope.
+- `$*` (not `$@`) records the user's argv as a single space-joined string. Either `$*` or `$@` works inside double-quoted `printf %s`; `$*` is chosen for explicit single-string semantics. (Phase 3's `_extract_resume_uuid` uses `shlex.split(argv)` which would handle either form — the rationale is wrapper-side clarity, not reader-side parsing.)
+- Write goes to a `.tmp` file first; `mv` is atomic (POSIX `rename(2)` semantics on the same filesystem) — Phase 3's parser never sees a half-written file.
+- `cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown` is defensive: on non-Linux hosts the `cat` would fail and we'd write `boot_id=unknown` rather than crashing the wrapper. This keeps the wrapper itself harmless cross-platform. The reader side (`crash-recovery scan`) does NOT rely on this fallback — it guards on `sys.platform == "linux"` and exits with code 2 before calling Phase 3's `current_boot_id()` (which would otherwise raise `FileNotFoundError` on non-Linux). So `boot_id=unknown` files exist only in pathological setups where the wrapper ran on Linux but `/proc/sys/kernel/random/boot_id` was unreadable — `scan` will see them and classify normally against the running kernel's boot_id (which definitionally won't match `"unknown"`, routing them to `liveness_boot_id_mismatch`).
 
-**Block B — Conditional cleanup (insert immediately AFTER `EXIT_CODE=$?` at line 90):**
+**Block B — Conditional cleanup (insert immediately BEFORE `exit $EXIT_CODE` at line 121 of the on-disk wrapper):**
 
 ```bash
 # --- crash-recovery liveness file cleanup ---
-# DR8/DR1: remove the liveness file only on clean (0) or Ctrl-C (130) exit.
+# DR8: remove the liveness file only on clean (0) or Ctrl-C (130) exit.
 # Any other code (137 SIGKILL, 139 SIGSEGV, generic non-zero) leaves the file
 # in place as evidence of an abnormal termination.
 if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ]; then
@@ -87,10 +87,13 @@ fi
 # --- end crash-recovery liveness file cleanup ---
 ```
 
+**Why insert at line 121, not immediately after `EXIT_CODE=$?` (line 90):** the on-disk wrapper has a post-session transcript-archive block (lines 92–119) that includes a `read -r` (line 106) — it pauses for the user to press Enter before archiving. If the rm-logic ran right after line 90, the liveness file would be removed *before* the user-blocking prompt. A `kill -9` of the wrapper while it sits at the prompt would then leave no liveness file behind, masking AC5.3's signal that the wrapper was killed abnormally. Inserting just before `exit $EXIT_CODE` preserves the file across the transcript-archive prompt and only removes it once we're committed to a clean exit.
+
 Key invariants:
 - The check is exit-status based, NOT signal-trap based. This is DR8: a `trap EXIT` would fire on the wrapper's clean exit-after-child-death (AC5.5), silently removing the file even though Claude was killed.
 - `rm -f` tolerates the file already being absent (defensive — though it should always exist by Block A's write).
 - This block is unreachable if the wrapper itself is SIGKILLed (AC5.3) — `rm` never runs, file stays. The bats test for this case asserts the file persists.
+- Known limitation: the existing bats fixture exits the stub `claude` immediately, so it never exercises the transcript-archive path. AC5.3's "wrapper SIGKILLed during transcript prompt" sub-scenario is therefore not covered by automated tests; it is verified manually via the Phase 8 UAT runbook. Accepted gap for v1.0.0.
 
 **Step: Verify operationally**
 
@@ -241,7 +244,7 @@ EOF
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 0 ]
 }
 
-@test "DR3 — user-supplied argv is recorded verbatim" {
+@test "wrapper records user-supplied argv verbatim in the liveness file" {
   cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
 #!/usr/bin/env bash
 sleep 2
@@ -256,7 +259,7 @@ EOF
   wait "$wrapper_pid"
 }
 
-@test "DR2 — liveness file appears atomically (no .tmp file at target path)" {
+@test "wrapper writes liveness file atomically via tempfile + mv (no .tmp residue)" {
   # Asserts no .tmp file persists at the target path under any timing.
   REAL_CLAUDE="$CR_TEST_DIR/fake-claude.sh" FAKE_CLAUDE_EXIT_CODE=0 "$WRAPPER" --print "test"
   # After completion, no .tmp leftovers
@@ -307,8 +310,10 @@ Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claud
 - `claude-wrapper.sh`: write `~/.claude/run/$$.live` at startup (atomic via temp+mv), inspect Claude's exit status post-invocation, conditionally remove the liveness file.
 
 **Compatibility:**
-- Requires Linux (reads `/proc/sys/kernel/random/boot_id`). On non-Linux hosts, the wrapper still works but writes `boot_id=unknown` — crash-recovery's classifier will treat all such sessions as boot-mismatched on the next scan.
-- `CRASH_RECOVERY_RUN_DIR` env-var overrides the default `~/.claude/run/` path (used in tests).
+- The wrapper itself runs cross-platform: on non-Linux hosts the `cat /proc/sys/kernel/random/boot_id` falls through to `echo unknown`, so the wrapper writes `boot_id=unknown` rather than crashing.
+- `crash-recovery scan` (the reader side, in the `denubis-crash-recovery` plugin) is Linux-only by design — it exits with code 2 and a clear error on non-Linux platforms. The wrapper-side fallback exists so that the `denubis-plan-and-execute` plugin remains usable on macOS / BSD for the rest of its features.
+- `crash-recovery scan` also refuses to run when `CRASH_RECOVERY_RUN_DIR` is on a network or union filesystem (NFS, CIFS, sshfs, FUSE-family, etc.) because the atomic-rename semantics liveness-file writes depend on are not guaranteed there. The wrapper itself does NOT make this check — it just writes the file; the reader-side guard catches the unsafe configuration before any scan-time damage.
+- `CRASH_RECOVERY_RUN_DIR` env-var overrides the default `~/.claude/run/` path (used in tests, and as the workaround for users whose `$HOME` is network-mounted).
 
 ```
 
@@ -369,11 +374,10 @@ First user-ready release. Identifies and resumes Claude Code sessions that ended
 - SQLite schema: `sessions`, `scan_runs`, `classification_history` with `classifier_version` column for forward-compat re-classification.
 - Deterministic rule table; one assertion per row via parametrised tests.
 - Atomic resume-file write (`tempfile + os.replace`).
-- Repo-root `testpaths` widened to `["tests", "plugins/*/scripts/*/tests"]` so a single `uv run pytest` discovers plugin-package tests.
 
 **Requires:**
 - `denubis-plan-and-execute ≥ 2.32.2` for the wrapper patch.
-- Linux for `/proc/sys/kernel/random/boot_id`-based reboot detection (the plugin runs on non-Linux but classifies all sessions as boot-mismatched).
+- Linux for the `scan` subcommand: it reads `/proc/sys/kernel/random/boot_id` for reboot detection and exits with code 2 on non-Linux platforms. The remaining subcommands (`init`, `render`, `triage`, `note`, `history`, `prune`, `list-live`) are filesystem/DB-only and run anywhere — but `triage` invokes `scan` internally, so the practical effect is "this plugin needs Linux".
 
 **Out of scope (future plans):**
 - byobu/tmux-resurrect helpers.
@@ -531,7 +535,7 @@ git commit -m "docs(crash-recovery): finalise UAT runbooks for AC5.6 and AC6.4"
 ## Phase 8 Done When
 
 - `plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh` writes a liveness file at startup (atomically) and conditionally removes it based on Claude's exit code.
-- bats lifecycle tests pass for all 10 cases (AC5.1 four-key check, AC5.2 × 2 clean-exit paths, AC5.3 wrapper-SIGKILL, AC5.4 × concurrent, AC5.5 × 3 abnormal exits, DR3 argv recording, DR2 atomic write).
+- bats lifecycle tests pass for all 10 cases: AC5.1 four-key check; AC5.2 × 2 clean-exit paths; AC5.3 wrapper-SIGKILL; AC5.4 concurrent wrappers; AC5.5 × 3 abnormal exits; argv-verbatim recording; atomic tempfile-then-mv write.
 - `denubis-plan-and-execute` bumped to 2.32.2 with marketplace + CHANGELOG.
 - `denubis-crash-recovery` bumped to 1.0.0 with marketplace + CHANGELOG; README `<PHASE-8-VERSION>` filled with `2.32.2`.
 - Version-sync invariant verified (AC8.2): both plugins' plugin.json + marketplace.json agree.
@@ -544,5 +548,5 @@ git commit -m "docs(crash-recovery): finalise UAT runbooks for AC5.6 and AC6.4"
 This is the final implementation phase. The next steps are:
 - **Finalization**: code-reviewer pass over all eight phase files (this implementation plan's tracked Finalization task).
 - **Test Requirements**: generate `test-requirements.md` mapping every AC to its automated test path.
-- **UAT Requirements**: collate `uat-requirements.md` from the three UAT entries produced across phases (Phase 7 DR2 + Phase 8 AC5.6 + Phase 8 AC6.4).
+- **UAT Requirements**: collate `uat-requirements.md` from the three UAT entries produced across phases (Phase 7 prune-prompt clarity + Phase 8 AC5.6 + Phase 8 AC6.4).
 - **Execution handoff**: hand the plan to `executing-an-implementation-plan` with verified absolute paths.
