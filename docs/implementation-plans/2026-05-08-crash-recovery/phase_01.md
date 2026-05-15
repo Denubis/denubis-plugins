@@ -24,6 +24,8 @@ Each plugin keeps its own `pyproject.toml`, so the install model is unchanged: `
 
 **Phase Type:** infrastructure
 
+The canonical data-model description (ERD-equivalent tables, relationships, constraint rationale, concurrency model) lives at `docs/architecture/database.md`.
+
 ---
 
 ## Acceptance Criteria Coverage
@@ -305,9 +307,19 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
 1. **Module-level constants** for the schema (DDL strings) — one per table, plus an `ALL_DDL` tuple for the init code to iterate. Match the design's Data Model verbatim:
 
    ```python
-   SESSIONS_DDL = """
+   # Allowed classification values — shared by CHECK constraints and Phase 2 classifier.
+   CLASSIFICATION_VALUES: tuple[str, ...] = (
+       "live",
+       "hard_crash",
+       "concluded",
+       "irrecoverable",
+       "borderline+ambiguous_match",
+       "borderline+malformed_tail",
+   )
+
+   SESSIONS_DDL = f"""
    CREATE TABLE IF NOT EXISTS sessions (
-       uuid                  TEXT PRIMARY KEY,
+       uuid                  TEXT PRIMARY KEY NOT NULL,
        project_path          TEXT NOT NULL,
        cwd                   TEXT NOT NULL,
        jsonl_path            TEXT,
@@ -319,7 +331,8 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
        state_summary         TEXT,
        first_seen            INTEGER NOT NULL,
        last_scanned          INTEGER NOT NULL,
-       user_notes            TEXT
+       user_notes            TEXT,
+       CHECK (classification IN ({', '.join(f"'{v}'" for v in CLASSIFICATION_VALUES)}))
    )
    """
 
@@ -333,7 +346,7 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
    )
    """
 
-   CLASSIFICATION_HISTORY_DDL = """
+   CLASSIFICATION_HISTORY_DDL = f"""
    CREATE TABLE IF NOT EXISTS classification_history (
        uuid                  TEXT NOT NULL,
        scan_id               INTEGER NOT NULL,
@@ -341,7 +354,9 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
        reason                TEXT,
        classifier_version    INTEGER NOT NULL,
        PRIMARY KEY (uuid, scan_id),
-       FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
+       FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE,
+       FOREIGN KEY (scan_id) REFERENCES scan_runs(id) ON DELETE RESTRICT,
+       CHECK (classification IN ({', '.join(f"'{v}'" for v in CLASSIFICATION_VALUES)}))
    )
    """
 

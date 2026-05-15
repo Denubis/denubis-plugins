@@ -141,13 +141,13 @@ The orchestrating skill (`denubis-crash-recovery:triage`) is a thin wrapper: inv
 
 ```
 sessions
-  uuid                  TEXT PRIMARY KEY    -- claude session UUID (NULL allowed for irrecoverable rows; see note)
+  uuid                  TEXT PRIMARY KEY NOT NULL  -- claude session UUID; NOT NULL declared explicitly (SQLite quirk: TEXT PK is not implicitly NOT NULL)
   project_path          TEXT NOT NULL       -- decoded ~/.claude/projects/<encoded>/ → /home/brian/...
   cwd                   TEXT NOT NULL       -- working directory for `claudew --resume`
   jsonl_path            TEXT                -- absolute path; NULL if no JSONL ever written
   jsonl_mtime           INTEGER             -- unix epoch; for cache invalidation
   jsonl_last_ts         INTEGER             -- last-entry timestamp inside the JSONL
-  classification        TEXT NOT NULL       -- enum: hard_crash | borderline | concluded | live | irrecoverable
+  classification        TEXT NOT NULL       -- CHECK: live | hard_crash | concluded | irrecoverable | borderline+ambiguous_match | borderline+malformed_tail
   classification_reason TEXT                -- short machine-generated reason
   classifier_version    INTEGER NOT NULL    -- version of the rule table used; scan re-classifies stale rows
   state_summary         TEXT                -- 1-line render of the last few entries
@@ -158,17 +158,19 @@ sessions
 scan_runs
   id                    INTEGER PRIMARY KEY
   ts                    INTEGER NOT NULL
-  live_pids             TEXT                -- JSON array of currently-live PIDs at scan time
+  live_pids             TEXT                -- JSON-encoded array of integers; write-only audit field; never queried per-element
   sessions_scanned      INTEGER
-  classifier_version    INTEGER NOT NULL    -- version active during this run
+  classifier_version    INTEGER NOT NULL    -- version active during this run; denormalised onto classification_history to allow stale-row detection without a join
 
 classification_history
   uuid                  TEXT NOT NULL
   scan_id               INTEGER NOT NULL
-  classification        TEXT NOT NULL
+  classification        TEXT NOT NULL       -- CHECK: same enum as sessions.classification
   reason                TEXT
-  classifier_version    INTEGER NOT NULL
+  classifier_version    INTEGER NOT NULL    -- denormalised; enables stale-row queries without joining scan_runs
   PRIMARY KEY (uuid, scan_id)
+  FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
+  FOREIGN KEY (scan_id) REFERENCES scan_runs(id) ON DELETE RESTRICT  -- scan_runs rows are never deleted; RESTRICT documents intent
 ```
 
 **Liveness file format** (at `~/.claude/run/<wrapper-pid>.live`, one file per running wrapper):

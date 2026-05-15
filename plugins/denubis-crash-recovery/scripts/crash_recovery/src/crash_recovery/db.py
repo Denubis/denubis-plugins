@@ -8,6 +8,13 @@ Data Model verbatim.
 Boundary validation: ``open_db()`` asserts WAL journal mode is set so callers
 never operate on a DB that was created without ``crash-recovery init`` (or one
 that was downgraded to ``delete`` mode out-of-band).
+
+``scan_runs.live_pids`` is a JSON-encoded array of integers stored as TEXT;
+it is a write-only audit field recorded at scan time and never queried per-element.
+
+``classifier_version`` is denormalised onto ``classification_history`` so the
+re-classify-stale-rows query (Phase 4) can detect stale rows without joining
+``scan_runs``.
 """
 
 from __future__ import annotations
@@ -17,9 +24,27 @@ import os
 import sqlite3
 from pathlib import Path
 
-SESSIONS_DDL = """
+# Allowed values for the ``classification`` column in both ``sessions`` and
+# ``classification_history``.  Defined here so CHECK constraints and the Phase 2
+# classifier share one source of truth.
+CLASSIFICATION_VALUES: tuple[str, ...] = (
+    "live",
+    "hard_crash",
+    "concluded",
+    "irrecoverable",
+    "borderline+ambiguous_match",
+    "borderline+malformed_tail",
+)
+
+_CLASSIFICATION_CHECK = (
+    "CHECK (classification IN ("
+    + ", ".join(f"'{v}'" for v in CLASSIFICATION_VALUES)
+    + "))"
+)
+
+SESSIONS_DDL = f"""
 CREATE TABLE IF NOT EXISTS sessions (
-    uuid                  TEXT PRIMARY KEY,
+    uuid                  TEXT PRIMARY KEY NOT NULL,
     project_path          TEXT NOT NULL,
     cwd                   TEXT NOT NULL,
     jsonl_path            TEXT,
@@ -31,7 +56,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     state_summary         TEXT,
     first_seen            INTEGER NOT NULL,
     last_scanned          INTEGER NOT NULL,
-    user_notes            TEXT
+    user_notes            TEXT,
+    {_CLASSIFICATION_CHECK}
 )
 """
 
@@ -45,7 +71,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
 )
 """
 
-CLASSIFICATION_HISTORY_DDL = """
+CLASSIFICATION_HISTORY_DDL = f"""
 CREATE TABLE IF NOT EXISTS classification_history (
     uuid                  TEXT NOT NULL,
     scan_id               INTEGER NOT NULL,
@@ -53,7 +79,9 @@ CREATE TABLE IF NOT EXISTS classification_history (
     reason                TEXT,
     classifier_version    INTEGER NOT NULL,
     PRIMARY KEY (uuid, scan_id),
-    FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE
+    FOREIGN KEY (uuid) REFERENCES sessions(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (scan_id) REFERENCES scan_runs(id) ON DELETE RESTRICT,
+    {_CLASSIFICATION_CHECK}
 )
 """
 
@@ -96,6 +124,8 @@ def open_db(path: Path) -> sqlite3.Connection:
     Defensive boundary: a DB that is not in WAL mode was not produced by
     ``init()``. Surfacing this as a ``RuntimeError`` here keeps every downstream
     caller (scan, render, note, prune) from having to re-check.
+
+    The caller owns the returned connection and must close it.
     """
     conn = sqlite3.connect(path)
     mode_row = conn.execute("PRAGMA journal_mode").fetchone()

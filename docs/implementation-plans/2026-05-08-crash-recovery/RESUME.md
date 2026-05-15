@@ -144,7 +144,7 @@ These are falsification anchors. If any of these stops being true after edits, h
 - `unmatched` reason has a render message and a triage-skill entry that mention manual review.
 - Every reference to `boot_id_current` shows the comparison site, not just the field declaration.
 - No bats test name or README sentence starts with `"DR<n> —"` except where it correctly cites an actual design plan DR.
-- Root `pyproject.toml`'s `testpaths` is still `["tests"]` after Phase 1's edits.
+- ~~Root `pyproject.toml`'s `testpaths` is still `["tests"]` after Phase 1's edits.~~ (superseded — see Task #11)
 - `classification_history` has the FK on `uuid` with `ON DELETE CASCADE`.
 - Phase 4's concurrent-scan test asserts `== 2` rows, not `1 or 2`.
 - No reference to `current_boot_id()` returning `"unknown"` survives anywhere (we picked fail-fast, not defensive fallback).

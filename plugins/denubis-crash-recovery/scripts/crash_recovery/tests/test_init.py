@@ -20,11 +20,13 @@ from crash_recovery import db
 # ``(name, type, notnull)`` where ``notnull`` is 1 if the column is NOT NULL.
 # PRAGMA table_info returns rows shaped as
 # (cid, name, type, notnull, dflt_value, pk); we project the three we care
-# about. PRIMARY KEY columns are implicitly NOT NULL only for INTEGER PK;
-# TEXT PRIMARY KEY in SQLite is *not* enforced as NOT NULL unless declared,
-# so ``uuid`` shows notnull=0 here — that matches the design's DDL.
+# about. SQLite does NOT enforce NOT NULL on TEXT PRIMARY KEY by default
+# (documented quirk: only INTEGER PRIMARY KEY is implicitly NOT NULL).
+# We explicitly declare NOT NULL on ``uuid`` *because of* this quirk, to make
+# the invariant visible in the schema and enforceable by the DB engine.
+# As a result ``uuid`` shows notnull=1 in PRAGMA table_info.
 _EXPECTED_SESSIONS_COLUMNS: tuple[tuple[str, str, int], ...] = (
-    ("uuid", "TEXT", 0),
+    ("uuid", "TEXT", 1),
     ("project_path", "TEXT", 1),
     ("cwd", "TEXT", 1),
     ("jsonl_path", "TEXT", 0),
@@ -207,3 +209,115 @@ class TestCliInit:
         assert result.returncode == 0, (result.stdout, result.stderr)
         assert opt_path.exists(), f"DB not created at --db path {opt_path}"
         assert not env_path.exists(), "Env var path should have been overridden"
+
+
+# ---------------------------------------------------------------------------
+# Constraint enforcement
+# ---------------------------------------------------------------------------
+class TestConstraints:
+    def test_sessions_classification_check_rejects_invalid_value(
+        self, tmp_db_path: Path
+    ) -> None:
+        """CHECK on sessions.classification rejects values not in CLASSIFICATION_VALUES."""
+        db.init(tmp_db_path)
+        conn = db.open_db(tmp_db_path)
+        try:
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO sessions (
+                        uuid, project_path, cwd, classification,
+                        classifier_version, first_seen, last_scanned
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "test-uuid-1",
+                        "/some/project",
+                        "/some/cwd",
+                        "hard-crash",  # typo: hyphen instead of underscore
+                        1,
+                        1_000_000,
+                        1_000_000,
+                    ),
+                )
+                conn.commit()
+        finally:
+            conn.close()
+
+    def test_classification_history_classification_check_rejects_invalid_value(
+        self, tmp_db_path: Path
+    ) -> None:
+        """CHECK on classification_history.classification rejects invalid values."""
+        db.init(tmp_db_path)
+        conn = db.open_db(tmp_db_path)
+        try:
+            # Insert prerequisite session and scan_runs rows.
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, classification,
+                    classifier_version, first_seen, last_scanned
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                ("test-uuid-2", "/p", "/c", "live", 1, 1_000_000, 1_000_000),
+            )
+            conn.execute(
+                "INSERT INTO scan_runs (ts, classifier_version) VALUES (?, ?)",
+                (1_000_000, 1),
+            )
+            scan_id = conn.execute(
+                "SELECT id FROM scan_runs ORDER BY id DESC LIMIT 1"
+            ).fetchone()[0]
+            conn.commit()
+
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO classification_history
+                        (uuid, scan_id, classification, classifier_version)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("test-uuid-2", scan_id, "LIVE", 1),  # wrong case
+                )
+                conn.commit()
+        finally:
+            conn.close()
+
+    def test_classification_history_scan_id_fk_is_restrict(
+        self, tmp_db_path: Path
+    ) -> None:
+        """ON DELETE RESTRICT on scan_id prevents deleting a scan_runs row that has history."""
+        db.init(tmp_db_path)
+        conn = db.open_db(tmp_db_path)
+        try:
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, classification,
+                    classifier_version, first_seen, last_scanned
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                ("test-uuid-3", "/p", "/c", "live", 1, 1_000_000, 1_000_000),
+            )
+            conn.execute(
+                "INSERT INTO scan_runs (ts, classifier_version) VALUES (?, ?)",
+                (1_000_000, 1),
+            )
+            scan_id = conn.execute(
+                "SELECT id FROM scan_runs ORDER BY id DESC LIMIT 1"
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO classification_history
+                    (uuid, scan_id, classification, classifier_version)
+                VALUES (?, ?, ?, ?)
+                """,
+                ("test-uuid-3", scan_id, "live", 1),
+            )
+            conn.commit()
+
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute("DELETE FROM scan_runs WHERE id = ?", (scan_id,))
+                conn.commit()
+        finally:
+            conn.close()

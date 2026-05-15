@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
-import typing as _t
 from pathlib import Path
 
 import pytest
