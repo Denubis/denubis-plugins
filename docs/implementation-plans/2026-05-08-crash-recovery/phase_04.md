@@ -8,7 +8,7 @@
 
 **Scope:** Phase 4 of 8 from `docs/design-plans/2026-05-08-crash-recovery.md`.
 
-**Codebase verified:** 2026-05-13. Phase 1 db.py (init, open_db, schema_hash) is consumable; Phase 2 (TailSummary, classify) and Phase 3 (Liveness, correlate) provide the read-side primitives. SQLite ≥3.43 (bundled with Python 3.12) supports `INSERT … ON CONFLICT(uuid) DO UPDATE` upserts.
+**Codebase verified:** 2026-05-13. Phase 1 db.py (init, open_db, _schema_hash) is consumable; Phase 2 (TailSummary, classify) and Phase 3 (Liveness, correlate) provide the read-side primitives. SQLite ≥3.43 (bundled with Python 3.12) supports `INSERT … ON CONFLICT(uuid) DO UPDATE` upserts.
 
 **Phase Type:** functionality
 

@@ -105,7 +105,7 @@ Schema changes are coupled to `CLASSIFIER_VERSION` (defined in Phase 2's `crash_
 1. Add the new value to `db.py::CLASSIFICATION_VALUES`.
 2. Provide an `ALTER TABLE` migration that recreates the CHECK constraint from the updated `_CLASSIFICATION_CHECK`. SQLite supports CHECK changes only via table-rebuild (create temp table with the new CHECK, copy rows, drop original, rename) — `init()` is not the migration mechanism.
 3. Bump `CLASSIFIER_VERSION`; existing rows stamped with the old version are flagged stale by Phase 4's orphan sweep and re-classified on next `scan`.
-4. `schema_hash()` will change after the migration — that's expected. It's a test-time helper, not a production invariant; only the idempotency test in `tests/test_init.py` consults it, and a migration test should treat `schema_hash` as a fingerprint that changes when the schema changes (which is the desired behaviour).
+4. `_schema_hash()` will change after the migration — that's expected. It's a test-time helper (underscore prefix marks it module-private), not a production invariant; only the idempotency test in `tests/test_init.py` consults it, and a migration test should treat `_schema_hash` as a fingerprint that changes when the schema changes (which is the desired behaviour).
 
 `init()` itself remains idempotent across re-runs of the same schema version. Migrations are a separate code path tied to version bumps and live alongside the version that introduces them.
 

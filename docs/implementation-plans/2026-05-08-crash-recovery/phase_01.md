@@ -369,7 +369,7 @@ git commit -m "feat(crash-recovery): register denubis-crash-recovery 0.1.0 in ma
 
 4. **`open_db(path: Path) -> sqlite3.Connection`** — opens a connection, asserts `PRAGMA journal_mode` returns `'wal'`, raises `RuntimeError("crash-recovery DB at {path} is not in WAL mode; re-run `crash-recovery init`")` on mismatch, enables `PRAGMA foreign_keys = ON`, returns the connection. Used by all subsequent phases that read or write the DB.
 
-5. **`schema_hash(conn: sqlite3.Connection) -> str`** — returns SHA-256 (hex) of the concatenated `(name, sql)` rows of `sqlite_master` ordered by name. Used by tests for AC2.4 idempotency verification. Pure read-only helper.
+5. **`_schema_hash(conn: sqlite3.Connection) -> str`** — returns SHA-256 (hex) of the concatenated `(name, sql)` rows of `sqlite_master` ordered by name. Test-only helper (underscore prefix marks it module-private); consumed by `test_init.py::TestInitIsIdempotent::test_init_is_idempotent` for AC2.4 idempotency verification. Pure read-only.
 
 **Step: Verify operationally**
 
@@ -391,7 +391,7 @@ with tempfile.TemporaryDirectory() as td:
 
 ```bash
 git add plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/db.py
-git commit -m "feat(crash-recovery): add db module with schema DDL, init, open_db, schema_hash"
+git commit -m "feat(crash-recovery): add db module with schema DDL, init, open_db, _schema_hash"
 ```
 <!-- END_TASK_4 -->
 
@@ -475,7 +475,7 @@ git commit -m "feat(crash-recovery): add init subcommand to crash-recovery CLI"
 
 - **crash-recovery.AC2.3 (init creates schema):** `test_init_creates_documented_schema` — call `db.init(tmp_db_path)`, open the DB, query `sqlite_master` for tables named `sessions`, `scan_runs`, `classification_history`, assert all three present. Then for the `sessions` table specifically, query `PRAGMA table_info(sessions)` and assert every column from the design's Data Model is present with the documented type/NOT-NULL flag. Test type: unit (touches sqlite directly, no subprocess).
 
-- **crash-recovery.AC2.4 (idempotency via row-count and schema-hash):** `test_init_is_idempotent` — call `db.init(tmp_db_path)`, capture `schema_hash(conn)` and row counts for all three tables (expected: 0 each); call `db.init(tmp_db_path)` a second time on the same path; capture hash and counts again; assert both unchanged. Test type: unit.
+- **crash-recovery.AC2.4 (idempotency via row-count and schema-hash):** `test_init_is_idempotent` — call `db.init(tmp_db_path)`, capture `_schema_hash(conn)` and row counts for all three tables (expected: 0 each); call `db.init(tmp_db_path)` a second time on the same path; capture hash and counts again; assert both unchanged. Test type: unit.
 
 - **crash-recovery.AC2.5 (unknown subcommand exits non-zero with `--help` hint):** `test_unknown_subcommand_exits_nonzero` — invoke the CLI as a subprocess with `crash-recovery wibble`; assert exit code is non-zero and stderr contains the substring `--help` (typer's default error message includes this). Test type: integration (uses subprocess).
 
