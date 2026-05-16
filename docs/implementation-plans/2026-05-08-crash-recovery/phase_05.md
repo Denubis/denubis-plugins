@@ -78,6 +78,8 @@ The module exposes:
 
    These three sets MUST be disjoint and MUST exhaustively cover every reason emitted by Phase 2's `RULES` plus Phase 4's `ambiguous_match` override. A separate test (Task 6) asserts this partition.
 
+   **Reason-level visibility anchor** (recorded after Phase 2 proleptic challenge CA1, 2026-05-16): Phase 2's deny-list filter (keep `assistant`/`user`, drop everything else) is "conservatively safe" only if Phase 5's render makes `borderline/unknown_tail_kind` cases distinguishable from other borderline outcomes — otherwise an unknown future JSONL `type` field silently lands in a generic borderline bucket the user does not investigate. The section partition (`SectionKey.NEEDS_INVESTIGATION` vs `AMBIGUOUS_CORRELATION` vs `IDLE_LIVE_KILLED`) gives one layer of granularity. The row-level render MUST surface `classification_reason` so a reader can tell `unknown_tail_kind` apart from `malformed_tail` or `no_liveness_dangling_tool_use`. Confirm this when Task 4's row format is finalised — if reasons are not surfaced row-level, the deny-list visibility claim is aspirational rather than operational.
+
 2. **`Section`** — frozen dataclass with section metadata:
 
    ```python

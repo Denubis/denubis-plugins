@@ -135,6 +135,8 @@ The module exposes:
        return classify(fact.tail_summary, ls, fact.pid_alive_value)
    ```
 
+   **Boundary-contract invariant** (recorded after Phase 2 proleptic challenge CA2, 2026-05-16): `classify()` raises `ValueError` if `LivenessState.present=True` is paired with `pid_alive=None`. The two construction sites in `_walk_sessions` already honour this — the liveness-walk path sets `pid_alive_value=pid_alive(liveness.pid)` (which Phase 3 guarantees returns `bool`, never `None`), and the JSONL-only path sets `liveness=None` together with `pid_alive_value=None` (so `LivenessState.present=False` and the ValueError doesn't fire). Phase 3's `pid_alive()` contract MUST guarantee bool-return; Phase 4 does not catch the `ValueError` deliberately — if it fires, the scan crashes loudly rather than silently producing wrong classifications, surfacing a Phase 3 contract violation immediately.
+
    When `_walk_sessions` builds a `SessionFact` for an ambiguous-correlation candidate, it constructs the `TailSummary` with `state_summary=f"ambiguous match: {', '.join(candidates)}"` at construction time (TailSummary is frozen — no mutation possible; the field is set via the constructor). The override path then propagates that pre-set `state_summary` through into the `sessions.state_summary` column per AC6.3.
 
    Pseudocode for the walk's ambiguous-correlation branch:

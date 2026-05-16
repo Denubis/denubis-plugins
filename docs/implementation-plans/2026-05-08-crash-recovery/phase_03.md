@@ -481,6 +481,8 @@ git commit -m "test(crash-recovery): cover correlate for argv-resume, mtime-matc
 
 - `crash_recovery.liveness` exposes `Liveness`, `read_liveness`, `current_boot_id`, `pid_alive`, `list_liveness_files`. Parser handles all four design-required keys plus tolerates extras.
 - `crash_recovery.correlate` exposes `CorrelationResult` and `correlate()`. Argv-resume direct match wins when both argv UUID and `<uuid>.jsonl` are present; mtime-window fallback returns single match, ambiguous, or no_match.
+- `pid_alive(pid)` returns `bool` and never `None` — its return type is `bool`, not `bool | None`. On platform/permission errors (`OSError` from `os.kill(pid, 0)` for reasons other than "no such process"), it logs the error and returns `False` (conservative: treat-as-dead). This contract is **load-bearing**: Phase 2's `classify()` raises `ValueError` if passed `pid_alive=None` together with `liveness_state.present=True`, so any code path producing `pid_alive=None` for a liveness-present session crashes the scan. Phase 4 relies on this contract to safely call `classify()` for every session with `liveness is not None`. Recorded after Phase 2 proleptic challenge (CA2, 2026-05-16).
+- A unit test pins the error-handling contract: `pid_alive(some_pid)` under a patched `os.kill` raising `PermissionError` returns `False` and does not propagate the exception.
 - All Phase 3 tests pass; repo-root `uv run pytest -q` passes (Phases 1–3 cumulative).
 
 ## Outstanding for later phases
