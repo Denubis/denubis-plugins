@@ -33,20 +33,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-# Top-level ``type`` values that are bookkeeping per the Phase 2B
-# investigation. Filtered out before the tail-shape walk so that, e.g., a
-# hook-success attachment doesn't mask the tool_result that follows it.
-_BOOKKEEPING_TYPES: frozenset[str] = frozenset(
-    {
-        "system",
-        "attachment",
-        "file-history-snapshot",
-        "last-prompt",
-        "ai-title",
-        "permission-mode",
-        "progress",
-    }
-)
+# Allow-list of top-level ``type`` values that carry real signal. Everything
+# else is treated as bookkeeping and dropped before the tail-shape walk.
+#
+# Deny-list approach (Phase 2 review, 2026-05-16): earlier allow-list held
+# ``{"assistant", "user", "system", "attachment", ...}`` but empirical
+# verification found ``custom-title``, ``agent-name``, ``agent-color``, and
+# ``pr-link`` at the tails of main-session JSONLs — types the Phase 2B
+# investigator's allow-list did not record. A smoking-gun session ended with
+# 5 bookkeeping entries; the allow-list would have walked back through 3
+# unfiltered ones and mis-classified a cleanly-concluded session as
+# ``borderline_unknown_tail``. The deny-list is robust to new bookkeeping
+# types Claude Code adds in future: any unknown ``type`` is conservatively
+# filtered so it can never silently mask a concluded-tail signal. The failure
+# mode runs the other direction (a future *real* type would be misclassified
+# as bookkeeping) but that failure is visible (session falls to UNKNOWN /
+# borderline) rather than silent.
+_REAL_TYPES: frozenset[str] = frozenset({"assistant", "user"})
 
 
 class TailKind(Enum):
@@ -291,7 +294,7 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
     total_entries = len(parsed)
 
     # --- Drop bookkeeping entries before walking the tail ----------------
-    filtered = [e for e in parsed if e.get("type") not in _BOOKKEEPING_TYPES]
+    filtered = [e for e in parsed if e.get("type") in _REAL_TYPES]
 
     if not filtered:
         # All entries in the window were bookkeeping; we have no signal.

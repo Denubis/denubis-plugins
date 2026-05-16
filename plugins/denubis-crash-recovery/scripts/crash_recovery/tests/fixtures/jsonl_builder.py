@@ -133,6 +133,35 @@ def make_malformed_tail(path: Path) -> None:
     path.write_text(body)
 
 
+def make_bookkeeping_only_tail(path: Path) -> None:
+    """Assistant end_turn entry followed by 4 bookkeeping entries.
+
+    Types ``custom-title``, ``agent-name``, ``agent-color``, and
+    ``permission-mode`` were observed at real session tails on 2026-05-16.
+    The original allow-list filter did not record these types, so it would
+    have walked back through them and mis-classified the session as UNKNOWN.
+    The deny-list approach (_REAL_TYPES) correctly filters them out, leaving
+    the ``assistant`` end_turn entry as the last real signal → CONCLUDED.
+    """
+    _write(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "done"}],
+                },
+            },
+            {"type": "custom-title", "timestamp": FIXED_TS, "title": "My session"},
+            {"type": "agent-name", "timestamp": FIXED_TS, "name": "Claude"},
+            {"type": "agent-color", "timestamp": FIXED_TS, "color": "#abc"},
+            {"type": "permission-mode", "timestamp": FIXED_TS, "mode": "default"},
+        ],
+    )
+
+
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
     """Assistant tool_use → attachment (bookkeeping) → user tool_result → assistant end_turn.
 

@@ -21,6 +21,7 @@ from fixtures.jsonl_builder import (
     make_agent_dispatch_no_result,
     make_ask_question_no_reply,
     make_attachment_interleaved_then_concluded,
+    make_bookkeeping_only_tail,
     make_concluded,
     make_empty,
     make_malformed_tail,
@@ -131,3 +132,22 @@ def test_parse_tail_returns_tail_summary_instance(tmp_path: Path) -> None:
     p = tmp_path / "ok.jsonl"
     make_concluded(p)
     assert isinstance(parse_tail(p), TailSummary)
+
+
+def test_bookkeeping_only_tail_walks_past_to_real_signal(tmp_path: Path) -> None:
+    """Deny-list filter regression: bookkeeping entries after end_turn are dropped.
+
+    The smoking-gun case: an assistant ``end_turn`` entry followed by
+    ``custom-title``, ``agent-name``, ``agent-color``, and ``permission-mode``
+    entries (types observed at real session tails on 2026-05-16). The
+    allow-list filter would have walked back through those unfiltered entries
+    and mis-classified the session as UNKNOWN → borderline_unknown_tail. The
+    deny-list (_REAL_TYPES) correctly filters them out, leaving the
+    ``assistant`` end_turn as the last real signal → CONCLUDED.
+    """
+    p = tmp_path / "bookkeeping_tail.jsonl"
+    make_bookkeeping_only_tail(p)
+    summary = parse_tail(p)
+    assert summary.kind is TailKind.CONCLUDED, (
+        f"expected CONCLUDED after deny-list strips bookkeeping tail, got {summary.kind}"
+    )
