@@ -133,10 +133,19 @@ def test_current_boot_id_returns_kernel_value() -> None:
     assert current_boot_id() == expected
 
 
-def test_current_boot_id_is_lowercase() -> None:
-    """Defensive normalisation: the return value is always lowercase."""
-    value = current_boot_id()
-    assert value == value.lower()
+def test_current_boot_id_lowercases_uppercase_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Defensive normalisation: an uppercase kernel value is lowercased on return.
+
+    The kernel writes the boot-id lowercase in practice, so the live-value
+    test above can only confirm "happens to be lowercase". Patch the path
+    read to return an uppercase synthetic UUID and confirm the function's
+    own ``.lower()`` actually runs. Replaces a prior tautological assertion
+    (``value == value.lower()`` is trivially true for any already-lowercase
+    string). Coherence review L1 (2026-05-16).
+    """
+    upper_uuid = "8B2F4A3D-6C0E-4F1A-9D2B-7E3C5A8B1C4D"
+    monkeypatch.setattr(Path, "read_text", lambda self, *_a, **_kw: upper_uuid + "\n")
+    assert current_boot_id() == upper_uuid.lower()
 
 
 # ---------------------------------------------------------------------------

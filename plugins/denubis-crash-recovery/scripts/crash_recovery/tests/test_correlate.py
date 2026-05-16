@@ -17,6 +17,7 @@ from pathlib import Path
 from crash_recovery.correlate import (
     CorrelationKind,
     CorrelationResult,
+    _extract_resume_uuid,
     _project_dir_for_cwd,
     correlate,
 )
@@ -305,6 +306,45 @@ def test_correlate_filters_out_jsonl_with_old_first_entry(tmp_path: Path) -> Non
     result = correlate(liveness, tmp_path)
     # …but the first-entry-ts check excludes it.
     assert result.kind == CorrelationKind.NO_MATCH
+
+
+def test_correlate_argv_uuid_but_no_project_dir_is_no_match(tmp_path: Path) -> None:
+    """argv carries --resume <uuid> AND the cwd has no project dir → NO_MATCH.
+
+    Pins the conservative argv-without-project-dir decision (coherence
+    review M4, 2026-05-16): when ``_project_dir_for_cwd`` returns ``None``
+    the wrapper's UUID hint is dropped rather than surfaced. The UUID could
+    refer to a JSONL anywhere on disk and we cannot disk-verify it without
+    a project directory; misattribution would poison downstream
+    classification. Conservative is the right call.
+    """
+    # tmp_path has no project dirs at all.
+    liveness = _make_liveness(
+        cwd="/home/user/never-existed",
+        started=1_715_000_000,
+        argv=f"--resume {_UUID_A}",
+    )
+    result = correlate(liveness, tmp_path)
+    assert result.kind == CorrelationKind.NO_MATCH
+    assert result.uuid is None  # wrapper hint discarded
+
+
+# ---------------------------------------------------------------------------
+# _extract_resume_uuid
+# ---------------------------------------------------------------------------
+
+
+def test_extract_resume_uuid_returns_none_for_malformed_shlex() -> None:
+    """argv with unbalanced quotes triggers shlex.split ValueError → None.
+
+    ``_extract_resume_uuid`` catches ``ValueError`` from ``shlex.split`` and
+    returns ``None`` rather than propagating. Coherence review L2
+    (2026-05-16): the malformed-shell-string branch was untested.
+    """
+    # Single unterminated double-quote — shlex.split raises ValueError.
+    assert _extract_resume_uuid('--resume "unterminated') is None
+    # Single unterminated single-quote — same.
+    assert _extract_resume_uuid("--resume 'also-unterminated") is None
 
 
 # ---------------------------------------------------------------------------
