@@ -180,6 +180,11 @@ def list_liveness_files(run_dir: Path) -> Iterator[Liveness]:
 # liveness lifecycle relies on POSIX atomic-rename semantics for the wrapper's
 # temp-file → final-name handoff, so misbehaviour here would manifest as
 # either spurious "missing" classifications or torn reads.
+#
+# Curated 2026-05-16 against the Linux fstype namespace observed in
+# /proc/filesystems and the findmnt(8) man page. The set is exhaustive for
+# the common-distro shipping defaults at that date; new networked or union
+# filesystems should be added here as they appear. Coherence review L4.
 _REFUSED_FSTYPES_EXACT: frozenset[str] = frozenset(
     {
         "nfs",

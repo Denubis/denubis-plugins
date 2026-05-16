@@ -87,15 +87,19 @@ def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Path | None:
     """Return the ``~/.claude/projects/<encoded>/`` dir whose JSONLs declare ``cwd``.
 
     Iterates children of ``projects_root``. For each child directory, reads
-    the first JSON line of the first ``.jsonl`` file it finds and checks the
-    entry's ``cwd`` field. Returns the first matching directory, or ``None``
+    the first valid JSON line of every ``.jsonl`` file until one matches the
+    requested ``cwd``. Returns the first matching directory, or ``None``
     if no directory matches.
 
-    The break-out-of-inner-loop after one JSONL read is deliberate: Claude
-    Code groups all sessions for a given cwd under one encoded directory, so
-    one JSONL's ``cwd`` is authoritative for the whole directory. Reading
-    additional JSONLs in the same directory would waste I/O and tell us
-    nothing new.
+    Why scan every JSONL rather than short-circuit after the first: Claude
+    Code's encoded-directory naming is lossy — ``/`` and ``.`` both collapse
+    to ``-``, so two distinct cwds (e.g. ``/home/x/y-z`` and ``/home/x-y/z``)
+    can share one encoded directory. The first JSONL's ``cwd`` is therefore
+    NOT authoritative for the whole directory under collision. An earlier
+    version of this function broke out of the inner loop after one read;
+    the optimisation was unsafe and was removed after Phase 3 proleptic
+    challenge CA1 (2026-05-16). Full-scan cost is microseconds at realistic
+    scale (dozens of dirs × dozens of JSONLs).
 
     Parameters
     ----------
@@ -208,6 +212,17 @@ def correlate(liveness: Liveness, projects_root: Path) -> CorrelationResult:
     JSONL is gone — this is intentional. The wrapper hint was the best
     available signal; we still try to report something useful before giving
     up. See ``test_correlate_argv_uuid_but_jsonl_missing_falls_back_to_mtime``.
+
+    Conservative argv-without-project-dir handling (Phase 3 coherence
+    review M4, 2026-05-16): when ``argv`` carries ``--resume <uuid>`` but
+    ``_project_dir_for_cwd`` returns ``None`` (the cwd cannot be located
+    on disk), we return ``NO_MATCH`` and drop the wrapper hint rather than
+    surfacing the unverified UUID. The wrapper's claim could refer to a
+    JSONL anywhere on disk; without a project directory we cannot confirm
+    the UUID maps to a real session. Conservative is correct here:
+    misattributing a UUID to a session whose files we cannot find would
+    poison downstream classification. See
+    ``test_correlate_argv_uuid_but_no_project_dir_is_no_match``.
     """
     resume_uuid = _extract_resume_uuid(liveness.argv)
     project_dir = _project_dir_for_cwd(projects_root, liveness.cwd)
@@ -224,6 +239,8 @@ def correlate(liveness: Liveness, projects_root: Path) -> CorrelationResult:
         # so we still report something useful.
 
     if project_dir is None:
+        # See docstring: conservative drop of the wrapper hint when we
+        # cannot locate the project directory on disk (coherence review M4).
         return CorrelationResult(kind=CorrelationKind.NO_MATCH)
 
     # 2. mtime-window scan over JSONLs in project_dir.
