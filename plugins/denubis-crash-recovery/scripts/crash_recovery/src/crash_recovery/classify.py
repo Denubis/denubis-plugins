@@ -219,7 +219,30 @@ def classify(
     is still current — a scan/kill race). Phase 5's render surfaces it with
     a distinct "go look manually" message; Phase 7's triage skill tags such
     entries for review. AC3.3 (non-empty classification_reason) is preserved.
+
+    Raises
+    ------
+    ValueError
+        If ``liveness_state.present`` is ``True`` but ``pid_alive`` is
+        ``None``. This is a contradictory caller input: a liveness file
+        exists, so Phase 3 must have run ``kill -0`` and produced a concrete
+        ``bool`` for ``pid_alive``. Receiving ``None`` here means the caller
+        skipped the probe. Failing fast at the boundary is preferable to
+        silently routing 4 distinct ``(TailKind, present=True, pid_alive=None,
+        boot=True)`` combinations to the ``unmatched`` fallback. Resolved
+        during Phase 2 review (2026-05-16).
     """
+    # Boundary check: pid_alive=None means "no liveness file" per Phase 3's
+    # caller contract. Passing it together with liveness_state.present=True
+    # is contradictory — the file exists but the caller didn't run kill -0.
+    # Fail fast at the boundary rather than silently routing 4 distinct
+    # (kind, present=True, pid_alive=None, boot=True) combinations to
+    # "unmatched". Resolved during Phase 2 review (2026-05-16).
+    if liveness_state.present and pid_alive is None:
+        raise ValueError(
+            "liveness_state.present=True requires concrete pid_alive (bool); "
+            "got None. Phase 3 caller must run kill -0 when a liveness file exists."
+        )
     for rule in RULES:
         if rule.trailing_kind is not None and rule.trailing_kind is not tail_summary.kind:
             continue

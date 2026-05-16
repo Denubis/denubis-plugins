@@ -42,13 +42,14 @@ def _build_liveness_state(
 ) -> LivenessState:
     """Synthesise a LivenessState matching the rule (or sane defaults if wildcard).
 
-    When ``liveness_present`` is a wildcard we default to ``True`` so that a
-    rule whose ``boot_id_current`` constraint is concrete still gets a
-    well-formed liveness state. When ``boot_id_current`` is a wildcard we
-    default to ``True``.
+    When ``liveness_present`` is a wildcard we default to ``False`` — no
+    liveness file. This avoids the classify() boundary check which requires a
+    concrete ``pid_alive`` when ``present=True``: with ``present=False``,
+    ``pid_alive=None`` is always valid. When ``boot_id_current`` is a wildcard
+    we default to ``True``.
     """
     return LivenessState(
-        present=liveness_present if liveness_present is not None else True,
+        present=liveness_present if liveness_present is not None else False,
         boot_id_current=boot_id_current if boot_id_current is not None else True,
     )
 
@@ -58,7 +59,17 @@ def test_every_rule_classifies_its_fixture(rule: Rule) -> None:
     """AC3.1 + AC3.3: every row of RULES fires for an input synthesised from its matchers."""
     tail = _build_tail_summary(rule.trailing_kind)
     liveness = _build_liveness_state(rule.liveness_present, rule.boot_id_current)
-    result = classify(tail, liveness, pid_alive=rule.pid_alive)
+
+    # Resolve a concrete pid_alive for the test call that satisfies the
+    # classify() boundary check (liveness_state.present=True requires a
+    # concrete bool for pid_alive). When the rule's pid_alive is a wildcard
+    # (None) but the effective liveness_present is True, supply False — a
+    # concrete bool that the wildcard rule still matches.
+    pid_alive = rule.pid_alive
+    if pid_alive is None and liveness.present:
+        pid_alive = False
+
+    result = classify(tail, liveness, pid_alive=pid_alive)
 
     assert result.value == rule.classification, (
         f"rule {rule.reason!r} expected {rule.classification} but got {result.value}"
@@ -247,4 +258,47 @@ def test_rules_have_unique_reasons() -> None:
     pairs = [(r.classification, r.reason) for r in RULES]
     assert len(pairs) == len(set(pairs)), (
         f"duplicate (classification, reason) pairs in RULES: {pairs}"
+    )
+
+
+# Contradictory caller inputs: liveness_state.present=True but pid_alive=None.
+# Phase 3 caller contract: when a liveness file exists, kill -0 MUST have run,
+# producing a concrete bool. pid_alive=None means "no liveness file" — pairing
+# it with present=True is a programming error. The boundary check in classify()
+# must raise ValueError rather than silently routing to "unmatched".
+_CONTRADICTORY_INPUTS: tuple[TailKind, ...] = (
+    TailKind.CONCLUDED,
+    TailKind.TOOL_USE_NO_RESULT,
+    TailKind.ASK_QUESTION_NO_REPLY,
+    TailKind.AGENT_DISPATCH_NO_RESULT,
+)
+
+
+@pytest.mark.parametrize("kind", _CONTRADICTORY_INPUTS, ids=lambda k: k.value)
+def test_classify_rejects_contradictory_caller_inputs(kind: TailKind) -> None:
+    """classify() raises ValueError for present=True + pid_alive=None (contradictory).
+
+    Pins the structural boundary check added in Phase 2 review (Important finding).
+    The 4 kinds above are the ones the review identified; each paired with
+    present=True, pid_alive=None, boot_id_current=True covers the contradictory
+    combinations that previously routed silently to "unmatched". A future
+    refactor that drops the boundary check breaks this test immediately.
+    """
+    tail = TailSummary(
+        kind=kind,
+        last_ts=0,
+        total_entries=1,
+        state_summary="contradictory-input-test",
+    )
+    liveness = LivenessState(present=True, boot_id_current=True)
+
+    with pytest.raises(ValueError) as exc_info:
+        classify(tail, liveness, pid_alive=None)
+
+    message = str(exc_info.value)
+    assert "pid_alive" in message, (
+        f"ValueError message must mention 'pid_alive'; got: {message!r}"
+    )
+    assert "liveness" in message, (
+        f"ValueError message must mention 'liveness'; got: {message!r}"
     )
