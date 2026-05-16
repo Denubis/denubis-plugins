@@ -218,6 +218,31 @@ def make_only_bookkeeping_no_signal(path: Path) -> None:
     )
 
 
+def make_liveness_file(
+    run_dir: Path,
+    pid: int,
+    cwd: str = "/tmp/test",
+    started: int = 1715151234,
+    argv: str = "",
+    boot_id: str = "8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d",
+) -> Path:
+    """Write a four-key ``<pid>.live`` file under ``run_dir``; return the path.
+
+    Mirrors the format Phase 8's wrapper patch will write: one ``key=value``
+    line per required field, UTF-8, newline-terminated. ``argv`` may be empty
+    (no resume flag in the parent invocation) and may contain ``=`` signs.
+    """
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / f"{pid}.live"
+    path.write_text(
+        f"cwd={cwd}\n"
+        f"started={started}\n"
+        f"argv={argv}\n"
+        f"boot_id={boot_id}\n"
+    )
+    return path
+
+
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
     """Assistant tool_use → attachment (bookkeeping) → user tool_result → assistant end_turn.
 
