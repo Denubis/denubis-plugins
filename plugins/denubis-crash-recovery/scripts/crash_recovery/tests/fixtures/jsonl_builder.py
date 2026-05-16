@@ -14,6 +14,7 @@ load-bearing shape.
 
 from __future__ import annotations
 
+import itertools
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -248,7 +249,7 @@ def make_liveness_file(
 # Counter used to keep encoded-dir names unique across calls within one test.
 # Each call returns a different directory so callers can layer multiple
 # projects under one projects_root without collisions.
-_project_dir_counter = [0]
+_project_dir_counter = itertools.count(1)
 
 
 def make_project_dir(
@@ -287,8 +288,7 @@ def make_project_dir(
     Path
         The created project directory.
     """
-    _project_dir_counter[0] += 1
-    encoded = f"-encoded-project-{_project_dir_counter[0]}"
+    encoded = f"-encoded-project-{next(_project_dir_counter)}"
     project_dir = projects_root / encoded
     project_dir.mkdir(parents=True, exist_ok=True)
     iso_ts = datetime.fromtimestamp(first_entry_ts, tz=UTC).strftime(
