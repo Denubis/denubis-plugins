@@ -208,6 +208,35 @@ _REFUSED_FSTYPES_EXACT: frozenset[str] = frozenset(
 _REFUSED_FSTYPE_PREFIXES: tuple[str, ...] = ("fuse.",)
 
 
+def _match_fstype_from_mounts(resolved: str, mounts: list[str]) -> str | None:
+    """Return the longest-prefix-matching fstype for ``resolved`` in ``mounts``.
+
+    Pure function: takes the resolved path string and the lines of
+    ``/proc/mounts`` (already read by the caller), returns the fstype of
+    the mount-point with the longest prefix match against ``resolved``,
+    or ``None`` if no mount matches.
+
+    Lines with fewer than 3 whitespace-separated parts are skipped (the
+    ``/proc/mounts`` format is ``device mount-point fstype options ...``;
+    anything shorter is malformed). The match accepts either exact
+    equality (``resolved == mount_point``) or path prefix (``mount_point``
+    with a trailing slash). Longest prefix wins so a bind mount under
+    ``/home`` doesn't shadow ``/home/user/something``.
+    """
+    best_mount, best_fstype = "", None
+    for line in mounts:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        mount_point, fstype = parts[1], parts[2]
+        if resolved == mount_point or resolved.startswith(
+            mount_point.rstrip("/") + "/"
+        ):
+            if len(mount_point) > len(best_mount):
+                best_mount, best_fstype = mount_point, fstype
+    return best_fstype
+
+
 def _detect_fstype(path: Path) -> str | None:
     """Return the filesystem type for ``path``, or ``None`` if undetectable.
 
@@ -231,19 +260,7 @@ def _detect_fstype(path: Path) -> str | None:
         mounts = Path("/proc/mounts").read_text().splitlines()
     except OSError:
         return None
-    resolved = str(path.resolve())
-    best_mount, best_fstype = "", None
-    for line in mounts:
-        parts = line.split()
-        if len(parts) < 3:
-            continue
-        mount_point, fstype = parts[1], parts[2]
-        if resolved == mount_point or resolved.startswith(
-            mount_point.rstrip("/") + "/"
-        ):
-            if len(mount_point) > len(best_mount):
-                best_mount, best_fstype = mount_point, fstype
-    return best_fstype
+    return _match_fstype_from_mounts(str(path.resolve()), mounts)
 
 
 def assert_local_filesystem(path: Path) -> None:
