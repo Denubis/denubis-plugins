@@ -188,17 +188,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from crash_recovery.db import CLASSIFICATION_VALUES
+
 CLASSIFIER_VERSION: int = 1
 """Bump when RULES changes shape. Scan re-classifies any row whose stored
 classifier_version is below this constant. See design plan DR9."""
 
 
-class ClassificationValue(StrEnum):
-    LIVE = "live"
-    HARD_CRASH = "hard_crash"
-    BORDERLINE = "borderline"
-    CONCLUDED = "concluded"
-    IRRECOVERABLE = "irrecoverable"
+# Derived at module load from db.CLASSIFICATION_VALUES — single authoritative
+# source for the schema-locked value set (see project CLAUDE.md, "Schema
+# Constants from Authoritative Source"). Adding a value in db.py automatically
+# extends this enum; removing one breaks any classify.py reference at import
+# time. Members: LIVE, HARD_CRASH, BORDERLINE, CONCLUDED, IRRECOVERABLE.
+ClassificationValue = StrEnum(
+    "ClassificationValue",
+    {v.upper(): v for v in CLASSIFICATION_VALUES},
+)
 
 
 @dataclass(frozen=True)
@@ -207,7 +212,7 @@ class Classification:
     reason: str
 ```
 
-`StrEnum` gives us serialisable string values directly usable as SQLite `TEXT` column values (matches the design's `classification TEXT NOT NULL` column type) without manual conversion.
+`StrEnum` gives us serialisable string values directly usable as SQLite `TEXT` column values (matches the design's `classification TEXT NOT NULL` column type) without manual conversion. The functional `StrEnum(name, mapping)` form is used instead of a literal class so the enum's value set is derived from `db.CLASSIFICATION_VALUES` rather than re-declared — this resolves the Phase 2 tension where the plan originally re-declared the values that the design plan and project CLAUDE.md pin to a single source. The dict comprehension preserves db.py's tuple order (Python 3.7+ ordered dicts), so the enum members appear in the same order as the CHECK-constraint string.
 
 The `Rule` dataclass and `RULES` table land in Task 4 — kept separate so the test file (Task 5) can import `Classification`/`ClassificationValue` independently from `RULES`.
 
@@ -380,6 +385,8 @@ Required tests:
   - Any other combinations encountered during integration testing are added to this list; the test is the documentation. For each entry, parametrise: assert `classify(...)` returns `Classification(value=BORDERLINE, reason="unmatched")` for the positive cases, and the rule-specified reason for the negative cases. When a new rule is added that covers a previously-unmatched combination, remove it from the positive set in the same commit.
 
 - **`test_classify_returns_classification_value_strenum`** — assert `classify(...).value` is a member of `ClassificationValue` (a `StrEnum`) and serialises as the documented strings (`"live"`, `"hard_crash"`, etc.). Protects against silent enum renames.
+
+- **`test_classification_value_matches_db_schema_source`** — import `CLASSIFICATION_VALUES` from `crash_recovery.db` and assert `tuple(v.value for v in ClassificationValue) == CLASSIFICATION_VALUES`. Pins the project-CLAUDE.md "Schema Constants from Authoritative Source" convention: catches future refactors that re-declare the enum literally and forget to keep it in lock-step with the CHECK constraint's value list.
 
 - **`test_rules_have_unique_reasons`** — assert that within `RULES`, every `(classification, reason)` pair is unique. Catches copy-paste errors when extending the table.
 
