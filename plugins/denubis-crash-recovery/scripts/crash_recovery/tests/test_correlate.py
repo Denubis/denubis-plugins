@@ -111,6 +111,48 @@ def test_project_dir_for_cwd_skips_blank_first_jsonl_and_finds_match_in_second(
     assert result == project_dir
 
 
+def test_project_dir_for_cwd_handles_encoding_collision(tmp_path: Path) -> None:
+    """One encoded dir holds JSONLs from two distinct cwds → both are findable.
+
+    Claude Code's encoded-directory naming is lossy: `/` and `.` both collapse
+    to `-`, so distinct cwds (e.g. `/home/x/y-z` and `/home/x-y/z`) can share
+    one encoded directory. Under collision the first JSONL's cwd is NOT
+    authoritative for the whole directory. Pins the post-CA1 (2026-05-16)
+    collision-safe behaviour: `_project_dir_for_cwd` must scan past a
+    non-matching first JSONL to find a matching later one in the same dir.
+    """
+    import json
+
+    collision_dir = tmp_path / "-home-x-y-z"
+    collision_dir.mkdir()
+
+    cwd_one = "/home/x/y-z"
+    cwd_two = "/home/x-y/z"
+
+    # Lexicographically first JSONL: declares cwd_one (non-matching for our query).
+    entry_one = {
+        "type": "user",
+        "cwd": cwd_one,
+        "timestamp": "2026-05-16T00:00:00.000Z",
+        "message": {"content": []},
+    }
+    (collision_dir / f"{_UUID_A}.jsonl").write_text(json.dumps(entry_one) + "\n")
+
+    # Lexicographically second JSONL: declares cwd_two (the target).
+    entry_two = {
+        "type": "user",
+        "cwd": cwd_two,
+        "timestamp": "2026-05-16T00:00:00.000Z",
+        "message": {"content": []},
+    }
+    (collision_dir / f"{_UUID_B}.jsonl").write_text(json.dumps(entry_two) + "\n")
+
+    # cwd_two is reachable even though cwd_one's JSONL sorts first.
+    assert _project_dir_for_cwd(tmp_path, cwd_two) == collision_dir
+    # And cwd_one is still reachable on its own (sanity check — first-match wins).
+    assert _project_dir_for_cwd(tmp_path, cwd_one) == collision_dir
+
+
 # ---------------------------------------------------------------------------
 # correlate — argv direct match
 # ---------------------------------------------------------------------------

@@ -127,10 +127,13 @@ def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Path | None:
             entry_cwd = entry.get("cwd")
             if isinstance(entry_cwd, str) and entry_cwd == cwd:
                 return child
-            # First JSONL in this dir didn't match; remaining JSONLs in the
-            # same dir have the same cwd by Claude Code's grouping
-            # convention, so break out of the inner loop.
-            break
+            # Non-matching cwd here does NOT mean this directory is irrelevant.
+            # Claude Code's encoded-directory naming is lossy (`/` and `.` both
+            # collapse to `-`), so two distinct cwds can share one encoded
+            # directory (e.g. `/home/x/y-z` and `/home/x-y/z`). Continue
+            # scanning the rest of the directory; a later JSONL may match.
+            # See phase_03.md proleptic CA1 (2026-05-16).
+            continue
     return None
 
 
