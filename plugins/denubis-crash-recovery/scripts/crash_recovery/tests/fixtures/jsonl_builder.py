@@ -15,6 +15,8 @@ load-bearing shape.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Deterministic timestamp used across every fixture so ``last_ts`` is stable
@@ -241,6 +243,67 @@ def make_liveness_file(
         f"boot_id={boot_id}\n"
     )
     return path
+
+
+# Counter used to keep encoded-dir names unique across calls within one test.
+# Each call returns a different directory so callers can layer multiple
+# projects under one projects_root without collisions.
+_project_dir_counter = [0]
+
+
+def make_project_dir(
+    projects_root: Path,
+    cwd: str,
+    uuids: Sequence[str],
+    first_entry_ts: int = 1_715_151_234,
+) -> Path:
+    """Create a ``~/.claude/projects/<encoded>/`` directory with N session JSONLs.
+
+    Each JSONL is named ``<uuid>.jsonl`` and starts with a single entry whose
+    ``cwd`` and ``timestamp`` carry the supplied values — enough for both
+    :func:`_project_dir_for_cwd` (which reads the first entry's ``cwd``) and
+    :func:`correlate`'s mtime-window filter (which reads the first entry's
+    ``timestamp``). The encoded directory name is opaque; correlate never
+    decodes it (the codebase-verified note at the top of the phase file:
+    Claude Code's encoding is lossy, so the canonical lookup is by reading
+    the in-file ``cwd``).
+
+    Parameters
+    ----------
+    projects_root
+        The ``~/.claude/projects/`` analogue (callers pass ``tmp_path``).
+    cwd
+        Value written to every JSONL's first-entry ``cwd``.
+    uuids
+        One session UUID per JSONL to create.
+    first_entry_ts
+        Unix epoch (seconds) written into every JSONL's first-entry
+        ``timestamp`` as an ISO-8601 UTC string. Default mirrors the
+        liveness fixture's default ``started`` so happy-path tests don't
+        need to pass anything.
+
+    Returns
+    -------
+    Path
+        The created project directory.
+    """
+    _project_dir_counter[0] += 1
+    encoded = f"-encoded-project-{_project_dir_counter[0]}"
+    project_dir = projects_root / encoded
+    project_dir.mkdir(parents=True, exist_ok=True)
+    iso_ts = datetime.fromtimestamp(first_entry_ts, tz=UTC).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z"
+    )
+    for uuid in uuids:
+        jsonl = project_dir / f"{uuid}.jsonl"
+        entry = {
+            "type": "user",
+            "cwd": cwd,
+            "timestamp": iso_ts,
+            "message": {"content": []},
+        }
+        jsonl.write_text(json.dumps(entry) + "\n")
+    return project_dir
 
 
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
