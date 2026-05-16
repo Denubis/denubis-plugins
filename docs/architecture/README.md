@@ -2,7 +2,7 @@
 
 Per-plugin context diagrams + shared glossary, personae, and constraints. Each plugin is its own system with its own boundary. There is no marketplace-level Level-0 because the marketplace decomposes recursively into plugins and the plugins themselves are the right unit of analysis.
 
-## Plugin Contexts (14)
+## Plugin Contexts (15)
 
 Hook plugins:
 - [`denubis-hook-branch-bg/0-context.md`](plugins/denubis-hook-branch-bg/0-context.md) — `SessionStart`: recolours terminal background based on git repo (hue) + branch (offsets).
@@ -25,6 +25,7 @@ Meta + utility:
 - [`denubis-00-getting-started/0-context.md`](plugins/denubis-00-getting-started/0-context.md) — `/getting-started` and `/setup` slash commands.
 - [`denubis-git-commit/0-context.md`](plugins/denubis-git-commit/0-context.md) — single skill that handles `/commit`.
 - [`denubis-bibliography/0-context.md`](plugins/denubis-bibliography/0-context.md) — Zotero PDF → per-page markdown + page-keyed blockquotes (skill marks itself WIP — only one validated path).
+- [`denubis-dream/0-context.md`](plugins/denubis-dream/0-context.md) — `/dream`: audits per-project auto-memory against worktree-aggregated transcripts; produces a dated scratch tree for reconciliation; finalises atomically to live `memory/`. Design landed 2026-05-16; implementation not yet started.
 
 ## Shared Documents
 
