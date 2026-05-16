@@ -71,7 +71,7 @@ The module exposes:
    - If file exists but is empty (zero lines or zero bytes): return `TailSummary(kind=EMPTY, ..., state_summary="empty jsonl")`.
    - Open the file with `path.open("r", encoding="utf-8")` and iterate via `tail = deque(f, maxlen=n)`.
    - Try to `json.loads()` each line in `tail`; any `json.JSONDecodeError` flips the kind to `MALFORMED_TAIL` (continue parsing the rest for state_summary, but the final classification is `MALFORMED_TAIL`).
-   - Filter parsed entries: drop entries whose top-level `type` is `system`, `attachment`, `file-history-snapshot`, `last-prompt`, `ai-title`, or `permission-mode` — these are bookkeeping per Phase 2B investigation.
+   - Filter parsed entries: keep only entries whose top-level `type` is `assistant` or `user`; everything else is treated as bookkeeping and dropped. This **deny-list** approach replaces the original allow-list spec after Phase 2 review-time empirical verification (2026-05-16) found `custom-title`, `agent-name`, `agent-color`, and `pr-link` at session tails in real JSONLs — types the Phase 2B investigator's 2026-05-13 allow-list did not record. The implementor's allow-list addition of `progress` was correct-direction but landed against subagent JSONLs (which crash-recovery does not scan) rather than main-session files. Deny-list is robust to new bookkeeping types Claude Code adds in future: any unknown `type` is conservatively filtered, so it can never silently mask a concluded-tail signal. The risk runs the other direction (a future *real* type would be misclassified as bookkeeping) but the failure mode is visible (sessions falling to UNKNOWN/borderline) rather than silent. Implementation: `_REAL_TYPES = frozenset({"assistant", "user"})`; drop any entry whose `type` is not in this set.
    - Walk the filtered window from the end:
      - Last entry is assistant with `message.stop_reason == "end_turn"` and all `message.content[]` items typed `text` → `CONCLUDED`.
      - Last assistant entry has a `tool_use` content item; check whether any later user entry (after this dispatch in the original window) carries a `tool_result` with matching `tool_use_id` OR a `toolUseResult.answers` (for AskUserQuestion). If not, classify by the tool name:
@@ -132,6 +132,8 @@ git commit -m "feat(crash-recovery): add jsonl module with TailSummary and parse
 - `make_empty(path)` → creates an empty file.
 - `make_malformed_tail(path)` → writes 3 valid entries followed by a line that is not valid JSON.
 - `make_attachment_interleaved_then_concluded(path)` → assistant `tool_use`, then `attachment` (hook_success), then matching user `tool_result`, then assistant text end_turn. Used to assert the parser does NOT mis-classify interleaved attachments as crash signatures.
+- `make_ask_question_answered_by_answers(path)` → assistant entry with `tool_use.name == "AskUserQuestion"`, followed by a user entry with `toolUseResult.answers` populated. Pins the answered-AskUserQuestion path (`_has_ask_question_answer`) which had no coverage in the initial Task 2 set. Added during Phase 2 review (Minor 1 finding).
+- `make_bookkeeping_only_tail(path)` → an assistant `end_turn` entry followed by 4 bookkeeping entries with types `custom-title`, `agent-name`, `agent-color`, `permission-mode` (types observed at real session tails on 2026-05-16 that the original allow-list did not include). Used by `test_bookkeeping_only_tail_walks_past_to_real_signal` to regression-guard the deny-list filter (Task 1).
 
 Each helper accepts the destination `Path` and returns nothing (writes JSONL to disk via `path.write_text(json.dumps(entry) + "\n" for entry in entries)`). Timestamps in fixtures use a fixed UTC string to keep `last_ts` deterministic.
 
@@ -140,6 +142,7 @@ Each helper accepts the destination `Path` and returns nothing (writes JSONL to 
 - `test_parse_tail_classifies_concluded` → call `make_concluded`, assert `parse_tail(...).kind is TailKind.CONCLUDED`, assert `state_summary` is non-empty.
 - `test_parse_tail_classifies_tool_use_no_result` → `make_tool_use_no_result`, assert kind matches.
 - `test_parse_tail_classifies_ask_question_no_reply` → assert kind matches.
+- `test_parse_tail_handles_ask_question_answered_by_answers` → `make_ask_question_answered_by_answers`, assert kind is NOT `ASK_QUESTION_NO_REPLY` (exercises the `_has_ask_question_answer` satisfaction path; covers Phase 2 review Minor 1).
 - `test_parse_tail_classifies_agent_dispatch_no_result` → assert kind matches.
 - `test_parse_tail_handles_attachment_interleave` → `make_attachment_interleaved_then_concluded`, assert kind is `CONCLUDED` (NOT `TOOL_USE_NO_RESULT`).
 - `test_parse_tail_classifies_empty_file_as_empty` → `make_empty`, assert kind is `EMPTY`, state_summary mentions `empty` (AC3.5).
@@ -304,6 +307,17 @@ Add to `classify.py`:
        liveness_state: LivenessState,
        pid_alive: Optional[bool],
    ) -> Classification:
+       # Boundary check: pid_alive=None means "no liveness file" per Phase 3's
+       # caller contract. Passing it together with liveness_state.present=True
+       # is contradictory — the file exists but the caller didn't run kill -0.
+       # Fail fast at the boundary rather than silently routing 4 distinct
+       # (kind, present=True, pid_alive=None, boot=True) combinations to
+       # "unmatched". Resolved during Phase 2 review (2026-05-16).
+       if liveness_state.present and pid_alive is None:
+           raise ValueError(
+               "liveness_state.present=True requires concrete pid_alive (bool); "
+               "got None. Phase 3 caller must run kill -0 when a liveness file exists."
+           )
        for rule in RULES:
            if rule.trailing_kind is not None and rule.trailing_kind is not tail_summary.kind:
                continue
@@ -316,14 +330,14 @@ Add to `classify.py`:
            return Classification(value=rule.classification, reason=rule.reason)
        # No rule matched: deliberate review-queue route. The rule table covers
        # common cases; `unmatched` is the explicit "go look at this manually"
-       # signal for realistic combinations the rules don't speak to (e.g., a
-       # concluded JSONL paired with a liveness file whose PID is dead but boot
-       # is still current — possible during scan/kill race conditions).
+       # signal for realistic combinations the rules don't speak to — primarily
+       # the scan/kill race on a CONCLUDED session (liveness file still records
+       # a dead PID on a current boot, but the JSONL tail shows end_turn).
        # AC3.3 (non-empty classification_reason) is preserved.
        return Classification(value=ClassificationValue.BORDERLINE, reason="unmatched")
    ```
 
-   The `unmatched` route is a deliberate output of the rule table, not a programmer-error fallback. Phase 5's render surfaces it with a distinct "Something fucky — let's go look" message, and Phase 7's triage skill tags such entries for manual review. Task 5 includes a partition-documenting test that enumerates the realistic combinations expected to land here.
+   The `unmatched` route is a deliberate output of the rule table, not a programmer-error fallback. Phase 5's render surfaces it with a distinct "Something fucky — let's go look" message, and Phase 7's triage skill tags such entries for manual review. With the boundary check added, the *only* production-reachable input that lands at `unmatched` is the scan/kill-race case; the 4 contradictory inputs (`liveness_present=True` with `pid_alive=None`) are excluded structurally rather than documented in the partition test.
 
 **Step: Verify operationally**
 
@@ -378,6 +392,10 @@ Required tests:
 - **`test_empty_jsonl_maps_to_borderline_empty_file`** — same shape for `EMPTY`. Covers AC3.5.
 
 - **`test_unmatched_route_returns_borderline_unmatched`** — synthesise a realistic input combination that no rule covers, e.g., `TailKind.CONCLUDED + LivenessState(present=True, boot_id_current=True) + pid_alive=False` (a concluded session whose liveness file still records a now-dead PID on a still-current boot — a scan/kill race). Assert the result is `Classification(value=BORDERLINE, reason="unmatched")` with non-empty reason (AC3.3 guard).
+
+- **`test_classify_rejects_contradictory_caller_inputs`** — parametrise over the 4 contradictory `(TailKind ∈ {CONCLUDED, TOOL_USE_NO_RESULT, ASK_QUESTION_NO_REPLY, AGENT_DISPATCH_NO_RESULT}, present=True, pid_alive=None, boot=True)` combinations. For each, assert `classify(...)` raises `ValueError` whose message mentions `pid_alive` and `liveness`. Pins the structural boundary check added to Task 4's `classify()` and prevents a future refactor from silently dropping the check and routing these to `unmatched`.
+
+- **`test_bookkeeping_only_tail_walks_past_to_real_signal`** — exercise the deny-list filter (Task 1) with a fixture whose last 4 entries are `custom-title`, `agent-name`, `agent-color`, `permission-mode` (types observed at real session tails on 2026-05-16) preceded by an `assistant` `end_turn` entry. Assert `parse_tail(...).kind is TailKind.CONCLUDED`. Regression guard for the smoking-gun case where the original allow-list would have walked back into bookkeeping and mis-classified as `UNKNOWN` → `borderline_unknown_tail`.
 
 - **`test_rules_table_partition_documents_unmatched_cases`** — enumerate the input combinations expected to route to `unmatched`. For v0.1.0 the documented set is:
   - `TailKind.CONCLUDED + LivenessState(present=True, boot_id_current=True) + pid_alive=False` (scan/kill race on a concluded session).
