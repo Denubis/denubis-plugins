@@ -196,6 +196,40 @@ def _is_concluded(entry: dict[str, Any]) -> bool:
     )
 
 
+def _parse_ts_pair(value: Any) -> tuple[int | None, str | None]:
+    """Parse ``value`` into both epoch-seconds and ISO-string representations.
+
+    Returns ``(epoch, iso_str)`` where ``epoch`` is the unix-epoch-seconds int
+    parsed via :func:`_parse_ts`, and ``iso_str`` is the original string form
+    (only when ``value`` itself was a string). Either or both may be ``None``.
+
+    Consolidates the otherwise-duplicated pattern of deriving the int and the
+    raw-string form of a ``timestamp`` field together — they are always used
+    together as a pair within :func:`parse_tail`.
+    """
+    epoch = _parse_ts(value)
+    iso_str = value if isinstance(value, str) else None
+    return epoch, iso_str
+
+
+def _extract_best_ts(
+    parsed: list[dict[str, Any]],
+) -> tuple[int | None, str | None]:
+    """Best-effort scan for the latest parseable ``timestamp`` in ``parsed``.
+
+    Used by the malformed-tail branch of :func:`parse_tail`: when one or more
+    lines in the read window failed to JSON-decode, this walks the
+    successfully-parsed entries in reverse to surface whatever timestamp
+    information remains. Returns ``(None, None)`` when no entry carries a
+    parseable ISO-8601 ``timestamp``.
+    """
+    for entry in reversed(parsed):
+        epoch, iso_str = _parse_ts_pair(entry.get("timestamp"))
+        if epoch is not None:
+            return epoch, iso_str
+    return None, None
+
+
 def _summarise(
     kind: TailKind,
     last_ts_str: str | None,
@@ -216,6 +250,101 @@ def _summarise(
     detail_part = f": {detail}" if detail else ""
     summary = f"{prefix}{detail_part}{ts_part}"
     return summary[:120]
+
+
+def _make_tail(
+    kind: TailKind,
+    last_ts: int | None,
+    last_ts_str: str | None,
+    total_entries: int,
+    detail: str = "",
+) -> TailSummary:
+    """Construct a :class:`TailSummary` for a late-phase dispatch-walk result.
+
+    Consolidates the five structurally-identical ``TailSummary`` construction
+    sites in :func:`parse_tail` and :func:`_classify_dispatch` that share the
+    shape ``TailSummary(kind=K, last_ts=last_ts, total_entries=total_entries,
+    state_summary=_summarise(K, last_ts_str, detail))``. The ``kind`` is
+    passed explicitly at each call site (TailKind discrimination is *not*
+    abstracted here — only the construction boilerplate is).
+
+    Not used by the early-return branches (MISSING_FILE, EMPTY, bookkeeping-
+    only UNKNOWN) which carry ``last_ts=None`` and ``total_entries=0`` and
+    are structurally distinct.
+    """
+    return TailSummary(
+        kind=kind,
+        last_ts=last_ts,
+        total_entries=total_entries,
+        state_summary=_summarise(kind, last_ts_str, detail),
+    )
+
+
+def _classify_dispatch(
+    filtered: list[dict[str, Any]],
+    last_ts: int | None,
+    last_ts_str: str | None,
+    total_entries: int,
+) -> TailSummary | None:
+    """Walk ``filtered`` backward to find the most recent unmatched tool dispatch.
+
+    Returns the appropriate :class:`TailSummary` for the unmatched dispatch
+    (one of ASK_QUESTION_NO_REPLY, AGENT_DISPATCH_NO_RESULT, or
+    TOOL_USE_NO_RESULT), or ``None`` if every assistant ``tool_use`` in the
+    window is satisfied by a downstream ``tool_result`` (or
+    ``toolUseResult.answers`` for AskUserQuestion). The caller decides what
+    "no dangling dispatch" means in context — :func:`parse_tail` treats it
+    as ``TailKind.UNKNOWN``.
+
+    Extracted from :func:`parse_tail` to reduce its cognitive complexity; see
+    Phase 2 refactoring assessment (2026-05-16).
+    """
+    for i in range(len(filtered) - 1, -1, -1):
+        entry = filtered[i]
+        tu = _last_assistant_tool_use(entry)
+        if tu is None:
+            continue
+        tool_name = tu.get("name")
+        tool_id = tu.get("id")
+
+        if tool_name == "AskUserQuestion":
+            if isinstance(tool_id, str) and _has_matching_tool_result(
+                filtered, i, tool_id
+            ):
+                # tool_result satisfied — keep scanning earlier dispatches.
+                continue
+            if _has_ask_question_answer(filtered, i):
+                continue
+            return _make_tail(
+                TailKind.ASK_QUESTION_NO_REPLY,
+                last_ts,
+                last_ts_str,
+                total_entries,
+            )
+
+        if isinstance(tool_id, str) and _has_matching_tool_result(
+            filtered, i, tool_id
+        ):
+            # This dispatch was resolved — look further back for an earlier
+            # unmatched dispatch.
+            continue
+
+        if tool_name == "Task":
+            return _make_tail(
+                TailKind.AGENT_DISPATCH_NO_RESULT,
+                last_ts,
+                last_ts_str,
+                total_entries,
+            )
+        return _make_tail(
+            TailKind.TOOL_USE_NO_RESULT,
+            last_ts,
+            last_ts_str,
+            total_entries,
+            f"{tool_name} dispatched" if tool_name else "tool dispatched",
+        )
+
+    return None
 
 
 def parse_tail(path: Path, n: int = 20) -> TailSummary:
@@ -277,17 +406,8 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
             parsed.append(obj)
 
     if saw_malformed:
-        last_ts_str = None
-        last_ts: int | None = None
         # Best-effort last_ts from whatever parsed cleanly.
-        for entry in reversed(parsed):
-            ts_val = entry.get("timestamp")
-            candidate = _parse_ts(ts_val)
-            if candidate is not None:
-                last_ts = candidate
-                if isinstance(ts_val, str):
-                    last_ts_str = ts_val
-                break
+        last_ts, last_ts_str = _extract_best_ts(parsed)
         return TailSummary(
             kind=TailKind.MALFORMED_TAIL,
             last_ts=last_ts,
@@ -312,78 +432,23 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
         )
 
     last_entry = filtered[-1]
-    last_ts_str = last_entry.get("timestamp") if isinstance(last_entry.get("timestamp"), str) else None
-    last_ts = _parse_ts(last_entry.get("timestamp"))
+    last_ts, last_ts_str = _parse_ts_pair(last_entry.get("timestamp"))
 
     # --- Classify the tail ----------------------------------------------
     # CONCLUDED: last entry is assistant end_turn with text-only content.
     if _is_concluded(last_entry):
-        return TailSummary(
-            kind=TailKind.CONCLUDED,
-            last_ts=last_ts,
-            total_entries=total_entries,
-            state_summary=_summarise(TailKind.CONCLUDED, last_ts_str),
+        return _make_tail(
+            TailKind.CONCLUDED, last_ts, last_ts_str, total_entries
         )
 
-    # Tool dispatch: walk backward from the end to find the most recent
-    # assistant entry that dispatched a tool_use; check the full filtered
-    # window forward of it for a matching result.
-    for i in range(len(filtered) - 1, -1, -1):
-        entry = filtered[i]
-        tu = _last_assistant_tool_use(entry)
-        if tu is None:
-            continue
-        tool_name = tu.get("name")
-        tool_id = tu.get("id")
-
-        if tool_name == "AskUserQuestion":
-            if isinstance(tool_id, str) and _has_matching_tool_result(
-                filtered, i, tool_id
-            ):
-                # tool_result satisfied — keep scanning earlier dispatches.
-                continue
-            if _has_ask_question_answer(filtered, i):
-                continue
-            return TailSummary(
-                kind=TailKind.ASK_QUESTION_NO_REPLY,
-                last_ts=last_ts,
-                total_entries=total_entries,
-                state_summary=_summarise(
-                    TailKind.ASK_QUESTION_NO_REPLY, last_ts_str
-                ),
-            )
-
-        if isinstance(tool_id, str) and _has_matching_tool_result(
-            filtered, i, tool_id
-        ):
-            # This dispatch was resolved — look further back for an earlier
-            # unmatched dispatch.
-            continue
-
-        if tool_name == "Task":
-            return TailSummary(
-                kind=TailKind.AGENT_DISPATCH_NO_RESULT,
-                last_ts=last_ts,
-                total_entries=total_entries,
-                state_summary=_summarise(
-                    TailKind.AGENT_DISPATCH_NO_RESULT, last_ts_str
-                ),
-            )
-        return TailSummary(
-            kind=TailKind.TOOL_USE_NO_RESULT,
-            last_ts=last_ts,
-            total_entries=total_entries,
-            state_summary=_summarise(
-                TailKind.TOOL_USE_NO_RESULT,
-                last_ts_str,
-                f"{tool_name} dispatched" if tool_name else "tool dispatched",
-            ),
-        )
+    # Tool dispatch: walk backward through ``filtered`` for the most recent
+    # unmatched assistant tool_use. ``None`` means every dispatch in the
+    # window was satisfied — fall through to UNKNOWN.
+    dispatch_summary = _classify_dispatch(
+        filtered, last_ts, last_ts_str, total_entries
+    )
+    if dispatch_summary is not None:
+        return dispatch_summary
 
     # Nothing matched — clean parse, no end_turn, no dangling dispatch.
-    return TailSummary(
-        kind=TailKind.UNKNOWN,
-        last_ts=last_ts,
-        total_entries=total_entries,
-        state_summary=_summarise(TailKind.UNKNOWN, last_ts_str),
-    )
+    return _make_tail(TailKind.UNKNOWN, last_ts, last_ts_str, total_entries)
