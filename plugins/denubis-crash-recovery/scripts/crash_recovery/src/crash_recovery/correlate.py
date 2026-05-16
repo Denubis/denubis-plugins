@@ -83,23 +83,45 @@ _UUID_RE = re.compile(
 _CLOCK_SKEW_GRACE_SECONDS = 60
 
 
+def _cwd_matches_any_jsonl_in(child: Path, cwd: str) -> bool:
+    """Return whether any ``.jsonl`` in ``child`` declares the given ``cwd``.
+
+    Iterates every ``.jsonl`` file in ``child``, reading only the first
+    JSON line of each. Returns ``True`` on the first match; returns
+    ``False`` only after scanning every JSONL.
+
+    Why scan every JSONL rather than short-circuit after the first read:
+    Claude Code's encoded-directory naming is lossy — ``/`` and ``.`` both
+    collapse to ``-``, so two distinct cwds (e.g. ``/home/x/y-z`` and
+    ``/home/x-y/z``) can share one encoded directory. A non-matching first
+    line does NOT mean this directory is irrelevant; a later JSONL may
+    match. An earlier version of the parent function broke out of the
+    inner loop after one read; the optimisation was unsafe and was
+    removed after Phase 3 proleptic challenge CA1 (2026-05-16). Full-scan
+    cost is microseconds at realistic scale.
+    """
+    for jsonl in child.glob("*.jsonl"):
+        try:
+            with jsonl.open("r", encoding="utf-8") as handle:
+                first = handle.readline()
+            if not first.strip():
+                continue
+            entry = json.loads(first)
+        except (OSError, json.JSONDecodeError):
+            continue
+        entry_cwd = entry.get("cwd")
+        if isinstance(entry_cwd, str) and entry_cwd == cwd:
+            return True
+    return False
+
+
 def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Path | None:
     """Return the ``~/.claude/projects/<encoded>/`` dir whose JSONLs declare ``cwd``.
 
-    Iterates children of ``projects_root``. For each child directory, reads
-    the first valid JSON line of every ``.jsonl`` file until one matches the
-    requested ``cwd``. Returns the first matching directory, or ``None``
-    if no directory matches.
-
-    Why scan every JSONL rather than short-circuit after the first: Claude
-    Code's encoded-directory naming is lossy — ``/`` and ``.`` both collapse
-    to ``-``, so two distinct cwds (e.g. ``/home/x/y-z`` and ``/home/x-y/z``)
-    can share one encoded directory. The first JSONL's ``cwd`` is therefore
-    NOT authoritative for the whole directory under collision. An earlier
-    version of this function broke out of the inner loop after one read;
-    the optimisation was unsafe and was removed after Phase 3 proleptic
-    challenge CA1 (2026-05-16). Full-scan cost is microseconds at realistic
-    scale (dozens of dirs × dozens of JSONLs).
+    Iterates children of ``projects_root`` and returns the first child whose
+    JSONLs declare the requested ``cwd`` (see
+    :func:`_cwd_matches_any_jsonl_in` for the per-child scan semantics).
+    Returns ``None`` if no directory matches.
 
     Parameters
     ----------
@@ -119,25 +141,8 @@ def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Path | None:
     for child in sorted(projects_root.iterdir()):
         if not child.is_dir():
             continue
-        for jsonl in child.glob("*.jsonl"):
-            try:
-                with jsonl.open("r", encoding="utf-8") as handle:
-                    first = handle.readline()
-                if not first.strip():
-                    continue
-                entry = json.loads(first)
-            except (OSError, json.JSONDecodeError):
-                continue
-            entry_cwd = entry.get("cwd")
-            if isinstance(entry_cwd, str) and entry_cwd == cwd:
-                return child
-            # Non-matching cwd here does NOT mean this directory is irrelevant.
-            # Claude Code's encoded-directory naming is lossy (`/` and `.` both
-            # collapse to `-`), so two distinct cwds can share one encoded
-            # directory (e.g. `/home/x/y-z` and `/home/x-y/z`). Continue
-            # scanning the rest of the directory; a later JSONL may match.
-            # See phase_03.md proleptic CA1 (2026-05-16).
-            continue
+        if _cwd_matches_any_jsonl_in(child, cwd):
+            return child
     return None
 
 
