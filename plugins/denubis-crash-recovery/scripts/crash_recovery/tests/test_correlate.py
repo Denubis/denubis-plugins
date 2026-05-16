@@ -75,6 +75,42 @@ def test_project_dir_for_cwd_returns_none_for_no_match(tmp_path: Path) -> None:
     assert _project_dir_for_cwd(tmp_path, "/home/user/missing") is None
 
 
+def test_project_dir_for_cwd_skips_blank_first_jsonl_and_finds_match_in_second(
+    tmp_path: Path,
+) -> None:
+    """First JSONL in dir is blank; second has matching cwd → dir is returned.
+
+    Exercises the ``continue`` branch in :func:`_project_dir_for_cwd`: when
+    ``first.strip()`` is empty the file is skipped and the inner loop moves on
+    to the next ``.jsonl``.  Without this path exercised, a directory whose
+    earliest JSONL is blank (e.g. a zero-byte file left by an interrupted write)
+    would silently drop the whole directory even when a valid second JSONL holds
+    the authoritative cwd.
+    """
+    import json
+
+    project_dir = tmp_path / "-encoded-blank-first-test"
+    project_dir.mkdir()
+
+    # Lexicographically first: UUID starting with 0 — empty content.
+    blank_jsonl = project_dir / f"0{_UUID_A[1:]}.jsonl"
+    blank_jsonl.write_text("")
+
+    # Lexicographically second: UUID_B — valid first entry with the target cwd.
+    target_cwd = "/home/user/blank-first-target"
+    valid_entry = {
+        "type": "user",
+        "cwd": target_cwd,
+        "timestamp": "2026-05-16T00:00:00.000Z",
+        "message": {"content": []},
+    }
+    valid_jsonl = project_dir / f"{_UUID_B}.jsonl"
+    valid_jsonl.write_text(json.dumps(valid_entry) + "\n")
+
+    result = _project_dir_for_cwd(tmp_path, target_cwd)
+    assert result == project_dir
+
+
 # ---------------------------------------------------------------------------
 # correlate — argv direct match
 # ---------------------------------------------------------------------------
