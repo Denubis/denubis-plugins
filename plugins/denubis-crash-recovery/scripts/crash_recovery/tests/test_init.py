@@ -94,7 +94,7 @@ class TestInitIsIdempotent:
 
         conn = db.open_db(tmp_db_path)
         try:
-            first_hash = db.schema_hash(conn)
+            first_hash = db._schema_hash(conn)
             first_counts = {
                 table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                 for table in ("sessions", "scan_runs", "classification_history")
@@ -109,7 +109,7 @@ class TestInitIsIdempotent:
 
         conn = db.open_db(tmp_db_path)
         try:
-            second_hash = db.schema_hash(conn)
+            second_hash = db._schema_hash(conn)
             second_counts = {
                 table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                 for table in ("sessions", "scan_runs", "classification_history")
