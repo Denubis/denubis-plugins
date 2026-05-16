@@ -16,6 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from crash_recovery.jsonl import TailKind, TailSummary, parse_tail
+# pytest injects tests/ onto sys.path when tests/__init__.py is absent (a
+# deliberate Phase 1 decision for workspace-wide collection), so the
+# fixtures package is addressable as top-level "fixtures", not "tests.fixtures".
 from fixtures.jsonl_builder import (
     FIXED_TS,
     make_agent_dispatch_no_result,
