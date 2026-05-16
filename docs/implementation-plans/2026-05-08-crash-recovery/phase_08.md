@@ -532,6 +532,11 @@ git commit -m "docs(crash-recovery): finalise UAT runbooks for AC5.6 and AC6.4"
 
 ---
 
+## Deferred from earlier coherence reviews
+
+- **(Phase 2 L3, 2026-05-16)**: Tighten `docs/architecture/constraints.md`'s "Deterministic classification" verification cell to cite `test_classify.py::test_every_rule_classifies_its_fixture` as the per-row enforcement point for Phase 2's portion of AC3.1. Tightening, not correction — snapshot tests still deferred to Phase 5. Cheap docs edit.
+- **(Phase 2 situated-accountability anchor, 2026-05-16)**: Add a "Crash-Recovery bookkeeping deny-list re-sampling cadence" entry to `docs/architecture/constraints.md`. The deny-list's epistemic warrant decays as Claude Code evolves and ships new top-level `type` values. The Phase 8 release is the natural moment to document a maintenance-cadence expectation (e.g., re-sample real main-session JSONLs at each Claude Code minor-version bump; if a new "real" type appears, update `_REAL_TYPES` and add a regression fixture). Pair with the version-coordination work the rest of Phase 8 already records.
+
 ## Phase 8 Done When
 
 - `plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh` writes a liveness file at startup (atomically) and conditionally removes it based on Claude's exit code.

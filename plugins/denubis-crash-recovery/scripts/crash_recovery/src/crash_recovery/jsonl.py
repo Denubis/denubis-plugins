@@ -33,8 +33,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-# Allow-list of top-level ``type`` values that carry real signal. Everything
-# else is treated as bookkeeping and dropped before the tail-shape walk.
+# Deny-list filter: keep only top-level ``type`` values that carry real
+# signal; everything else is treated as bookkeeping and dropped before the
+# tail-shape walk.
 #
 # Deny-list approach (Phase 2 review, 2026-05-16): earlier allow-list held
 # ``{"assistant", "user", "system", "attachment", ...}`` but empirical
@@ -48,7 +49,12 @@ from typing import Any
 # filtered so it can never silently mask a concluded-tail signal. The failure
 # mode runs the other direction (a future *real* type would be misclassified
 # as bookkeeping) but that failure is visible (session falls to UNKNOWN /
-# borderline) rather than silent.
+# borderline) rather than silent — load-bearing on Phase 5 surfacing
+# ``classification_reason`` row-level (anchored in phase_05.md).
+#
+# Full rationale and the empirical verification details live in
+# ``docs/implementation-plans/2026-05-08-crash-recovery/phase_02.md`` Task 1.
+# Do NOT revert to an allow-list without re-running that verification.
 _REAL_TYPES: frozenset[str] = frozenset({"assistant", "user"})
 
 

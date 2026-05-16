@@ -29,6 +29,7 @@ from fixtures.jsonl_builder import (
     make_concluded,
     make_empty,
     make_malformed_tail,
+    make_only_bookkeeping_no_signal,
     make_tool_use_no_result,
 )
 
@@ -152,6 +153,21 @@ def test_parse_tail_returns_tail_summary_instance(tmp_path: Path) -> None:
     p = tmp_path / "ok.jsonl"
     make_concluded(p)
     assert isinstance(parse_tail(p), TailSummary)
+
+
+def test_parse_tail_handles_only_bookkeeping_no_signal(tmp_path: Path) -> None:
+    """Deny-list edge case: every entry is bookkeeping; no real signal.
+
+    The filter strips every entry, leaving an empty filtered window. The
+    parser must walk that empty window without crashing and return UNKNOWN
+    (there is no signal to interpret). Coherence-review L2 (2026-05-16).
+    """
+    p = tmp_path / "only_bookkeeping.jsonl"
+    make_only_bookkeeping_no_signal(p)
+    summary = parse_tail(p)
+    assert summary.kind is TailKind.UNKNOWN, (
+        f"expected UNKNOWN when filter strips every entry, got {summary.kind}"
+    )
 
 
 def test_bookkeeping_only_tail_walks_past_to_real_signal(tmp_path: Path) -> None:

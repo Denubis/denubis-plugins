@@ -199,6 +199,25 @@ def make_bookkeeping_only_tail(path: Path) -> None:
     )
 
 
+def make_only_bookkeeping_no_signal(path: Path) -> None:
+    """File whose every entry is bookkeeping — no ``assistant`` or ``user`` entries.
+
+    Edge case: the deny-list filter (Task 1) removes every entry, leaving an
+    empty filtered window. The parser must walk that empty window without
+    crashing and return ``UNKNOWN`` (it has no signal to interpret).
+    Coherence-review L2 (2026-05-16) — no prior direct fixture for this case.
+    """
+    _write(
+        path,
+        [
+            {"type": "system", "timestamp": FIXED_TS, "content": "boot"},
+            {"type": "custom-title", "timestamp": FIXED_TS, "title": "Just bookkeeping"},
+            {"type": "agent-name", "timestamp": FIXED_TS, "name": "Claude"},
+            {"type": "permission-mode", "timestamp": FIXED_TS, "mode": "default"},
+        ],
+    )
+
+
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
     """Assistant tool_use → attachment (bookkeeping) → user tool_result → assistant end_turn.
 

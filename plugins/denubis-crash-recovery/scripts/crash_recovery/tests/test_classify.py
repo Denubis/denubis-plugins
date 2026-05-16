@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from crash_recovery.classify import (
+    CLASSIFIER_VERSION,
     RULES,
     Classification,
     ClassificationValue,
@@ -259,6 +260,18 @@ def test_rules_have_unique_reasons() -> None:
     assert len(pairs) == len(set(pairs)), (
         f"duplicate (classification, reason) pairs in RULES: {pairs}"
     )
+
+
+def test_classifier_version_is_one() -> None:
+    """Regression guard: CLASSIFIER_VERSION must remain 1 until a deliberate bump.
+
+    Phase 4's scan re-classifies rows whose stored classifier_version is below
+    this constant. A silent bump would re-classify the entire DB on the next
+    scan run, which is correct-direction but the bump should be a deliberate
+    decision (rule-table shape change), not a stray edit. Fitness function per
+    Phase 2 coherence review (L1, 2026-05-16).
+    """
+    assert CLASSIFIER_VERSION == 1
 
 
 # Contradictory caller inputs: liveness_state.present=True but pid_alive=None.
