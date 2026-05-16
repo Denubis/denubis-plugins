@@ -311,13 +311,16 @@ def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Optional[Path]:
             entry_cwd = entry.get("cwd")
             if isinstance(entry_cwd, str) and entry_cwd == cwd:
                 return child
-            # First JSONL in this dir didn't match; remaining JSONLs in the same dir
-            # have the same cwd by Claude Code's convention, so break out of inner loop.
-            break
+            # Non-matching cwd here does NOT mean this directory is irrelevant.
+            # The encoded-directory naming is lossy (codebase-verified note at the
+            # top of this phase: `/` and `.` both collapse to `-`), so two distinct
+            # cwds can share one encoded directory. Continue scanning JSONLs in
+            # this directory rather than abandoning it on first non-match.
+            continue
     return None
 ```
 
-The break-out-of-inner-loop optimisation: once we've read one JSONL from a project directory, its `cwd` is authoritative for the whole directory (Claude Code groups all sessions for a given cwd under one encoded directory). No need to keep opening other JSONLs in the same dir.
+Why we scan every JSONL in a directory rather than short-circuiting after the first: Claude Code's encoded-directory naming is lossy. Real-world example: `/home/x/y-z` and `/home/x-y/z` both encode to `-home-x-y-z`. Under collision, one encoded directory can hold JSONLs from multiple cwds, so the first JSONL's cwd is **not** authoritative for the whole directory. An earlier draft of this plan included a break-out-of-inner-loop optimisation; it was removed after Phase 3 proleptic challenge CA1 (2026-05-16) as unsafe under the documented lossy-encoding scenario. The cost of the full scan is microseconds at realistic scale (dozens of dirs × dozens of JSONLs).
 
 **Step: Verify operationally**
 
@@ -458,6 +461,7 @@ git commit -m "feat(crash-recovery): add correlate() with argv-resume + mtime-wi
 - **`test_correlate_filters_out_jsonl_with_old_first_entry`** — JSONL whose filesystem mtime is recent but whose first entry's timestamp is far older than `liveness.started`; assert `NO_MATCH`. Guards against false positives when the same cwd had a long-running session before the wrapper started.
 - **`test_project_dir_for_cwd_finds_match_among_multiple_dirs`** — three project dirs each declaring a different cwd; `_project_dir_for_cwd(root, "/home/user/target")` returns the directory whose JSONL `cwd` matches.
 - **`test_project_dir_for_cwd_returns_none_for_no_match`** — three project dirs, none matching the requested cwd; helper returns `None`.
+- **`test_project_dir_for_cwd_handles_encoding_collision`** — one project dir containing two JSONLs whose first entries declare different cwds (simulating Claude Code's lossy encoding collision: e.g. `/home/x/y-z` and `/home/x-y/z` collapsing to the same encoded dir). Assert that `_project_dir_for_cwd(root, second_jsonl_cwd)` returns the project dir, not `None`. Pins the post-CA1 (2026-05-16) collision-safe scan: the loop must read past a non-matching first JSONL to find the matching second one.
 
 **Step: Verify operationally**
 
@@ -500,3 +504,5 @@ git commit -m "test(crash-recovery): cover correlate for argv-resume, mtime-matc
 - Phase 4's `scan` wires `Liveness` records + `correlate()` + `classify()` + DB upsert into a single transaction.
 - Phase 4's `scan` compares `Liveness.boot_id` against `current_boot_id()` and passes `boot_id_current` to `classify()` (AC5.6 end-to-end).
 - Phase 8's wrapper patch produces the `.live` files this phase parses (AC5.1, AC5.4, AC5.5 writer side).
+- **Phase 8 dep — argv escaping contract** (Phase 3 proleptic CA2, 2026-05-16). The `.live` file stores `argv` as a single raw string and the parser splits on the first `=` only. `_extract_resume_uuid` then runs `shlex.split` over the stored value. The writer side (Phase 8's `claude-wrapper.sh`) must produce a `shlex`-compatible serialisation of the wrapper's `"$@"`, otherwise `shlex.split` may reconstruct tokens differently than the originals. UUID-only direct-match works regardless (UUIDs contain no shell-special characters), but anything else requires writer/reader contract agreement. Record in `phase_08.md` and add a writer-side round-trip test (write argv with shell-specials → parse → confirm token-equivalence).
+- **Phase 8 dep — local-filesystem guard must run on the writer's effective dir** (Phase 3 proleptic CA3, 2026-05-16). `assert_local_filesystem(ctx.run_dir)` is called by Phase 4's `scan` on the consumer's directory. The atomicity guarantee the guard exists to enforce (POSIX `rename(2)`) depends on where the **wrapper writes**, not where the scan reads. If the wrapper and scan disagree on `run_dir` (e.g. `CRASH_RECOVERY_RUN_DIR` set for one but not the other, or wrapper hardcodes a path), the guard fires on a local dir while writes happen on a network dir, defeating the protection. Phase 8 must either (a) call `assert_local_filesystem` on the wrapper's resolved write directory at startup and refuse to start under a refused fstype, or (b) require both sides to resolve `run_dir` from the same source and add a UAT entry that verifies the agreement.
