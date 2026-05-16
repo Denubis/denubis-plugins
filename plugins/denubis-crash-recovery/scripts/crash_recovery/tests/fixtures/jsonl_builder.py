@@ -133,6 +133,43 @@ def make_malformed_tail(path: Path) -> None:
     path.write_text(body)
 
 
+def make_ask_question_answered_by_answers(path: Path) -> None:
+    """Assistant AskUserQuestion dispatch followed by a user answers entry.
+
+    Pins the ``_has_ask_question_answer`` satisfaction path in ``parse_tail``:
+    when a user entry carries ``toolUseResult.answers``, the AskUserQuestion
+    is considered answered and must NOT produce ASK_QUESTION_NO_REPLY.
+    Added during Phase 2 review (Minor 1 finding).
+    """
+    _write(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "tool_use",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_ask_answered_001",
+                            "name": "AskUserQuestion",
+                            "input": {"question": "Which option?"},
+                        }
+                    ],
+                },
+            },
+            {
+                "type": "user",
+                "timestamp": FIXED_TS,
+                "toolUseResult": {
+                    "answers": [{"inputName": "answer", "inputValue": "option A"}]
+                },
+            },
+        ],
+    )
+
+
 def make_bookkeeping_only_tail(path: Path) -> None:
     """Assistant end_turn entry followed by 4 bookkeeping entries.
 

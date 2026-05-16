@@ -19,6 +19,7 @@ from crash_recovery.jsonl import TailKind, TailSummary, parse_tail
 from fixtures.jsonl_builder import (
     FIXED_TS,
     make_agent_dispatch_no_result,
+    make_ask_question_answered_by_answers,
     make_ask_question_no_reply,
     make_attachment_interleaved_then_concluded,
     make_bookkeeping_only_tail,
@@ -49,6 +50,22 @@ def test_parse_tail_classifies_ask_question_no_reply(tmp_path: Path) -> None:
     make_ask_question_no_reply(p)
     summary = parse_tail(p)
     assert summary.kind is TailKind.ASK_QUESTION_NO_REPLY
+
+
+def test_parse_tail_handles_ask_question_answered_by_answers(tmp_path: Path) -> None:
+    """AskUserQuestion satisfied by toolUseResult.answers must NOT produce ASK_QUESTION_NO_REPLY.
+
+    Exercises the ``_has_ask_question_answer`` satisfaction path in parse_tail
+    which had no coverage in the initial Task 2 set (Phase 2 review Minor 1).
+    The answered AskUserQuestion is the last signal, so the tail resolves to
+    UNKNOWN (no end_turn, no dangling dispatch) rather than ASK_QUESTION_NO_REPLY.
+    """
+    p = tmp_path / "ask_answered.jsonl"
+    make_ask_question_answered_by_answers(p)
+    summary = parse_tail(p)
+    assert summary.kind is not TailKind.ASK_QUESTION_NO_REPLY, (
+        f"answered AskUserQuestion should not produce ASK_QUESTION_NO_REPLY; got {summary.kind}"
+    )
 
 
 def test_parse_tail_classifies_agent_dispatch_no_result(tmp_path: Path) -> None:
