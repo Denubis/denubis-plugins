@@ -86,19 +86,27 @@ The module exposes:
 
    ```python
    import os
+   import warnings
 
    def pid_alive(pid: int) -> bool:
        try:
            os.kill(pid, 0)
        except ProcessLookupError:
            return False
-       except PermissionError:
-           # Process exists but we lack permission to signal it; counts as alive.
-           return True
+       except OSError as exc:
+           # PermissionError: the PID has been recycled to a process this user
+           # does not own — the wrapper itself is gone. Any other OSError signals
+           # platform/system trouble; treat-as-dead is the conservative choice so
+           # a crashed wrapper is not pinned live forever.
+           warnings.warn(
+               f"pid_alive({pid}) saw {type(exc).__name__}: {exc}",
+               UserWarning,
+           )
+           return False
        return True
    ```
 
-   Any other `OSError` propagates (signals a deeper system problem worth surfacing to the caller).
+   The single `except OSError` branch covers `PermissionError` (the documented PID-recycling case) and every other `OSError` subclass — all logged via `warnings.warn(UserWarning)`, all return `False`, nothing propagates. This contract is load-bearing on Phase 2's `classify()` boundary check (CA2, 2026-05-16): a `pid_alive=None` return paired with `liveness_state.present=True` raises `ValueError` and crashes the scan, so `pid_alive` must always return a real `bool`.
 
 5. **`list_liveness_files(run_dir: Path) -> Iterator[Liveness]`** — yields parsed `Liveness` records for each `*.live` file in `run_dir`:
    - If `run_dir` does not exist or is not a directory, return immediately (yield nothing). No error — the directory legitimately may not exist before the wrapper has ever run.
@@ -210,6 +218,8 @@ Tests (all unit):
 - **`test_current_boot_id_is_lowercase`** — assert the returned string equals its `.lower()`.
 - **`test_pid_alive_self_is_true`** — `assert pid_alive(os.getpid()) is True`.
 - **`test_pid_alive_sentinel_is_false`** — `assert pid_alive(2**30) is False`.
+- **`test_pid_alive_permission_error_returns_false`** — monkey-patch `os.kill` to raise `PermissionError`; assert `pid_alive(12345) is False` and that the exception does **not** propagate. Pins the CA2 (2026-05-16) falsification anchor: `PermissionError` from `os.kill(pid, 0)` means the wrapper's PID has been recycled to a process this user does not own, so the wrapper itself is gone — treat-as-dead. Load-bearing on Phase 2's `classify()` boundary check.
+- **`test_pid_alive_unexpected_oserror_returns_false_with_warning`** — monkey-patch `os.kill` to raise a generic `OSError("simulated platform failure")`; assert `pid_alive(12345) is False` and that exactly one `UserWarning` was emitted (use `pytest.warns(UserWarning)`). Pins the log-and-return-False contract for non-`PermissionError` `OSError` subclasses; documents that `pid_alive` never propagates `OSError`.
 - **`test_list_liveness_files_tolerates_missing_directory`** — pass a `Path` that doesn't exist; assert `list(list_liveness_files(...))` is empty (no exception).
 - **`test_list_liveness_files_enumerates_distinct_pids`** — write 3 `.live` files (PIDs 100, 200, 300); assert iteration yields all three with distinct PIDs. (AC5.4)
 - **`test_list_liveness_files_skips_malformed_with_warning`** — write 1 well-formed and 1 malformed (missing key) `.live` file; assert iteration yields only 1 record and `pytest.warns(UserWarning)` fires.
