@@ -12,7 +12,6 @@ is True paired with ``pid_alive=None``).
 from __future__ import annotations
 
 import os
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -156,25 +155,26 @@ def test_pid_alive_sentinel_is_false() -> None:
 
 
 def test_pid_alive_permission_error_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PermissionError → PID-recycled-to-foreign-process → wrapper is gone → False.
+    """Pins return-False + UserWarning emitted + non-propagation; symmetric with test_pid_alive_unexpected_oserror_returns_false_with_warning.
 
     CA2 (2026-05-16) falsification anchor. Without this contract a recycled
     PID would silently return ``None`` (or propagate) and Phase 2's
     ``classify()`` boundary check would raise ``ValueError`` on the next scan
     pass, crashing the whole scan rather than classifying one row as a
     casualty. The wrapper itself is gone; treat-as-dead is the conservative
-    and correct choice.
+    and correct choice. ``PermissionError`` is caught by the shared
+    ``except OSError`` handler, so the warning fires just as it does for any
+    other ``OSError`` subclass — both pin tests now assert it.
     """
 
     def _raise_perm(pid: int, sig: int) -> None:
         raise PermissionError("Operation not permitted")
 
     monkeypatch.setattr(os, "kill", _raise_perm)
-    # Use pytest.warns to silently consume the expected UserWarning; the
-    # contract only requires "does not propagate", not "does not warn".
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        assert pid_alive(12345) is False
+    with pytest.warns(UserWarning) as record:
+        result = pid_alive(12345)
+    assert result is False
+    assert len(record) == 1
 
 
 def test_pid_alive_unexpected_oserror_returns_false_with_warning(
