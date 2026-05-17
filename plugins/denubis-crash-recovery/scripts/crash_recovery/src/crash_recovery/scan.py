@@ -38,6 +38,12 @@ from crash_recovery.liveness import (
     pid_alive,
 )
 
+# Pinned format for the AMBIGUOUS state_summary so downstream consumers
+# (Phase 5's reader / triage CLI) can recognise an ambiguous row by
+# prefix rather than depending on the free-form f-string body. NOT
+# underscore-prefixed: this is part of the module's public surface.
+AMBIGUOUS_STATE_SUMMARY_PREFIX = "ambiguous match: "
+
 
 @dataclass(frozen=True)
 class ScanContext:
@@ -201,7 +207,7 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
                 kind=TailKind.UNKNOWN,
                 last_ts=None,
                 total_entries=0,
-                state_summary=f"ambiguous match: {candidates_str}",
+                state_summary=f"{AMBIGUOUS_STATE_SUMMARY_PREFIX}{candidates_str}",
             )
             facts.append(
                 SessionFact(

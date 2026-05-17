@@ -999,3 +999,64 @@ def test_classification_history_appends_when_classification_changes(
     assert len(rows) == 2
     assert rows[0] == ("live", "live_pid_present_boot_current")
     assert rows[1] == ("hard_crash", "liveness_dead_pid_tool_use_no_result")
+
+
+# ---------------------------------------------------------------------------
+# M5 — ambiguous state_summary uses pinned AMBIGUOUS_STATE_SUMMARY_PREFIX
+# ---------------------------------------------------------------------------
+
+
+def test_ambiguous_state_summary_uses_pinned_format(tmp_path: Path) -> None:
+    """The ambiguous state_summary uses the AMBIGUOUS_STATE_SUMMARY_PREFIX constant.
+
+    M5: phase 5 needs to parse this prefix to recognise an ambiguous row,
+    so the format is pinned in a named module-level constant rather than
+    a free-form f-string. Existing AC6.3 test only checks substring; this
+    one pins the exact prefix + comma-joined candidates.
+    """
+    cwd = "/tmp/ambig-pinned"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    uuid_a = "aaaaaaaa-3333-3333-3333-333333333333"
+    uuid_b = "bbbbbbbb-4444-4444-4444-444444444444"
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=now_epoch - 100,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=now_epoch - 50,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=os.getpid(),
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, state_summary FROM sessions ORDER BY uuid",
+    )
+    assert len(rows) == 2
+    expected = f"{scan_mod.AMBIGUOUS_STATE_SUMMARY_PREFIX}{uuid_a}, {uuid_b}"
+    for _uuid, summary in rows:
+        assert summary == expected
