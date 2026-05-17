@@ -277,17 +277,28 @@ def _first_entry_cwd(jsonl_path: Path) -> str:
 def _classify_fact(fact: SessionFact) -> Classification:
     """Map a :class:`SessionFact` to its :class:`Classification`.
 
-    AC6.3 short-circuit: ambiguous correlation gets a hardcoded
-    ``BORDERLINE/ambiguous_match`` without consulting Phase 2's RULES. The
-    rule table catalogues tail-shape-driven outcomes; correlation
-    ambiguity is a different category entirely.
+    Short-circuits (checked before delegating to Phase 2's :func:`classify`):
 
-    The non-ambiguous path delegates to Phase 2's :func:`classify`. The
+    * Empty ``cwd`` → ``IRRECOVERABLE/missing_cwd``. Without a cwd, Phase 7's
+      ``claudew --resume`` from ``""`` would fail confusingly. The walker
+      still writes the row so the user sees the irrecoverable session in
+      triage with a clear reason.
+    * AC6.3 — ambiguous correlation → hardcoded
+      ``BORDERLINE/ambiguous_match`` without consulting Phase 2's RULES. The
+      rule table catalogues tail-shape-driven outcomes; correlation
+      ambiguity is a different category entirely.
+
+    The non-short-circuit path delegates to Phase 2's :func:`classify`. The
     caller (``_walk_sessions``) guarantees ``LivenessState.present=True``
     implies ``pid_alive_value`` is a concrete ``bool`` (Phase 3 contract);
     a violation surfaces as the boundary ``ValueError`` from
     :func:`classify` and crashes the scan loudly.
     """
+    if not fact.cwd:
+        return Classification(
+            value=ClassificationValue.IRRECOVERABLE,
+            reason="missing_cwd",
+        )
     if fact.ambiguity_candidates:
         return Classification(
             value=ClassificationValue.BORDERLINE,

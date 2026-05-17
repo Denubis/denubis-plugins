@@ -815,3 +815,48 @@ def test_walk_project_path_equals_cwd_for_normal_sessions(tmp_path: Path) -> Non
     # JSONL-only walk path
     pp_b, cwd_b = by_uuid[jsonl_only_session.uuid]
     assert pp_b == cwd_b == "/tmp/jsonl-only"
+
+
+# ---------------------------------------------------------------------------
+# M3 — empty cwd short-circuits to IRRECOVERABLE/missing_cwd
+# ---------------------------------------------------------------------------
+
+
+def test_walk_emits_irrecoverable_missing_cwd_for_unreadable_jsonl(
+    tmp_path: Path,
+) -> None:
+    """JSONL with no ``cwd`` key → classify as ``irrecoverable``/``missing_cwd``.
+
+    ``_first_entry_cwd`` returns ``""`` on parse error, missing-cwd-key, or
+    corruption. Without a cwd, Phase 7's ``claudew --resume`` from ``""``
+    would fail confusingly. ``_classify_fact`` must short-circuit empty-cwd
+    sessions to ``IRRECOVERABLE/missing_cwd`` so the user sees a clear
+    reason in triage. ``project_path`` (per M2) is also empty.
+    """
+    uuid = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    # Synthesise a JSONL under a project_dir but with NO cwd key in the
+    # first entry. ``_first_entry_cwd`` returns "".
+    project_dir = projects_root / "-no-cwd-fixture"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    jsonl_path = project_dir / f"{uuid}.jsonl"
+    jsonl_path.write_text(
+        json.dumps({"role": "assistant", "content": "hi"}) + "\n"
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason, cwd, project_path "
+        "FROM sessions",
+    )
+    assert len(rows) == 1
+    row_uuid, classification, reason, cwd_val, pp_val = rows[0]
+    assert row_uuid == uuid
+    assert classification == "irrecoverable"
+    assert reason == "missing_cwd"
+    assert cwd_val == ""
+    assert pp_val == ""
