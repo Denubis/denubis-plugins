@@ -184,7 +184,7 @@ boot_id=8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d
 
 `boot_id` is read from `/proc/sys/kernel/random/boot_id` and changes on every system reboot. CLI compares against the current boot_id at scan time.
 
-**Classifier version contract:** the rule table in `crash_recovery.classify` carries an integer `CLASSIFIER_VERSION` constant. Each `scan` writes the active version to every row it upserts and to the `scan_runs` row. On subsequent scans, rows whose `classifier_version` is below the active value are re-classified before being read by render or prune. This invariant guarantees that classification queries (including prune's three-condition guard) always reflect the current rule table.
+**Classifier version contract:** the rule table in `crash_recovery.classify` carries an integer `CLASSIFIER_VERSION` constant. Each `scan` writes the active version to every row it upserts and to the `scan_runs` row. On subsequent scans, the orphan-sweep pass re-classifies every row whose UUID was not seen in the current filesystem walk (regardless of the stored `classifier_version`), and the upsert path stamps the current `CLASSIFIER_VERSION` on every touched row. After scan completes, no row carries a stale `classifier_version`. This invariant guarantees that classification queries (including prune's three-condition guard) always reflect the current rule table. See **DR10** for why orphan-sweep was widened beyond version-stale rows.
 
 ## Decision Record
 
@@ -324,6 +324,23 @@ boot_id=8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d
 **Alternatives considered:**
 - **No version tracking:** Rejected because the proleptic challenge identified a real risk — prune could delete a session whose old classification said "concluded" but whose current rules would say "borderline".
 - **Hash of the rule table:** Rejected as over-engineered; an integer version bumped manually with each rule change is simpler and matches typical schema-version semantics.
+
+### DR10: Orphan sweep re-classifies all unseen rows, not only version-stale ones
+**Status:** Accepted (2026-05-17, deferred from Phase 4 coherence review)
+**Confidence:** High
+**Reevaluation triggers:** If the cost of touching every orphan on every scan becomes measurable (e.g. ten-thousand-session databases). If a future feature requires distinguishing "scan saw the JSONL is gone now" from "scan was re-run with stale rules".
+
+**Decision:** scan's orphan-sweep pass re-classifies every `sessions` row whose UUID was not seen in the current filesystem walk, regardless of stored `classifier_version`. The narrower "only re-classify version-stale orphans" pattern (originally implied by the Classifier version contract paragraph above and by an earlier draft of this DR9) was widened during Phase 4 implementation because the JSONL backing a row can vanish between scans — we want that captured on the very next scan, not deferred until the next `CLASSIFIER_VERSION` bump (a rare event).
+
+**Consequences:**
+- **Enables:** Sessions whose JSONLs are deleted between scans get re-classified to `IRRECOVERABLE/missing_jsonl_on_disk` on the next scan, without waiting for a rule-table bump.
+- **Enables:** Annotation-aware exemption (deferred to Phase 6's `note` subcommand per phase_06 Design Constraint): when `note` lands, the orphan sweep will skip rows where `user_notes IS NOT NULL` so that the user's "I care about this" annotation isn't silently overridden by an irrecoverable verdict on a transiently unmounted volume.
+- **Prevents:** A scenario where a deleted JSONL silently retains its prior classification (e.g. `concluded`) forever, misleading render and any prune decision the user might make.
+- **Costs:** Every scan does an UPDATE on every orphan, even when nothing has changed. Phase 4 coherence-review finding M4 deduplicates `classification_history` writes when the classification + reason are unchanged, so the audit table doesn't fill with redundant "still irrecoverable" rows — the `sessions` row's `last_scanned` still refreshes regardless.
+
+**Alternatives considered:**
+- **Narrower sweep** (only `classifier_version < CURRENT`): rejected because it misses the JSONL-vanished case until the next `CLASSIFIER_VERSION` bump.
+- **Separate "vanished sweep" pass**: rejected as over-engineering; one orphan-sweep pass handles both vanished-JSONL and version-stale cases uniformly.
 
 ## Existing Patterns
 
