@@ -214,20 +214,24 @@ Opus walks existing memories by `mtime` ascending (stalest first). Memories with
 - **Audit existing + Sonnet authors candidates:** Rejected because authoring is a high-trust action that should stay with the user.
 
 ### DR3: Disjoint disposition vocab per stream
-**Status:** Accepted
+**Status:** Accepted (amended 2026-05-17 per implementation-plan critical-peer-review cycle 1)
 **Confidence:** High
 **Reevaluation triggers:** User finds the disjoint vocab confusing; cross-stream operations emerge (e.g., promoting an existing memory's type from `feedback` to `user`).
 
 **Decision:** We chose disjoint disposition vocab — existing memories get `keep` / `prune` / `edit`; flagged regions get `promote` / `dismiss` — over unified vocab with overloaded meanings.
 
+**Implementation-time amendment (2026-05-17, user-approved deviation):** existing-memory turns also offer a 4th verb `reject` as a meta-verb. `reject` is NOT a disposition — it's a user response that means "discard Phase 4's recommendation entirely; revert the mirror to byte-for-byte live state". Its action-outcome semantics: a no-op when the recommendation was `keep` (mirror was already at live); a revert-to-live when the recommendation was `edit` (drops Opus's revision); a don't-prune when the recommendation was `prune`. The disjoint-vocab invariant is preserved at the disposition layer (the underlying mirror state still resolves to one of `keep` / `prune` / `edit`); `reject` lives one layer above, in the reconciliation-walk user-response vocabulary. See `docs/implementation-plans/2026-05-16-denubis-dream/phase_05.md` header (deviation #2) for the rationale: without `reject`, a user wanting to discard an `edit` or `prune` recommendation would have to compose verbose `edit` instructions to undo Opus's proposed edit — `reject` provides a one-word path for that frequent case.
+
 **Consequences:**
-- **Enables:** Each word means exactly one thing; reconciliation UX has unambiguous commands per stream.
+- **Enables:** Each disposition word means exactly one thing; reconciliation UX has unambiguous commands per stream. The `reject` meta-verb adds a one-word path for "discard the recommendation" without complicating the disposition layer.
 - **Prevents:** Unifying logic across streams (one "decision" record per entry regardless of source).
 
 **Alternatives considered:**
 - **Unified vocab with overloaded meaning:** Rejected — same word meaning different things across streams creates confusion.
 - **Three dispositions only (edit ad-hoc):** Rejected — `edit` is structural enough to deserve a named disposition.
 - **`promote` also applies to existing memories:** Rejected — keeps `promote` specifically meaning "newly authored from a flagged region".
+- **Omit `reject` entirely (implementation-time):** Rejected — forces users to type long `edit <restore original>` instructions to discard a recommendation; high-frequency user action deserves a one-word verb.
+- **Rename `reject` to `revert` (implementation-time):** Rejected — `reject` reads as "I'm rejecting your recommendation"; `revert` is more programmer-y and less natural in the reconciliation-walk dialogue.
 
 ### DR4: Mirror + per-memory verdict file layout
 **Status:** Accepted
