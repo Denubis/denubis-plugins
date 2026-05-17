@@ -12,7 +12,7 @@ import sys
 
 # Subcommands wired by the current phase. Later phases append entries; the
 # test that consumes this list grows with the CLI surface.
-EXPECTED_SUBCOMMANDS: tuple[str, ...] = ("init", "scan")
+EXPECTED_SUBCOMMANDS: tuple[str, ...] = ("init", "scan", "render")
 
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:

@@ -11,7 +11,9 @@ Phase 1 wires the ``init`` subcommand. Phase 4 adds ``scan``. Phases 5-6 add
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -19,6 +21,7 @@ import typer
 
 from crash_recovery import db
 from crash_recovery import liveness as _liveness
+from crash_recovery import render as _render
 from crash_recovery import scan as _scan
 
 app = typer.Typer(no_args_is_help=True)
@@ -115,6 +118,56 @@ def scan(
         f"{result.sessions_reclassified} re-classified (orphans/version-stale); "
         f"scan_run_id={result.scan_run_id}"
     )
+
+
+def _render_to_file(db_path: Path, output: Path) -> int:
+    """Render ``db_path``'s markdown and write atomically to ``output``.
+
+    Returns the count of rows in the ``sessions`` table for the user-visible
+    confirmation line. The tempfile is created in ``output.parent`` so the
+    final :func:`os.replace` stays on the same filesystem (cross-device
+    ``os.replace`` would silently degrade to a copy-and-unlink, defeating
+    the atomicity guarantee).
+    """
+    content = _render.render(db_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=output.parent,
+        delete=False,
+    ) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+    os.replace(tmp_path, output)
+    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
+        (count,) = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()
+    return count
+
+
+@app.command()
+def render(
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        help="Path to the rendered markdown file (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md).",
+    ),
+) -> None:
+    """Render the crash-recovery DB to a markdown file.
+
+    The DB is opened read-only. The output file is written atomically via
+    ``tempfile + os.replace`` so an interrupted write cannot leave a
+    partially-rendered file at the destination path.
+    """
+    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
+    count = _render_to_file(resolved_db, resolved_out)
+    typer.echo(f"Rendered {count} sessions to {resolved_out}")
 
 
 def main() -> None:
