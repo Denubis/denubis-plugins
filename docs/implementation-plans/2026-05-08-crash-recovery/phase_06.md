@@ -34,6 +34,24 @@
 
 ---
 
+## Design Constraints
+
+### Annotation-preserves-classification (deferred from Phase 4 proleptic review, 2026-05-17)
+
+When Phase 6 implements `note`, the `user_notes` column becomes load-bearing for the user's intent — it signals "I care about this session; don't lose it". Phase 4's `_orphan_sweep` in `scan.py` re-classifies any row not seen in the filesystem walk: if `jsonl_path` is gone or NULL, the row's classification flips to `IRRECOVERABLE/missing_jsonl_on_disk`. This means a user who annotates a session, then has its JSONL transiently unavailable (unmounted volume, network filesystem hiccup, etc.), then runs `scan`, will silently see the classification flip to irrecoverable — even though their annotation said they wanted to keep it.
+
+AC7.5 already exempts annotated rows from `prune --confirm`. The same logical exemption should apply to classification reset, since reset to `irrecoverable` can mislead the user about the session's actual recoverability (and the user's `user_notes` survives the reset, creating a contradictory record: "user said keep, classification says give up").
+
+**Phase 6 must include a task** — placed in Subcomponent A alongside `note.py` so the constraint lands when `user_notes` becomes a load-bearing column — that:
+
+1. Modifies `_orphan_sweep` in `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/scan.py` to skip rows where `user_notes IS NOT NULL`. The skip preserves both `classification` and `classifier_version` on annotated orphans. (`last_scanned` may still be refreshed since it's a bookkeeping field, not a user-intent field; the decision is documented in the new test's docstring.)
+2. Adds `test_orphan_sweep_preserves_annotated_session_classification` in `tests/test_scan.py`: seed an annotated row with a vanished `jsonl_path`, run `scan`, assert `classification` and `classifier_version` unchanged and a `classification_history` row is NOT appended for it (no reclassification means no history entry).
+3. Adds a paired test `test_orphan_sweep_reclassifies_unannotated_session` that re-verifies the existing AC3.6 behaviour on rows where `user_notes IS NULL` — to pin the exemption is scoped to annotated rows only.
+
+This is a Phase 4 code change driven by Phase 6's semantics: the constraint surfaced in Phase 4's proleptic review, but the fix belongs with the annotation feature that motivates it. Phase 4's plan-level Outstanding section cross-references this constraint.
+
+---
+
 <!-- START_SUBCOMPONENT_A (tasks 1-2) -->
 
 <!-- START_TASK_1 -->
