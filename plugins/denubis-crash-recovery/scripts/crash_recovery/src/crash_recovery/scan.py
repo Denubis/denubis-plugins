@@ -144,7 +144,11 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
         # it up by content for the path string we store. We reuse the
         # correlation's uuid/candidates to derive the JSONL filenames.
         project_dir = _project_dir_for_cwd(ctx.projects_root, liveness.cwd)
-        project_path = str(project_dir) if project_dir is not None else ""
+        # project_path is the decoded cwd, not the encoded directory name —
+        # the on-disk directory name is lossy (collapsed ``/``/``.`` to ``-``)
+        # so we use the value Claude Code recorded as cwd. In current Claude
+        # Code behaviour this equals ``cwd``; future behaviour may diverge.
+        project_path = liveness.cwd
         pid_alive_value = pid_alive(liveness.pid)
         boot_match = liveness.boot_id == current_bid
 
@@ -228,12 +232,13 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
             tail_summary = parse_tail(jsonl_path)
             # Best-effort cwd: read it from the JSONL's first entry. The
             # encoded directory name is lossy, so the JSONL's own ``cwd`` is
-            # the canonical source.
+            # the canonical source. project_path uses the same decoded value
+            # — see comment on the liveness-walk path above.
             cwd = _first_entry_cwd(jsonl_path)
             facts.append(
                 SessionFact(
                     uuid=uuid,
-                    project_path=str(jsonl_path.parent),
+                    project_path=cwd,
                     cwd=cwd,
                     jsonl_path=str(jsonl_path),
                     jsonl_mtime=jsonl_mtime,

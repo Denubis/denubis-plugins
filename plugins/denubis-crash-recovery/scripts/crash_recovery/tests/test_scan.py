@@ -764,3 +764,54 @@ def test_scan_two_concurrent_invocations_do_not_corrupt_db(tmp_path: Path) -> No
     for cv, ls in rows:
         assert cv == CLASSIFIER_VERSION
         assert ls in run_timestamps
+
+
+# ---------------------------------------------------------------------------
+# M2 — project_path holds the decoded cwd, not the encoded directory name
+# ---------------------------------------------------------------------------
+
+
+def test_walk_project_path_equals_cwd_for_normal_sessions(tmp_path: Path) -> None:
+    """``project_path`` and ``cwd`` hold the same decoded path on both walker paths.
+
+    The design plan (line 145) says ``project_path`` is the decoded path —
+    i.e. the cwd Claude Code recorded inside the JSONL, not the encoded
+    directory name with leading ``-`` and ``/``/``.`` collapsed. This test
+    pins both walker paths (liveness-driven and JSONL-only) to that contract.
+
+    Fixture: one session with a liveness file (liveness-walk path) and one
+    without (JSONL-only walk path). Both must end up with
+    ``project_path == cwd`` and neither must contain the encoded leading
+    ``-`` directory-name form.
+    """
+    liveness_session = FixtureSession(
+        uuid="11111111-1111-1111-1111-111111111111",
+        cwd="/tmp/with-liveness",
+        tail_kind=TailKind.CONCLUDED,
+        has_liveness=True,
+        pid_alive=True,
+        boot_id_current=True,
+    )
+    jsonl_only_session = FixtureSession(
+        uuid="22222222-2222-2222-2222-222222222222",
+        cwd="/tmp/jsonl-only",
+        tail_kind=TailKind.CONCLUDED,
+        has_liveness=False,
+        pid_alive=None,
+        boot_id_current=False,
+    )
+    db_dir, run_dir, projects_root = make_full_fixture(
+        tmp_path, [liveness_session, jsonl_only_session]
+    )
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(db_path, "SELECT uuid, project_path, cwd FROM sessions")
+    by_uuid = {r[0]: (r[1], r[2]) for r in rows}
+    # Liveness-walk path
+    pp_a, cwd_a = by_uuid[liveness_session.uuid]
+    assert pp_a == cwd_a == "/tmp/with-liveness"
+    # JSONL-only walk path
+    pp_b, cwd_b = by_uuid[jsonl_only_session.uuid]
+    assert pp_b == cwd_b == "/tmp/jsonl-only"
