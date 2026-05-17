@@ -585,6 +585,79 @@ def make_full_fixture(
     return db_dir, run_dir, projects_root
 
 
+@dataclass
+class DbFixtureRow:
+    """Declarative spec for one ``sessions`` row inserted directly by tests.
+
+    Used by :func:`make_db_with_sessions` to seed the DB without going through
+    Phase 4's filesystem walk — render tests can then assert byte-level
+    contracts against a known set of rows. All timestamp fields default to
+    deterministic values so two test runs against the same fixture produce
+    byte-identical render output.
+    """
+
+    uuid: str
+    cwd: str
+    classification: str
+    classification_reason: str
+    state_summary: str
+    user_notes: str | None
+    last_scanned: int
+    first_seen: int
+    classifier_version: int = 1
+    project_path: str = "/decoded/project/path"
+    jsonl_path: str = "/jsonl/path.jsonl"
+    jsonl_mtime: int = 1_700_000_000
+    jsonl_last_ts: int = 1_700_000_000
+
+
+def make_db_with_sessions(tmp_path: Path, sessions: list[DbFixtureRow]) -> Path:
+    """Initialise a fresh DB under ``tmp_path`` and insert each ``DbFixtureRow``.
+
+    Bypasses :mod:`crash_recovery.scan` so render-layer tests do not depend
+    on Phase 4's filesystem walk. The DB is created via
+    :func:`crash_recovery.db.init` (so WAL mode and CHECK constraints apply),
+    then each row is inserted with an explicit ``INSERT INTO sessions``
+    statement. Returns the path to the created DB so callers can pass it
+    directly to :func:`crash_recovery.render.render`.
+    """
+    from crash_recovery import db as _db
+
+    db_path = tmp_path / "render-fixture.db"
+    _db.init(db_path)
+    conn = _db.open_db(db_path)
+    try:
+        for session in sessions:
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                    classification, classification_reason, classifier_version,
+                    state_summary, first_seen, last_scanned, user_notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session.uuid,
+                    session.project_path,
+                    session.cwd,
+                    session.jsonl_path,
+                    session.jsonl_mtime,
+                    session.jsonl_last_ts,
+                    session.classification,
+                    session.classification_reason,
+                    session.classifier_version,
+                    session.state_summary,
+                    session.first_seen,
+                    session.last_scanned,
+                    session.user_notes,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return db_path
+
+
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
     """Assistant tool_use → attachment (bookkeeping) → user tool_result → assistant end_turn.
 
