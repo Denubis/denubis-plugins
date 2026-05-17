@@ -231,7 +231,7 @@ def triage(
     guards as ``scan``.
     """
     ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
-    typer.echo(_render.render(ctx.db_path))
+    typer.echo(_render.render(ctx.db_path), nl=False)
 
 
 @app.command()
