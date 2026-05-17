@@ -73,7 +73,7 @@ Allowed values for `sessions.classification` and `classification_history.classif
 
 Both `SESSIONS_DDL` and `CLASSIFICATION_HISTORY_DDL` reference this constant to generate their CHECK constraints. Phase 2's `classify` module re-exports this constant so the classifier and the schema share one source of truth.
 
-The rendered markdown output groups sessions into sections whose headings combine classification and reason (e.g. `borderline+ambiguous_match`, `borderline+malformed_tail`). These compound section keys are a rendering concept only — they are derived at render time from `(classification, reason)` tuples stored in separate columns. The DB stores only the bare classification value; the `reason` column holds the distinguishing reason string.
+The rendered markdown output groups sessions into six fixed sections in document order, each backed by a `SectionKey` StrEnum value (`render.py::SectionKey`): `Currently unfinished`, `Idle-live killed`, `Ambiguous correlation`, `Needs investigation`, `Recently concluded`, `Irrecoverable`. Section assignment is a pure function of `(classification, classification_reason)` performed by `_section_for_row` at render time; the DB stores only the bare classification value and the distinguishing reason string in separate columns. See `glossary.md` for the `SectionKey`, `Section`, and `SECTIONS` entries.
 
 ### Scan transaction model
 
