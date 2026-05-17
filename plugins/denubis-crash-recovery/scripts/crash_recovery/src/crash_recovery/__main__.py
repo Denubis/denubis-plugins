@@ -112,7 +112,7 @@ def scan(
     result = _scan.run_scan(ctx)
     typer.echo(
         f"Scanned {result.sessions_scanned} sessions; "
-        f"{result.sessions_reclassified} re-classified; "
+        f"{result.sessions_reclassified} re-classified (orphans/version-stale); "
         f"scan_run_id={result.scan_run_id}"
     )
 
