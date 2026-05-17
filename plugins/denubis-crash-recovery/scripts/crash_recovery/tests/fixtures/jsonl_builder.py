@@ -16,9 +16,14 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+from crash_recovery.jsonl import TailKind
+from crash_recovery.liveness import current_boot_id
 
 # Deterministic timestamp used across every fixture so ``last_ts`` is stable
 # in assertions.
@@ -304,6 +309,280 @@ def make_project_dir(
         }
         jsonl.write_text(json.dumps(entry) + "\n")
     return project_dir
+
+
+@dataclass
+class FixtureSession:
+    """High-level declarative spec for one session in a scan fixture.
+
+    Combines a tail-shape choice (``tail_kind``) with optional liveness-file
+    presence so :func:`make_full_fixture` can synthesise a complete
+    ``(db, run_dir, projects_root)`` layout from a list of these.
+
+    ``started_offset`` is added to ``time.time()`` at fixture-construction
+    time; the default ``-3600`` makes the liveness ``started`` an hour in
+    the past so correlate's mtime window (now > started − 60) admits the
+    JSONL written immediately after.
+    """
+
+    uuid: str
+    cwd: str
+    tail_kind: TailKind
+    has_liveness: bool
+    pid_alive: bool | None
+    boot_id_current: bool
+    started_offset: int = -3600
+
+
+# Sentinel boot_id that will never match the kernel's value — used to
+# drive the AC5.6 boot-mismatch-wins-over-pid-alive test path.
+_NEVER_MATCH_BOOT_ID = "00000000-0000-0000-0000-000000000000"
+
+
+def _pick_dead_pid() -> int:
+    """Return a PID guaranteed not to be alive.
+
+    Walks ``/proc`` to collect every numeric entry (every running PID) and
+    returns one greater than the maximum. The kernel hasn't assigned this
+    number to a process yet, so ``kill -0`` against it produces
+    ``ProcessLookupError`` → ``pid_alive`` returns ``False``.
+
+    Fallback to a high constant ``999_999`` if ``/proc`` isn't readable
+    (e.g. someone runs the suite on non-Linux). The constant is still
+    almost-certainly dead but the ``/proc`` walk is the tight bound.
+    """
+    try:
+        pids = [int(name) for name in os.listdir("/proc") if name.isdigit()]
+    except OSError:
+        return 999_999
+    return max(pids) + 1 if pids else 999_999
+
+
+def _iso_ts(epoch: int) -> str:
+    """Return ``epoch`` as ISO-8601 UTC with millisecond precision."""
+    return datetime.fromtimestamp(epoch, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def _tail_entries_for(kind: TailKind) -> list[dict]:
+    """Return the JSONL entries that produce ``kind`` from ``parse_tail``.
+
+    Used by :func:`_write_session_jsonl` to append tail-shape content
+    after the leading cwd+timestamp header entry. Empty list means the
+    file gets only the header (which by itself parses as UNKNOWN).
+    """
+    if kind is TailKind.CONCLUDED:
+        return [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "done"}],
+                },
+            }
+        ]
+    if kind is TailKind.TOOL_USE_NO_RESULT:
+        return [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "tool_use",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_no_result_fixture",
+                            "name": "Bash",
+                            "input": {},
+                        }
+                    ],
+                },
+            }
+        ]
+    if kind is TailKind.ASK_QUESTION_NO_REPLY:
+        return [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "tool_use",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_ask_fixture",
+                            "name": "AskUserQuestion",
+                            "input": {"question": "?"},
+                        }
+                    ],
+                },
+            }
+        ]
+    if kind is TailKind.AGENT_DISPATCH_NO_RESULT:
+        return [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "tool_use",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_agent_fixture",
+                            "name": "Task",
+                            "input": {"prompt": "go"},
+                        }
+                    ],
+                },
+            }
+        ]
+    # UNKNOWN / EMPTY / MALFORMED_TAIL / MISSING_FILE: header alone yields
+    # UNKNOWN from parse_tail. Tests that need EMPTY/MALFORMED would call
+    # make_empty / make_malformed_tail directly rather than via FixtureSession.
+    return []
+
+
+def _write_session_jsonl(
+    jsonl_path: Path,
+    cwd: str,
+    first_entry_epoch: int,
+    tail_kind: TailKind,
+) -> None:
+    """Write a session JSONL with a cwd+timestamp header plus tail-shape entries.
+
+    The header satisfies correlate's first-entry-cwd lookup
+    (:func:`_project_dir_for_cwd`) and mtime-window filter
+    (:func:`_jsonl_first_entry_ts_meets_threshold`). The tail entries
+    drive :func:`parse_tail`'s ``TailKind`` discrimination.
+    """
+    iso = _iso_ts(first_entry_epoch)
+    header = {
+        "type": "user",
+        "cwd": cwd,
+        "timestamp": iso,
+        "message": {"content": []},
+    }
+    entries = [header, *_tail_entries_for(tail_kind)]
+    _write(jsonl_path, entries)
+
+
+def _encoded_dir_name_for(cwd: str) -> str:
+    """Return a deterministic encoded directory name for ``cwd``.
+
+    Claude Code's real encoding collapses ``/`` and ``.`` to ``-`` and is
+    lossy. Tests only need a unique-per-cwd name that doesn't collide
+    with other test fixtures; ``correlate`` never decodes the name (it
+    reads the in-file ``cwd`` via :func:`_project_dir_for_cwd`).
+    """
+    # Strip leading slash so we don't produce a name starting with "-"
+    # twice; map remaining "/" and "." to "-" to mimic the lossy encoding.
+    stripped = cwd.lstrip("/")
+    return "-" + stripped.replace("/", "-").replace(".", "-")
+
+
+def make_full_fixture(
+    tmp_path: Path,
+    sessions: list[FixtureSession],
+) -> tuple[Path, Path, Path]:
+    """Build a ``(db_dir, run_dir, projects_root)`` layout from declared sessions.
+
+    Returns absolute paths to three directories rooted at ``tmp_path``:
+
+    * ``db_dir`` — empty parent dir; tests place their SQLite file here.
+    * ``run_dir`` — populated with one ``<pid>.live`` file per session
+      that requested ``has_liveness=True``.
+    * ``projects_root`` — populated with one encoded-directory per
+      distinct ``cwd``, each containing the session JSONLs that share
+      that cwd.
+
+    Sessions sharing a ``cwd`` land in the same encoded directory so
+    AMBIGUOUS-correlation tests can drive multiple in-window candidates
+    against one liveness file.
+
+    Liveness semantics:
+
+    * ``pid_alive=True`` → ``os.getpid()`` (the test process). ``kill -0``
+      always succeeds against the test process.
+    * ``pid_alive=False`` → :func:`_pick_dead_pid` (max-PID + 1). ``kill -0``
+      yields ``ProcessLookupError`` → ``False``.
+    * ``boot_id_current=True`` → :func:`current_boot_id` (real kernel value).
+    * ``boot_id_current=False`` → :data:`_NEVER_MATCH_BOOT_ID` sentinel.
+
+    Two sessions in the same fixture must use different ``pid_alive=False``
+    PIDs to keep the resulting ``<pid>.live`` filenames distinct — we
+    increment from ``_pick_dead_pid()`` for each dead PID allocated.
+
+    Parameters
+    ----------
+    tmp_path
+        pytest's ``tmp_path`` fixture (the per-test temp directory).
+    sessions
+        Declarative spec for each session. Order is not significant.
+
+    Returns
+    -------
+    tuple[Path, Path, Path]
+        ``(db_dir, run_dir, projects_root)`` as absolute paths.
+    """
+    db_dir = tmp_path / "db"
+    run_dir = tmp_path / "run"
+    projects_root = tmp_path / "projects"
+    for d in (db_dir, run_dir, projects_root):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Group sessions by cwd so each unique cwd maps to one encoded dir.
+    by_cwd: dict[str, list[FixtureSession]] = {}
+    for session in sessions:
+        by_cwd.setdefault(session.cwd, []).append(session)
+
+    import time as _time
+
+    now_epoch = int(_time.time())
+
+    # Sequential dead PIDs so two has_liveness+pid_alive=False sessions
+    # don't share a <pid>.live filename.
+    dead_pid_base = _pick_dead_pid()
+    dead_pid_counter = itertools.count(dead_pid_base)
+
+    real_boot_id = current_boot_id()
+
+    for cwd, cwd_sessions in by_cwd.items():
+        project_dir = projects_root / _encoded_dir_name_for(cwd)
+        project_dir.mkdir(parents=True, exist_ok=True)
+        for session in cwd_sessions:
+            # JSONL first-entry timestamp = now + started_offset so the
+            # mtime-window filter (entry_ts >= started - 60) admits it.
+            first_entry_epoch = now_epoch + session.started_offset + 1
+            _write_session_jsonl(
+                project_dir / f"{session.uuid}.jsonl",
+                cwd=cwd,
+                first_entry_epoch=first_entry_epoch,
+                tail_kind=session.tail_kind,
+            )
+
+    # Now write liveness files (after JSONLs exist on disk, so the
+    # mtime-window scan has everything to find).
+    for session in sessions:
+        if not session.has_liveness:
+            continue
+        if session.pid_alive is True:
+            pid = os.getpid()
+        else:
+            pid = next(dead_pid_counter)
+        boot_id = real_boot_id if session.boot_id_current else _NEVER_MATCH_BOOT_ID
+        started = now_epoch + session.started_offset
+        # argv carries ``--resume <uuid>`` so correlate takes the DIRECT_MATCH
+        # path — keeps fixtures unambiguous unless the test explicitly omits
+        # this by constructing its own liveness file.
+        make_liveness_file(
+            run_dir=run_dir,
+            pid=pid,
+            cwd=session.cwd,
+            started=started,
+            argv=f"--resume {session.uuid}",
+            boot_id=boot_id,
+        )
+
+    return db_dir, run_dir, projects_root
 
 
 def make_attachment_interleaved_then_concluded(path: Path) -> None:

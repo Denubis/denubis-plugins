@@ -1,0 +1,697 @@
+"""Integration tests for ``crash_recovery.scan.run_scan`` and the ``scan`` CLI.
+
+Covers crash-recovery.AC3.6 (stale-classifier-version re-classification),
+crash-recovery.AC5.6 end-to-end (boot mismatch wins over PID-alive),
+crash-recovery.AC6.2 (live PID → ``live`` classification), and
+crash-recovery.AC6.3 (ambiguous correlation → ``BORDERLINE``/``ambiguous_match``).
+
+Each test uses :func:`make_full_fixture` to declare a temp filesystem layout
+and either calls :func:`run_scan` directly (preferred — exercises the same
+code path the CLI invokes) or shells out to ``python -m crash_recovery scan``
+(only where the platform-guard or subprocess concurrency is the SUT).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import pytest
+import typer
+
+from crash_recovery import db as db_mod
+from crash_recovery import liveness as liveness_mod
+from crash_recovery import scan as scan_mod
+from crash_recovery.__main__ import scan as scan_cmd
+from crash_recovery.classify import CLASSIFIER_VERSION
+from crash_recovery.jsonl import TailKind
+
+from fixtures.jsonl_builder import (
+    FixtureSession,
+    make_full_fixture,
+)
+
+
+def _init_db(db_dir: Path) -> Path:
+    """Create the DB file and apply schema; return the path."""
+    db_path = db_dir / "crash-recovery.db"
+    db_mod.init(db_path)
+    return db_path
+
+
+def _make_ctx(
+    db_path: Path, run_dir: Path, projects_root: Path, now: int | None = None
+) -> scan_mod.ScanContext:
+    return scan_mod.ScanContext(
+        db_path=db_path,
+        run_dir=run_dir,
+        projects_root=projects_root,
+        now=now if now is not None else int(time.time()),
+    )
+
+
+def _rows(db_path: Path, query: str) -> list[tuple]:
+    """Open the DB and return ``query`` result rows. Closes after read."""
+    conn = sqlite3.connect(db_path)
+    try:
+        return conn.execute(query).fetchall()
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Idempotency + shape
+# ---------------------------------------------------------------------------
+
+
+def test_scan_writes_expected_rows(tmp_path: Path) -> None:
+    """One CONCLUDED, one HARD_CRASH (dead pid + tool_use_no_result), one LIVE.
+
+    Asserts the basic happy-path shape: 3 sessions rows with the expected
+    classifications, one scan_runs row, three classification_history rows.
+    """
+    sessions = [
+        FixtureSession(
+            uuid="11111111-1111-1111-1111-111111111111",
+            cwd="/tmp/conc",
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        ),
+        FixtureSession(
+            uuid="22222222-2222-2222-2222-222222222222",
+            cwd="/tmp/hardc",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,
+            boot_id_current=True,
+        ),
+        FixtureSession(
+            uuid="33333333-3333-3333-3333-333333333333",
+            cwd="/tmp/live",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+        ),
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    result = scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    assert result.sessions_scanned == 3
+    rows = _rows(
+        db_path, "SELECT uuid, classification, classification_reason FROM sessions"
+    )
+    by_uuid = {r[0]: (r[1], r[2]) for r in rows}
+    assert by_uuid["11111111-1111-1111-1111-111111111111"] == (
+        "concluded",
+        "no_liveness_clean_end_turn",
+    )
+    assert by_uuid["22222222-2222-2222-2222-222222222222"] == (
+        "hard_crash",
+        "liveness_dead_pid_tool_use_no_result",
+    )
+    assert by_uuid["33333333-3333-3333-3333-333333333333"] == (
+        "live",
+        "live_pid_present_boot_current",
+    )
+
+    scan_runs = _rows(db_path, "SELECT COUNT(*) FROM scan_runs")
+    assert scan_runs == [(1,)]
+    history = _rows(db_path, "SELECT COUNT(*) FROM classification_history")
+    assert history == [(3,)]
+
+
+def test_scan_is_idempotent(tmp_path: Path) -> None:
+    """Two scans → same sessions rows; first_seen preserved; last_scanned updated."""
+    sessions = [
+        FixtureSession(
+            uuid="11111111-1111-1111-1111-111111111111",
+            cwd="/tmp/conc",
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        ),
+        FixtureSession(
+            uuid="22222222-2222-2222-2222-222222222222",
+            cwd="/tmp/hardc",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,
+            boot_id_current=True,
+        ),
+        FixtureSession(
+            uuid="33333333-3333-3333-3333-333333333333",
+            cwd="/tmp/live",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+        ),
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    # ``now`` pinned to two distinct values so we can compare last_scanned
+    # before/after without depending on wall-clock resolution.
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=1_000_000))
+    first_seen_before = {
+        r[0]: r[1]
+        for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
+    }
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=2_000_000))
+
+    # Same 3 sessions rows.
+    count_rows = _rows(db_path, "SELECT COUNT(*) FROM sessions")
+    assert count_rows == [(3,)]
+    # first_seen preserved.
+    first_seen_after = {
+        r[0]: r[1]
+        for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
+    }
+    assert first_seen_after == first_seen_before
+    # last_scanned advanced to the second scan's now.
+    last_scanned_after = {
+        r[0]: r[1]
+        for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
+    }
+    assert all(v == 2_000_000 for v in last_scanned_after.values())
+    # Two scan_runs rows; six history rows (3 × 2).
+    assert _rows(db_path, "SELECT COUNT(*) FROM scan_runs") == [(2,)]
+    assert _rows(db_path, "SELECT COUNT(*) FROM classification_history") == [(6,)]
+
+
+# ---------------------------------------------------------------------------
+# AC3.6 — stale-classifier-version re-classification
+# ---------------------------------------------------------------------------
+
+
+def test_scan_reclassifies_stale_classifier_version_rows(tmp_path: Path) -> None:
+    """Seeded rows at ``CLASSIFIER_VERSION - 1`` with no JSONLs on disk.
+
+    All three rows must end up at ``CLASSIFIER_VERSION`` after scan with
+    classification ``irrecoverable`` / ``missing_jsonl_on_disk`` — AC3.6.
+    """
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    stale_version = CLASSIFIER_VERSION - 1
+    conn = sqlite3.connect(db_path)
+    try:
+        for i in range(3):
+            uuid = f"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa{i}"
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                    classification, classification_reason, classifier_version,
+                    state_summary, first_seen, last_scanned, user_notes
+                ) VALUES (?, '/p', '/c', '/no/such.jsonl', NULL, NULL,
+                          'borderline', 'old_reason', ?, NULL, 1, 1, NULL)
+                """,
+                (uuid, stale_version),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(
+        db_path,
+        "SELECT classifier_version, classification, classification_reason "
+        "FROM sessions",
+    )
+    assert len(rows) == 3
+    for cv, classification, reason in rows:
+        assert cv == CLASSIFIER_VERSION
+        assert classification == "irrecoverable"
+        assert reason == "missing_jsonl_on_disk"
+
+
+def test_scan_reclassifies_stale_row_whose_jsonl_still_exists(tmp_path: Path) -> None:
+    """Seeded row at stale ``classifier_version`` whose JSONL is on disk.
+
+    Scan finds the JSONL during ``_walk_sessions`` (JSONL-only path), so the
+    row is upserted with the current ``classifier_version`` and the
+    classification matches what :func:`classify` produces for the CONCLUDED
+    tail. The orphan sweep is not the path here — the upsert path is.
+    """
+    uuid = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    cwd = "/tmp/stillalive"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd=cwd,
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    stale_version = CLASSIFIER_VERSION - 1
+    # Find the JSONL path that the fixture wrote.
+    jsonl_paths = list(projects_root.glob("*/*.jsonl"))
+    assert len(jsonl_paths) == 1
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                classification, classification_reason, classifier_version,
+                state_summary, first_seen, last_scanned, user_notes
+            ) VALUES (?, ?, ?, ?, NULL, NULL,
+                      'borderline', 'old', ?, NULL, 1, 1, NULL)
+            """,
+            (uuid, str(jsonl_paths[0].parent), cwd, str(jsonl_paths[0]), stale_version),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classifier_version, classification, classification_reason "
+            "FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    cv, classification, reason = row
+    assert cv == CLASSIFIER_VERSION
+    assert classification == "concluded"
+    assert reason == "no_liveness_clean_end_turn"
+
+
+# ---------------------------------------------------------------------------
+# AC6.2 / AC5.6 / boot-vs-pid precedence
+# ---------------------------------------------------------------------------
+
+
+def test_scan_classifies_live_pid_as_live(tmp_path: Path) -> None:
+    """Live PID + boot_id current → ``live`` / ``live_pid_present_boot_current`` (AC6.2)."""
+    uuid = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd="/tmp/liveone",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("live", "live_pid_present_boot_current")
+
+
+def test_scan_classifies_boot_mismatch_as_hard_crash_even_if_pid_alive(
+    tmp_path: Path,
+) -> None:
+    """Boot mismatch wins over PID-alive — AC5.6 end-to-end.
+
+    The session's liveness file claims a never-matching boot_id but the
+    test process's PID is alive. Per RULES ordering, the boot-mismatch
+    rule fires first and produces ``hard_crash`` /
+    ``liveness_boot_id_mismatch`` regardless of pid_alive=True.
+    """
+    uuid = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd="/tmp/reboot",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,  # but boot is stale — boot wins
+            boot_id_current=False,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("hard_crash", "liveness_boot_id_mismatch")
+
+
+def test_scan_marks_vanished_jsonl_as_irrecoverable(tmp_path: Path) -> None:
+    """Seeded row whose ``jsonl_path`` no longer exists → irrecoverable."""
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+    uuid = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                classification, classification_reason, classifier_version,
+                state_summary, first_seen, last_scanned, user_notes
+            ) VALUES (?, '/p', '/c', '/no/such/file.jsonl', NULL, NULL,
+                      'borderline', 'before', ?, NULL, 1, 1, NULL)
+            """,
+            (uuid, CLASSIFIER_VERSION),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("irrecoverable", "missing_jsonl_on_disk")
+
+
+# ---------------------------------------------------------------------------
+# scan_runs.live_pids serialisation
+# ---------------------------------------------------------------------------
+
+
+def test_scan_writes_scan_runs_with_live_pids(tmp_path: Path) -> None:
+    """``scan_runs.live_pids`` is a JSON array of sorted alive PIDs.
+
+    Two live sessions and one crashed → ``live_pids`` is a JSON list with
+    exactly the test-process PID (both alive sessions share it because both
+    set ``pid_alive=True`` → ``os.getpid()``). The ``sorted({...})`` in
+    ``run_scan`` collapses duplicates.
+    """
+    sessions = [
+        FixtureSession(
+            uuid="11111111-1111-1111-1111-111111111111",
+            cwd="/tmp/live1",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+        ),
+        FixtureSession(
+            uuid="22222222-2222-2222-2222-222222222222",
+            cwd="/tmp/live2",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+        ),
+        FixtureSession(
+            uuid="33333333-3333-3333-3333-333333333333",
+            cwd="/tmp/crashed",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,
+            boot_id_current=True,
+        ),
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(db_path, "SELECT live_pids FROM scan_runs")
+    assert len(rows) == 1
+    live_pids = json.loads(rows[0][0])
+    assert isinstance(live_pids, list)
+    assert live_pids == sorted(set(live_pids))  # sorted+deduped
+    assert live_pids == [os.getpid()]  # both alive sessions share this PID
+
+
+# ---------------------------------------------------------------------------
+# Atomicity
+# ---------------------------------------------------------------------------
+
+
+def test_scan_atomic_on_simulated_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Failure mid-loop rolls back the entire transaction (no partial state).
+
+    Three sessions; patch ``_upsert_session`` to raise after its second call.
+    The ``with conn:`` context manager wrapping the entire write block must
+    roll back so ``sessions`` and ``scan_runs`` end empty.
+    """
+    sessions = [
+        FixtureSession(
+            uuid=f"abcdefab-cdef-abcd-efab-cdefabcdef0{i}",
+            cwd=f"/tmp/atomic{i}",
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        )
+        for i in range(3)
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    real_upsert = scan_mod._upsert_session
+    counter = {"n": 0}
+
+    def flaky_upsert(*args, **kwargs):
+        counter["n"] += 1
+        if counter["n"] >= 2:
+            raise RuntimeError("simulated mid-loop failure")
+        return real_upsert(*args, **kwargs)
+
+    monkeypatch.setattr(scan_mod, "_upsert_session", flaky_upsert)
+
+    with pytest.raises(RuntimeError, match="simulated mid-loop failure"):
+        scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    assert _rows(db_path, "SELECT COUNT(*) FROM sessions") == [(0,)]
+    assert _rows(db_path, "SELECT COUNT(*) FROM scan_runs") == [(0,)]
+
+
+# ---------------------------------------------------------------------------
+# CLI guards: non-Linux + network FS
+# ---------------------------------------------------------------------------
+
+
+def test_scan_cli_refuses_to_run_on_non_linux(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Non-Linux platform → ``typer.Exit(code=2)`` with helpful stderr message.
+
+    Subprocess can't carry the monkeypatch, so we invoke the typer command
+    function directly with ``sys.platform`` patched.
+    """
+    monkeypatch.setattr(sys, "platform", "darwin")
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    with pytest.raises(typer.Exit) as excinfo:
+        scan_cmd(db_path=db_path, run_dir=run_dir, projects_root=projects_root)
+    assert excinfo.value.exit_code == 2
+
+    captured = capsys.readouterr()
+    assert "requires Linux" in captured.err
+    assert "/proc/sys/kernel/random/boot_id" in captured.err
+
+
+@pytest.mark.parametrize("fstype", ["nfs4", "fuse.sshfs"])
+def test_scan_cli_refuses_when_run_dir_is_on_network_fs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    fstype: str,
+) -> None:
+    """Refused fstype on ``run_dir`` → ``typer.Exit(2)`` mentioning env var + fstype."""
+
+    def _fake_detect(path: Path) -> str:
+        return fstype
+
+    monkeypatch.setattr(liveness_mod, "_detect_fstype", _fake_detect)
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    with pytest.raises(typer.Exit) as excinfo:
+        scan_cmd(db_path=db_path, run_dir=run_dir, projects_root=projects_root)
+    assert excinfo.value.exit_code == 2
+
+    captured = capsys.readouterr()
+    assert "CRASH_RECOVERY_RUN_DIR" in captured.err
+    assert fstype in captured.err
+
+
+# ---------------------------------------------------------------------------
+# AC6.3 — ambiguous correlation
+# ---------------------------------------------------------------------------
+
+
+def test_scan_classifies_ambiguous_correlation_as_borderline_ambiguous_match(
+    tmp_path: Path,
+) -> None:
+    """One liveness file (no ``--resume``), two JSONLs in the mtime window.
+
+    Correlate returns ``AMBIGUOUS`` with both UUIDs as candidates; scan
+    emits one ``SessionFact`` per candidate, each classified as
+    ``borderline`` / ``ambiguous_match`` with ``state_summary`` listing the
+    other candidate (AC6.3).
+    """
+    cwd = "/tmp/ambig"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    # Build two JSONLs in the same project dir + one liveness file with no
+    # ``--resume`` flag in argv (correlate must use the mtime window).
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    uuid_a = "aaaaaaaa-1111-1111-1111-111111111111"
+    uuid_b = "bbbbbbbb-2222-2222-2222-222222222222"
+    # Both JSONLs have first_entry_ts comfortably in the mtime window:
+    # started = now - 3600, so any ts >= now - 3660 is admitted.
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=now_epoch - 100,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=now_epoch - 50,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=os.getpid(),
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv="",  # no --resume → mtime-window path
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason, state_summary "
+        "FROM sessions",
+    )
+    by_uuid = {r[0]: (r[1], r[2], r[3]) for r in rows}
+    assert set(by_uuid.keys()) == {uuid_a, uuid_b}
+    for u in (uuid_a, uuid_b):
+        classification, reason, summary = by_uuid[u]
+        assert classification == "borderline"
+        assert reason == "ambiguous_match"
+        assert "ambiguous match:" in summary
+        # The other candidate's UUID is in the state_summary
+        other = uuid_b if u == uuid_a else uuid_a
+        assert other in summary
+
+
+# ---------------------------------------------------------------------------
+# Concurrency — WAL + busy timeout
+# ---------------------------------------------------------------------------
+
+
+def test_scan_two_concurrent_invocations_do_not_corrupt_db(tmp_path: Path) -> None:
+    """Two parallel ``crash-recovery scan`` subprocesses → exactly 2 scan_runs.
+
+    Three synthetic sessions, two parallel ``python -m crash_recovery scan``
+    invocations. WAL mode + SQLite's 5s default busy timeout serialise the
+    two write transactions. Both subprocesses exit 0; sessions count is
+    exactly 3; scan_runs count is exactly 2; every sessions row has the
+    current ``classifier_version`` and a ``last_scanned`` matching one of
+    the two ``scan_runs.ts`` values.
+    """
+    sessions = [
+        FixtureSession(
+            uuid=f"abc{i}defa-bcde-fabc-defa-bcdefabcdef{i}",
+            cwd=f"/tmp/concurrent{i}",
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        )
+        for i in range(3)
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    env = {
+        **os.environ,
+        "CRASH_RECOVERY_DB": str(db_path),
+        "CRASH_RECOVERY_RUN_DIR": str(run_dir),
+        "CRASH_RECOVERY_PROJECTS_ROOT": str(projects_root),
+    }
+    proc_a = subprocess.Popen(
+        [sys.executable, "-m", "crash_recovery", "scan"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    proc_b = subprocess.Popen(
+        [sys.executable, "-m", "crash_recovery", "scan"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    out_a, err_a = proc_a.communicate(timeout=30)
+    out_b, err_b = proc_b.communicate(timeout=30)
+    assert proc_a.returncode == 0, (out_a, err_a)
+    assert proc_b.returncode == 0, (out_b, err_b)
+
+    sess_count = _rows(db_path, "SELECT COUNT(*) FROM sessions")
+    assert sess_count == [(3,)]
+    runs = _rows(db_path, "SELECT id, ts FROM scan_runs ORDER BY id")
+    assert len(runs) == 2
+    run_timestamps = {r[1] for r in runs}
+
+    rows = _rows(
+        db_path, "SELECT classifier_version, last_scanned FROM sessions"
+    )
+    for cv, ls in rows:
+        assert cv == CLASSIFIER_VERSION
+        assert ls in run_timestamps
