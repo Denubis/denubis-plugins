@@ -29,7 +29,7 @@ from crash_recovery.classify import (
     LivenessState,
     classify,
 )
-from crash_recovery.correlate import CorrelationKind, correlate
+from crash_recovery.correlate import CorrelationKind, _project_dir_for_cwd, correlate
 from crash_recovery.jsonl import TailKind, TailSummary, parse_tail
 from crash_recovery.liveness import (
     Liveness,
@@ -143,8 +143,6 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
         # correlate has already located it (or we'd be in NO_MATCH); re-look
         # it up by content for the path string we store. We reuse the
         # correlation's uuid/candidates to derive the JSONL filenames.
-        from crash_recovery.correlate import _project_dir_for_cwd
-
         project_dir = _project_dir_for_cwd(ctx.projects_root, liveness.cwd)
         project_path = str(project_dir) if project_dir is not None else ""
         pid_alive_value = pid_alive(liveness.pid)
