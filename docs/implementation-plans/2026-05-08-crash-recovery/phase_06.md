@@ -598,6 +598,14 @@ git commit -m "feat(crash-recovery): add list-live subcommand (plain + --json ou
 
 - **`_render_to_file` opens a second SQLite connection for `COUNT(*)`** (`plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/__main__.py:180-182`). Phase 5 code review (2026-05-17) surfaced a narrow TOCTOU window where a concurrent `scan` between the `os.replace` and the `COUNT(*)` query can produce a stale "Rendered N sessions" line (cosmetic, off-by-one or off-by-two on the user-visible echo only — the rendered file itself is always consistent). Reviewer marked Minor with "No action required before merge". Phase 6 owns the resolution because (a) Phase 6 adds more typer subcommands (`note`, `history`, `prune`, `list-live`) that share the same `__main__.py` module and CLI patterns, so consolidating the count-handling can ride alongside, and (b) the natural fix lands in render itself or the CLI wrapper, both of which Phase 6 touches. Suggested fix options, pick whichever Phase 6 finds least intrusive: (i) `render()` returns `tuple[str, int]` so the count comes from the same read transaction; (ii) drop the count from the user-visible line; (iii) accept the TOCTOU window with an explicit comment. No test owed unless the fix changes user-visible semantics.
 
+  **If you pick option (i)**, the return-type change requires SIMULTANEOUS updates across four sites — do not commit partial coverage:
+  1. `crash_recovery/render.py::render()` — change signature to `tuple[str, int]` and adjust the body to extract the count from the same `conn.execute(...).fetchall()` call (use `len(rows)` rather than a second `COUNT(*)` query).
+  2. `crash_recovery/__main__.py::_render_to_file` — unpack `(content, n) = _render.render(db_path)`; drop the second `sqlite3.connect`.
+  3. `crash_recovery/__main__.py::triage` — currently `typer.echo(_render.render(ctx.db_path), nl=False)`; must become `content, _ = _render.render(...); typer.echo(content, nl=False)` (or surface the count somewhere — current `triage` doesn't echo it).
+  4. `crash_recovery/tests/test_render.py::test_render_matches_snapshot[empty|mixed|all_concluded]` AND `test_render_is_byte_identical_across_calls` — both call `render.render(db_path)` and compare against snapshot strings via `==`. With a tuple return, these fail with cryptic `TypeError: cannot compare tuple to str`. Unpack the tuple in the test body or update the helper. The expected_*.md snapshot fixtures themselves DO NOT change.
+
+  Without all four updates landing together, the test suite reports an unhelpful failure rather than a useful diff. (Falsification anchor surfaced by Phase 5 proleptic challenge CA3, 2026-05-17.)
+
 ## Outstanding for later phases
 
 - Phase 7: triage skill registration; verifies AC1.2 (plugin lists after install), AC8.1 (README documents dependency).
