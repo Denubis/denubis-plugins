@@ -186,9 +186,10 @@ def test_scan_is_idempotent(tmp_path: Path) -> None:
         for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
     }
     assert all(v == 2_000_000 for v in last_scanned_after.values())
-    # Two scan_runs rows; six history rows (3 × 2).
+    # Two scan_runs rows; three history rows (one per session from scan 1;
+    # scan 2 dedups because no classification changed — M4).
     assert _rows(db_path, "SELECT COUNT(*) FROM scan_runs") == [(2,)]
-    assert _rows(db_path, "SELECT COUNT(*) FROM classification_history") == [(6,)]
+    assert _rows(db_path, "SELECT COUNT(*) FROM classification_history") == [(3,)]
 
 
 # ---------------------------------------------------------------------------
@@ -860,3 +861,141 @@ def test_walk_emits_irrecoverable_missing_cwd_for_unreadable_jsonl(
     assert reason == "missing_cwd"
     assert cwd_val == ""
     assert pp_val == ""
+
+
+# ---------------------------------------------------------------------------
+# M4 — classification_history dedup
+# ---------------------------------------------------------------------------
+
+
+def test_classification_history_skips_append_when_unchanged(tmp_path: Path) -> None:
+    """Running scan twice on the same fixture writes history rows only once.
+
+    M4: classification_history previously accumulated a row per scan per
+    session, even when the classification was unchanged. After M4 the
+    second scan must skip the history append for any session whose
+    classification + reason are unchanged. ``last_scanned`` still
+    advances on both rows (refreshed on every scan).
+    """
+    sessions = [
+        FixtureSession(
+            uuid="11111111-1111-1111-1111-111111111111",
+            cwd="/tmp/conc-dedup",
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        ),
+        FixtureSession(
+            uuid="22222222-2222-2222-2222-222222222222",
+            cwd="/tmp/hardc-dedup",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,
+            boot_id_current=True,
+        ),
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=1_000_000))
+    history_after_first = _rows(
+        db_path, "SELECT COUNT(*) FROM classification_history"
+    )
+    assert history_after_first == [(2,)]
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=2_000_000))
+
+    # No new history rows because nothing changed
+    history_after_second = _rows(
+        db_path, "SELECT COUNT(*) FROM classification_history"
+    )
+    assert history_after_second == [(2,)]
+    # last_scanned still advanced
+    last_scanned = {
+        r[0]: r[1]
+        for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
+    }
+    assert all(v == 2_000_000 for v in last_scanned.values())
+
+
+def test_classification_history_appends_when_classification_changes(
+    tmp_path: Path,
+) -> None:
+    """Seed a row with one classification; scan produces a different one → history grows.
+
+    M4: when a session's classification + reason genuinely change between
+    scans, the append still happens. Seed a row at ``classification=live``
+    for a UUID that the fixture actually classifies as ``hard_crash``
+    (dead PID + tool_use_no_result, boot current). After scan,
+    classification_history must hold 2 rows for that UUID — the seeded
+    one and the new change.
+    """
+    uuid = "44444444-4444-4444-4444-444444444444"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd="/tmp/hardc-change",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,
+            boot_id_current=True,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    # Find the JSONL the fixture wrote so the seeded row references it.
+    jsonl_paths = list(projects_root.glob("*/*.jsonl"))
+    assert len(jsonl_paths) == 1
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                classification, classification_reason, classifier_version,
+                state_summary, first_seen, last_scanned, user_notes
+            ) VALUES (?, '/tmp/hardc-change', '/tmp/hardc-change', ?, NULL, NULL,
+                      'live', 'live_pid_present_boot_current', ?, NULL, 1, 1, NULL)
+            """,
+            (uuid, str(jsonl_paths[0]), CLASSIFIER_VERSION),
+        )
+        # Seed a matching history row for the initial state so we can
+        # assert the count grows by exactly one after the change.
+        conn.execute(
+            """
+            INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version)
+            VALUES (1, '[]', 1, ?)
+            """,
+            (CLASSIFIER_VERSION,),
+        )
+        seeded_run_id = conn.execute(
+            "SELECT id FROM scan_runs ORDER BY id LIMIT 1"
+        ).fetchone()[0]
+        conn.execute(
+            """
+            INSERT INTO classification_history
+            (uuid, scan_id, classification, reason, classifier_version)
+            VALUES (?, ?, 'live', 'live_pid_present_boot_current', ?)
+            """,
+            (uuid, seeded_run_id, CLASSIFIER_VERSION),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=2_000_000))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT classification, reason FROM classification_history "
+            "WHERE uuid = ? ORDER BY scan_id",
+            (uuid,),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 2
+    assert rows[0] == ("live", "live_pid_present_boot_current")
+    assert rows[1] == ("hard_crash", "liveness_dead_pid_tool_use_no_result")

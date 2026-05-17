@@ -427,7 +427,8 @@ def _orphan_sweep(
 
     Algorithm:
 
-    1. Query all rows.
+    1. Query all rows (uuid, jsonl_path, classifier_version, classification,
+       classification_reason).
     2. Skip rows whose UUID was seen this scan (handled by upsert).
     3. If ``jsonl_path`` is NULL or points to a now-missing file: classify
        as ``IRRECOVERABLE`` with reason ``missing_jsonl_on_disk``.
@@ -435,13 +436,25 @@ def _orphan_sweep(
        :class:`LivenessState`. This handles the case where a previous scan
        saw a liveness file that has since been cleaned up — the session
        itself may still have a JSONL on disk.
-    5. UPDATE the row and append history. Return count of rows updated.
+    5. UPDATE the row's fields (refreshes ``last_scanned`` and
+       ``classifier_version`` every scan). M4: only append a
+       classification_history row when the new classification + reason
+       differ from the stored values — repeated orphan sweeps over an
+       unchanged row no longer accumulate redundant "still irrecoverable"
+       history entries. Return count of rows updated.
     """
     rows = conn.execute(
-        "SELECT uuid, jsonl_path, classifier_version FROM sessions"
+        "SELECT uuid, jsonl_path, classifier_version, "
+        "classification, classification_reason FROM sessions"
     ).fetchall()
     updated = 0
-    for uuid, jsonl_path_str, _stored_version in rows:
+    for (
+        uuid,
+        jsonl_path_str,
+        _stored_version,
+        stored_classification,
+        stored_reason,
+    ) in rows:
         if uuid in seen_uuids:
             continue
         if not jsonl_path_str or not Path(jsonl_path_str).exists():
@@ -476,7 +489,11 @@ def _orphan_sweep(
                 uuid,
             ),
         )
-        _append_history(conn, uuid, scan_run_id, new_classification)
+        if (
+            new_classification.value != stored_classification
+            or new_classification.reason != stored_reason
+        ):
+            _append_history(conn, uuid, scan_run_id, new_classification)
         updated += 1
     return updated
 
@@ -522,8 +539,20 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
                 live_pids=live_pids,
             )
             for fact, classification in classifications:
+                # M4: query existing classification + reason before upsert
+                # so we can dedup the history append. The upsert below will
+                # overwrite these values; we need the pre-upsert state.
+                prior = conn.execute(
+                    "SELECT classification, classification_reason "
+                    "FROM sessions WHERE uuid = ?",
+                    (fact.uuid,),
+                ).fetchone()
                 _upsert_session(conn, fact, classification, ctx, run_id)
-                _append_history(conn, fact.uuid, run_id, classification)
+                if prior is None or (
+                    classification.value != prior[0]
+                    or classification.reason != prior[1]
+                ):
+                    _append_history(conn, fact.uuid, run_id, classification)
             reclassified = _orphan_sweep(conn, ctx, run_id, seen_uuids)
     return ScanRunResult(
         scan_run_id=run_id,
