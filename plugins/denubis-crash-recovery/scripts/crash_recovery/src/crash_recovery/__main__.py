@@ -120,6 +120,43 @@ def scan(
     )
 
 
+def _build_scan_ctx_and_run(
+    db_path: Path | None,
+    run_dir: Path | None,
+    projects_root: Path | None,
+) -> _scan.ScanContext:
+    """Resolve scan options, apply Linux + local-filesystem guards, then scan.
+
+    Replicates the guard sequence from the ``scan`` subcommand so the
+    composite commands (``triage``, ``regenerate``) reject the same
+    environments at the same exit code (2). Returns the :class:`ScanContext`
+    that was used so callers can re-open the DB path for rendering.
+    """
+    if sys.platform != "linux":
+        typer.echo(
+            "crash-recovery requires Linux: reboot detection reads "
+            "/proc/sys/kernel/random/boot_id, which only exists on Linux. "
+            f"Detected platform: {sys.platform}.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    ctx = _scan.ScanContext(
+        db_path=_resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db"),
+        run_dir=_resolve(run_dir, "CRASH_RECOVERY_RUN_DIR", "~/.claude/run"),
+        projects_root=_resolve(
+            projects_root, "CRASH_RECOVERY_PROJECTS_ROOT", "~/.claude/projects"
+        ),
+        now=int(time.time()),
+    )
+    try:
+        _liveness.assert_local_filesystem(ctx.run_dir)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    _scan.run_scan(ctx)
+    return ctx
+
+
 def _render_to_file(db_path: Path, output: Path) -> int:
     """Render ``db_path``'s markdown and write atomically to ``output``.
 
@@ -167,6 +204,68 @@ def render(
     resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
     resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
     count = _render_to_file(resolved_db, resolved_out)
+    typer.echo(f"Rendered {count} sessions to {resolved_out}")
+
+
+@app.command()
+def triage(
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+    run_dir: Path = typer.Option(
+        None,
+        "--run-dir",
+        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+    ),
+    projects_root: Path = typer.Option(
+        None,
+        "--projects-root",
+        help="Projects root (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects).",
+    ),
+) -> None:
+    """Scan the filesystem, then print the rendered report to stdout.
+
+    Composite of ``scan`` + ``render``-to-stdout. Same Linux + local-filesystem
+    guards as ``scan``.
+    """
+    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
+    typer.echo(_render.render(ctx.db_path))
+
+
+@app.command()
+def regenerate(
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+    run_dir: Path = typer.Option(
+        None,
+        "--run-dir",
+        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+    ),
+    projects_root: Path = typer.Option(
+        None,
+        "--projects-root",
+        help="Projects root (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects).",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output",
+        help="Path to the rendered markdown file (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md).",
+    ),
+) -> None:
+    """Scan the filesystem, then write the rendered report to the output file.
+
+    Composite of ``scan`` + ``render``-to-file. Uses the same atomic-write
+    path as the standalone ``render`` subcommand so an interrupted write
+    cannot leave a partial markdown file at the destination.
+    """
+    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
+    resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
+    count = _render_to_file(ctx.db_path, resolved_out)
     typer.echo(f"Rendered {count} sessions to {resolved_out}")
 
 
