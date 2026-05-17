@@ -297,6 +297,106 @@ def _classify_fact(fact: SessionFact) -> Classification:
     return classify(fact.tail_summary, liveness_state, fact.pid_alive_value)
 
 
+def _write_scan_run(
+    conn,
+    ctx: ScanContext,
+    *,
+    sessions_scanned: int,
+    live_pids: list[int],
+) -> int:
+    """Insert one row into ``scan_runs`` and return its ``rowid``.
+
+    Called BEFORE the per-session upserts so the returned ``run_id`` is
+    available for :func:`_append_history`. ``live_pids`` is serialised via
+    :func:`json.dumps`; the empty-list case serialises as ``"[]"`` (the
+    column is TEXT and the design's convention is non-null TEXT — empty
+    array is the natural empty value).
+    """
+    cur = conn.execute(
+        "INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version) "
+        "VALUES (?, ?, ?, ?)",
+        (ctx.now, json.dumps(live_pids), sessions_scanned, CLASSIFIER_VERSION),
+    )
+    return cur.lastrowid
+
+
+def _upsert_session(
+    conn,
+    fact: SessionFact,
+    classification: Classification,
+    ctx: ScanContext,
+    scan_run_id: int,
+) -> None:
+    """INSERT ... ON CONFLICT(uuid) DO UPDATE one row in ``sessions``.
+
+    ``first_seen`` is preserved on conflict (set only on the initial INSERT
+    to ``ctx.now``). ``user_notes`` is NEVER touched on conflict — user
+    annotations persist across scans per Phase 6's contract. All other
+    fields are refreshed with the current scan's values.
+    """
+    conn.execute(
+        """
+        INSERT INTO sessions (
+            uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+            classification, classification_reason, classifier_version, state_summary,
+            first_seen, last_scanned, user_notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ON CONFLICT(uuid) DO UPDATE SET
+            project_path = excluded.project_path,
+            cwd = excluded.cwd,
+            jsonl_path = excluded.jsonl_path,
+            jsonl_mtime = excluded.jsonl_mtime,
+            jsonl_last_ts = excluded.jsonl_last_ts,
+            classification = excluded.classification,
+            classification_reason = excluded.classification_reason,
+            classifier_version = excluded.classifier_version,
+            state_summary = excluded.state_summary,
+            last_scanned = excluded.last_scanned
+        """,
+        (
+            fact.uuid,
+            fact.project_path,
+            fact.cwd,
+            fact.jsonl_path,
+            fact.jsonl_mtime,
+            fact.tail_summary.last_ts,
+            classification.value,
+            classification.reason,
+            CLASSIFIER_VERSION,
+            fact.tail_summary.state_summary,
+            ctx.now,
+            ctx.now,
+        ),
+    )
+
+
+def _append_history(
+    conn,
+    uuid: str,
+    scan_run_id: int,
+    classification: Classification,
+) -> None:
+    """INSERT one row into ``classification_history``.
+
+    Primary key is ``(uuid, scan_id)``: re-running with the same
+    ``scan_run_id`` raises ``sqlite3.IntegrityError`` — that's a programmer
+    error guard (each scan_run should produce at most one history row per
+    UUID).
+    """
+    conn.execute(
+        "INSERT INTO classification_history "
+        "(uuid, scan_id, classification, reason, classifier_version) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            uuid,
+            scan_run_id,
+            classification.value,
+            classification.reason,
+            CLASSIFIER_VERSION,
+        ),
+    )
+
+
 def run_scan(ctx: ScanContext) -> ScanRunResult:
     """Walk the filesystem, classify, and write one transaction to the DB.
 
