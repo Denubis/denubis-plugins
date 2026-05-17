@@ -94,6 +94,24 @@ class SessionFact:
     ambiguity_candidates: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class WriteContext:
+    """Bundle of arguments shared across DB-writer helpers.
+
+    Each per-session write (``_upsert_session``, ``_append_history``) and the
+    closing orphan sweep (``_orphan_sweep``) need the open ``conn``, the
+    frozen :class:`ScanContext`, and the row id of the in-progress
+    ``scan_runs`` row. Bundling them keeps writer signatures compact and
+    makes it impossible to call a writer with a mismatched ``ctx``/``conn``
+    pair. Created by :func:`_write_scan_run`, which is the helper that
+    allocates ``scan_run_id``.
+    """
+
+    conn: object
+    ctx: ScanContext
+    scan_run_id: int
+
+
 def _jsonl_path_and_mtime(
     project_dir: Path | None, uuid: str
 ) -> tuple[str | None, int | None]:
@@ -323,38 +341,38 @@ def _write_scan_run(
     *,
     sessions_scanned: int,
     live_pids: list[int],
-) -> int:
-    """Insert one row into ``scan_runs`` and return its ``rowid``.
+) -> WriteContext:
+    """Insert one row into ``scan_runs`` and return a :class:`WriteContext`.
 
-    Called BEFORE the per-session upserts so the returned ``run_id`` is
+    Called BEFORE the per-session upserts so the returned ``scan_run_id`` is
     available for :func:`_append_history`. ``live_pids`` is serialised via
     :func:`json.dumps`; the empty-list case serialises as ``"[]"`` (the
     column is TEXT and the design's convention is non-null TEXT — empty
-    array is the natural empty value).
+    array is the natural empty value). Returns the bundled
+    ``(conn, ctx, scan_run_id)`` triple that the per-session writers and
+    the orphan sweep consume.
     """
     cur = conn.execute(
         "INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version) "
         "VALUES (?, ?, ?, ?)",
         (ctx.now, json.dumps(live_pids), sessions_scanned, CLASSIFIER_VERSION),
     )
-    return cur.lastrowid
+    return WriteContext(conn=conn, ctx=ctx, scan_run_id=cur.lastrowid)
 
 
 def _upsert_session(
-    conn,
+    wctx: WriteContext,
     fact: SessionFact,
     classification: Classification,
-    ctx: ScanContext,
-    scan_run_id: int,
 ) -> None:
     """INSERT ... ON CONFLICT(uuid) DO UPDATE one row in ``sessions``.
 
     ``first_seen`` is preserved on conflict (set only on the initial INSERT
-    to ``ctx.now``). ``user_notes`` is NEVER touched on conflict — user
+    to ``wctx.ctx.now``). ``user_notes`` is NEVER touched on conflict — user
     annotations persist across scans per Phase 6's contract. All other
     fields are refreshed with the current scan's values.
     """
-    conn.execute(
+    wctx.conn.execute(
         """
         INSERT INTO sessions (
             uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
@@ -384,32 +402,31 @@ def _upsert_session(
             classification.reason,
             CLASSIFIER_VERSION,
             fact.tail_summary.state_summary,
-            ctx.now,
-            ctx.now,
+            wctx.ctx.now,
+            wctx.ctx.now,
         ),
     )
 
 
 def _append_history(
-    conn,
+    wctx: WriteContext,
     uuid: str,
-    scan_run_id: int,
     classification: Classification,
 ) -> None:
     """INSERT one row into ``classification_history``.
 
     Primary key is ``(uuid, scan_id)``: re-running with the same
-    ``scan_run_id`` raises ``sqlite3.IntegrityError`` — that's a programmer
-    error guard (each scan_run should produce at most one history row per
-    UUID).
+    ``wctx.scan_run_id`` raises ``sqlite3.IntegrityError`` — that's a
+    programmer error guard (each scan_run should produce at most one
+    history row per UUID).
     """
-    conn.execute(
+    wctx.conn.execute(
         "INSERT INTO classification_history "
         "(uuid, scan_id, classification, reason, classifier_version) "
         "VALUES (?, ?, ?, ?, ?)",
         (
             uuid,
-            scan_run_id,
+            wctx.scan_run_id,
             classification.value,
             classification.reason,
             CLASSIFIER_VERSION,
@@ -418,9 +435,7 @@ def _append_history(
 
 
 def _orphan_sweep(
-    conn,
-    ctx: ScanContext,
-    scan_run_id: int,
+    wctx: WriteContext,
     seen_uuids: set[str],
 ) -> int:
     """Re-classify DB rows whose UUIDs were not seen in this scan's walk.
@@ -449,7 +464,7 @@ def _orphan_sweep(
        unchanged row no longer accumulate redundant "still irrecoverable"
        history entries. Return count of rows updated.
     """
-    rows = conn.execute(
+    rows = wctx.conn.execute(
         "SELECT uuid, jsonl_path, classifier_version, "
         "classification, classification_reason FROM sessions"
     ).fetchall()
@@ -482,7 +497,7 @@ def _orphan_sweep(
             new_classification = classify(
                 tail_summary, liveness_state, pid_alive=None
             )
-        conn.execute(
+        wctx.conn.execute(
             "UPDATE sessions SET classification = ?, classification_reason = ?, "
             "classifier_version = ?, state_summary = ?, last_scanned = ? "
             "WHERE uuid = ?",
@@ -491,7 +506,7 @@ def _orphan_sweep(
                 new_classification.reason,
                 CLASSIFIER_VERSION,
                 tail_summary.state_summary,
-                ctx.now,
+                wctx.ctx.now,
                 uuid,
             ),
         )
@@ -499,7 +514,7 @@ def _orphan_sweep(
             new_classification.value != stored_classification
             or new_classification.reason != stored_reason
         ):
-            _append_history(conn, uuid, scan_run_id, new_classification)
+            _append_history(wctx, uuid, new_classification)
         updated += 1
     return updated
 
@@ -538,7 +553,7 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
     )
     with closing(db.open_db(ctx.db_path)) as conn:
         with conn:
-            run_id = _write_scan_run(
+            wctx = _write_scan_run(
                 conn,
                 ctx,
                 sessions_scanned=len(facts),
@@ -553,15 +568,15 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
                     "FROM sessions WHERE uuid = ?",
                     (fact.uuid,),
                 ).fetchone()
-                _upsert_session(conn, fact, classification, ctx, run_id)
+                _upsert_session(wctx, fact, classification)
                 if prior is None or (
                     classification.value != prior[0]
                     or classification.reason != prior[1]
                 ):
-                    _append_history(conn, fact.uuid, run_id, classification)
-            reclassified = _orphan_sweep(conn, ctx, run_id, seen_uuids)
+                    _append_history(wctx, fact.uuid, classification)
+            reclassified = _orphan_sweep(wctx, seen_uuids)
     return ScanRunResult(
-        scan_run_id=run_id,
+        scan_run_id=wctx.scan_run_id,
         sessions_scanned=len(facts),
         sessions_reclassified=reclassified,
     )
