@@ -75,6 +75,16 @@ Both `SESSIONS_DDL` and `CLASSIFICATION_HISTORY_DDL` reference this constant to 
 
 The rendered markdown output groups sessions into sections whose headings combine classification and reason (e.g. `borderline+ambiguous_match`, `borderline+malformed_tail`). These compound section keys are a rendering concept only — they are derived at render time from `(classification, reason)` tuples stored in separate columns. The DB stores only the bare classification value; the `reason` column holds the distinguishing reason string.
 
+### Scan transaction model
+
+`run_scan` opens one SQLite connection via `db.open_db()` and wraps its entire write block in a single `with conn:` transaction. Inside that transaction, in order:
+
+1. `_write_scan_run(conn, ctx, sessions_scanned, live_pids)` inserts the `scan_runs` row first so the returned rowid is available for `classification_history` appends.
+2. For each `SessionFact` from the read-only filesystem walk: `_upsert_session(conn, fact, classification, ctx, run_id)` performs the `INSERT … ON CONFLICT(uuid) DO UPDATE` and (conditionally, when classification changed) `_append_history(conn, fact.uuid, run_id, classification)` writes the history row.
+3. `_orphan_sweep(conn, ctx, run_id, seen_uuids)` iterates `sessions` rows not seen in the walk and applies the same update + conditional history-append pattern.
+
+On any uncaught exception the entire transaction rolls back atomically: no `scan_runs` row, no partial `sessions` updates, no orphan `classification_history` entries. WAL mode (set by `db.py::init`) admits concurrent readers throughout; concurrent `scan` invocations serialize at the SQLite write lock, both completing successfully with one `scan_runs` row each (the default 5s busy timeout absorbs the contention). Source: `scan.py::run_scan`. Atomicity pin: `tests/test_scan.py::test_scan_atomic_on_simulated_failure`. Concurrency pin: `tests/test_scan.py::test_scan_two_concurrent_invocations_do_not_corrupt_db`.
+
 ## Denormalisation Rationale
 
 **`scan_runs.live_pids` stored as JSON TEXT** (`db.py::SCAN_RUNS_DDL`): This column is a write-only audit field capturing the PID snapshot at scan time. No query ever filters or aggregates on individual PIDs. Storing as a JSON-encoded TEXT array is pragmatic — it avoids a separate `scan_live_pids` junction table for a field that is read back only as a whole blob (if at all).
