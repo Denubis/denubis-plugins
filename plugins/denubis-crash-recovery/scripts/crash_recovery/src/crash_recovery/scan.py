@@ -397,6 +397,76 @@ def _append_history(
     )
 
 
+def _orphan_sweep(
+    conn,
+    ctx: ScanContext,
+    scan_run_id: int,
+    seen_uuids: set[str],
+) -> int:
+    """Re-classify DB rows whose UUIDs were not seen in this scan's walk.
+
+    AC3.6: even if ``classifier_version`` is already current, orphans are
+    re-considered because their JSONL may have been deleted since the last
+    scan. On every orphan we write ``classifier_version = CLASSIFIER_VERSION``
+    (a no-op when the row was already current; the AC3.6 win is the rows
+    seeded at lower versions in tests).
+
+    Algorithm:
+
+    1. Query all rows.
+    2. Skip rows whose UUID was seen this scan (handled by upsert).
+    3. If ``jsonl_path`` is NULL or points to a now-missing file: classify
+       as ``IRRECOVERABLE`` with reason ``missing_jsonl_on_disk``.
+    4. Otherwise: re-parse the JSONL tail and classify with a no-liveness
+       :class:`LivenessState`. This handles the case where a previous scan
+       saw a liveness file that has since been cleaned up — the session
+       itself may still have a JSONL on disk.
+    5. UPDATE the row and append history. Return count of rows updated.
+    """
+    rows = conn.execute(
+        "SELECT uuid, jsonl_path, classifier_version FROM sessions"
+    ).fetchall()
+    updated = 0
+    for uuid, jsonl_path_str, _stored_version in rows:
+        if uuid in seen_uuids:
+            continue
+        if not jsonl_path_str or not Path(jsonl_path_str).exists():
+            new_classification = Classification(
+                value=ClassificationValue.IRRECOVERABLE,
+                reason="missing_jsonl_on_disk",
+            )
+            tail_summary = TailSummary(
+                kind=TailKind.MISSING_FILE,
+                last_ts=None,
+                total_entries=0,
+                state_summary="jsonl missing on disk",
+            )
+        else:
+            tail_summary = parse_tail(Path(jsonl_path_str))
+            liveness_state = LivenessState(
+                present=False, boot_id_current=False
+            )
+            new_classification = classify(
+                tail_summary, liveness_state, pid_alive=None
+            )
+        conn.execute(
+            "UPDATE sessions SET classification = ?, classification_reason = ?, "
+            "classifier_version = ?, state_summary = ?, last_scanned = ? "
+            "WHERE uuid = ?",
+            (
+                new_classification.value,
+                new_classification.reason,
+                CLASSIFIER_VERSION,
+                tail_summary.state_summary,
+                ctx.now,
+                uuid,
+            ),
+        )
+        _append_history(conn, uuid, scan_run_id, new_classification)
+        updated += 1
+    return updated
+
+
 def run_scan(ctx: ScanContext) -> ScanRunResult:
     """Walk the filesystem, classify, and write one transaction to the DB.
 
