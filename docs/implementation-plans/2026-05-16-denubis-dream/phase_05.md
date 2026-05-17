@@ -200,21 +200,27 @@ rm -f "$DATED_DIR/.windowed/$name.jsonl"
 
 # 3. Remove this memory's line from SKIPPED.md so Phase 3's regenerate-on-each-pass logic
 #    doesn't re-list it before the retry has a chance to succeed. Preserve other lines.
+#    `grep -vFx` is literal exact-line match — `$basefile` ends in `.md`, and the regex
+#    form would treat `.` as any-char (theoretical false-positive against adjacent names).
 if [ -f "$DATED_DIR/SKIPPED.md" ]; then
-  grep -v "^- $basefile\$" "$DATED_DIR/SKIPPED.md" > "$DATED_DIR/SKIPPED.md.tmp" && \
+  grep -vFx "- $basefile" "$DATED_DIR/SKIPPED.md" > "$DATED_DIR/SKIPPED.md.tmp" && \
     mv "$DATED_DIR/SKIPPED.md.tmp" "$DATED_DIR/SKIPPED.md"
   [ -s "$DATED_DIR/SKIPPED.md" ] || rm -f "$DATED_DIR/SKIPPED.md"
 fi
 
-# 4. Re-execute Phase 3's `## Pre-windowing transcripts` block AND `## Per-memory evidence
-#    retrieval` orchestrator. The orchestrator's `## Evidence`-presence check (Phase 3 Task 2)
-#    naturally scopes the dispatch to the just-deleted audit — every other memory's audit
-#    file still exists with a populated `## Evidence`, so they are skipped. Only the just-
-#    deleted entry triggers a new Sonnet subagent dispatch.
+# 4. Re-execute Phase 3's `## Pre-windowing transcripts` block (see Phase 3 Task 1's bash
+#    block — the `for memfile in memory/*.md` loop with the `jq` extractor) AND
+#    `## Per-memory evidence retrieval` orchestrator (see Phase 3 Task 2's task-implementor
+#    dispatch). The orchestrator's `## Evidence`-presence check (Phase 3 Task 2) naturally
+#    scopes the dispatch to the just-deleted audit — every other memory's audit file still
+#    exists with a populated `## Evidence`, so they are skipped. Only the just-deleted entry
+#    triggers a new Sonnet subagent dispatch.
 
-# 5. Re-execute Phase 4's `## Judgement orchestration` block. Its `## Disposition`-presence
-#    check (Phase 4 Task 4) similarly scopes the work to the just-rewritten audit — every
-#    other audit already has `## Disposition`, so Opus only judges the one new audit.
+# 5. Re-execute Phase 4's `## Judgement orchestration` block (see Phase 4 Task 4 — the
+#    orchestrator that iterates audits and dispatches the Opus judgement subagent). Its
+#    `## Disposition`-presence check (Phase 4 Task 4) similarly scopes the work to the
+#    just-rewritten audit — every other audit already has `## Disposition`, so Opus only
+#    judges the one new audit.
 ```
 
 - **On success** (new `.audit.md` with both `## Evidence` populated by Phase 3 and `## Disposition` populated by Phase 4): re-enter the walk. The retried memory is no longer in `SKIPPED.md`; it falls into the regular memory-stream walk at its mtime-ordered position. Walk continues from there.
@@ -376,7 +382,7 @@ For each flagged region:
 
 **On `edit <instructions>`:**
 - Revise the scaffold per the user's instructions (rename, rewrite, change type, restructure body — whatever the instruction says).
-- **Persist the revised scaffold** to `<dated_dir>/flagged/<region-id>.scaffold.md` (atomic `.tmp + mv` write, same pattern as Phase 6). This survives mid-walk abandonment: the persistence happens as part of Task 7's mid-walk persistence sequence (substantive write → decisions.log append) BEFORE control returns to the user for the next iteration. On resume, the per-region resume check at the top of this section reads the persisted file so the user's prior edits are preserved across sessions.
+- **Persist the revised scaffold** to `<dated_dir>/flagged/<region-id>.scaffold.md` (atomic write via the `Write` tool — a fresh write to a dated-dir file; `Write` is single-call atomic so no `.tmp + mv` ceremony is needed). This survives mid-walk abandonment: the persistence happens as part of Task 7's mid-walk persistence sequence (substantive write → decisions.log append) BEFORE control returns to the user for the next iteration. On resume, the per-region resume check at the top of this section reads the persisted file so the user's prior edits are preserved across sessions.
 - Re-present the revised scaffold with the same prompt (`accept / edit / dismiss`). The user can iterate as many times as they want; only the most recent accepted scaffold lands in `promoted/`.
 - Each `edit` iteration is one decisions.log line — the last line per identifier wins (per AC5.11). The scaffold file is rewritten on every iteration so it always reflects the latest revision, not just the most recent decisions.log instruction.
 
@@ -669,7 +675,9 @@ denubis-dream: walk complete.
 Apply to live memory/? [y/n]
 ```
 
-Counts are derived from the most-recent decisions.log line per (stream, identifier). `reject` outcomes are counted in the `kept` total because their final mirror state equals live byte-for-byte — they appear as the `R` sub-count for transparency (an audit of "how many recommendations did the user discard?" is recoverable from the decisions.log, and the summary surfaces the aggregate without complicating the apply step). Per the user-approved deviation #2 in the phase header, `reject` is a meta-verb that resolves to a live-state mirror regardless of the recommendation it was applied against.
+The format above is the printed shape, not a derivation recipe. The implementer derives the M / N / R / P / Q / Z / W / V sub-counts via `jq` over `decisions.log`, taking the most-recent line per (stream, identifier) and partitioning by `action` and `stream`. Concretely: M = `keep` outcomes on the memory stream from a batch-keep turn (Phase 5 Task 4's batch-clean path); N = `accept` outcomes on the memory stream from an individual turn; R = `reject` outcomes on the memory stream; P = `edit` outcomes with a non-empty user `instruction`; Q = `edit` outcomes with empty instruction (Opus's edit unchanged); Z = `prune` outcomes (memory stream); W = `accept` outcomes on the flagged stream; V = `dismiss` outcomes on the flagged stream.
+
+`reject` outcomes are counted in the `kept` total because their final mirror state equals live byte-for-byte — they appear as the `R` sub-count for transparency (an audit of "how many recommendations did the user discard?" is recoverable from the decisions.log, and the summary surfaces the aggregate without complicating the apply step). Per the user-approved deviation #2 in the phase header, `reject` is a meta-verb that resolves to a live-state mirror regardless of the recommendation it was applied against.
 
 **If user answers `y`:** continue into Phase 6 finalisation in the same session.
 
