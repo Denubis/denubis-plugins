@@ -29,7 +29,7 @@ from crash_recovery import liveness as liveness_mod
 from crash_recovery import scan as scan_mod
 from crash_recovery.__main__ import scan as scan_cmd
 from crash_recovery.classify import CLASSIFIER_VERSION
-from crash_recovery.jsonl import TailKind
+from crash_recovery.jsonl import TailKind, TailSummary
 
 from fixtures.jsonl_builder import (
     FixtureSession,
@@ -412,25 +412,20 @@ def test_scan_marks_vanished_jsonl_as_irrecoverable(tmp_path: Path) -> None:
 
 
 def test_scan_writes_scan_runs_with_live_pids(tmp_path: Path) -> None:
-    """``scan_runs.live_pids`` is a JSON array of sorted alive PIDs.
+    """``scan_runs.live_pids`` is a JSON array containing the alive session's PID.
 
-    Two live sessions and one crashed → ``live_pids`` is a JSON list with
-    exactly the test-process PID (both alive sessions share it because both
-    set ``pid_alive=True`` → ``os.getpid()``). The ``sorted({...})`` in
-    ``run_scan`` collapses duplicates.
+    One live session (``pid_alive=True`` → ``os.getpid()``) and one crashed
+    session → ``live_pids`` is a JSON list containing exactly the test-process
+    PID.
+
+    Note: this test does NOT exercise the ``sorted({...})`` deduplication path
+    in ``run_scan``. That path is covered by
+    ``test_run_scan_deduplicates_live_pids_across_facts``.
     """
     sessions = [
         FixtureSession(
             uuid="11111111-1111-1111-1111-111111111111",
             cwd="/tmp/live1",
-            tail_kind=TailKind.TOOL_USE_NO_RESULT,
-            has_liveness=True,
-            pid_alive=True,
-            boot_id_current=True,
-        ),
-        FixtureSession(
-            uuid="22222222-2222-2222-2222-222222222222",
-            cwd="/tmp/live2",
             tail_kind=TailKind.TOOL_USE_NO_RESULT,
             has_liveness=True,
             pid_alive=True,
@@ -454,8 +449,82 @@ def test_scan_writes_scan_runs_with_live_pids(tmp_path: Path) -> None:
     assert len(rows) == 1
     live_pids = json.loads(rows[0][0])
     assert isinstance(live_pids, list)
-    assert live_pids == sorted(set(live_pids))  # sorted+deduped
-    assert live_pids == [os.getpid()]  # both alive sessions share this PID
+    assert live_pids == [os.getpid()]
+
+
+def test_run_scan_deduplicates_live_pids_across_facts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``run_scan`` deduplicates PIDs via ``sorted({...})`` when two facts share one PID.
+
+    Two ``SessionFact`` objects with distinct UUIDs and cwds but the same
+    ``liveness.pid`` (12345) and ``pid_alive_value=True`` are injected by
+    monkey-patching ``_walk_sessions``. The ``sorted({pid for ...})`` set
+    comprehension in ``run_scan`` must collapse the duplicate so
+    ``scan_runs.live_pids`` serialises as ``[12345]``, not ``[12345, 12345]``.
+
+    The test is designed to FAIL (red) if ``sorted({...})`` is changed to
+    ``sorted([...])`` (list keeps duplicates) — a structural regression guard.
+    """
+    _synthetic_liveness = liveness_mod.Liveness(
+        path=tmp_path / "12345.live",
+        pid=12345,
+        cwd="/tmp/dedup",
+        started=1_000_000,
+        argv="--resume 11111111-1111-1111-1111-111111111111",
+        boot_id="test-boot-id",
+    )
+    _tail = TailSummary(
+        kind=TailKind.TOOL_USE_NO_RESULT,
+        last_ts=None,
+        total_entries=0,
+        state_summary="tool use pending",
+    )
+    _facts = [
+        scan_mod.SessionFact(
+            uuid="11111111-1111-1111-1111-111111111111",
+            project_path="/tmp/proj",
+            cwd="/tmp/dedup",
+            jsonl_path=None,
+            jsonl_mtime=None,
+            tail_summary=_tail,
+            liveness=_synthetic_liveness,
+            pid_alive_value=True,
+            boot_id_current=True,
+        ),
+        scan_mod.SessionFact(
+            uuid="22222222-2222-2222-2222-222222222222",
+            project_path="/tmp/proj",
+            cwd="/tmp/dedup",
+            jsonl_path=None,
+            jsonl_mtime=None,
+            tail_summary=_tail,
+            liveness=_synthetic_liveness,
+            pid_alive_value=True,
+            boot_id_current=True,
+        ),
+    ]
+
+    monkeypatch.setattr(scan_mod, "_walk_sessions", lambda _ctx: list(_facts))
+
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
+    db_path = _init_db(db_dir)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    projects_root = tmp_path / "projects"
+    projects_root.mkdir()
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(db_path, "SELECT live_pids FROM scan_runs")
+    assert len(rows) == 1
+    live_pids = json.loads(rows[0][0])
+    assert isinstance(live_pids, list), "live_pids must be a list (JSON array), not a set"
+    assert live_pids == [12345], (
+        f"expected [12345] (deduplicated); got {live_pids!r}. "
+        "If this is [12345, 12345], sorted({{...}}) was changed to sorted([...])."
+    )
 
 
 # ---------------------------------------------------------------------------
