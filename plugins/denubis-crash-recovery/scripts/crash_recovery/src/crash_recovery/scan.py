@@ -23,7 +23,6 @@ from pathlib import Path
 
 from crash_recovery import db
 from crash_recovery.classify import (
-    CLASSIFIER_VERSION,
     Classification,
     ClassificationValue,
     LivenessState,
@@ -37,6 +36,22 @@ from crash_recovery.liveness import (
     list_liveness_files,
     pid_alive,
 )
+from crash_recovery.scan_db import (
+    WriteContext,
+    _append_history,
+    _orphan_sweep,
+    _upsert_session,
+    _write_scan_run,
+)
+
+__all__ = [
+    "AMBIGUOUS_STATE_SUMMARY_PREFIX",
+    "ScanContext",
+    "ScanRunResult",
+    "SessionFact",
+    "WriteContext",
+    "run_scan",
+]
 
 # Pinned format for the AMBIGUOUS state_summary so downstream consumers
 # (Phase 5's reader / triage CLI) can recognise an ambiguous row by
@@ -92,24 +107,6 @@ class SessionFact:
     pid_alive_value: bool | None
     boot_id_current: bool = False
     ambiguity_candidates: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class WriteContext:
-    """Bundle of arguments shared across DB-writer helpers.
-
-    Each per-session write (``_upsert_session``, ``_append_history``) and the
-    closing orphan sweep (``_orphan_sweep``) need the open ``conn``, the
-    frozen :class:`ScanContext`, and the row id of the in-progress
-    ``scan_runs`` row. Bundling them keeps writer signatures compact and
-    makes it impossible to call a writer with a mismatched ``ctx``/``conn``
-    pair. Created by :func:`_write_scan_run`, which is the helper that
-    allocates ``scan_run_id``.
-    """
-
-    conn: object
-    ctx: ScanContext
-    scan_run_id: int
 
 
 def _jsonl_path_and_mtime(
@@ -371,190 +368,6 @@ def _classify_fact(fact: SessionFact) -> Classification:
         boot_id_current=fact.boot_id_current,
     )
     return classify(fact.tail_summary, liveness_state, fact.pid_alive_value)
-
-
-def _write_scan_run(
-    conn,
-    ctx: ScanContext,
-    *,
-    sessions_scanned: int,
-    live_pids: list[int],
-) -> WriteContext:
-    """Insert one row into ``scan_runs`` and return a :class:`WriteContext`.
-
-    Called BEFORE the per-session upserts so the returned ``scan_run_id`` is
-    available for :func:`_append_history`. ``live_pids`` is serialised via
-    :func:`json.dumps`; the empty-list case serialises as ``"[]"`` (the
-    column is TEXT and the design's convention is non-null TEXT — empty
-    array is the natural empty value). Returns the bundled
-    ``(conn, ctx, scan_run_id)`` triple that the per-session writers and
-    the orphan sweep consume.
-    """
-    cur = conn.execute(
-        "INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version) "
-        "VALUES (?, ?, ?, ?)",
-        (ctx.now, json.dumps(live_pids), sessions_scanned, CLASSIFIER_VERSION),
-    )
-    return WriteContext(conn=conn, ctx=ctx, scan_run_id=cur.lastrowid)
-
-
-def _upsert_session(
-    wctx: WriteContext,
-    fact: SessionFact,
-    classification: Classification,
-) -> None:
-    """INSERT ... ON CONFLICT(uuid) DO UPDATE one row in ``sessions``.
-
-    ``first_seen`` is preserved on conflict (set only on the initial INSERT
-    to ``wctx.ctx.now``). ``user_notes`` is NEVER touched on conflict — user
-    annotations persist across scans per Phase 6's contract. All other
-    fields are refreshed with the current scan's values.
-    """
-    wctx.conn.execute(
-        """
-        INSERT INTO sessions (
-            uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
-            classification, classification_reason, classifier_version, state_summary,
-            first_seen, last_scanned, user_notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-        ON CONFLICT(uuid) DO UPDATE SET
-            project_path = excluded.project_path,
-            cwd = excluded.cwd,
-            jsonl_path = excluded.jsonl_path,
-            jsonl_mtime = excluded.jsonl_mtime,
-            jsonl_last_ts = excluded.jsonl_last_ts,
-            classification = excluded.classification,
-            classification_reason = excluded.classification_reason,
-            classifier_version = excluded.classifier_version,
-            state_summary = excluded.state_summary,
-            last_scanned = excluded.last_scanned
-        """,
-        (
-            fact.uuid,
-            fact.project_path,
-            fact.cwd,
-            fact.jsonl_path,
-            fact.jsonl_mtime,
-            fact.tail_summary.last_ts,
-            classification.value,
-            classification.reason,
-            CLASSIFIER_VERSION,
-            fact.tail_summary.state_summary,
-            wctx.ctx.now,
-            wctx.ctx.now,
-        ),
-    )
-
-
-def _append_history(
-    wctx: WriteContext,
-    uuid: str,
-    classification: Classification,
-) -> None:
-    """INSERT one row into ``classification_history``.
-
-    Primary key is ``(uuid, scan_id)``: re-running with the same
-    ``wctx.scan_run_id`` raises ``sqlite3.IntegrityError`` — that's a
-    programmer error guard (each scan_run should produce at most one
-    history row per UUID).
-    """
-    wctx.conn.execute(
-        "INSERT INTO classification_history "
-        "(uuid, scan_id, classification, reason, classifier_version) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (
-            uuid,
-            wctx.scan_run_id,
-            classification.value,
-            classification.reason,
-            CLASSIFIER_VERSION,
-        ),
-    )
-
-
-def _orphan_sweep(
-    wctx: WriteContext,
-    seen_uuids: set[str],
-) -> int:
-    """Re-classify DB rows whose UUIDs were not seen in this scan's walk.
-
-    AC3.6: even if ``classifier_version`` is already current, orphans are
-    re-considered because their JSONL may have been deleted since the last
-    scan. On every orphan we write ``classifier_version = CLASSIFIER_VERSION``
-    (a no-op when the row was already current; the AC3.6 win is the rows
-    seeded at lower versions in tests).
-
-    Algorithm:
-
-    1. Query all rows (uuid, jsonl_path, classifier_version, classification,
-       classification_reason).
-    2. Skip rows whose UUID was seen this scan (handled by upsert).
-    3. If ``jsonl_path`` is NULL or points to a now-missing file: classify
-       as ``IRRECOVERABLE`` with reason ``missing_jsonl_on_disk``.
-    4. Otherwise: re-parse the JSONL tail and classify with a no-liveness
-       :class:`LivenessState`. This handles the case where a previous scan
-       saw a liveness file that has since been cleaned up — the session
-       itself may still have a JSONL on disk.
-    5. UPDATE the row's fields (refreshes ``last_scanned`` and
-       ``classifier_version`` every scan). M4: only append a
-       classification_history row when the new classification + reason
-       differ from the stored values — repeated orphan sweeps over an
-       unchanged row no longer accumulate redundant "still irrecoverable"
-       history entries. Return count of rows updated.
-    """
-    rows = wctx.conn.execute(
-        "SELECT uuid, jsonl_path, classifier_version, "
-        "classification, classification_reason FROM sessions"
-    ).fetchall()
-    updated = 0
-    for (
-        uuid,
-        jsonl_path_str,
-        _stored_version,
-        stored_classification,
-        stored_reason,
-    ) in rows:
-        if uuid in seen_uuids:
-            continue
-        if not jsonl_path_str or not Path(jsonl_path_str).exists():
-            new_classification = Classification(
-                value=ClassificationValue.IRRECOVERABLE,
-                reason="missing_jsonl_on_disk",
-            )
-            tail_summary = TailSummary(
-                kind=TailKind.MISSING_FILE,
-                last_ts=None,
-                total_entries=0,
-                state_summary="jsonl missing on disk",
-            )
-        else:
-            tail_summary = parse_tail(Path(jsonl_path_str))
-            liveness_state = LivenessState(
-                present=False, boot_id_current=False
-            )
-            new_classification = classify(
-                tail_summary, liveness_state, pid_alive=None
-            )
-        wctx.conn.execute(
-            "UPDATE sessions SET classification = ?, classification_reason = ?, "
-            "classifier_version = ?, state_summary = ?, last_scanned = ? "
-            "WHERE uuid = ?",
-            (
-                new_classification.value,
-                new_classification.reason,
-                CLASSIFIER_VERSION,
-                tail_summary.state_summary,
-                wctx.ctx.now,
-                uuid,
-            ),
-        )
-        if (
-            new_classification.value != stored_classification
-            or new_classification.reason != stored_reason
-        ):
-            _append_history(wctx, uuid, new_classification)
-        updated += 1
-    return updated
 
 
 def run_scan(ctx: ScanContext) -> ScanRunResult:
