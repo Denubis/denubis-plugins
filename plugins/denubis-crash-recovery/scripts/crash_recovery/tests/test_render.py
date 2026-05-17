@@ -405,23 +405,64 @@ def test_reduced_confidence_emitted_for_no_liveness_only(tmp_path: Path) -> None
     assert "Reduced confidence" not in block, block
 
 
+# Hand-written independent source of truth for section assignment.
+# Each entry is derived by applying _section_for_row's branching rules
+# manually to every Phase 2 RULE:
+#   "live"           → SectionKey.CURRENTLY_UNFINISHED
+#   "hard_crash"     → SectionKey.IDLE_LIVE_KILLED
+#   "concluded"      → SectionKey.RECENTLY_CONCLUDED
+#   "irrecoverable"  → SectionKey.IRRECOVERABLE
+#   "borderline" + reason=="ambiguous_match" → SectionKey.AMBIGUOUS_CORRELATION
+#   "borderline" + anything else             → SectionKey.NEEDS_INVESTIGATION
+#
+# If a new RULE is added to classify.py without a corresponding entry here,
+# the test will raise KeyError — loudly telling the author to update this dict.
+_EXPECTED_SECTIONS: dict[tuple[str, str], SectionKey] = {
+    # --- irrecoverable ---
+    ("irrecoverable", "missing_jsonl_on_disk"): SectionKey.IRRECOVERABLE,
+    # --- borderline (no liveness context) ---
+    ("borderline", "malformed_tail"): SectionKey.NEEDS_INVESTIGATION,
+    ("borderline", "empty_file"): SectionKey.NEEDS_INVESTIGATION,
+    # --- hard_crash (liveness present, boot mismatch) ---
+    ("hard_crash", "liveness_boot_id_mismatch"): SectionKey.IDLE_LIVE_KILLED,
+    # --- live ---
+    ("live", "live_pid_present_boot_current"): SectionKey.CURRENTLY_UNFINISHED,
+    # --- hard_crash (liveness present, dead pid, boot current) ---
+    ("hard_crash", "liveness_dead_pid_tool_use_no_result"): SectionKey.IDLE_LIVE_KILLED,
+    ("hard_crash", "liveness_dead_pid_ask_question_no_reply"): SectionKey.IDLE_LIVE_KILLED,
+    ("hard_crash", "liveness_dead_pid_agent_dispatch_no_result"): SectionKey.IDLE_LIVE_KILLED,
+    ("hard_crash", "liveness_dead_pid_unknown_tail"): SectionKey.IDLE_LIVE_KILLED,
+    # --- concluded ---
+    ("concluded", "no_liveness_clean_end_turn"): SectionKey.RECENTLY_CONCLUDED,
+    # --- borderline (no liveness, dangling tails) ---
+    ("borderline", "no_liveness_dangling_tool_use"): SectionKey.NEEDS_INVESTIGATION,
+    ("borderline", "no_liveness_dangling_ask_question"): SectionKey.NEEDS_INVESTIGATION,
+    ("borderline", "no_liveness_dangling_agent_dispatch"): SectionKey.NEEDS_INVESTIGATION,
+    # --- borderline (unknown tail, catch-all) ---
+    ("borderline", "unknown_tail_kind"): SectionKey.NEEDS_INVESTIGATION,
+}
+
+
 @pytest.mark.parametrize(
-    ("classification", "reason", "expected"),
+    ("classification", "reason"),
     [
-        (rule.classification.value, rule.reason, _section_for_row(rule.classification.value, rule.reason))
+        (rule.classification.value, rule.reason)
         for rule in RULES
     ],
 )
 def test_section_assignment_for_every_phase_2_reason(
-    classification: str, reason: str, expected: SectionKey
+    classification: str, reason: str
 ) -> None:
-    """Each Phase 2 ``(classification, reason)`` pair maps to a stable section.
+    """Asserts that ``_section_for_row`` returns the documented SectionKey for every Phase 2 RULE.
 
-    Parametrised over :data:`RULES`. The expected SectionKey is computed
-    once at module-import time by calling ``_section_for_row`` directly,
-    so this test guards against future drift between the rule table and
-    the section-assignment helper rather than re-asserting today's mapping.
+    The expected mapping is hand-written in ``_EXPECTED_SECTIONS`` as an
+    independent source of truth. If ``_section_for_row`` ever disagrees with
+    the expected mapping, the test fails. If a new RULE is added to
+    :data:`classify.RULES` without a corresponding entry in
+    ``_EXPECTED_SECTIONS``, the test raises ``KeyError`` — loudly telling the
+    author to update the dict.
     """
+    expected = _EXPECTED_SECTIONS[(classification, reason)]
     assert _section_for_row(classification, reason) is expected
 
 
