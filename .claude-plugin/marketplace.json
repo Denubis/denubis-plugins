@@ -204,6 +204,15 @@
         "research",
         "markdown"
       ]
+    },
+    {
+      "name": "denubis-dream",
+      "description": "Audit a project's per-project auto-memory against the historical record of Claude Code conversations. Produces a reviewable proposed-change tree without touching live memory during the audit.",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-dream",
+      "author": {"name": "Brian Ballsun-Stanton", "github": "denubis"},
+      "license": "CC-BY-SA-4.0",
+      "keywords": ["memory", "audit", "claude-code", "auto-memory", "dream"]
     }
   ]
 }

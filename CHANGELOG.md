@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-dream] 0.1.0
+
+Initial scaffolding for the denubis-dream auto-memory audit plugin. Skill skeleton and `/dream` slash-command alias only; the full audit pipeline lands in subsequent phases.
+
+**New:**
+- Plugin manifest at `plugins/denubis-dream/.claude-plugin/plugin.json`.
+- `denubis-dream:dreaming` skill skeleton with `user-invocable: true` frontmatter.
+- `/dream` command alias routing to the `dreaming` skill.
+- Marketplace registration at `.claude-plugin/marketplace.json`.
+- `.gitignore` entry for `memory.dream-*` (defence-in-depth; see design DoD #9).
+
 ## [denubis-bibliography] 0.2.3
 
 Cascade now catches image-only pages that pymupdf4llm renders as placeholder markers. Discovered when Levenson 1973 (`10.1037/h0035357`, J. Consulting and Clinical Psychology) needed a manual `docling+OCR` one-off under 0.2.2 — the paper's 8 pages were emitted as `**==> picture [W x H] intentionally omitted <==**` markers, which are ~50 chars and slipped just above the empty-page threshold, so the cascade did not escalate.

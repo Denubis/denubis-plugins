@@ -1,6 +1,7 @@
 .worktrees/
 .claude/settings.local.json
 .serena/
+memory.dream-*
 .venv/
 __pycache__/
 *.pyc
