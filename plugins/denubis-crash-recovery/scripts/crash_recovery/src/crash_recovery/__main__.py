@@ -165,7 +165,12 @@ def _render_to_file(db_path: Path, output: Path) -> int:
     final :func:`os.replace` stays on the same filesystem (cross-device
     ``os.replace`` would silently degrade to a copy-and-unlink, defeating
     the atomicity guarantee).
+
+    Raises :exc:`RuntimeError` if ``output.parent`` is on a network or union
+    filesystem (same guard as Phase 4's ``run_dir`` check). Set
+    ``CRASH_RECOVERY_RESUME_PATH`` to a path on a local filesystem to resolve.
     """
+    _liveness.assert_local_filesystem(output.parent)
     content = _render.render(db_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
@@ -203,7 +208,11 @@ def render(
     """
     resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
     resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
-    count = _render_to_file(resolved_db, resolved_out)
+    try:
+        count = _render_to_file(resolved_db, resolved_out)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     typer.echo(f"Rendered {count} sessions to {resolved_out}")
 
 
@@ -265,7 +274,11 @@ def regenerate(
     """
     ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
     resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
-    count = _render_to_file(ctx.db_path, resolved_out)
+    try:
+        count = _render_to_file(ctx.db_path, resolved_out)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     typer.echo(f"Rendered {count} sessions to {resolved_out}")
 
 
