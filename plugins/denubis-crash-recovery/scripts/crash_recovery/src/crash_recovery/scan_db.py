@@ -179,7 +179,7 @@ def _orphan_sweep(
     """
     rows = wctx.conn.execute(
         "SELECT uuid, jsonl_path, classifier_version, "
-        "classification, classification_reason FROM sessions"
+        "classification, classification_reason, user_notes FROM sessions"
     ).fetchall()
     updated = 0
     for (
@@ -188,8 +188,20 @@ def _orphan_sweep(
         _stored_version,
         stored_classification,
         stored_reason,
+        user_notes,
     ) in rows:
         if uuid in seen_uuids:
+            continue
+        if user_notes is not None:
+            # Annotation-preserves-classification (Phase 6 Task 0; deferred
+            # from Phase 4 proleptic review, 2026-05-17). ``user_notes IS
+            # NOT NULL`` signals the user wants this row kept; preserve both
+            # ``classification`` and ``classifier_version`` so a transiently
+            # absent JSONL (unmounted volume, network FS hiccup) cannot
+            # silently flip the row to ``irrecoverable`` and contradict the
+            # user's annotation. ``last_scanned`` is bookkeeping but the
+            # simplest correct implementation is to skip the row entirely:
+            # no UPDATE, no ``classification_history`` append.
             continue
         if not jsonl_path_str or not Path(jsonl_path_str).exists():
             new_classification = Classification(

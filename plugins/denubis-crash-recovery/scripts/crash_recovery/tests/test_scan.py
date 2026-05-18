@@ -408,6 +408,148 @@ def test_scan_marks_vanished_jsonl_as_irrecoverable(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Annotation-preserves-classification (Phase 4 proleptic-review deferral,
+# 2026-05-17). Realised in Phase 6, Subcomponent A, Task 0: ``_orphan_sweep``
+# skips rows where ``user_notes IS NOT NULL`` so a user's annotation acts as
+# a "keep this row" signal that protects both ``classification`` and
+# ``classifier_version`` from being silently reset when the JSONL is
+# transiently or permanently absent.
+# ---------------------------------------------------------------------------
+
+
+def _seed_orphan_row(
+    db_path: Path,
+    *,
+    uuid: str,
+    user_notes: str | None,
+    classification: str = "concluded",
+    classification_reason: str = "no_liveness_clean_end_turn",
+) -> None:
+    """Seed a sessions row whose ``jsonl_path`` does not exist on disk.
+
+    Both annotated and unannotated variants share this scaffolding; the only
+    difference is ``user_notes``. The seeded row uses the current
+    ``CLASSIFIER_VERSION`` so any post-scan version drift is attributable
+    to ``_orphan_sweep``'s UPDATE rather than the AC3.6 stale-version path.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
+                classification, classification_reason, classifier_version,
+                state_summary, first_seen, last_scanned, user_notes
+            ) VALUES (?, '/p', '/c', '/no/such/orphan.jsonl', NULL, NULL,
+                      ?, ?, ?, 'seeded state', 1, 1, ?)
+            """,
+            (
+                uuid,
+                classification,
+                classification_reason,
+                CLASSIFIER_VERSION,
+                user_notes,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_orphan_sweep_preserves_annotated_session_classification(
+    tmp_path: Path,
+) -> None:
+    """Annotated orphans keep their classification + classifier_version.
+
+    Phase 6 contract: ``user_notes IS NOT NULL`` signals user intent to
+    preserve a row. ``_orphan_sweep`` must skip those rows entirely — no
+    classification flip to ``irrecoverable``/``missing_jsonl_on_disk``, no
+    ``classifier_version`` bump, and no ``classification_history`` append.
+
+    Decision documented here: ``last_scanned`` is bookkeeping rather than
+    user intent, so in principle it could be refreshed. The simplest
+    correct implementation skips the entire UPDATE for annotated orphans,
+    which means ``last_scanned`` is also preserved. This test pins that
+    end-to-end skip behaviour (no UPDATE, no history append) so any future
+    "refresh last_scanned only" optimisation must consciously break this
+    test rather than silently re-introduce a partial reset.
+    """
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+    uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    _seed_orphan_row(db_path, uuid=uuid, user_notes="keep this")
+
+    history_before = _rows(
+        db_path,
+        "SELECT COUNT(*) FROM classification_history WHERE uuid = '" + uuid + "'",
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(
+        db_path,
+        "SELECT classification, classification_reason, classifier_version, "
+        "state_summary, last_scanned "
+        "FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1
+    classification, reason, cv, state_summary, last_scanned = rows[0]
+    # Classification + reason unchanged.
+    assert classification == "concluded"
+    assert reason == "no_liveness_clean_end_turn"
+    # classifier_version unchanged (and equal to the value we seeded, which
+    # happens to be CLASSIFIER_VERSION — the point is _orphan_sweep did not
+    # rewrite it).
+    assert cv == CLASSIFIER_VERSION
+    # state_summary + last_scanned preserved per the "skip the whole UPDATE"
+    # decision documented above.
+    assert state_summary == "seeded state"
+    assert last_scanned == 1
+
+    history_after = _rows(
+        db_path,
+        "SELECT COUNT(*) FROM classification_history WHERE uuid = '" + uuid + "'",
+    )
+    # No reclassification ⇒ no history append.
+    assert history_after == history_before
+
+
+def test_orphan_sweep_reclassifies_unannotated_session(tmp_path: Path) -> None:
+    """Unannotated orphans still flip to irrecoverable (re-pins AC3.6).
+
+    Paired with ``test_orphan_sweep_preserves_annotated_session_classification``
+    to confirm the new exemption is scoped to rows with ``user_notes IS NOT
+    NULL`` and does not loosen the existing AC3.6 behaviour for rows the user
+    has not annotated.
+    """
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+    uuid = "ffffffff-1111-2222-3333-444444444444"
+    _seed_orphan_row(db_path, uuid=uuid, user_notes=None)
+
+    history_before = _rows(
+        db_path,
+        "SELECT COUNT(*) FROM classification_history WHERE uuid = '" + uuid + "'",
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(
+        db_path,
+        "SELECT classification, classification_reason "
+        "FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert rows == [("irrecoverable", "missing_jsonl_on_disk")]
+
+    history_after = _rows(
+        db_path,
+        "SELECT COUNT(*) FROM classification_history WHERE uuid = '" + uuid + "'",
+    )
+    # AC3.6 reclassification path appends exactly one history row.
+    assert history_after[0][0] == history_before[0][0] + 1
+
+
+# ---------------------------------------------------------------------------
 # scan_runs.live_pids serialisation
 # ---------------------------------------------------------------------------
 
