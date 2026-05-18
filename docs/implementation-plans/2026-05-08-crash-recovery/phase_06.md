@@ -678,3 +678,7 @@ git commit -m "feat(crash-recovery): add list-live subcommand (plain + --json ou
 
 - Phase 7: triage skill registration; verifies AC1.2 (plugin lists after install), AC8.1 (README documents dependency).
 - Phase 8: wrapper patch + version bumps; verifies AC5.1/AC5.2/AC5.3/AC5.5 writer side, AC5.6 reboot UAT, AC6.4 idle-kill UAT, AC8.2 (version sync), AC8.3 (CHANGELOG entries).
+
+## Coherence review outcome (2026-05-18)
+
+Coherence review surfaced 0 High / 4 Medium / 4 Low / 3 Flagged findings. All 4 Mediums (M1 constraints.md three-condition rewrite, M2 arch-doc updates for Phase 6, M3 CLI exit-code contract row, M4 list-live boot filter code comment) resolved in commit `22d0064`. Lows accepted as documented trade-offs. Flagged items (F1-F3) carried to Phase 7 awareness.
