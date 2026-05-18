@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import sys
 import tempfile
 import time
@@ -176,7 +175,7 @@ def _render_to_file(db_path: Path, output: Path) -> int:
     ``CRASH_RECOVERY_RESUME_PATH`` to a path on a local filesystem to resolve.
     """
     _liveness.assert_local_filesystem(output.parent)
-    content = _render.render(db_path)
+    content, n = _render.render(db_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
@@ -187,9 +186,7 @@ def _render_to_file(db_path: Path, output: Path) -> int:
         tmp.write(content)
         tmp_path = Path(tmp.name)
     os.replace(tmp_path, output)
-    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
-        (count,) = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()
-    return count
+    return n
 
 
 @app.command()
@@ -245,7 +242,8 @@ def triage(
     guards as ``scan``.
     """
     ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
-    typer.echo(_render.render(ctx.db_path), nl=False)
+    content, _ = _render.render(ctx.db_path)
+    typer.echo(content, nl=False)
 
 
 @app.command()

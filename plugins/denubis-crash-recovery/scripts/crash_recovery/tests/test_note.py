@@ -109,7 +109,7 @@ def test_note_set_then_regenerate_surfaces_text(tmp_path: Path) -> None:
 
     note_mod.set_note(db_path, uuid, "remember to re-run after lunch")
 
-    rendered = render_mod.render(db_path)
+    rendered, _ = render_mod.render(db_path)
     assert "remember to re-run after lunch" in rendered
     # Section header for concluded rows surrounds the entry.
     assert uuid[:8] in rendered
@@ -129,7 +129,7 @@ def test_note_overwrites_existing(tmp_path: Path) -> None:
     note_mod.set_note(db_path, uuid, "first note")
     note_mod.set_note(db_path, uuid, "second note overrides")
 
-    rendered = render_mod.render(db_path)
+    rendered, _ = render_mod.render(db_path)
     assert "first note" not in rendered
     assert "second note overrides" in rendered
 
@@ -153,7 +153,7 @@ def test_note_clear_removes_note(tmp_path: Path) -> None:
     note_mod.set_note(db_path, uuid, "scratch this")
     note_mod.clear_note(db_path, uuid)
 
-    rendered = render_mod.render(db_path)
+    rendered, _ = render_mod.render(db_path)
     assert "scratch this" not in rendered
     # The fixture has exactly one row; if "Notes:" appears anywhere, it must
     # be for that row.

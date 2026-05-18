@@ -208,7 +208,7 @@ def test_render_matches_snapshot(tmp_path: Path, name: str) -> None:
     """
     fixture_name, sessions = _SNAPSHOT_CASES[name]
     db_path = make_db_with_sessions(tmp_path, sessions)
-    actual = render.render(db_path)
+    actual, _ = render.render(db_path)
     expected = (SNAPSHOTS_DIR / fixture_name).read_text(encoding="utf-8")
     assert actual == expected, (
         f"Snapshot mismatch for {name}.\n"
@@ -220,8 +220,8 @@ def test_render_matches_snapshot(tmp_path: Path, name: str) -> None:
 def test_render_is_byte_identical_across_calls(tmp_path: Path) -> None:
     """AC3.2 idempotency: two render calls against the same DB return ``==``."""
     db_path = make_db_with_sessions(tmp_path, _mixed_sessions())
-    first = render.render(db_path)
-    second = render.render(db_path)
+    first, _ = render.render(db_path)
+    second, _ = render.render(db_path)
     assert first == second
 
 
@@ -358,7 +358,7 @@ def test_unmatched_reason_emits_review_queue_message(tmp_path: Path) -> None:
         ),
     ]
     db_path = make_db_with_sessions(tmp_path, sessions)
-    actual = render.render(db_path)
+    actual, _ = render.render(db_path)
     assert "⚠ Reduced confidence: Something fucky — let's go look" in actual
     assert (
         "⚠ Reduced confidence: session data is incomplete or corrupted"
@@ -391,7 +391,7 @@ def test_reduced_confidence_emitted_for_no_liveness_only(tmp_path: Path) -> None
         ),
     ]
     db_path = make_db_with_sessions(tmp_path, sessions)
-    actual = render.render(db_path)
+    actual, _ = render.render(db_path)
     assert (
         "⚠ Reduced confidence: no liveness file recorded "
         "(pre-installation session or wrapper bypass)"
@@ -507,7 +507,7 @@ def test_irrecoverable_row_suppresses_resume_command(tmp_path: Path) -> None:
         ),
     ]
     db_path = make_db_with_sessions(tmp_path, sessions)
-    actual = render.render(db_path)
+    actual, _ = render.render(db_path)
 
     assert "~~no resume — missing_jsonl_on_disk~~" in actual
     assert "~~no resume — missing_cwd~~" in actual

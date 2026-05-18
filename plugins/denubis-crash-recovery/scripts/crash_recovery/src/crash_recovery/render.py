@@ -225,8 +225,8 @@ def _render_entry(row: tuple) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def render(db_path: Path) -> str:
-    """Read ``sessions`` from ``db_path`` and return the rendered markdown.
+def render(db_path: Path) -> tuple[str, int]:
+    """Read ``sessions`` from ``db_path`` and return ``(markdown, row_count)``.
 
     The connection is opened read-only via the ``file:...?mode=ro`` URI
     so render cannot accidentally mutate the DB. Rows are sorted
@@ -237,6 +237,13 @@ def render(db_path: Path) -> str:
     No timestamps appear in the output. ``last_scanned`` drives ordering
     only; rendering at different times against the same DB state produces
     byte-identical output.
+
+    The row count is derived from ``len(rows)`` on the same ``fetchall``
+    result used for rendering — no second ``COUNT(*)`` query is issued.
+    This eliminates the TOCTOU window where a concurrent ``scan`` between
+    ``os.replace`` and a second DB read could cause an off-by-one in the
+    user-visible "Rendered N sessions" echo. Resolved in Phase 6 review
+    2026-05-18 (Option i).
     """
     with closing(
         sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -268,4 +275,4 @@ def render(db_path: Path) -> str:
             for row in section_rows:
                 parts.extend(_render_entry(row))
         parts.append("")
-    return "\n".join(parts).rstrip() + "\n"
+    return "\n".join(parts).rstrip() + "\n", len(rows)
