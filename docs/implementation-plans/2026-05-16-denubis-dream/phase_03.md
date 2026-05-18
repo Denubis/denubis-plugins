@@ -14,6 +14,8 @@
 
 **Cascading correction reapplied:** memory frontmatter is flat — `lastAudited` reads (Tasks 1, 7) and writes (Phase 6) are top-level, not `metadata.lastAudited`. Rationale: the user's global CLAUDE.md convention uses flat frontmatter; existing memory files have no `lastAudited` field at all (flat or nested) — this plugin invents it at first finalisation. See phase_02.md header for the canonical statement.
 
+**Bash helper:** Per DR1 amendment 2026-05-18, this phase's Bash blocks source `plugins/denubis-dream/skills/dreaming/_lib.sh` (see `## Helper resolution` in the skill) for deterministic operations like `dream_main_slug`, `dream_main_dir`, `dream_dated_dir`. Cross-block variable persistence (e.g., `MAIN_SLUG` defined in one block and read in another) is NOT supported — each block sources `_lib.sh` and calls the helper. Phase 3 helpers may add to `_lib.sh` (e.g., `dream_window_jsonl`, `dream_audit_path`) as needed.
+
 ---
 
 ## Acceptance Criteria Coverage

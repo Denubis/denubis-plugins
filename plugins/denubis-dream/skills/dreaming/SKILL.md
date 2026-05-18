@@ -9,9 +9,23 @@ last-reviewed: 2026-05-18
 
 **Announce at start:** "I'm using the denubis-dream:dreaming skill."
 
+## Helper resolution
+
+Before running any Bash block below, locate `_lib.sh` (co-located with this skill). The Claude Code session has direct knowledge of this skill's plugin path — use that to construct the absolute path to `_lib.sh` and substitute it into every subsequent `source ...` line.
+
+Worked path examples:
+- Local dev: `<repo-root>/plugins/denubis-dream/skills/dreaming/_lib.sh`
+- Installed: `~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-dream/skills/dreaming/_lib.sh`
+
+The Bash blocks below all begin with `source "$DREAM_LIB"`. Substitute `$DREAM_LIB` with the resolved absolute path when you assemble each Bash tool call. (`$DREAM_LIB` is a clearly-flagged template placeholder in this skill text — it is NOT an environment variable that survives across blocks.)
+
 ## Bash-block convention
 
-Every Bash block in this skill is **self-contained**: Claude may execute each block as a separate tool call, which means each runs in a fresh shell. Variables defined in one block (e.g., `$MAIN_SLUG`, `$TODAY`, `$DATED_DIR`) do NOT persist into subsequent blocks. Each block that needs a value must re-derive it. Do not "clean up" apparent duplication — the repetition is intentional and load-bearing.
+Every Bash block in this skill is **self-contained**: each Bash tool call runs in a fresh shell, so variables defined in one block do NOT persist into subsequent blocks. To avoid re-deriving values like `MAIN_SLUG` and `DATED_DIR` in every block, this skill ships `_lib.sh` co-located in the skill directory. Each Bash block begins with `source "$DREAM_LIB"` and then calls the relevant helper function (`dream_main_slug`, `dream_main_dir`, `dream_dated_dir`, `dream_discovered_slugs`, etc.).
+
+See `## Helper resolution` (above) for how to resolve `$DREAM_LIB` to the absolute path at runtime.
+
+If you find yourself wanting to "clean up" a `source "$DREAM_LIB"` line because the previous block already sourced it — don't. Each block is a separate tool call and the source must happen in every block that uses a helper.
 
 ## Mode detection
 
@@ -24,28 +38,18 @@ If you are uncertain whether the user intended `--autonomous`, default to manual
 
 ## Project slug resolution
 
-Resolve the **main project slug** (the slug Claude Code uses for the repo root, not a worktree) using the following Bash pipeline:
+Resolve the **main project slug** (the slug Claude Code uses for the repo root, not a worktree) by sourcing the helper and calling `dream_main_slug`:
 
 ```bash
-# 1. Get the worktree root (may be the main repo or a worktree)
-GIT_TOP=$(git rev-parse --show-toplevel 2>/dev/null)
+source "$DREAM_LIB"
 
-if [ -z "$GIT_TOP" ]; then
-  echo "denubis-dream: unable to resolve project slug — not inside a git repository. Exiting." >&2
-  exit 0   # AC2.5: clean exit, no dated dir created
-fi
-
-# 2. Strip /.worktrees/<name> if present (only at end of path)
-MAIN_PATH=$(printf '%s' "$GIT_TOP" | sed -E 's|/\.worktrees/[^/]+$||')
-
-# 3. Apply Claude Code slug rule: remove leading slash, prepend '-', replace / with -
-MAIN_SLUG=$(printf '%s' "$MAIN_PATH" | sed -E 's|^/||; s|/|-|g; s|^|-|')
-
-# Sanity: the resolved memory dir must already exist OR we are about to create it
-MAIN_DIR=~/.claude/projects/"$MAIN_SLUG"
+MAIN_SLUG=$(dream_main_slug) || exit 0   # AC2.5: clean exit if not in a git repo
+MAIN_DIR=$(dream_main_dir)
 echo "denubis-dream: main slug = $MAIN_SLUG"
 echo "denubis-dream: main dir = $MAIN_DIR"
 ```
+
+The helper's `dream_main_slug` function (1) runs `git rev-parse --show-toplevel`, (2) strips `/.worktrees/<name>` if present, and (3) applies the Claude Code slug rule (remove leading `/`, prepend `-`, replace `/` with `-`). It returns non-zero and prints to stderr if the cwd is outside a git repo — the `|| exit 0` above honours AC2.5 (clean exit, no dated dir created).
 
 **Worked example.**
 - `pwd` = `/home/brian/people/Brian/brian-ed3d-plugins/.worktrees/denubis-dream/plugins/foo`
@@ -64,20 +68,20 @@ echo "denubis-dream: main dir = $MAIN_DIR"
 Scan `~/.claude/projects/` for slugs matching the anchored pattern. Both the main slug and any worktree-derived slugs (including those whose worktrees have been pruned but whose transcript dirs survive) qualify.
 
 ```bash
-# MAIN_SLUG comes from the previous section
-# The anchored regex matches exactly the main slug OR <main>--worktrees-<anything>
-DISCOVERED_SLUGS=$(ls -1 ~/.claude/projects/ 2>/dev/null \
-  | grep -E "^${MAIN_SLUG}\$|^${MAIN_SLUG}--worktrees-.+\$" \
-  || true)
+source "$DREAM_LIB"
+
+DISCOVERED_SLUGS=$(dream_discovered_slugs)
 
 if [ -z "$DISCOVERED_SLUGS" ]; then
-  echo "denubis-dream: no transcript dirs discovered for slug $MAIN_SLUG — first session?" >&2
+  echo "denubis-dream: no transcript dirs discovered for slug $(dream_main_slug) — first session?" >&2
   # This is not fatal; the autonomous pass can still proceed with no transcripts.
 fi
 
 echo "denubis-dream: discovered slugs:"
 printf '%s\n' "$DISCOVERED_SLUGS"
 ```
+
+`dream_discovered_slugs` applies the anchored regex `^<main>$|^<main>--worktrees-.+$` against `~/.claude/projects/` listings, so both the main slug and any worktree-derived slugs (including pruned-worktree leftovers, AC2.4) qualify.
 
 **Anchoring is structural, not aesthetic.** Without the leading `^` and trailing `$`, a sibling project whose slug happens to start with the main slug (e.g., `-home-brian-people-Brian-brian-ed3d-plugins-experimental`) would be picked up and its transcripts treated as in-scope for this audit — leaking unrelated session data into Phase 3's evidence retrieval. The codebase-investigator confirmed no such collisions currently exist in this user's `~/.claude/projects/`, but the anchoring is defence-in-depth against future projects.
 
@@ -92,8 +96,9 @@ Before creating today's dated dir, check whether one already exists for this mai
 First, compute the path:
 
 ```bash
-TODAY=$(date +%Y-%m-%d)
-DATED_DIR=~/.claude/projects/"$MAIN_SLUG"/memory.dream-"$TODAY"
+source "$DREAM_LIB"
+
+DATED_DIR=$(dream_dated_dir)
 ```
 
 If `"$DATED_DIR"` does **not** exist as a directory, fall through to `## Dated dir creation`. The autonomous pass proceeds normally.
@@ -103,8 +108,10 @@ If `"$DATED_DIR"` exists, branch on mode (which you determined in `## Mode detec
 **Autonomous mode + existing dir = no-op (AC9.3).** The cron-driven invocation must not overwrite an in-progress reconciliation. Print the existing path and exit cleanly:
 
 ```bash
-if [ -d "$DATED_DIR" ]; then
-  echo "denubis-dream: dated dir already exists for today: $DATED_DIR — exiting cleanly (no-op)."
+source "$DREAM_LIB"
+
+if [ -d "$(dream_dated_dir)" ]; then
+  echo "denubis-dream: dated dir already exists for today: $(dream_dated_dir) — exiting cleanly (no-op)."
   exit 0   # AC9.3
 fi
 ```
@@ -112,7 +119,9 @@ fi
 **Manual mode + existing dir = resume.** Re-invoking `/dream` interactively when a dated dir exists is the user's "let me pick up where I left off" gesture. Phase 5 implements the actual walk-resume; Phase 2's stub just prints a placeholder so the integration point is exercised:
 
 ```bash
-if [ -d "$DATED_DIR" ]; then
+source "$DREAM_LIB"
+
+if [ -d "$(dream_dated_dir)" ]; then
   echo "denubis-dream: existing dated dir found — resuming reconciliation walk."
   echo "denubis-dream: (Phase 2 stub) reconciliation walk lands in Phase 5."
   exit 0
@@ -126,9 +135,9 @@ Run **only the block matching the mode you detected.** Do not run both.
 Create today's dated audit directory under the main slug's transcript dir, with both subdirs pre-created so subsequent phases can `Write` into them without race conditions.
 
 ```bash
-TODAY=$(date +%Y-%m-%d)
-DATED_DIR=~/.claude/projects/"$MAIN_SLUG"/memory.dream-"$TODAY"
+source "$DREAM_LIB"
 
+DATED_DIR=$(dream_dated_dir)
 mkdir -p "$DATED_DIR"/flagged "$DATED_DIR"/promoted
 
 echo "denubis-dream: dated dir = $DATED_DIR"

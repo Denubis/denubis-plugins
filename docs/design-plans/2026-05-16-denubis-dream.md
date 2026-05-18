@@ -198,6 +198,8 @@ Opus walks existing memories by `mtime` ascending (stalest first). Memories with
 **Alternatives considered:**
 - **Hybrid skill + Python helper module:** Rejected because every deterministic operation needed is one `Bash` line or one tool call; abstracting them into Python would not earn its weight at this stage.
 
+**Amendment 2026-05-18 (after Phase 2 coherence review H1):** DR1's "no Python helpers" rule is preserved. However, the rule does NOT extend to a single Bash helper file (`_lib.sh`) co-located with the skill at `plugins/denubis-dream/skills/dreaming/_lib.sh`. The Phase 2 coherence reviewer surfaced that pure-Bash skill blocks cannot share state across Bash tool calls (each tool call is a fresh subprocess), so a sourced helper is required for deterministic operations that more than one block consumes (e.g., `MAIN_SLUG`, `DATED_DIR`). The helper remains POSIX Bash — no test runner, no Python interpreter, no language-runtime dependency. This preserves DR1's actual intent ("simple plugin structure, no test-runner setup, lower onboarding cost") while removing the cross-block variable-persistence bug surface.
+
 ### DR2: Audit existing + flag deltas, no Sonnet candidate authoring
 **Status:** Accepted
 **Confidence:** High

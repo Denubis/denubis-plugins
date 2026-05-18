@@ -14,6 +14,8 @@
 
 **Cascading correction from earlier finding:** The design plan's `frontmatter.metadata.lastAudited` references should be read as `frontmatter.lastAudited` (flat, no `metadata:` nesting). The flat shape aligns with the user's global CLAUDE.md frontmatter convention; existing memory files have no `lastAudited` field in any form (flat or nested) — this plugin invents the field at first finalisation. The "convention" being followed is the user's stated preference, not pre-existing precedent in memory files. This affects Phase 3 (windowing) and Phase 6 (finalisation). Phase 2 is unaffected — no frontmatter writes happen here.
 
+**Cascading correction from Phase 2 coherence review (2026-05-18):** The Bash blocks as originally specified in Tasks 1-5 assumed cross-block shell variable persistence (`MAIN_SLUG` set in `## Project slug resolution` was read in `## Discovery`, `## No-op detection`, `## Dated dir creation`). This violates the Bash tool's per-call subprocess contract. Resolution per DR1 amendment 2026-05-18: a co-located `_lib.sh` Bash helper provides `dream_main_slug`, `dream_dated_dir`, `dream_discovered_slugs`, etc. Each SKILL.md Bash block sources `_lib.sh` and calls the helper. The Phase 2 commit (`0b6ef13`) and review-fix commit (`8aa897f`) are kept as the audit trail; the refactor commit applies the corrected pattern. Phases 3-6 plans inherit this pattern — they will source `_lib.sh` rather than rely on inherited shell state.
+
 ---
 
 ## Acceptance Criteria Coverage

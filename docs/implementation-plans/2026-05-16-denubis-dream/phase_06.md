@@ -12,6 +12,8 @@
 
 **Phase Type:** functionality
 
+**Bash helper:** Per DR1 amendment 2026-05-18, this phase's Bash blocks source `plugins/denubis-dream/skills/dreaming/_lib.sh` (see `## Helper resolution` in the skill) for deterministic operations like `dream_main_slug`, `dream_main_dir`, `dream_dated_dir`. Cross-block variable persistence (e.g., `MAIN_SLUG` defined in one block and read in another) is NOT supported — each block sources `_lib.sh` and calls the helper. Phase 6 helpers may add to `_lib.sh` (e.g., for atomic-replace, MEMORY.md regeneration) as needed.
+
 ---
 
 ## Acceptance Criteria Coverage
