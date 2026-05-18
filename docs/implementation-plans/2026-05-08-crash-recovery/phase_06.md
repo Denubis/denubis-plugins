@@ -672,6 +672,8 @@ git commit -m "feat(crash-recovery): add list-live subcommand (plain + --json ou
 
   Without all four updates landing together, the test suite reports an unhelpful failure rather than a useful diff. (Falsification anchor surfaced by Phase 5 proleptic challenge CA3, 2026-05-17.)
 
+  **Resolved 2026-05-18:** Option (i) implemented; four-site coordination across render.py / __main__.py::_render_to_file / __main__.py::triage / test_render.py landed in commit ac50812. Additional call sites in test_note.py were updated in the same commit.
+
 ## Outstanding for later phases
 
 - Phase 7: triage skill registration; verifies AC1.2 (plugin lists after install), AC8.1 (README documents dependency).
