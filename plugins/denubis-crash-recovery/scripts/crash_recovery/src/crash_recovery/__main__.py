@@ -23,6 +23,7 @@ from crash_recovery import db
 from crash_recovery import history as _history
 from crash_recovery import liveness as _liveness
 from crash_recovery import note as _note
+from crash_recovery import prune as _prune
 from crash_recovery import render as _render
 from crash_recovery import scan as _scan
 
@@ -317,6 +318,69 @@ def note(
     except _note.UnknownSessionError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+
+
+@app.command()
+def prune(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="List candidate rows; do not delete."
+    ),
+    confirm: bool = typer.Option(False, "--confirm", help="Execute deletion."),
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+) -> None:
+    """Delete concluded sessions whose JSONLs are gone (gated).
+
+    Four-condition guard (see :mod:`crash_recovery.prune`): a row is a
+    candidate only if it is concluded, has no user note, its ``jsonl_path``
+    is no longer on disk, and its ``classifier_version`` matches
+    :data:`crash_recovery.classify.CLASSIFIER_VERSION`. ``--dry-run`` and
+    ``--confirm`` are mutually exclusive. Without either flag the command
+    refuses to delete (AC7.3); the user must opt in explicitly.
+
+    Rows excluded only by the AC7.7 ``classifier_version`` guard surface as
+    a stderr warning so the user knows running ``scan`` would unlock them.
+    """
+    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    if dry_run and confirm:
+        raise typer.BadParameter("--dry-run and --confirm are mutually exclusive")
+    survey = _prune.survey(resolved_db)
+    if survey.stale_version_concluded_rows > 0:
+        typer.echo(
+            f"warning: {survey.stale_version_concluded_rows} concluded session(s) are at a stale "
+            f"classifier_version and were excluded from this prune. Run `crash-recovery scan` to "
+            f"refresh them, then re-run prune.",
+            err=True,
+        )
+    if dry_run:
+        # AC7.2: list candidates, do not delete.
+        if not survey.candidates:
+            typer.echo("No prune candidates.")
+            return
+        typer.echo(f"{len(survey.candidates)} session(s) would be deleted:")
+        for candidate in survey.candidates:
+            typer.echo(
+                f"  {candidate.uuid}  cwd={candidate.cwd}  "
+                f"last_scanned={candidate.last_scanned}"
+            )
+        return
+    if not confirm:
+        # AC7.3: refuse without --confirm.
+        typer.echo(
+            "Refusing to delete without --confirm.\n"
+            "Run `crash-recovery prune --dry-run` to see what would be deleted, "
+            "then re-run with --confirm.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    # AC7.4: --confirm executes.
+    deleted = _prune.delete_candidates(
+        resolved_db, tuple(c.uuid for c in survey.candidates)
+    )
+    typer.echo(f"Deleted {deleted} session(s).")
 
 
 @app.command()
