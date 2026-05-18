@@ -1,6 +1,6 @@
 # denubis-dream — Context (Level 0)
 
-> System boundary: a skill-driven plugin that audits per-project auto-memory at `~/.claude/projects/<main-slug>/memory/` against the historical record of Claude Code conversations across the main slug plus its worktree-derived slugs. Produces a reviewable dated-scratch tree without touching live memory during the autonomous pass; interactive reconciliation collects user dispositions and finalises atomically. WIP — design plan landed 2026-05-16; implementation not yet started.
+> System boundary: a skill-driven plugin that audits per-project auto-memory at `~/.claude/projects/<main-slug>/memory/` against the historical record of Claude Code conversations across the main slug plus its worktree-derived slugs. Produces a reviewable dated-scratch tree without touching live memory during the autonomous pass; interactive reconciliation collects user dispositions and finalises atomically. WIP — design plan landed 2026-05-16; Phase 1 scaffold landed 2026-05-17 (commit `23fa22f`); Phase 2 orchestration landed 2026-05-18 (see git log).
 
 ## Diagram
 
@@ -84,6 +84,6 @@ flowchart LR
 ## Cross-References
 
 - **Design plan:** `docs/design-plans/2026-05-16-denubis-dream.md` (`3a26c87`) — full architecture, 14 Decision Records, 62 acceptance criteria, 7 implementation phases.
-- **Plugin manifest (planned):** `plugins/denubis-dream/.claude-plugin/plugin.json` (`3a26c87`), initial version `0.1.0`.
-- **Marketplace entry (planned):** `.claude-plugin/marketplace.json` (`3a26c87`).
+- **Plugin manifest:** `plugins/denubis-dream/.claude-plugin/plugin.json` (`23fa22f`), version `0.1.0`.
+- **Marketplace entry:** `.claude-plugin/marketplace.json` (`23fa22f`).
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`, `../../personae.md`.
