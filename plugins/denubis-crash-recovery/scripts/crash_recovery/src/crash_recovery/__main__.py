@@ -10,6 +10,7 @@ Phase 1 wires the ``init`` subcommand. Phase 4 adds ``scan``. Phases 5-6 add
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import sys
@@ -21,6 +22,7 @@ import typer
 
 from crash_recovery import db
 from crash_recovery import history as _history
+from crash_recovery import list_live as _list_live
 from crash_recovery import liveness as _liveness
 from crash_recovery import note as _note
 from crash_recovery import prune as _prune
@@ -413,6 +415,54 @@ def history(
         typer.echo(
             f"{entry.scan_id:>8} {entry.scan_ts:>11} "
             f"{entry.classification:<16} {reason:<40} {entry.classifier_version:>3}"
+        )
+
+
+@app.command(name="list-live")
+def list_live(
+    run_dir: Path = typer.Option(
+        None,
+        "--run-dir",
+        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+    ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit JSON array instead of plain table.",
+    ),
+) -> None:
+    """List currently-running Claude wrappers per liveness data.
+
+    Reads the per-PID liveness files under ``run_dir`` and prints the
+    subset whose wrapper process is still alive. The ``boot_ok`` column
+    (``--json``: ``boot_id_current``) flags whether each wrapper is
+    running under the current kernel boot id — ``NO`` (or ``false``)
+    indicates a recycled PID whose original wrapper is gone. Empty
+    ``run_dir`` prints ``No live sessions.`` (or ``[]`` under ``--json``).
+    """
+    resolved_run_dir = _resolve(run_dir, "CRASH_RECOVERY_RUN_DIR", "~/.claude/run")
+    entries = _list_live.survey_live(resolved_run_dir)
+    if json_out:
+        payload = [
+            {
+                "pid": e.pid,
+                "cwd": e.cwd,
+                "started": e.started,
+                "argv": e.argv,
+                "boot_id_current": e.boot_id_current,
+            }
+            for e in entries
+        ]
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    if not entries:
+        typer.echo("No live sessions.")
+        return
+    typer.echo(f"{'pid':>8} {'started':>11} {'boot_ok':>7} {'cwd':<40} argv")
+    for e in entries:
+        typer.echo(
+            f"{e.pid:>8} {e.started:>11} "
+            f"{'yes' if e.boot_id_current else 'NO':>7} {e.cwd:<40} {e.argv}"
         )
 
 

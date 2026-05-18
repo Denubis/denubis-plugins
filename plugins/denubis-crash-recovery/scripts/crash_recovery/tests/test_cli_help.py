@@ -21,6 +21,7 @@ EXPECTED_SUBCOMMANDS: tuple[str, ...] = (
     "note",
     "history",
     "prune",
+    "list-live",
 )
 
 
