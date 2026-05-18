@@ -678,6 +678,7 @@ git commit -m "feat(crash-recovery): add list-live subcommand (plain + --json ou
 
 - Phase 7: triage skill registration; verifies AC1.2 (plugin lists after install), AC8.1 (README documents dependency).
 - Phase 8: wrapper patch + version bumps; verifies AC5.1/AC5.2/AC5.3/AC5.5 writer side, AC5.6 reboot UAT, AC6.4 idle-kill UAT, AC8.2 (version sync), AC8.3 (CHANGELOG entries).
+- **Post-Phase-8 CLI extraction (deferred from Phase 6 refactor, 2026-05-18):** `__main__.py` reached 489 lines (22% over the 400-line growth threshold) after accumulating 9 subcommand handlers across Phases 1-6. The phase-end smell pipeline (smell-assessor + critical-peer-review) surfaced this as a Demonstrated Large Class finding but characterised it as "low-urgency growth management for a future extraction pass" — no correctness issue, no coupling problem. Deferred to a dedicated refactor session post-Phase 8 (when the wrapper-side surface is complete and the CLI is fully landed). Refactor options noted by smell-assessor: (a) per-domain `_cli_*.py` modules with the existing `app` object imported, or (b) typer `app.add_typer` sub-applications grouped by concern. Either approach is non-trivial — touches every subcommand registration, restructures imports, and likely affects `tests/test_cli_help.py`. Not blocking Phase 7 or Phase 8.
 
 ## Coherence review outcome (2026-05-18)
 
