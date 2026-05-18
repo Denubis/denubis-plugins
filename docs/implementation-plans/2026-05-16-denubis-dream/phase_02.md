@@ -283,13 +283,14 @@ After Task 6:
 ### Task 6: Replace scaffold stub with Phase 2 pipeline stub + commit
 
 **Files:**
-- Modify: `plugins/denubis-dream/skills/dreaming/SKILL.md` — remove the Phase 1 `## Scaffold status` section; replace the trailing print with the Phase 2 stub.
+- Modify: `plugins/denubis-dream/skills/dreaming/SKILL.md` — remove the Phase 1 `## Scaffold status` section; replace the trailing print with the Phase 2 stub; bump `last-reviewed` to today's date.
+- Modify: `docs/architecture/plugins/denubis-dream/0-context.md` — clear the "implementation not yet started" wording and the `(planned)` markers now that Phase 1 + Phase 2 have landed. **Deferred from Phase 1 coherence review (Medium-2)** — bundled into this commit per `feedback_commit-cadence.md`.
 
 **Implementation:**
 
 After Tasks 1-5 have appended their sections (Mode detection → Project slug resolution → No-op detection → Dated dir creation → Discovery), the skill body should end with a clear "Phase 2 boundary" stub announcing the autonomous pass is structurally complete but retrieval/judgement (Phase 3+) has not yet been implemented.
 
-Remove the Phase 1 `## Scaffold status` section entirely. Replace the trailing `denubis-dream:dreaming — scaffold ready, behaviour not yet implemented.` line with:
+**Step A — SKILL.md scaffold replacement.** Remove the Phase 1 `## Scaffold status` section entirely. Replace the trailing `denubis-dream:dreaming — scaffold ready, behaviour not yet implemented.` line with:
 
 ```markdown
 ## Pipeline status (Phase 2)
@@ -303,11 +304,24 @@ When invoked at this stage, the skill executes the autonomous-pass orchestration
 …and exits.
 ```
 
-**Single commit for the full Phase 2 set.** Per `feedback_commit-cadence.md`, bundle the section additions and stub replacement in one commit.
+**Step B — SKILL.md `last-reviewed` bump.** Phase 2 is a substantive revision of the skill (5 new orchestration sections + scaffold-status replacement). Per the in-repo `last-reviewed` convention (matches `using-bibliography`, `writing-claude-md-files`), bump the frontmatter's `last-reviewed:` line from `2026-05-17` to the date Phase 2 lands (run `date +%Y-%m-%d` and use the result). **This addresses Phase 1 coherence review Low-2.**
+
+**Step C — Architecture doc update (carried forward from Phase 1 coherence review Medium-2).** Update `docs/architecture/plugins/denubis-dream/0-context.md`:
+
+1. **Line 3** — replace the trailing clause `WIP — design plan landed 2026-05-16; implementation not yet started.` with `WIP — design plan landed 2026-05-16; Phase 1 scaffold landed 2026-05-17 (commit \`23fa22f\`); Phase 2 orchestration landed <today's date> (commit \`<this commit's sha>\` — fill in after commit, or use a follow-up amend if commit ordering blocks the back-reference).` If back-referencing this commit's own SHA is awkward, leave the Phase 2 reference loose ("Phase 2 orchestration landed <today's date>") and let the git log carry the SHA precision.
+
+2. **Lines 87-88** — drop the `(planned)` markers and update the commit references:
+   - Old: `**Plugin manifest (planned):** plugins/denubis-dream/.claude-plugin/plugin.json (3a26c87), initial version 0.1.0.`
+   - New: `**Plugin manifest:** plugins/denubis-dream/.claude-plugin/plugin.json (23fa22f), version 0.1.0.`
+   - Old: `**Marketplace entry (planned):** .claude-plugin/marketplace.json (3a26c87).`
+   - New: `**Marketplace entry:** .claude-plugin/marketplace.json (23fa22f).`
+
+**Single commit for the full Phase 2 set.** Per `feedback_commit-cadence.md`, bundle the section additions, stub replacement, `last-reviewed` bump, and architecture doc update in one commit.
 
 ```bash
-git add plugins/denubis-dream/skills/dreaming/SKILL.md
-git status   # sanity-check: only SKILL.md modified
+git add plugins/denubis-dream/skills/dreaming/SKILL.md \
+        docs/architecture/plugins/denubis-dream/0-context.md
+git status   # sanity-check: only SKILL.md and 0-context.md modified
 git commit -m "feat(dream): Phase 2 — autonomous-pass orchestration
 
 Adds the mode-detection, slug-resolution, discovery, dated-dir-creation,
@@ -316,6 +330,10 @@ the main slug via git rev-parse, scans ~/.claude/projects/ with an
 anchored regex (per design DR7), and creates today's dated dir with
 flagged/ and promoted/ subdirs. Retrieval and judgement land in
 subsequent phases.
+
+Also bumps SKILL.md last-reviewed (Phase 1 coherence-review Low-2) and
+clears 'implementation not yet started' / '(planned)' markers in the
+architecture context doc (Phase 1 coherence-review Medium-2 deferred).
 
 Covers AC2.1 through AC2.5. Cron no-op covered (AC9.3 stub).
 Design typo: Phase 2 'Done when' cites AC1; actual coverage is AC2."
