@@ -9,6 +9,10 @@ last-reviewed: 2026-05-18
 
 **Announce at start:** "I'm using the denubis-dream:dreaming skill."
 
+## Bash-block convention
+
+Every Bash block in this skill is **self-contained**: Claude may execute each block as a separate tool call, which means each runs in a fresh shell. Variables defined in one block (e.g., `$MAIN_SLUG`, `$TODAY`, `$DATED_DIR`) do NOT persist into subsequent blocks. Each block that needs a value must re-derive it. Do not "clean up" apparent duplication — the repetition is intentional and load-bearing.
+
 ## Mode detection
 
 Inspect the invocation prompt for the literal token `--autonomous`. Two cases:
@@ -83,32 +87,39 @@ printf '%s\n' "$DISCOVERED_SLUGS"
 
 ## No-op detection
 
-Before creating today's dated dir, check whether one already exists for this main slug. Two cases:
+Before creating today's dated dir, check whether one already exists for this main slug.
+
+First, compute the path:
 
 ```bash
 TODAY=$(date +%Y-%m-%d)
 DATED_DIR=~/.claude/projects/"$MAIN_SLUG"/memory.dream-"$TODAY"
+```
 
+If `"$DATED_DIR"` does **not** exist as a directory, fall through to `## Dated dir creation`. The autonomous pass proceeds normally.
+
+If `"$DATED_DIR"` exists, branch on mode (which you determined in `## Mode detection`):
+
+**Autonomous mode + existing dir = no-op (AC9.3).** The cron-driven invocation must not overwrite an in-progress reconciliation. Print the existing path and exit cleanly:
+
+```bash
 if [ -d "$DATED_DIR" ]; then
-  if [ "$MODE" = "autonomous" ]; then
-    echo "denubis-dream: dated dir already exists for today: $DATED_DIR — exiting cleanly (no-op)."
-    exit 0   # AC9.3
-  else
-    echo "denubis-dream: existing dated dir found — resuming reconciliation walk."
-    # Manual mode + existing dir: jump to the reconciliation walk entry.
-    # See ## Walk entry (Phase 5).
-    # For Phase 2 scaffolding the jump is a print-and-exit stub:
-    echo "denubis-dream: (Phase 2 stub) reconciliation walk lands in Phase 5."
-    exit 0
-  fi
+  echo "denubis-dream: dated dir already exists for today: $DATED_DIR — exiting cleanly (no-op)."
+  exit 0   # AC9.3
 fi
 ```
 
-**Autonomous mode + existing dir = no-op.** The cron-driven invocation must not overwrite an in-progress reconciliation. AC9.3 requires the existing path be printed and the command exit cleanly.
+**Manual mode + existing dir = resume.** Re-invoking `/dream` interactively when a dated dir exists is the user's "let me pick up where I left off" gesture. Phase 5 implements the actual walk-resume; Phase 2's stub just prints a placeholder so the integration point is exercised:
 
-**Manual mode + existing dir = resume.** Re-invoking `/dream` interactively when a dated dir exists is the user's "let me pick up where I left off" gesture. Phase 5 implements the actual walk-resume; Phase 2's stub just prints a placeholder so the integration point is exercised.
+```bash
+if [ -d "$DATED_DIR" ]; then
+  echo "denubis-dream: existing dated dir found — resuming reconciliation walk."
+  echo "denubis-dream: (Phase 2 stub) reconciliation walk lands in Phase 5."
+  exit 0
+fi
+```
 
-**No dir exists.** Fall through to `## Dated dir creation`. The autonomous pass proceeds.
+Run **only the block matching the mode you detected.** Do not run both.
 
 ## Dated dir creation
 
