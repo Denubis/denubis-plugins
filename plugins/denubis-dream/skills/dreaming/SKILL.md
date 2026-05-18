@@ -1,6 +1,6 @@
 ---
 name: dreaming
-description: Audit a project's per-project auto-memory against the historical record of Claude Code conversations. Produces a reviewable proposed-change tree under ~/.claude/projects/<slug>/memory.dream-YYYY-MM-DD/ without touching live memory during the audit.
+description: Use when auditing per-project auto-memory against the historical record of Claude Code conversations — produces a reviewable proposed-change tree without touching live memory.
 user-invocable: true
 last-reviewed: 2026-05-18
 ---
