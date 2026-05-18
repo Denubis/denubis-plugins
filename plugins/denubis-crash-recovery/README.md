@@ -14,42 +14,91 @@ same inputs.
 claude plugin install denubis-crash-recovery@brian-ed3d-plugins
 ```
 
+After installation, verify with `/plugin` — `denubis-crash-recovery` must
+appear with the version recorded in `plugin.json`.
+
 ## Dependency
 
-This plugin depends on the `claude-wrapper.sh` liveness-file behaviour shipped
-by `denubis-plan-and-execute`. Crash detection requires
-`denubis-plan-and-execute >= TBD-PHASE-8`.
+Requires `denubis-plan-and-execute` >= `<PHASE-8-VERSION>` for the wrapper
+patch that writes liveness files. Both plugins must be installed and at the
+documented versions for crash detection to work. If `denubis-plan-and-execute`
+is at an older version, crash-recovery still runs but degrades to
+JSONL-tail-only heuristics (no liveness file detection), and every session
+will be classified `concluded`.
 
-Phase 8 of the implementation plan wires the wrapper patch in
-`denubis-plan-and-execute` to write the liveness file on session start and
-remove it on clean exit. Until that wrapper patch lands, this plugin's
-`scan` and `triage` flows will see zero liveness files and classify every
-session as `concluded`. The CLI surface (`init`, schema, render, note, prune)
-is functional in v0.1.0 — only the live/crash signal depends on the wrapper
-patch.
+`<PHASE-8-VERSION>` is filled in by the Phase 8 task that ships the wrapper
+patch in `denubis-plan-and-execute`.
 
-## Usage
+## Usage — common flows
 
-Run triage to scan sessions, classify them, and regenerate `~/llm-resume.md`:
+- "I think a session just crashed" — invoke the `/denubis-crash-recovery:triage`
+  skill, or run `crash-recovery triage` directly. The skill walks through
+  classification, optional annotation, and the gated prune flow.
+- "I want to clean up the resume file" — run `crash-recovery prune --dry-run`
+  to see candidates, then `crash-recovery prune --confirm` to delete.
+- "I want to know what happened to session X" — run
+  `crash-recovery history <uuid>` to see the classification trail.
 
-```bash
-crash-recovery triage
-```
+Full subcommand reference is under `crash-recovery --help`. The database lives
+at `~/.claude/crash-recovery.db` (override with `CRASH_RECOVERY_DB`). Run
+`crash-recovery init` once to create the schema; the command is idempotent.
 
-Other subcommands (`init`, `scan`, `render`, `note`, `prune`) are documented
-under `crash-recovery --help` and land incrementally across Phases 1–6 of the
-implementation plan.
+## UAT scenarios
 
-## Database
+### AC5.6 — boot_id mismatch after reboot
 
-State lives in `~/.claude/crash-recovery.db` (SQLite, WAL journal mode).
-Override the path with the `CRASH_RECOVERY_DB` environment variable. Run
-`crash-recovery init` once to create the schema; the command is idempotent
-and safe to re-run.
+1. Start a wrapped Claude Code session via `denubis-plan-and-execute` and let
+   it run long enough that a liveness file is written under `~/.claude/run/`.
+2. Reboot the machine.
+3. After reboot, run `crash-recovery scan`.
+4. Assert the pre-reboot session is classified `hard_crash` with reason
+   `liveness_boot_id_mismatch`, regardless of whether the recorded PID has
+   been recycled.
+
+### AC6.4 — idle-kill of a wrapper process
+
+1. Start a wrapped Claude Code session in a known cwd and leave it idle for
+   five or more minutes.
+2. Find the wrapper PID and kill it ungracefully:
+
+   ```bash
+   kill -9 $(pgrep -f 'claude' | head -1)
+   ```
+
+3. Run `crash-recovery scan`.
+4. Assert the session is classified `hard_crash` despite a stale JSONL whose
+   tail might otherwise look idle-concluded.
+
+## Troubleshooting
+
+- **`scan` exits with `requires Linux` on macOS or BSD.** The `scan`
+  subcommand reads `/proc/sys/kernel/random/boot_id` and is Linux-only by
+  design. The other subcommands (`init`, `render`, `note`, `history`,
+  `prune`, `list-live`) work cross-platform against an existing DB, but the
+  scan and triage flows need Linux.
+- **`scan` exits with `does not provide reliable atomic-rename semantics`.**
+  `~/.claude/run/` is on a network or union filesystem (NFS, CIFS, sshfs,
+  FUSE) that cannot guarantee atomic `rename(2)` for liveness-file writes.
+  Set `CRASH_RECOVERY_RUN_DIR` to a path on a local filesystem such as ext4,
+  btrfs, xfs, zfs, or tmpfs.
+- **`scan` runs but reports zero sessions.** Check `CRASH_RECOVERY_RUN_DIR`
+  and `CRASH_RECOVERY_PROJECTS_ROOT` env vars; check `~/.claude/run/` exists
+  and that the `denubis-plan-and-execute` wrapper has been invoked at least
+  once since install.
+- **Pruned a session you wanted to keep.** There is no audit trail in v0.1.0
+  by design — the prune flow does not log deletions. Preserve future sessions
+  by adding `crash-recovery note <uuid>` before they get pruned.
+- **Schema corruption.** Rebuild from filesystem state:
+
+  ```bash
+  rm ~/.claude/crash-recovery.db && crash-recovery init && crash-recovery scan
+  ```
 
 ## Status
 
-v0.1.0 ships the plugin scaffold, SQLite schema, and `crash-recovery init`
-subcommand. The wrapper-patch dependency on `denubis-plan-and-execute` lands
-in Phase 8 of the implementation plan, at which point crash detection
-becomes operational end-to-end.
+v0.1.0 ships the plugin, the SQLite schema, the full classification pipeline
+(`init`, `scan`, `classify`, `render`, `note`, `history`, `prune`,
+`list-live`, `regenerate`, `triage`), and the user-facing triage skill. The
+wrapper-patch dependency on `denubis-plan-and-execute` lands in Phase 8 of
+the implementation plan, at which point crash detection becomes operational
+end-to-end.
