@@ -44,15 +44,80 @@ AC7.5 already exempts annotated rows from `prune --confirm`. The same logical ex
 
 **Phase 6 must include a task** — placed in Subcomponent A alongside `note.py` so the constraint lands when `user_notes` becomes a load-bearing column — that:
 
-1. Modifies `_orphan_sweep` in `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/scan.py` to skip rows where `user_notes IS NOT NULL`. The skip preserves both `classification` and `classifier_version` on annotated orphans. (`last_scanned` may still be refreshed since it's a bookkeeping field, not a user-intent field; the decision is documented in the new test's docstring.)
+1. Modifies `_orphan_sweep` in `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/scan_db.py` (the function moved here in the Phase 4 module split; an earlier draft of this constraint referenced `scan.py`) to skip rows where `user_notes IS NOT NULL`. The skip preserves both `classification` and `classifier_version` on annotated orphans. (`last_scanned` may still be refreshed since it's a bookkeeping field, not a user-intent field; the decision is documented in the new test's docstring.)
 2. Adds `test_orphan_sweep_preserves_annotated_session_classification` in `tests/test_scan.py`: seed an annotated row with a vanished `jsonl_path`, run `scan`, assert `classification` and `classifier_version` unchanged and a `classification_history` row is NOT appended for it (no reclassification means no history entry).
 3. Adds a paired test `test_orphan_sweep_reclassifies_unannotated_session` that re-verifies the existing AC3.6 behaviour on rows where `user_notes IS NULL` — to pin the exemption is scoped to annotated rows only.
 
 This is a Phase 4 code change driven by Phase 6's semantics: the constraint surfaced in Phase 4's proleptic review, but the fix belongs with the annotation feature that motivates it. Phase 4's plan-level Outstanding section cross-references this constraint.
 
+**Realised as:** Task 0 in Subcomponent A below.
+
 ---
 
-<!-- START_SUBCOMPONENT_A (tasks 1-2) -->
+<!-- START_SUBCOMPONENT_A (tasks 0-2) -->
+
+<!-- START_TASK_0 -->
+### Task 0: Annotation-preserves-classification — `_orphan_sweep` exemption
+
+**Verifies:** Design Constraint "Annotation-preserves-classification" (Phase 4 proleptic review deferral, 2026-05-17). Lands here because `user_notes` becomes load-bearing in this phase.
+
+**Files:**
+- Modify: `plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/scan_db.py` (the function `_orphan_sweep` is here after the Phase 4 module split — the Design Constraint section above predates that split and still says `scan.py`)
+- Modify: `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/test_scan.py`
+
+**Implementation:**
+
+1. In `_orphan_sweep`, extend the `SELECT` to fetch `user_notes` alongside the existing columns, and add a skip clause at the top of the per-row loop (immediately after the `if uuid in seen_uuids: continue` guard):
+   ```python
+   if user_notes is not None:
+       # Annotation-preserves-classification: user signalled "keep this row".
+       # Preserve both classification and classifier_version; do not append a
+       # classification_history row. last_scanned is a bookkeeping field and
+       # may still be refreshed by an UPDATE if the surrounding logic requires
+       # it, but the simplest correct implementation is to skip the row entirely
+       # for this sweep (no UPDATE, no history append).
+       continue
+   ```
+   The skip preserves `classification`, `classifier_version`, `classification_reason`, and `state_summary`. No `classification_history` row is appended because none of the per-row UPDATE/append code runs.
+
+2. Add `test_orphan_sweep_preserves_annotated_session_classification` in `tests/test_scan.py`. The test:
+   - Seeds a sessions row with `classification = 'concluded'`, `classifier_version = CLASSIFIER_VERSION`, `user_notes = 'keep this'`, and `jsonl_path` pointing to a path that does NOT exist on disk.
+   - Runs a `scan` invocation.
+   - Asserts the row's `classification` and `classifier_version` are unchanged.
+   - Asserts no `classification_history` row was appended for this UUID (count of `classification_history` rows for this uuid stays at the pre-scan count).
+   - Docstring documents the decision that `last_scanned` is bookkeeping and is preserved (we skip the entire UPDATE, not just the classification fields).
+
+3. Add a paired test `test_orphan_sweep_reclassifies_unannotated_session` in `tests/test_scan.py`. The test:
+   - Seeds an otherwise identical row but with `user_notes IS NULL`.
+   - Runs `scan`.
+   - Asserts the row's `classification` flips to `irrecoverable` with reason `missing_jsonl_on_disk` (the existing AC3.6 behaviour).
+   - Asserts a `classification_history` row WAS appended.
+   - Pins that the exemption added in step 1 is scoped to annotated rows only.
+
+Key invariants:
+- `_orphan_sweep`'s `SELECT … FROM sessions` is the only query touched in step 1; the per-row loop gets one additional skip branch.
+- The two paired tests share fixture scaffolding (a helper that seeds a sessions row with parameterised `user_notes`). Either inline both fixtures or extract a small helper inside the test module.
+- AC3.6 (orphan reclassification) is the existing behaviour the second test re-pins; do NOT loosen AC3.6 coverage in pursuit of the new exemption.
+
+**Step: Verify operationally**
+
+```bash
+uv run pytest plugins/denubis-crash-recovery/scripts/crash_recovery/tests/test_scan.py::test_orphan_sweep_preserves_annotated_session_classification plugins/denubis-crash-recovery/scripts/crash_recovery/tests/test_scan.py::test_orphan_sweep_reclassifies_unannotated_session -q
+```
+
+Then run the full suite to confirm no regression:
+
+```bash
+uv run pytest -q
+```
+
+**Step: Commit**
+
+```bash
+git add plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/scan_db.py plugins/denubis-crash-recovery/scripts/crash_recovery/tests/test_scan.py
+git commit -m "feat(crash-recovery): _orphan_sweep skips annotated rows; preserves classification + classifier_version (Phase 4 deferral)"
+```
+<!-- END_TASK_0 -->
 
 <!-- START_TASK_1 -->
 ### Task 1: `crash_recovery.note` module
@@ -592,6 +657,7 @@ git commit -m "feat(crash-recovery): add list-live subcommand (plain + --json ou
 - AC4.1, AC4.2, AC4.3, AC4.5 tests pass (annotation CRUD).
 - AC7.2, AC7.3, AC7.4, AC7.5, AC7.6, AC7.7 tests pass (prune guards).
 - `crash-recovery --help` now lists all 9 documented subcommands (`init`, `scan`, `render`, `triage`, `regenerate`, `note`, `history`, `prune`, `list-live`) — completes AC2.1.
+- Task 0 lands: `_orphan_sweep` skips annotated rows; both `test_orphan_sweep_preserves_annotated_session_classification` and `test_orphan_sweep_reclassifies_unannotated_session` pass.
 - Repo-root `uv run pytest -q` passes (Phases 1–6 cumulative).
 
 ## Deferred from phase-5 review
