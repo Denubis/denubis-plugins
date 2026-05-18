@@ -21,6 +21,7 @@ import typer
 
 from crash_recovery import db
 from crash_recovery import liveness as _liveness
+from crash_recovery import note as _note
 from crash_recovery import render as _render
 from crash_recovery import scan as _scan
 
@@ -280,6 +281,41 @@ def regenerate(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(f"Rendered {count} sessions to {resolved_out}")
+
+
+@app.command()
+def note(
+    uuid: str = typer.Argument(..., help="Session UUID."),
+    text: str = typer.Argument(None, help="Note text. Omit and pass --clear to remove."),
+    clear: bool = typer.Option(False, "--clear", help="Remove the existing note for this UUID."),
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+) -> None:
+    """Set, overwrite, or clear the user note for a session.
+
+    AC4.5: unknown UUIDs exit with code 2 and a "no session with uuid" error
+    on stderr. The ``--clear`` and positional text arguments are mutually
+    exclusive — supplying both raises ``typer.BadParameter`` so a caller
+    cannot ambiguously request "set this text" and "clear" in one call.
+    """
+    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    try:
+        if clear:
+            if text is not None:
+                raise typer.BadParameter("--clear cannot be combined with a text argument")
+            _note.clear_note(resolved_db, uuid)
+            typer.echo(f"Cleared note for {uuid}")
+        else:
+            if text is None:
+                raise typer.BadParameter("missing note text (or pass --clear)")
+            _note.set_note(resolved_db, uuid, text)
+            typer.echo(f"Set note for {uuid}")
+    except _note.UnknownSessionError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
 
 
 def main() -> None:
