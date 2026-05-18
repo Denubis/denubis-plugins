@@ -321,6 +321,39 @@ def note(
 
 
 @app.command()
+def history(
+    uuid: str = typer.Argument(..., help="Session UUID."),
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+) -> None:
+    """Show all recorded classifications for a session, chronologically.
+
+    Reads ``classification_history`` joined with ``scan_runs`` so each row
+    carries the originating scan's ``ts`` and the recorded
+    ``classifier_version``. Rows print oldest-first in a plain-text table.
+    A UUID with no history exits 1 with a stderr message; this distinguishes
+    "no rows" from "table fetched and table was empty" for downstream tools.
+    """
+    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    entries = _history.fetch_history(resolved_db, uuid)
+    if not entries:
+        typer.echo(f"No history for {uuid}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"{'scan_id':>8} {'ts':>11} {'classification':<16} {'reason':<40} {'cv':>3}"
+    )
+    for entry in entries:
+        reason = entry.reason or ""
+        typer.echo(
+            f"{entry.scan_id:>8} {entry.scan_ts:>11} "
+            f"{entry.classification:<16} {reason:<40} {entry.classifier_version:>3}"
+        )
+
+
+@app.command()
 def prune(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="List candidate rows; do not delete."
@@ -345,6 +378,12 @@ def prune(
     a stderr warning so the user knows running ``scan`` would unlock them.
     """
     resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    # Fail-fast on caller error before running survey(). Plan prescribed
+    # survey()-first then mutex check; reversed here so callers get the
+    # parameter error without an unnecessary DB read. Trade-off: when both
+    # --dry-run and --confirm are passed AND the DB has stale-version
+    # concluded rows, the AC7.7 warning is suppressed (the user fixes their
+    # args, re-runs, then sees the warning). Approved in Phase 6 review 2026-05-18.
     if dry_run and confirm:
         raise typer.BadParameter("--dry-run and --confirm are mutually exclusive")
     survey = _prune.survey(resolved_db)
@@ -381,39 +420,6 @@ def prune(
         resolved_db, tuple(c.uuid for c in survey.candidates)
     )
     typer.echo(f"Deleted {deleted} session(s).")
-
-
-@app.command()
-def history(
-    uuid: str = typer.Argument(..., help="Session UUID."),
-    db_path: Path = typer.Option(
-        None,
-        "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
-    ),
-) -> None:
-    """Show all recorded classifications for a session, chronologically.
-
-    Reads ``classification_history`` joined with ``scan_runs`` so each row
-    carries the originating scan's ``ts`` and the recorded
-    ``classifier_version``. Rows print oldest-first in a plain-text table.
-    A UUID with no history exits 1 with a stderr message; this distinguishes
-    "no rows" from "table fetched and table was empty" for downstream tools.
-    """
-    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
-    entries = _history.fetch_history(resolved_db, uuid)
-    if not entries:
-        typer.echo(f"No history for {uuid}", err=True)
-        raise typer.Exit(code=1)
-    typer.echo(
-        f"{'scan_id':>8} {'ts':>11} {'classification':<16} {'reason':<40} {'cv':>3}"
-    )
-    for entry in entries:
-        reason = entry.reason or ""
-        typer.echo(
-            f"{entry.scan_id:>8} {entry.scan_ts:>11} "
-            f"{entry.classification:<16} {reason:<40} {entry.classifier_version:>3}"
-        )
 
 
 @app.command(name="list-live")
