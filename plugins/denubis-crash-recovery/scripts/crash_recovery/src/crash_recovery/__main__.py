@@ -445,6 +445,16 @@ def list_live(
     ``run_dir`` prints ``No live sessions.`` (or ``[]`` under ``--json``).
     """
     resolved_run_dir = _resolve(run_dir, "CRASH_RECOVERY_RUN_DIR", "~/.claude/run")
+    # survey_live deliberately does NOT filter on boot_id_current; it reports
+    # boot_id_current as the `boot_ok` column instead. Rationale: a row with
+    # boot_ok=NO means the PID exists but came up under a different boot id —
+    # the original wrapper is gone and the new occupant is an unrelated
+    # process that happens to share the recycled PID. Surfacing the row lets
+    # the user see the evidence; filtering would hide what's actually on
+    # disk. A future "fix" that filters by boot_id_current=True would lose
+    # diagnostic signal. See DR7 (design plan): a non-current-boot liveness
+    # file is a "guaranteed casualty" for scan's classification purposes,
+    # but list-live is a diagnostic, not a classifier.
     entries = _list_live.survey_live(resolved_run_dir)
     if json_out:
         payload = [

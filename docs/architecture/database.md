@@ -49,7 +49,7 @@ Source file: `crash_recovery/db.py`. DDL constants: `db.py::SESSIONS_DDL`, `db.p
 
 ## Relationships
 
-- `classification_history.uuid` → `sessions.uuid` **ON DELETE CASCADE**: deleting a session row removes all its history. This is the Phase 6 `prune` behaviour — `prune` deletes from `sessions` and the cascade cleans up history automatically. Source: `db.py::CLASSIFICATION_HISTORY_DDL`.
+- `classification_history.uuid` → `sessions.uuid` **ON DELETE CASCADE**: deleting a session row removes all its history. This is the Phase 6 `prune` behaviour — `prune` deletes from `sessions` and the cascade cleans up history automatically. Source: `db.py::CLASSIFICATION_HISTORY_DDL`. Phase 6's `prune` exercises this cascade for the first time in production code; the cascade is tested by `tests/test_prune.py::test_prune_cascades_classification_history_deletion`.
 
 - `classification_history.scan_id` → `scan_runs.id` **ON DELETE RESTRICT**: scan_runs rows are never deleted in normal operation. RESTRICT documents this intent structurally — any future retention feature must consciously address existing history before removing a scan_runs row. Source: `db.py::CLASSIFICATION_HISTORY_DDL`.
 
