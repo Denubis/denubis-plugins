@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 
 from crash_recovery import db
+from crash_recovery import history as _history
 from crash_recovery import liveness as _liveness
 from crash_recovery import note as _note
 from crash_recovery import render as _render
@@ -316,6 +317,39 @@ def note(
     except _note.UnknownSessionError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+
+
+@app.command()
+def history(
+    uuid: str = typer.Argument(..., help="Session UUID."),
+    db_path: Path = typer.Option(
+        None,
+        "--db",
+        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+    ),
+) -> None:
+    """Show all recorded classifications for a session, chronologically.
+
+    Reads ``classification_history`` joined with ``scan_runs`` so each row
+    carries the originating scan's ``ts`` and the recorded
+    ``classifier_version``. Rows print oldest-first in a plain-text table.
+    A UUID with no history exits 1 with a stderr message; this distinguishes
+    "no rows" from "table fetched and table was empty" for downstream tools.
+    """
+    resolved_db = _resolve(db_path, "CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    entries = _history.fetch_history(resolved_db, uuid)
+    if not entries:
+        typer.echo(f"No history for {uuid}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"{'scan_id':>8} {'ts':>11} {'classification':<16} {'reason':<40} {'cv':>3}"
+    )
+    for entry in entries:
+        reason = entry.reason or ""
+        typer.echo(
+            f"{entry.scan_id:>8} {entry.scan_ts:>11} "
+            f"{entry.classification:<16} {reason:<40} {entry.classifier_version:>3}"
+        )
 
 
 def main() -> None:
