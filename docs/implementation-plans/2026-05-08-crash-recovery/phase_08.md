@@ -547,7 +547,13 @@ Phase 8's wrapper closes this gap going forward, but does NOT retroactively help
 
 **What Phase 8 must do with this:**
 
-1. **Honesty pass on README.** Phase 8 already edits the README to substitute `<PHASE-8-VERSION>` with the real version. While in there, replace the misleading "still runs but degrades to JSONL-tail-only heuristics (no liveness file detection)" line with the honest version: without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — sessions appear under "Needs investigation". Reference the design seed for the planned remediation.
+1. **Honesty pass on README and SKILL.md.** Phase 8 already edits the README to substitute `<PHASE-8-VERSION>` with the real version. While in there, fix three overclaims (all variants of the same false world model — "the tool degrades gracefully when wrapper is missing"):
+
+   a. `plugins/denubis-crash-recovery/README.md:25-27` — "still runs but degrades to JSONL-tail-only heuristics (no liveness file detection), and every session will be classified `concluded`." Both halves are wrong: dangling-tail sessions are classified `borderline` (not `concluded`) and routed to "Needs investigation" / "Ambiguous correlation", not "Recently concluded". The dogfood proved this — 5 crash victims appeared in "Needs investigation" as `unknown_tail_kind`.
+
+   b. `plugins/denubis-crash-recovery/skills/triage/SKILL.md:99` (Integration section) — "Without that wrapper patch, `scan` sees zero liveness files and every session is classified `concluded`." Same false claim as (a).
+
+   c. Honest replacement: without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — every rule producing them in `classify.py::RULES` requires `liveness_present=True`. Sessions with clean end_turn tails are classified `concluded`; everything else (dangling tool_use, dangling ask_question, dangling agent_dispatch, unknown tails) is classified `borderline` with reasons like `unknown_tail_kind` or `no_liveness_dangling_*`, and renders under "Needs investigation" or "Ambiguous correlation", not "Recently concluded". Reference the design seed for the planned remediation (post-mortem mtime-clustering detection).
 2. **Do NOT implement post-mortem crash detection in Phase 8.** The design seed has 8 open questions that need brainstorming first. Scope this phase strictly to the wrapper patch + version coordination as planned.
 3. **Flag the design seed at completion.** When Phase 8 wraps and the implementation plan is closed, the design seed becomes the input to the next brainstorming session. The Finalization step (post-Phase-8 code-reviewer pass over all eight phases) should explicitly call out the design seed as a known follow-up, not as an oversight.
 

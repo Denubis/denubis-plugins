@@ -34,7 +34,7 @@ Annotations are user-supplied context that survives prune. They are the only sig
 Walk the report's actionable sections in this order:
 
 1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use AskUserQuestion with a `[manual review]` prefix in the prompt.
-2. **Ambiguous correlation**, then **Needs investigation**, then **Idle-live killed** rows.
+2. **Ambiguous correlation**, then **Needs investigation**, then **Idle-live killed** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
 
 For each row, ask:
 

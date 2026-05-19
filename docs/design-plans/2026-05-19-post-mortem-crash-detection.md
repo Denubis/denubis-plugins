@@ -82,13 +82,25 @@ The two are **complementary**, not alternatives. mtime-clustering is the answer 
 
 ## Documentation honesty issue (Phase 7 fallout)
 
-`plugins/denubis-crash-recovery/README.md` (committed 2026-05-18 as `9b98add`) currently says:
+The Phase 7 README and SKILL.md (committed 2026-05-18 as `9b98add` and `963195a`) contain three overclaims — all variants of the same false world model that the tool "degrades gracefully" when the wrapper is missing. Phase 7 code review caught two of them; the third (the original heuristics framing) was already on the design seed list.
 
-> "If `denubis-plan-and-execute` is at an older version, crash-recovery still runs but degrades to JSONL-tail-only heuristics (no liveness file detection)."
+1. **README.md:25-27 (Dependency section):**
 
-This is misleading. The honest version: without the Phase 8 wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — every rule that produces them requires `liveness_present=True`. Sessions appear under "Needs investigation" with reasons like `unknown_tail_kind` or `no_liveness_dangling_tool_use`, not as recoverable crashes.
+   > "If `denubis-plan-and-execute` is at an older version, crash-recovery still runs but degrades to JSONL-tail-only heuristics (no liveness file detection), and every session will be classified `concluded`."
 
-Phase 8 already plans to edit the README (to substitute `<PHASE-8-VERSION>` with the real version). The honesty pass can fold in at the same time — flag this design seed as the reason.
+   Both halves are wrong. Dangling-tail sessions are classified `borderline`, not `concluded`, and routed to "Needs investigation" / "Ambiguous correlation", not "Recently concluded".
+
+2. **SKILL.md:99 (Integration section):**
+
+   > "Without that wrapper patch, `scan` sees zero liveness files and every session is classified `concluded`."
+
+   Same false claim.
+
+3. **The original "heuristics framing"** (from the Phase 6 design seed wording) — captured for completeness.
+
+**Honest replacement** (Phase 8 should substitute this when filling in `<PHASE-8-VERSION>`): without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — every rule producing them in `classify.py::RULES` requires `liveness_present=True`. Sessions with clean end_turn tails are classified `concluded`; everything else (dangling tool_use, dangling ask_question, dangling agent_dispatch, unknown tails) is classified `borderline` with reasons like `unknown_tail_kind` or `no_liveness_dangling_*`, and renders under "Needs investigation" or "Ambiguous correlation". The empirical dogfood (2026-05-18 crash, 5 sessions) produced exactly this pattern.
+
+Phase 8 already plans to edit the README (to substitute `<PHASE-8-VERSION>` with the real version). The honesty pass folds in at the same time — phase_08.md's "Surfaced during Phase 7 dogfood" section enumerates all three sites for the Phase 8 implementor.
 
 ## Suggested path forward
 

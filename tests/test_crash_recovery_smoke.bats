@@ -18,7 +18,7 @@ teardown() {
   rm -rf "$CRASH_RECOVERY_TEST_TMP"
 }
 
-CR="uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
+CR="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
 
 @test "init creates the database" {
   run $CR init
@@ -64,7 +64,7 @@ CR="uv run --project plugins/denubis-crash-recovery/scripts/crash_recovery crash
 @test "denubis-crash-recovery is listed in marketplace.json" {
   python3 -c "
 import json
-m = json.load(open('.claude-plugin/marketplace.json'))
+m = json.load(open('${BATS_TEST_DIRNAME}/../.claude-plugin/marketplace.json'))
 assert any(p['name'] == 'denubis-crash-recovery' for p in m['plugins'])
 "
 }
