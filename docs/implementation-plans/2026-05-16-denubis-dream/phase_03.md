@@ -57,7 +57,7 @@ The section text:
 ````markdown
 ## Pre-windowing transcripts
 
-Phase 3's subagents read from filtered streams, not raw transcripts. Native JSONL lines are NOT monotonic by timestamp, and substantive text is distributed across multiple block types within each message's `.content` array (`text`, `thinking`, `tool_use`, `tool_result`) — plus a string-form `.content` on some lines and entirely message-less lines (`attachment`, `queue-operation`, `system`). One central `jq` filter applied at the Bash layer extracts substantive text from every block type into a single per-line `text` field, producing a stable `{ts, uuid, role, text}` shape; subagent prompts then assume that shape and stay terse.
+Phase 3's subagents read from filtered streams, not raw transcripts. Native JSONL lines are NOT monotonic by timestamp, and substantive prose is mixed in with `tool_use` / `tool_result` / `thinking` blocks that carry work-product (file contents, command outputs, internal reasoning) rather than memory-worthy signal. One central `jq` filter applied at the Bash layer extracts ONLY conversational text — the `text` blocks in array-form `.message.content` plus the raw string for string-form `.message.content` (assistant text-only responses) — into a single per-line `text` field, producing a stable `{ts, uuid, role, text}` shape; subagent prompts then assume that shape and stay terse.
 
 ```bash
 source "$DREAM_LIB"
@@ -70,13 +70,18 @@ mkdir -p "$DATED_DIR"/.windowed
 # Helper: emit windowed JSONL from a set of transcript files,
 # filtered by timestamp >= $1 (or unbounded if $1 is empty).
 #
-# The extract_text jq function below handles every shape Claude Code transcripts
-# emit. Naïve `.message.content[0].text // .text // ""` drops ~95% of lines
-# because most lines have an array-form .message.content whose first block is
-# tool_use, tool_result, or thinking — NOT text. The extractor walks every
-# block, pulls substantive content from each type, joins on newlines, and
-# returns "" for non-message-bearing lines (attachment, queue-operation, system)
-# so the trailing `select(.text != "")` drops them cleanly without stderr noise.
+# The extract_text jq function below pulls ONLY conversational text — the
+# `text` blocks in array-form .message.content, plus the raw string when
+# .message.content itself is a string (assistant text-only responses).
+# tool_use, tool_result, thinking, and image blocks are dropped. They carry
+# work-product (file contents, command output, internal reasoning) that
+# bloats the substrate at project scale (a Read tool_result embeds a full
+# file; a Write tool_use embeds the full file being written) without
+# contributing memory-worthy signal. Memory-worthy claims live in user
+# prompts and assistant prose. If a subagent needs to verify a claim
+# against actual code or file content, the per-memory subagent prompt's
+# `## Code-artefact flags` rules instruct it to grep the live repo
+# directly — that's the "dig in on demand" path, not pre-staged bulk.
 window_jsonl() {
   local since="$1"; shift
   local files=("$@")
@@ -88,15 +93,6 @@ window_jsonl() {
         elif (.message.content | type) == "array" then
           [ .message.content[] |
             ( if .type == "text" then (.text // "")
-              elif .type == "thinking" then (.thinking // "")
-              elif .type == "tool_use" then
-                ("[tool_use " + (.name // "?") + "] " + ((.input // {}) | tostring))
-              elif .type == "tool_result" then
-                ( if (.content | type) == "string" then .content
-                  elif (.content | type) == "array" then
-                    ([.content[] | (if .type == "text" then (.text // "") else "" end)]
-                     | map(select(. != "")) | join("\n"))
-                  else "" end)
               else "" end )
           ] | map(select(. != null and . != "")) | join("\n")
         else "" end;
@@ -158,7 +154,7 @@ echo "denubis-dream: corpus window: since=$COVERAGE_BOUND lines=$COVERAGE_LINES"
 
 **Why pre-window.** Without pre-windowing, every subagent independently parses raw JSONL (variable shape, large files) — wastes context tokens and introduces per-subagent variance in what gets read. Centralising the filter is also the right place to absorb future Claude Code transcript-format changes (one filter to update, not N subagent prompts).
 
-**Why extract every block type.** Most assistant work in Claude Code transcripts lives in `tool_use` and `tool_result` blocks (commands invoked, outputs received); discussion lives in `text` blocks; reasoning lives in `thinking` blocks. A filter that pulls only `.message.content[0].text` drops the majority of substantive content because most messages have a non-text first block. The extractor concatenates substantive text from every block in the array (`tool_use` rendered as a `[tool_use <name>] <input-as-json>` marker line; `tool_result.content` handled for both string and nested-array forms) so subagents see the actual work history, not just the surfaced prose.
+**Why text-only.** A "comprehensive" extractor that pulls every block type produces a substrate dominated by file-content echoes. Concretely on this project (104 transcript files at the dream's first invocation, no `lastAudited` set yet so per-memory windows are unbounded scans): the comprehensive filter emitted a 27 MB per-memory file with average 1,186 bytes per line; the top-5 largest lines were 60-72 KB `Read` tool_results carrying full skill/design-document contents. Those bytes have no relationship to a memory's claim — they're just file contents that flowed through the transcript. Memory-worthy claims live in user prompts and assistant prose responses (the `text` blocks). When a per-memory subagent needs to verify a claim against actual code or file content, the `## Per-memory subagent prompt` instructs it to grep the live repo directly — the "dig in on demand" path is intentional, not an oversight to be papered over by pre-staging.
 
 **`lastAudited` is flat.** Existing memory frontmatter uses flat fields (`name`, `description`, `type`, `originSessionId`). The `lastAudited` field this audit introduces (written by Phase 6 finalisation) is also flat — the awk extractor above reads `lastAudited:` at the top level, not `metadata.lastAudited`.
 
@@ -172,8 +168,9 @@ After Phase 3 dispatch completes (Task 8 stub), check:
 - `<dated_dir>/.windowed/_corpus.jsonl` exists.
 - Each windowed file is valid JSONL (`jq -e . <file> > /dev/null`).
 - For the first dream (no `.last-dream`), the corpus window contains the union of all discovered transcripts' text-bearing lines.
-- **Filter-survivor sanity (smoke test for the comprehensive extractor):** for a typical transcript file, survivor count should be a sizeable fraction of timestamped lines, NOT a tiny fraction. On `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d28fd3f2-dc3e-41fd-9e62-75bf79264cce.jsonl` (the reference file used during plan-validation): 960 total lines / 785 timestamped / **475 survivors** under this filter. A naïve `.message.content[0].text` filter would produce 48 survivors on the same file. If your survivor count is in the 5%-of-timestamped-lines range on a representative transcript, the extractor has regressed to a single-block path — fix before dispatching subagents.
-- **No stderr noise.** Run the helper and confirm stderr is empty (`window_jsonl "" "$one_jsonl" 2>/tmp/err >/dev/null; wc -l /tmp/err`). The naïve filter crashes with `Cannot index string with number` on lines whose `.message.content` is a string; this filter handles both shapes silently.
+- **Filter-survivor sanity (text-only):** survivor count per typical transcript file is the count of text-bearing user prompts and assistant text-block responses — typically a small fraction of timestamped lines, because most transcript lines are tool_use / tool_result / thinking. On the 960-line reference transcript `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d28fd3f2-dc3e-41fd-9e62-75bf79264cce.jsonl`: ~48 survivors under text-only. That's the right order of magnitude: a typical session has dozens of conversational turns, not hundreds. If you see a survivor in the multi-hundreds for a single transcript, the extractor has regressed to including tool blocks — check that the `extract_text` arm only matches `.type == "text"`.
+- **Average line size:** with the text-only filter, average bytes per line should be in the 100-2000 range (user prompts + assistant prose). If average line size exceeds 5 KB, a Read tool_result or Write tool_use payload is leaking through.
+- **No stderr noise.** Run the helper and confirm stderr is empty (`window_jsonl "" "$one_jsonl" 2>/tmp/err >/dev/null; wc -l /tmp/err`). A filter that crashes with `Cannot index string with number` on lines whose `.message.content` is a string is broken — this filter handles both shapes silently.
 <!-- END_TASK_1 -->
 
 <!-- START_TASK_2 -->
@@ -574,12 +571,16 @@ with ## Evidence + ## Code-artefact flags), and corpus-wide
 flagged-region scanner + prompt. Resumable via missing-## Evidence
 detection; SKIPPED.md captures subagent failures for the Phase 5 walk.
 
-The pre-window jq filter extracts substantive text from every
-Claude Code transcript block type (text, thinking, tool_use,
-tool_result inc. nested-array form, plus string-form .message.content)
-rather than the naive .message.content[0].text path — verified against
-a representative 960-line transcript: 475 substantive lines survive
-the comprehensive extractor vs 48 under the naive path.
+The pre-window jq filter extracts ONLY conversational text — text
+blocks in array-form .message.content plus the raw string for
+string-form .message.content (assistant text-only responses).
+tool_use, tool_result, thinking, and image blocks are dropped: they
+carry work-product (file contents, command output, internal
+reasoning) that bloats the substrate without contributing
+memory-worthy signal. Memory-worthy claims live in user prompts and
+assistant prose responses; the per-memory subagent prompt's
+## Code-artefact flags rules instruct it to grep the live repo for
+any code references the memory's claim depends on.
 
 Covers AC3.1 through AC3.8. Implementation deviates from design text
 in two places: subagent_type 'denubis-basic-agents:sonnet-general-purpose'
