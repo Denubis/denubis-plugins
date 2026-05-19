@@ -20,11 +20,16 @@ appear with the version recorded in `plugin.json`.
 ## Dependency
 
 Requires `denubis-plan-and-execute` >= `<PHASE-8-VERSION>` for the wrapper
-patch that writes liveness files. Both plugins must be installed and at the
-documented versions for crash detection to work. If `denubis-plan-and-execute`
-is at an older version, crash-recovery still runs but degrades to
-JSONL-tail-only heuristics (no liveness file detection), and every session
-will be classified `concluded`.
+patch that writes liveness files. Both plugins must be installed, and the
+wrapper must have run before the crash, for crash detection to work.
+
+Without the wrapper having run before the crash, `hard_crash` and `live`
+classifications cannot fire — every rule producing them requires a
+liveness file (see `classify.py::RULES`). Crashed sessions appear under
+"Needs investigation" as `unknown_tail_kind` or `no_liveness_dangling_*`,
+not as recoverable crashes. Retroactive recovery for sessions that ran
+before the wrapper was installed is tracked in
+`docs/design-plans/2026-05-19-post-mortem-crash-detection.md`.
 
 `<PHASE-8-VERSION>` is filled in by the Phase 8 task that ships the wrapper
 patch in `denubis-plan-and-execute`.

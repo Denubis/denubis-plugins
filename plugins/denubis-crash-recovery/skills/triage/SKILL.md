@@ -96,4 +96,4 @@ Report the resulting path to the user.
 
 ## Integration
 
-This skill pairs with the `denubis-plan-and-execute` wrapper patch (Phase 8) that writes the liveness file on session start and removes it on clean exit. Without that wrapper patch, `scan` sees zero liveness files and every session is classified `concluded`. The triage flow still runs, but the live/crash signal is degraded to JSONL-tail-only heuristics. See `plugins/denubis-crash-recovery/README.md` for the version pin.
+This skill pairs with the `denubis-plan-and-execute` wrapper patch (Phase 8) that writes the liveness file on session start and removes it on clean exit. Without that wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — crashed sessions appear under "Needs investigation" as `unknown_tail_kind` or `no_liveness_dangling_*` rather than being identified as crash victims. Retroactive recovery for sessions that ran before the wrapper was installed is tracked in `docs/design-plans/2026-05-19-post-mortem-crash-detection.md`. See `plugins/denubis-crash-recovery/README.md` for the version pin.

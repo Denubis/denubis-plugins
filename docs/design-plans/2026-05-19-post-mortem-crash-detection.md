@@ -80,15 +80,17 @@ The two are **complementary**, not alternatives. mtime-clustering is the answer 
 7. **`history` command + `classification_history` cascade.** When a row is reclassified from borderline → hard_crash by the post-hoc pass, does that constitute a classification change that writes to `classification_history`? Or does the post-hoc pass live outside the history-tracking boundary?
 8. **Resume command generation.** The other instance generated `claudew --resume <uuid>` lines. Is `claudew` a stable wrapper name, or should the render emit the unwrapped `claude --resume <uuid>` form? Should this be a render option?
 
-## Documentation honesty issue (Phase 7 fallout)
+## Documentation honesty (resolved in Phase 7)
 
-The Phase 7 README and SKILL.md (committed 2026-05-18 as `9b98add` and `963195a`) contain three overclaims — all variants of the same false world model that the tool "degrades gracefully" when the wrapper is missing. Phase 7 code review caught two of them; the third (the original heuristics framing) was already on the design seed list.
+The first two Phase 7 commits (`963195a` SKILL.md, `9b98add` README) contained two overclaims — both variants of the same false world model that the tool "degrades gracefully" when the wrapper is missing. The Phase 7 coherence review surfaced the second occurrence; both were fixed inline before Phase 7 closed.
+
+The original false claims:
 
 1. **README.md:25-27 (Dependency section):**
 
    > "If `denubis-plan-and-execute` is at an older version, crash-recovery still runs but degrades to JSONL-tail-only heuristics (no liveness file detection), and every session will be classified `concluded`."
 
-   Both halves are wrong. Dangling-tail sessions are classified `borderline`, not `concluded`, and routed to "Needs investigation" / "Ambiguous correlation", not "Recently concluded".
+   Both halves were wrong. Dangling-tail sessions are classified `borderline`, not `concluded`, and routed to "Needs investigation" / "Ambiguous correlation", not "Recently concluded".
 
 2. **SKILL.md:99 (Integration section):**
 
@@ -96,11 +98,13 @@ The Phase 7 README and SKILL.md (committed 2026-05-18 as `9b98add` and `963195a`
 
    Same false claim.
 
-3. **The original "heuristics framing"** (from the Phase 6 design seed wording) — captured for completeness.
+The honest replacement (now in both files):
 
-**Honest replacement** (Phase 8 should substitute this when filling in `<PHASE-8-VERSION>`): without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — every rule producing them in `classify.py::RULES` requires `liveness_present=True`. Sessions with clean end_turn tails are classified `concluded`; everything else (dangling tool_use, dangling ask_question, dangling agent_dispatch, unknown tails) is classified `borderline` with reasons like `unknown_tail_kind` or `no_liveness_dangling_*`, and renders under "Needs investigation" or "Ambiguous correlation". The empirical dogfood (2026-05-18 crash, 5 sessions) produced exactly this pattern.
+> "Without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — every rule producing them in `classify.py::RULES` requires `liveness_present=True`. Crashed sessions appear under 'Needs investigation' as `unknown_tail_kind` or `no_liveness_dangling_*`, not as recoverable crashes. Retroactive recovery for sessions that ran before the wrapper was installed is tracked in this design seed."
 
-Phase 8 already plans to edit the README (to substitute `<PHASE-8-VERSION>` with the real version). The honesty pass folds in at the same time — phase_08.md's "Surfaced during Phase 7 dogfood" section enumerates all three sites for the Phase 8 implementor.
+The empirical dogfood (2026-05-18 crash, 5 sessions) produced exactly this pattern.
+
+**What remains for Phase 8:** substitute `<PHASE-8-VERSION>` in README with the real wrapper version, and extend the README Troubleshooting section with wrapper-side failure modes (Phase 7 cannot enumerate them because the writer doesn't exist yet). Both items are tracked in `phase_08.md`'s "Surfaced during Phase 7 dogfood" section.
 
 ## Suggested path forward
 
