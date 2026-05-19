@@ -537,6 +537,20 @@ git commit -m "docs(crash-recovery): finalise UAT runbooks for AC5.6 and AC6.4"
 - **(Phase 2 L3, 2026-05-16)**: Tighten `docs/architecture/constraints.md`'s "Deterministic classification" verification cell to cite `test_classify.py::test_every_rule_classifies_its_fixture` as the per-row enforcement point for Phase 2's portion of AC3.1. Tightening, not correction — snapshot tests still deferred to Phase 5. Cheap docs edit.
 - **(Phase 2 situated-accountability anchor, 2026-05-16)**: Add a "Crash-Recovery bookkeeping deny-list re-sampling cadence" entry to `docs/architecture/constraints.md`. The deny-list's epistemic warrant decays as Claude Code evolves and ships new top-level `type` values. The Phase 8 release is the natural moment to document a maintenance-cadence expectation (e.g., re-sample real main-session JSONLs at each Claude Code minor-version bump; if a new "real" type appears, update `_REAL_TYPES` and add a regression fixture). Pair with the version-coordination work the rest of Phase 8 already records.
 
+## Surfaced during Phase 7 dogfood (2026-05-19): post-mortem crash detection
+
+A real system crash on 2026-05-18 ~18:47 AEST killed 5 in-flight Claude sessions on the user's machine. The just-shipped `crash-recovery triage` reported 0 in "Currently unfinished" and 0 in "Idle-live killed" — the casualties were buried in "Needs investigation" as `unknown_tail_kind`. Causal analysis: every `HARD_CRASH` row in `classify.py::RULES` requires `liveness_present=True`, and no liveness files existed because Phase 8 (this phase) had not yet shipped the wrapper. The classifier is structurally incapable of identifying crash victims as crash victims without the wrapper having run before the crash.
+
+Phase 8's wrapper closes this gap going forward, but does NOT retroactively help sessions started before the wrapper was installed — and that "first crash after install" scenario will recur for every new user. A peer Claude session recovered the casualty list using a mtime-clustering heuristic against `last -F` output; the algorithm and open design questions are written up at:
+
+- **Design seed:** `docs/design-plans/2026-05-19-post-mortem-crash-detection.md`
+
+**What Phase 8 must do with this:**
+
+1. **Honesty pass on README.** Phase 8 already edits the README to substitute `<PHASE-8-VERSION>` with the real version. While in there, replace the misleading "still runs but degrades to JSONL-tail-only heuristics (no liveness file detection)" line with the honest version: without the wrapper having run before the crash, `hard_crash` and `live` classifications cannot fire — sessions appear under "Needs investigation". Reference the design seed for the planned remediation.
+2. **Do NOT implement post-mortem crash detection in Phase 8.** The design seed has 8 open questions that need brainstorming first. Scope this phase strictly to the wrapper patch + version coordination as planned.
+3. **Flag the design seed at completion.** When Phase 8 wraps and the implementation plan is closed, the design seed becomes the input to the next brainstorming session. The Finalization step (post-Phase-8 code-reviewer pass over all eight phases) should explicitly call out the design seed as a known follow-up, not as an oversight.
+
 ## Phase 8 Done When
 
 - `plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh` writes a liveness file at startup (atomically) and conditionally removes it based on Claude's exit code.
