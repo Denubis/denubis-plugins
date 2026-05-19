@@ -156,6 +156,11 @@ echo "denubis-dream: dated dir = $DATED_DIR"
 Phase 3's subagents read from filtered streams, not raw transcripts. Native JSONL lines are NOT monotonic by timestamp, and substantive text is distributed across multiple block types within each message's `.content` array (`text`, `thinking`, `tool_use`, `tool_result`) — plus a string-form `.content` on some lines and entirely message-less lines (`attachment`, `queue-operation`, `system`). One central `jq` filter applied at the Bash layer extracts substantive text from every block type into a single per-line `text` field, producing a stable `{ts, uuid, role, text}` shape; subagent prompts then assume that shape and stay terse.
 
 ```bash
+source "$DREAM_LIB"
+DATED_DIR=$(dream_dated_dir)
+MAIN_DIR=$(dream_main_dir)
+DISCOVERED_SLUGS=$(dream_discovered_slugs)
+
 mkdir -p "$DATED_DIR"/.windowed
 
 # Helper: emit windowed JSONL from a set of transcript files,
@@ -341,6 +346,9 @@ Dispatch ONE Sonnet subagent over the corpus-wide windowed stream (`<dated_dir>/
 **Memory-description bundle.** Construct in Bash:
 
 ```bash
+source "$DREAM_LIB"
+MAIN_DIR=$(dream_main_dir)
+
 MEMORY_DIGEST=$(mktemp)
 for m in "$MAIN_DIR"/memory/*.md; do
   name=$(basename "$m" .md)
@@ -417,6 +425,10 @@ The orchestrator substitutes `<CORPUS_PATH>`, `<MEMORY_DIGEST_PATH>`, `<FLAGGED_
 After all per-memory subagent dispatches return, walk `<dated_dir>/*.audit.md` and check for failures:
 
 ```bash
+source "$DREAM_LIB"
+DATED_DIR=$(dream_dated_dir)
+MAIN_DIR=$(dream_main_dir)
+
 SKIPPED_FILE="$DATED_DIR"/SKIPPED.md
 : > "$SKIPPED_FILE"   # truncate at the start of every Phase 3 pass
 
@@ -451,7 +463,7 @@ If `/dream` was invoked, started Phase 3, and crashed (or the user `Ctrl-C`'d) p
 
 1. **Pre-windowing (Task 1) re-runs unconditionally.** It's cheap (deterministic `jq` over already-computed file lists) and any windowed-file change since the last invocation (a new transcript landed, a memory's `lastAudited` changed) should be reflected.
 
-2. **Per-memory dispatch (Task 2) skips memories with a populated `.audit.md`.** The presence-of-`## Evidence` check in Task 6's loop is reused: if the section exists, the memory was successfully retrieved; don't redispatch.
+2. **Per-memory dispatch (Task 2) skips memories with a populated `.audit.md`.** The pre-dispatch check uses the same predicate as Task 6's post-dispatch SKIPPED.md detector (file exists AND `^## Evidence$` present). A partial write — file present but no `## Evidence` header — is treated as a failed retrieval and re-dispatched; if the second attempt also fails to populate the header, Task 6 catches it.
 
 3. **Corpus-wide scan (Task 4) skips if `<dated_dir>/flagged/` is non-empty.** A partial flagged-region scan that wrote files before failing won't be re-run — re-running is expensive and the user can prune duplicates during the walk.
 
