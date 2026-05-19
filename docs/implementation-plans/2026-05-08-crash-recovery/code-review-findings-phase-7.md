@@ -1,52 +1,71 @@
 # Code Review Findings — phase-7
 
-## Status: APPROVED — minor issues noted
+## Status: APPROVED
 
-**Critical: 0 | Important: 1 | Minor: 2**
+**Critical: 0 | Important: 0 | Minor: 0**
 
 ## Verification
 
 ```
 Tests: uv run pytest -q → 782 passed in 3.24s
-Bats:  bats tests/test_crash_recovery_smoke.bats → 6/6 ok
-Lint:  ruff not resolvable in this environment (rtk proxy and python module both failed); no Python changed in this diff — not a blocker
+Bats (repo root): bats tests/test_crash_recovery_smoke.bats → 6/6 ok
+Bats (/tmp): bats /path/to/tests/test_crash_recovery_smoke.bats → 6/6 ok (off-root confirmed)
 ```
+
+## Prior Findings Verification
+
+All three findings from the initial Phase 7 review (commit 2c49027) have been addressed in commit d0b5a8e.
+
+### Important #1 — "every session will be classified `concluded`" overclaim
+
+**Status: Resolved**
+
+The fix routes all three overclaim sites to Phase 8's honesty pass via an extended instruction in `phase_08.md:550–556`. The extension now enumerates:
+
+- `README.md:25-27` — both the "degrades to JSONL-tail-only heuristics" half and the "every session will be classified `concluded`" half, with the correct behaviour described
+- `SKILL.md:99 (Integration section)` — the identical false claim, flagged separately
+- The honest replacement text (what Phase 8 should write instead), including the empirical evidence from the dogfood
+
+The design seed (`docs/design-plans/2026-05-19-post-mortem-crash-detection.md`) is updated to be the authoritative list of all three overclaim sites with the same honest replacement, so Phase 8 has two corroborating references. The README and SKILL.md themselves are unchanged in Phase 7 as intended — Phase 7 stays scoped to ship-what's-there.
+
+The fix is complete and correctly scoped. The Phase 8 implementor has unambiguous, file:line-anchored instructions for all three corrections.
+
+### Minor #1 — bats `CR` uses cwd-relative path
+
+**Status: Resolved**
+
+`tests/test_crash_recovery_smoke.bats:21` is now:
+
+```bash
+CR="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
+```
+
+The marketplace.json `open()` call (line 67) is also anchored:
+
+```python
+m = json.load(open('${BATS_TEST_DIRNAME}/../.claude-plugin/marketplace.json'))
+```
+
+The `open()` call is inside a double-quoted `-c` string, so the shell expands `${BATS_TEST_DIRNAME}` before Python receives the path — correct. Verified: 6/6 pass from /tmp, which was the failure condition the finding identified.
+
+### Minor #2 — SKILL.md annotation iteration order undocumented
+
+**Status: Resolved**
+
+`plugins/denubis-crash-recovery/skills/triage/SKILL.md:39` now reads:
+
+> **Ambiguous correlation**, then **Needs investigation**, then **Idle-live killed** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
+
+The parenthetical exactly matches the suggested fix from the prior review.
 
 ## Plan Alignment
 
-- Task 1 (SKILL.md): ✓ implemented. Frontmatter, all required sections, `last-reviewed`, `user-invocable`, description ≤200 chars (163), leads with "Use when".
-- Task 1 deviation (description text): ✓ justified. Plan's example description contained a three-item parenthetical (`crashed, killed, idle-disconnected`) that would have failed `test_no_parenthetical_enumeration`. Implementor wrote a compliant alternative preserving intent. 7 QA tests pass.
-- Task 2 (README): ✓ implemented. All six required sections present. 104 lines, within ≤120 cap. `denubis-plan-and-execute` dependency documented. `<PHASE-8-VERSION>` placeholder present. AC5.6 and AC6.4 UAT runbooks present.
-- Task 2 deviation (dependency text): ~ deviated, partially problematic — see Important finding below.
-- Task 3 (bats smoke test): ✓ implemented verbatim from plan spec. All 6 tests pass.
-- Interlude commit (6639b76): ✓ justified. Captures a real structural gap (classifier cannot produce `hard_crash` without liveness files) surfaced during dogfood. Defers implementation appropriately. Phase 8 amendment is correctly scoped — it adds an honesty-pass instruction and a "do not implement this in Phase 8" guard without expanding Phase 8 scope.
-- AC1.2: ✓ verified by marketplace.json bats test.
-- AC8.1: ✓ dependency documented with version placeholder.
+Unchanged from initial review — all tasks implemented and verified. No plan-alignment regressions introduced by the fix commit.
 
 ## Issues
 
-### Important (count: 1)
-
-- **Issue**: The README Dependency section (and the SKILL.md Integration section) both state "every session will be classified `concluded`" when the liveness wrapper is absent. This is false. Without liveness files, `liveness_present=False` rules produce `CONCLUDED` for `TailKind.CONCLUDED` and `BORDERLINE` for dangling tool-use, dangling ask-question, and dangling agent-dispatch tails (`classify.py:173–195`). `BORDERLINE` maps to "Needs investigation" and "Ambiguous correlation" render sections, not to "Recently concluded". Users reading the README will believe the tool is useless without the wrapper; the real picture is that it degrades to borderline-only signal (which the dogfood proved has value — five crashed sessions appeared in "Needs investigation" as `unknown_tail_kind`).
-- **Location**: `plugins/denubis-crash-recovery/README.md:25–27` (diff hunk +25 to +27); `plugins/denubis-crash-recovery/skills/triage/SKILL.md:99` (Integration section).
-- **Fix**: This is flagged for Phase 8's honesty pass (phase_08.md:550). The Phase 8 amendment correctly identifies the problem and instructs Phase 8 to correct it. No fix needed in Phase 7 — the design seed and the phase_08.md amendment are the right mechanism. However, the Phase 8 instruction (line 550) quotes only the old "degrades to JSONL-tail-only heuristics" wording as the thing to fix; it should also call out the "every session will be classified `concluded`" claim as incorrect, since that wording appears in both the Phase 7 README diff and the SKILL.md Integration section. The Phase 8 implementor needs to know about both instances.
-
-  Suggested amendment to phase_08.md line 550: add "The Phase 7 README also adds 'every session will be classified `concluded`' — this is wrong; BORDERLINE classifications still fire. Fix both claims and update SKILL.md Integration section in the same pass."
-
-### Minor (count: 2)
-
-- **Issue**: The bats `CR` variable uses a relative path (`plugins/denubis-crash-recovery/scripts/crash_recovery`). Bats runs each test from the directory where `bats` is invoked. If the suite is ever run as `bats tests/test_crash_recovery_smoke.bats` from a directory other than the repo root, `CR` will fail with "No such file or directory". Other bats tests in this repo (`test_dispatcher.bats`, `test_rtk_rewrite.bats`) do not exhibit this pattern — they don't use `uv run --project` at all. The plan spec shows the same relative path, so this is faithfully implemented, but it introduces a latent fragility.
-- **Location**: `tests/test_crash_recovery_smoke.bats:21`
-- **Fix**: Use `BATS_TEST_DIRNAME` to anchor the project path: `CR="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"`. This is robust regardless of invocation directory. Low urgency — tests currently pass from repo root, which is the documented invocation.
-
----
-
-- **Issue**: The SKILL.md Step 2 annotation loop iterates "Ambiguous correlation, then Needs investigation, then Idle-live killed" rows, but SKILL.md Step 1 notes the report renders sections in the fixed order: "Currently unfinished, Idle-live killed, Ambiguous correlation, Needs investigation, Recently concluded, Irrecoverable". The annotation iteration order (Ambiguous → Needs investigation → Idle-live killed) is different from the render order (Idle-live killed → Ambiguous → Needs investigation). This is intentional per the plan (plan line 62: "Ambiguous correlation, then Needs investigation, then Idle-live killed"), but it is undocumented and could confuse an implementor who assumes the annotation loop mirrors the render order. The rationale (surfacing higher-confidence borderlines first) is implicit.
-- **Location**: `plugins/denubis-crash-recovery/skills/triage/SKILL.md:39–42`
-- **Fix**: Add a parenthetical: "Iterate in this order — higher-confidence borderlines first, regardless of render section order." Prevents future implementors from silently reordering to match the render.
+None.
 
 ## Decision: APPROVED FOR MERGE
 
-All three planned tasks are implemented and verified. The interlude commit is well-reasoned and correctly scoped. The Important finding is a documentation accuracy issue already flagged and routed to Phase 8 — the phase_08.md amendment needs one additional sentence to ensure Phase 8 catches both instances. The two Minor findings are low urgency and do not block merge.
-
-**Action required before Phase 8 merge:** extend phase_08.md line 550's honesty-pass instruction to explicitly cover (a) the "every session will be classified `concluded`" claim in the README and (b) the same claim in SKILL.md Integration section.
+All three prior findings are resolved. No new issues were introduced in the fix commit. The five changed files are: the design seed (overclaim documentation extended), the prior findings file (written by the initial review), phase_08.md (honesty-pass instruction extended to cover all three sites), SKILL.md (parenthetical added), and the bats suite (BATS_TEST_DIRNAME anchoring applied to both path references). All changes are targeted and correct.
