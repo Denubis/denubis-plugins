@@ -1,9 +1,15 @@
 #!/usr/bin/env bats
-# End-to-end smoke test for the denubis-crash-recovery CLI pipeline.
+# Smoke test for the denubis-crash-recovery CLI.
 #
-# Exercises the same commands the triage skill invokes (init, triage,
-# regenerate, prune) plus a marketplace-listing assertion (closest automatable
-# proxy for AC1.2). Regression guard for future refactors.
+# Verifies the commands the triage skill invokes (init / triage / regenerate /
+# prune) run without error and produce expected scaffolding, plus a
+# marketplace-listing assertion (closest automatable proxy for AC1.2).
+# Regression guard for future refactors.
+#
+# Scope note: these tests exercise CLI plumbing on an empty filesystem. They
+# do NOT verify crash-detection capability — that requires liveness files,
+# which only exist after Phase 8 ships the wrapper patch. Detection-level
+# tests are part of Phase 8's lifecycle suite, not this smoke suite.
 
 setup() {
   export CRASH_RECOVERY_TEST_TMP="$(mktemp -d)"
