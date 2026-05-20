@@ -120,7 +120,7 @@ EOF
   wait "$wrapper_pid"
 }
 
-@test "wrapper writes liveness file atomically via tempfile + mv (no .tmp residue)" {
+@test "no .tmp residue after clean completion" {
   # Asserts no .tmp file persists at the target path under any timing.
   CLAUDE_REAL_BINARY="$CR_TEST_DIR/fake-claude.sh" FAKE_CLAUDE_EXIT_CODE=0 "$WRAPPER" --print "test"
   # After completion, no .tmp leftovers

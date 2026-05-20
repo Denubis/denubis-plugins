@@ -120,8 +120,7 @@ wrapper was killed.
   and `CRASH_RECOVERY_PROJECTS_ROOT` env vars; check `~/.claude/run/` exists
   and that the `denubis-plan-and-execute` wrapper has been invoked at least
   once since install.
-- **Pruned a session you wanted to keep.** There is no audit trail in v0.1.0
-  by design — the prune flow does not log deletions. Preserve future sessions
+- **Pruned a session you wanted to keep.** There is no audit trail by design — the prune flow does not log deletions. Preserve future sessions
   by adding `crash-recovery note <uuid>` before they get pruned.
 - **Schema corruption.** Rebuild from filesystem state:
 
@@ -168,9 +167,9 @@ failure modes:
 
 ## Status
 
-v0.1.0 ships the plugin, the SQLite schema, the full classification pipeline
+v1.0.0 ships the plugin, the SQLite schema, the full classification pipeline
 (`init`, `scan`, `classify`, `render`, `note`, `history`, `prune`,
-`list-live`, `regenerate`, `triage`), and the user-facing triage skill. The
-wrapper-patch dependency on `denubis-plan-and-execute` lands in Phase 8 of
-the implementation plan, at which point crash detection becomes operational
-end-to-end.
+`list-live`, `regenerate`, `triage`), and the user-facing triage skill.
+Crash detection is operational end-to-end as of 1.0.0; requires
+`denubis-plan-and-execute >= 2.32.2` for the wrapper that writes liveness
+files.
