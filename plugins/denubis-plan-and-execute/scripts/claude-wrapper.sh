@@ -86,8 +86,22 @@ has_transcripts_dir() {
     return 1
 }
 
-"$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@"
-EXIT_CODE=$?
+# --- crash-recovery liveness file write (atomic) ---
+CR_RUN_DIR="${CRASH_RECOVERY_RUN_DIR:-$HOME/.claude/run}"
+mkdir -p "$CR_RUN_DIR"
+CR_LIVE_FILE="$CR_RUN_DIR/$$.live"
+CR_LIVE_TMP="$CR_RUN_DIR/$$.live.tmp"
+{
+    printf 'cwd=%s\n' "$PWD"
+    printf 'started=%s\n' "$(date +%s)"
+    printf 'argv=%s\n' "$*"
+    printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)"
+} > "$CR_LIVE_TMP"
+mv "$CR_LIVE_TMP" "$CR_LIVE_FILE"
+# --- end crash-recovery liveness file write ---
+
+"$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@" || EXIT_CODE=$?
+EXIT_CODE=${EXIT_CODE:-0}
 
 if [[ "$SHOULD_TRANSCRIPT" == true ]] && has_transcripts_dir; then
     # Locate the JSONL by exact session_id match — deterministic against
@@ -117,5 +131,14 @@ elif [[ "$IS_RESUMED" == true ]] && has_transcripts_dir; then
     echo ""
     echo "Reminder: resumed sessions aren't auto-archived. Run /transcript before exiting next time."
 fi
+
+# --- crash-recovery liveness file cleanup ---
+# DR8: remove the liveness file only on clean (0) or Ctrl-C (130) exit.
+# Any other code (137 SIGKILL, 139 SIGSEGV, generic non-zero) leaves the file
+# in place as evidence of an abnormal termination.
+if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ]; then
+    rm -f "$CR_LIVE_FILE"
+fi
+# --- end crash-recovery liveness file cleanup ---
 
 exit $EXIT_CODE
