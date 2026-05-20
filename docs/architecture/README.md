@@ -2,7 +2,7 @@
 
 Per-plugin context diagrams + shared glossary, personae, and constraints. Each plugin is its own system with its own boundary. There is no marketplace-level Level-0 because the marketplace decomposes recursively into plugins and the plugins themselves are the right unit of analysis.
 
-## Plugin Contexts (14)
+## Plugin Contexts (15)
 
 Hook plugins:
 - [`denubis-hook-branch-bg/0-context.md`](plugins/denubis-hook-branch-bg/0-context.md) — `SessionStart`: recolours terminal background based on git repo (hue) + branch (offsets).
@@ -18,7 +18,10 @@ Agent-and-skill plugins:
 - [`denubis-research-agents/0-context.md`](plugins/denubis-research-agents/0-context.md) — four research agents (codebase, internet, combined, remote-code) + three companion skills.
 
 Orchestration:
-- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md) — the largest plugin: 34 skills, 10 agents, 6 commands, 2 hooks (`session-start.sh`, `code-quality-guard.py`), and 2 scripts (`workflow_statusline/`, `claude-wrapper.sh`).
+- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md) — the largest plugin: 34 skills, 10 agents, 6 commands, 2 hooks (`session-start.sh`, `code-quality-guard.py`), and 2 scripts (`workflow_statusline/`, `claude-wrapper.sh` — the wrapper writes liveness files consumed by `denubis-crash-recovery`).
+
+Crash recovery:
+- [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) — 9 CLI subcommands + `/denubis-crash-recovery:triage` skill + SQLite schema; classifies live/crashed/concluded sessions deterministically. Linux-only (`/proc`-dependent). Sibling-coupled to `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes the liveness files this plugin reads.
 
 Meta + utility:
 - [`denubis-extending-claude/0-context.md`](plugins/denubis-extending-claude/0-context.md) — nine authoring skills + `project-claude-librarian` agent for CLAUDE.md/AGENTS.md upkeep.

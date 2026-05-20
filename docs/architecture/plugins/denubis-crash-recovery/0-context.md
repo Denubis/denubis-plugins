@@ -1,0 +1,121 @@
+# denubis-crash-recovery — Context (Level 0)
+
+> System boundary: a Linux-only crash-recovery plugin that identifies and resumes Claude Code sessions which ended abnormally (SIGKILL, SIGSEGV, kernel kill, reboot, terminal disconnect). Combines liveness-file detection (via the sibling `denubis-plan-and-execute` plugin's patched `claude-wrapper.sh`) with JSONL-tail-only heuristics; a deterministic Python rule table classifies every session; SQLite at `~/.claude/crash-recovery.db` is the source of truth; `~/llm-resume.md` regenerates byte-identically from DB state.
+
+## Diagram
+
+```mermaid
+flowchart LR
+    User[Human user]
+    CC[Claude Code host]
+    Wrapper@{ shape: das, label: "denubis-plan-and-execute\nclaude-wrapper.sh\n(sibling plugin, writer side)" }
+    RunDir@{ shape: das, label: "~/.claude/run/$$.live\n(liveness files,\nwritten atomically)" }
+    Projects@{ shape: das, label: "~/.claude/projects/*/<uuid>.jsonl\n(Claude Code session transcripts)" }
+    Proc@{ shape: das, label: "/proc (Linux only)\n- /proc/sys/kernel/random/boot_id\n- /proc/<pid> (PID-alive check)" }
+    DB@{ shape: cyl, label: "~/.claude/crash-recovery.db\nSQLite WAL mode\n(sessions, scan_runs,\nclassification_history)" }
+    Resume@{ shape: das, label: "~/llm-resume.md\n(rendered atomically\nvia tempfile + os.replace)" }
+
+    Plugin((0.0\ndenubis-crash-recovery))
+
+    User -->|"/denubis-crash-recovery:triage\nor crash-recovery <subcommand>"| CC
+    CC -->|"loads SKILL.md;\ninvokes CLI via uv run"| Plugin
+
+    Wrapper -.->|"writes per-PID liveness files\nat startup; removes on exit 0 or 130"| RunDir
+    Plugin -->|"scan: read liveness files,\ncorrelate to JSONL by cwd"| RunDir
+    Plugin -->|"scan: walk JSONLs,\nparse tail, extract cwd"| Projects
+    Plugin -->|"current_boot_id();\npid_alive(pid)"| Proc
+    Plugin <-->|"upsert sessions,\nappend classification_history,\nrecord scan_runs"| DB
+    Plugin -->|"render: read DB,\nwrite resume markdown"| Resume
+    Plugin -.->|"triage output\n(stdout markdown)"| CC
+```
+
+## External Entities
+
+| Entity | Description | Inputs to System | Outputs from System |
+|--------|-------------|------------------|---------------------|
+| Human user | Invokes the `/denubis-crash-recovery:triage` skill, or runs `crash-recovery <subcommand>` directly. Reads `~/llm-resume.md`. | Skill invocation; CLI invocations; `crash-recovery note <uuid> "<text>"` for manual annotation | Triage report (stdout); `~/llm-resume.md` (filesystem); session annotation persisted in DB |
+| Claude Code host | Loads `SKILL.md` into context for `/triage`; invokes the CLI via `uv run` using the Bash tool. | Skill invocation | Skill body as behavioural prompt + tool calls |
+| `denubis-plan-and-execute` (sibling plugin) | The wrapper-side writer. Patched `claude-wrapper.sh` writes `~/.claude/run/$$.live` atomically at startup and removes it conditionally on clean exit (status 0 or 130). Requires version ≥ 2.32.2. | (none — this plugin reads what the wrapper writes) | (none — this plugin is the consumer) |
+| `~/.claude/run/<pid>.live` files | Per-wrapper-PID liveness markers. Four key=value lines: `cwd`, `started`, `argv`, `boot_id`. Atomic via tempfile + `mv` (`rename(2)`). Absence after abnormal exit is the crash signal. | (none — this is a Filesystem location the plugin reads) | (none) |
+| `~/.claude/projects/*/<uuid>.jsonl` | Claude Code's per-session transcript files. The plugin walks these to extract session UUIDs, the `cwd` from the first user message, and the tail kind for classification. | (none — Filesystem read) | (none) |
+| `/proc/sys/kernel/random/boot_id` (Linux) | Kernel-provided boot identifier. Compared against each liveness file's `boot_id` to detect post-reboot casualties. | (none — read at scan time) | (none) |
+| `/proc/<pid>` (Linux) | Used by `liveness.pid_alive(pid)` to determine whether a wrapper PID is still running. | (none — read at scan time) | (none) |
+
+## System Boundary
+
+**In scope:**
+- **Classification.** `crash_recovery.classify::classify()` and `RULES` produce one of `live`, `hard_crash`, `borderline`, `concluded`, `irrecoverable` from a fixed feature tuple (`liveness_present`, `pid_alive`, `boot_id_current`, `tail_kind`, `cwd_present`). Deterministic; one parametrised assertion per row in `tests/test_classify.py::test_every_rule_classifies_its_fixture`. (`plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/classify.py`.)
+- **End-to-end scan.** `crash_recovery.scan::run_scan` orchestrates: walk `~/.claude/run/` + `~/.claude/projects/`; correlate liveness files to JSONL UUIDs; compute features; classify; single-transaction upsert into SQLite; orphan sweep for stale rows. (`scan.py`.)
+- **Render + atomic resume-file write.** `crash_recovery.render::render(db_path)` returns a byte-stable markdown string; `__main__::_render_to_file` writes via `tempfile.NamedTemporaryFile(dir=output.parent) + os.replace`. (`render.py`, `__main__.py`.)
+- **Manual annotation + audit trail.** `crash-recovery note <uuid> "<text>"` attaches user notes; `crash-recovery history <uuid>` shows the classification trail. Annotations exempt the row from `_orphan_sweep` re-classification. (`note.py`, `history.py`.)
+- **Gated prune.** `crash-recovery prune --dry-run` previews; `--confirm` deletes — only rows where classification == `concluded` AND `user_notes IS NULL` AND `jsonl_path` no longer on disk AND `classifier_version` matches the current `CLASSIFIER_VERSION`. (`prune.py`.)
+- **User-facing triage flow.** The `denubis-crash-recovery:triage` skill walks the user through scan → triage report → optional annotation → gated prune. (`plugins/denubis-crash-recovery/skills/triage/SKILL.md`.)
+- **Local-filesystem refusal.** `scan`, `render`, `regenerate` exit code 2 if `CRASH_RECOVERY_RUN_DIR` or the render output's parent is on a network/union filesystem (NFS, CIFS, sshfs, FUSE, overlayfs). (`liveness.py::assert_local_filesystem`.)
+- **Linux-only guard.** `scan` exits code 2 on non-Linux platforms; the other subcommands work cross-platform against an existing DB. (`__main__.py::scan`.)
+
+**Out of scope:**
+- **Writer side.** The plugin does not write liveness files itself — it consumes what `denubis-plan-and-execute`'s wrapper writes. Cross-plugin contract documented in `docs/architecture/constraints.md` § "Writer-side liveness lifecycle (Phase 8)".
+- **Retroactive recovery.** Sessions that ran before the wrapper was installed have no liveness file; they cannot be classified as `hard_crash` (every `HARD_CRASH` rule requires `liveness_present=True`). Retroactive recovery via mtime-clustering against `last -F` output is a planned future extension; design seed at `docs/design-plans/2026-05-19-post-mortem-crash-detection.md`.
+- **LLM judgement on borderline cases.** Borderline classifications are surfaced for the user to annotate manually; no model judgement participates in classification.
+- **Automatic pruning.** Prune is explicit only (`--dry-run` then `--confirm`); no scheduled cleanup.
+- **byobu/tmux-resurrect helpers.** Out of scope for v1.0.0.
+
+## What This Plugin Ships
+
+### CLI subcommands (`plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/__main__.py`)
+
+| Subcommand | Purpose |
+|------------|---------|
+| `init` | Create the SQLite schema at `~/.claude/crash-recovery.db` (idempotent). |
+| `scan` | Walk filesystem, classify sessions, upsert into DB (Linux-only). |
+| `render` | Emit the resume markdown to stdout. |
+| `regenerate` | Atomically write the resume markdown to `~/llm-resume.md` (or `CRASH_RECOVERY_RESUME_PATH`). |
+| `triage` | Combined scan + render with section headers (the human-facing flow). |
+| `note` | Attach a user note to a session UUID. |
+| `history` | Show the `classification_history` trail for a UUID. |
+| `prune` | Delete `concluded`+`user_notes IS NULL`+vanished-JSONL+current-classifier rows (gated). |
+| `list-live` | List sessions classified `live` (skips `boot_id_current` filter so it shows mid-classification state). |
+
+### Skills (`plugins/denubis-crash-recovery/skills/`)
+
+| Skill | User-invocable? | Description (frontmatter) |
+|-------|-----------------|---------------------------|
+| `triage` | yes | Orchestrates the user-facing crash-recovery flow: scan → review report → optional annotation → gated prune. |
+
+### Key modules (`plugins/denubis-crash-recovery/scripts/crash_recovery/src/crash_recovery/`)
+
+| Module | Responsibility |
+|--------|----------------|
+| `db.py` | SQLite schema DDL: `sessions`, `scan_runs`, `classification_history`. `CLASSIFICATION_VALUES` is the schema-locked StrEnum; `open_db(...)` enables WAL mode and `PRAGMA foreign_keys = ON`. |
+| `classify.py` | `RULES` table + `classify()` function. First-match deterministic. `CLASSIFIER_VERSION` constant for forward-compat stamping. |
+| `liveness.py` | Liveness file parser (`read_liveness`), boot-id reader (`current_boot_id`), PID-alive check (`pid_alive`), local-filesystem refusal (`assert_local_filesystem`). |
+| `scan.py` | `run_scan()` orchestrator + single-transaction write block + `_orphan_sweep`. |
+| `correlate.py` | Maps cwds to encoded project directory names (handles `/` and `.` lossy collapse). |
+| `render.py` | Section model + `render()` byte-stable markdown emitter. |
+| `note.py` / `history.py` / `prune.py` / `list_live.py` | One module per CLI subcommand of similar name. |
+| `bookkeeping.py` | `_REAL_TYPES` deny-list filtering for top-level JSONL `type` values (re-sampling cadence in `constraints.md`). |
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CRASH_RECOVERY_DB` | `~/.claude/crash-recovery.db` | SQLite database path. |
+| `CRASH_RECOVERY_RUN_DIR` | `~/.claude/run/` | Liveness file directory; the wrapper writes here, the reader scans here. |
+| `CRASH_RECOVERY_PROJECTS_ROOT` | `~/.claude/projects/` | Where Claude Code stores JSONL transcripts. |
+| `CRASH_RECOVERY_RESUME_PATH` | `~/llm-resume.md` | Resume-file target for `regenerate`. |
+
+### Dependencies
+
+- **Runtime:** Python 3.14+, stdlib only (sqlite3, pathlib, etc.).
+- **Sibling plugin:** `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes liveness files. The `scan` subcommand reads what that wrapper writes.
+- **Platform:** Linux (for `/proc/sys/kernel/random/boot_id` and `/proc/<pid>`). Non-Linux platforms exit code 2 from `scan` and `triage`; other subcommands work cross-platform against an existing DB.
+
+## Cross-References
+
+- **Plugin manifest:** `plugins/denubis-crash-recovery/.claude-plugin/plugin.json`, version 1.0.0.
+- **Marketplace entry:** `.claude-plugin/marketplace.json`.
+- **Design plan:** `docs/design-plans/2026-05-08-crash-recovery.md` (Phases 1-8 design).
+- **Implementation plan:** `docs/implementation-plans/2026-05-08-crash-recovery/` (8 phase files + design conformance + UAT requirements + test requirements).
+- **Future extension design seed:** `docs/design-plans/2026-05-19-post-mortem-crash-detection.md` (retroactive recovery for sessions that pre-date the wrapper).
+- **Sibling plugin (wrapper):** `plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh` (the writer side of the cross-plugin liveness contract).
+- **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`, `../../database.md`, `../../personae.md`.

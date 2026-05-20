@@ -113,7 +113,7 @@ Counts and groupings (each is a `<name>/SKILL.md`). Manifest commit `1ef36f5`.
 | Script | Form | Purpose |
 |--------|------|---------|
 | `workflow_statusline/` (`4359ab2`) | uv-managed Python package (project name `workflow-statusline`, version 0.1.0, `requires-python >=3.12`). Modules in `src/workflow_statusline/`: `cache.py`, `bar.py`, `colours.py`, `ratelimit.py`, `tmux.py`, `git.py`, `__main__.py`. Tests in `tests/`. | Generates the statusline string Claude Code renders on every prompt — branch, token usage, rate-limit, active skill bar. Invoked as `uv run --project <path>/workflow_statusline workflow-statusline`. |
-| `claude-wrapper.sh` (`31e42d0`) | Bash script | The user's primary entry point. `exec`s `claude` with a list of `--disallowedTools` (`NotebookEdit`, `EnterPlanMode`, `ExitPlanMode`, `EnterWorktree`, `ExitWorktree`, `ListMcpResourcesTool`, `ReadMcpResourceTool`, `RemoteTrigger`, `CronCreate`, `CronDelete`, `CronList`) and exports `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Header notes `teammate-mode=auto` detects `$TMUX` for split-pane teaming. |
+| `claude-wrapper.sh` (`31e42d0` baseline; Phase 8 liveness patch in 2.32.2) | Bash script | The user's primary entry point. Foreground-runs `claude` with a list of `--disallowedTools` (`NotebookEdit`, `EnterPlanMode`, `ExitPlanMode`, `EnterWorktree`, `ExitWorktree`, `ListMcpResourcesTool`, `ReadMcpResourceTool`, `RemoteTrigger`, `CronCreate`, `CronDelete`, `CronList`), exports `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, and uses `teammate-mode=auto` (detects `$TMUX` for split-pane teaming). **Phase 8 / 2.32.2 addition** — also writes a per-PID liveness file at `~/.claude/run/$$.live` atomically at startup (four keys: `cwd`, `started`, `argv`, `boot_id`) and removes it conditionally on `claude` exit code 0 or 130. Any other exit retains the file as crash evidence. The four-mode contract is consumed by the sibling `denubis-crash-recovery` plugin (≥ 1.0.0) — see `docs/architecture/constraints.md` § "Writer-side liveness lifecycle (Phase 8)". A separate exit-0 gate wraps the transcript-archive prompt so abnormal exits skip it (preserves pre-Phase-8 effective behaviour). |
 
 ### Docs (`plugins/denubis-plan-and-execute/docs/`, 2 files)
 
@@ -124,9 +124,10 @@ Counts and groupings (each is a `<name>/SKILL.md`). Manifest commit `1ef36f5`.
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-plan-and-execute/.claude-plugin/plugin.json` (`1ef36f5`), version 2.32.1. Manifest description: *"Planning and execution workflows for Claude Code. Slow and steady. Based on obra/superpowers."*
+- **Plugin manifest:** `plugins/denubis-plan-and-execute/.claude-plugin/plugin.json`, version 2.32.2 (bumped from 2.32.1 in Phase 8 of the crash-recovery implementation for the wrapper liveness patch). Manifest description: *"Planning and execution workflows for Claude Code. Slow and steady. Based on obra/superpowers."*
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **README:** `plugins/denubis-plan-and-execute/README.md` (`894c66b`).
 - **Sibling plugins this plugin dispatches:** `denubis-basic-agents`, `denubis-research-agents`.
 - **Sibling hook that reminds about this plugin's `project-claude-librarian` agent:** `denubis-hook-claudemd-reminder` (the agent itself lives in `denubis-extending-claude`, not here).
+- **Sibling plugin coupled via wrapper liveness contract:** `denubis-crash-recovery` consumes the `~/.claude/run/$$.live` files this plugin's wrapper writes. Cross-plugin contract is the source of truth in `docs/architecture/constraints.md` § "Writer-side liveness lifecycle (Phase 8)".
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.
