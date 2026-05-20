@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.32.2
+
+Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claude/run/<pid>.live` containing `cwd`, `started`, `argv`, and `boot_id` at startup; on clean exit (status 0) or Ctrl-C (status 130), the file is removed. Any other exit status leaves the file in place. This is the writer side of the denubis-crash-recovery plugin's session triage; install both plugins together for the full crash-recovery workflow.
+
+**Changed:**
+- `claude-wrapper.sh`: write `~/.claude/run/$$.live` at startup (atomic via temp+mv), inspect Claude's exit status post-invocation, conditionally remove the liveness file.
+
+**Compatibility:**
+- The wrapper itself runs cross-platform: on non-Linux hosts the `cat /proc/sys/kernel/random/boot_id` falls through to `echo unknown`, so the wrapper writes `boot_id=unknown` rather than crashing.
+- `crash-recovery scan` (the reader side, in the `denubis-crash-recovery` plugin) is Linux-only by design — it exits with code 2 and a clear error on non-Linux platforms. The wrapper-side fallback exists so that the `denubis-plan-and-execute` plugin remains usable on macOS / BSD for the rest of its features.
+- `crash-recovery scan` also refuses to run when `CRASH_RECOVERY_RUN_DIR` is on a network or union filesystem (NFS, CIFS, sshfs, FUSE-family, etc.) because the atomic-rename semantics liveness-file writes depend on are not guaranteed there. The wrapper itself does NOT make this check — it just writes the file; the reader-side guard catches the unsafe configuration before any scan-time damage.
+- `CRASH_RECOVERY_RUN_DIR` env-var overrides the default `~/.claude/run/` path (used in tests, and as the workaround for users whose `$HOME` is network-mounted).
+
 ## [denubis-crash-recovery] 0.1.0
 
 New plugin. Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders `~/llm-resume.md`. This release ships the plugin scaffold, SQLite schema, and `crash-recovery init` subcommand. Subsequent phases land the classification rule table, scan/render/note/prune subcommands, the triage skill, and the wrapper patch in `denubis-plan-and-execute`.
