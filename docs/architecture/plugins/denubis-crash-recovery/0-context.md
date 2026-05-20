@@ -89,11 +89,12 @@ flowchart LR
 | `db.py` | SQLite schema DDL: `sessions`, `scan_runs`, `classification_history`. `CLASSIFICATION_VALUES` is the schema-locked StrEnum; `open_db(...)` enables WAL mode and `PRAGMA foreign_keys = ON`. |
 | `classify.py` | `RULES` table + `classify()` function. First-match deterministic. `CLASSIFIER_VERSION` constant for forward-compat stamping. |
 | `liveness.py` | Liveness file parser (`read_liveness`), boot-id reader (`current_boot_id`), PID-alive check (`pid_alive`), local-filesystem refusal (`assert_local_filesystem`). |
-| `scan.py` | `run_scan()` orchestrator + single-transaction write block + `_orphan_sweep`. |
+| `jsonl.py` | JSONL tail parser (`parse_tail`, `TailKind`, `TailSummary`) and the `_REAL_TYPES` deny-list filtering for top-level `type` values (re-sampling cadence documented in `constraints.md`). |
+| `scan.py` | `run_scan()` orchestrator: enumerate JSONLs + liveness files, classify each session (`_classify_fact`), build `SessionFact` / `ScanContext` / `ScanRunResult`. Pure-read; delegates the write block to `scan_db.py`. |
+| `scan_db.py` | The four DB-writer helpers consumed by `run_scan`: `_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`. Plus `WriteContext`. Single-transaction discipline lives here. Functional-Core / Imperative-Shell separation made explicit at the module boundary (an implementation-time decision not in the original design plan; see Departures from design plan below). |
 | `correlate.py` | Maps cwds to encoded project directory names (handles `/` and `.` lossy collapse). |
-| `render.py` | Section model + `render()` byte-stable markdown emitter. |
+| `render.py` | Section model + `render()` byte-stable markdown emitter. Signature `render(db_path) -> tuple[str, int]` (string + entry count; tuple form lands in Phase 6 to resolve a TOCTOU window — the Phase 5 plan documents the single-string form). |
 | `note.py` / `history.py` / `prune.py` / `list_live.py` | One module per CLI subcommand of similar name. |
-| `bookkeeping.py` | `_REAL_TYPES` deny-list filtering for top-level JSONL `type` values (re-sampling cadence in `constraints.md`). |
 
 ### Environment variables
 
@@ -109,6 +110,13 @@ flowchart LR
 - **Runtime:** Python 3.14+, stdlib only (sqlite3, pathlib, etc.).
 - **Sibling plugin:** `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes liveness files. The `scan` subcommand reads what that wrapper writes.
 - **Platform:** Linux (for `/proc/sys/kernel/random/boot_id` and `/proc/<pid>`). Non-Linux platforms exit code 2 from `scan` and `triage`; other subcommands work cross-platform against an existing DB.
+
+## Departures from design plan
+
+Two implementation-time choices diverge from `docs/design-plans/2026-05-08-crash-recovery.md` as written. Both are reasoned engineering decisions caught during build; neither has been retroactively edited into the design plan. Stage 2 design-conformance review (2026-05-20) rated both notable.
+
+- **`scan` module split into `scan.py` + `scan_db.py`.** Design plan named a single `crash_recovery.scan` module. Implementation split the orchestrator (`scan.py`: pure-read enumeration + classification) from the four DB-writer helpers (`scan_db.py`: `_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`, plus `WriteContext`). The split is a Functional-Core / Imperative-Shell separation at the module boundary; the rationale is recorded in both modules' docstrings. Future plan edits referencing "`scan.py::_orphan_sweep`" by symbol path will not match grep — `_orphan_sweep` lives in `scan_db.py`.
+- **No boolean `liveness_present` column on `sessions`.** Design plan line 508 described "liveness presence/absence is recorded in `sessions` as a boolean flag." The implementation instead encodes the same information via a render-side partition: `render.py::LIVENESS_REASONS`, `NO_LIVENESS_REASONS`, `JSONL_ONLY_REASONS` form a disjoint partition over every reason `classify.py::RULES` can emit. `_reduced_confidence_text` reads the reason and returns the appropriate inline warning. The partition is pinned by `test_render.py::test_reason_prefix_partition_is_exhaustive` (any new reason must be assigned to exactly one set or the test fails). The schema is simpler at the cost of an extra render-side guarantee.
 
 ## Cross-References
 
