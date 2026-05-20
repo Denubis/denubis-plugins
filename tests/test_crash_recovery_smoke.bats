@@ -63,7 +63,7 @@ CR="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scri
 @test "prune without --confirm refuses (AC7.3 smoke)" {
   $CR init
   run $CR prune
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
   echo "$output" | grep -q "confirm"
 }
 
@@ -73,4 +73,8 @@ import json
 m = json.load(open('${BATS_TEST_DIRNAME}/../.claude-plugin/marketplace.json'))
 assert any(p['name'] == 'denubis-crash-recovery' for p in m['plugins'])
 "
+}
+
+@test "README documents the sibling-plugin dependency (AC8.1)" {
+  grep -q 'denubis-plan-and-execute' "${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/README.md"
 }
