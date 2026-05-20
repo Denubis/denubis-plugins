@@ -47,29 +47,62 @@ at `~/.claude/crash-recovery.db` (override with `CRASH_RECOVERY_DB`). Run
 
 ## UAT scenarios
 
-### AC5.6 — boot_id mismatch after reboot
+### AC5.6 — Boot_id mismatch after reboot
 
-1. Start a wrapped Claude Code session via `denubis-plan-and-execute` and let
-   it run long enough that a liveness file is written under `~/.claude/run/`.
-2. Reboot the machine.
-3. After reboot, run `crash-recovery scan`.
-4. Assert the pre-reboot session is classified `hard_crash` with reason
-   `liveness_boot_id_mismatch`, regardless of whether the recorded PID has
-   been recycled.
+This UAT verifies that crash-recovery correctly identifies sessions that cannot have
+survived a reboot, regardless of whether a recycled PID happens to match the recorded
+wrapper PID.
 
-### AC6.4 — idle-kill of a wrapper process
-
-1. Start a wrapped Claude Code session in a known cwd and leave it idle for
-   five or more minutes.
-2. Find the wrapper PID and kill it ungracefully:
-
-   ```bash
-   kill -9 $(pgrep -f 'claude' | head -1)
+1. Start a wrapped Claude session in a known cwd:
    ```
+   cd ~/some/project && claudew --resume <existing-uuid>
+   ```
+2. Type one or two messages so the JSONL has fresh entries; verify the liveness file
+   exists: `ls ~/.claude/run/`.
+3. Exit Claude cleanly (`/exit` or Ctrl-D). Verify the liveness file is gone:
+   `ls ~/.claude/run/`.
+4. Start the session again the same way (Step 1) and leave Claude running.
+5. **Reboot the machine.** (This is the destructive step — save your work everywhere first.)
+6. After reboot, run: `crash-recovery scan && crash-recovery triage`.
+7. **Expected observation:** the session you had running pre-reboot appears in the
+   "Idle-live killed" section with `classification: hard_crash` and `reason: liveness_boot_id_mismatch`.
 
-3. Run `crash-recovery scan`.
-4. Assert the session is classified `hard_crash` despite a stale JSONL whose
-   tail might otherwise look idle-concluded.
+   It's wrong if: the session is misclassified as `live`, `concluded`, or shows a different
+   reason. A misclassification here means the reboot-safety mechanism didn't engage —
+   investigate `current_boot_id()` (Phase 3) and the rule-table ordering in `classify.py`
+   (Phase 2).
+
+### AC6.4 — Idle session killed via SIGKILL
+
+This UAT verifies the liveness mechanism catches what JSONL-tail-only heuristics
+would miss: a session that looked concluded (clean trailing entries) but whose
+wrapper was killed.
+
+1. Start a wrapped Claude session in a known cwd:
+   ```
+   cd ~/some/project && claudew
+   ```
+2. Have one normal exchange (a message + assistant response). Verify the liveness
+   file exists: `ls ~/.claude/run/`.
+3. Leave the session idle for at least 5 minutes (do NOT type anything — the JSONL
+   should NOT receive new entries during this window).
+4. Kill the wrapper process from another terminal:
+   ```
+   pgrep -af claude-wrapper.sh    # find the wrapper PID
+   kill -9 <wrapper-pid>
+   ```
+5. Confirm the liveness file PERSISTED: `ls ~/.claude/run/` — your wrapper's PID
+   should still have a `.live` file.
+6. Run: `crash-recovery scan && crash-recovery triage`.
+7. **Expected observation:** the session appears in "Idle-live killed" with
+   `classification: hard_crash`. The JSONL's tail looks concluded (the last entry
+   was a clean assistant turn), but the liveness mechanism catches that the wrapper
+   never got a chance to clean up.
+
+   It's wrong if: the session is misclassified as `concluded`. That would mean the
+   classifier is relying on the JSONL tail alone and ignoring the liveness signal —
+   the bug is in Phase 4's scan wiring or Phase 2's rule ordering (`live_pid_present`
+   vs `hard_crash_*` rules).
 
 ## Troubleshooting
 
