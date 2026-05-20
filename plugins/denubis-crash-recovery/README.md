@@ -19,7 +19,7 @@ appear with the version recorded in `plugin.json`.
 
 ## Dependency
 
-Requires `denubis-plan-and-execute` >= `<PHASE-8-VERSION>` for the wrapper
+Requires `denubis-plan-and-execute` >= `2.32.2` for the wrapper
 patch that writes liveness files. Both plugins must be installed, and the
 wrapper must have run before the crash, for crash detection to work.
 
@@ -30,9 +30,6 @@ liveness file (see `classify.py::RULES`). Crashed sessions appear under
 not as recoverable crashes. Retroactive recovery for sessions that ran
 before the wrapper was installed is tracked in
 `docs/design-plans/2026-05-19-post-mortem-crash-detection.md`.
-
-`<PHASE-8-VERSION>` is filled in by the Phase 8 task that ships the wrapper
-patch in `denubis-plan-and-execute`.
 
 ## Usage — common flows
 
@@ -98,6 +95,43 @@ at `~/.claude/crash-recovery.db` (override with `CRASH_RECOVERY_DB`). Run
   ```bash
   rm ~/.claude/crash-recovery.db && crash-recovery init && crash-recovery scan
   ```
+
+### Wrapper-side failure modes (writer)
+
+The entries above cover the reader side (`crash-recovery scan` and friends).
+The wrapper in `denubis-plan-and-execute` is the writer and has its own
+failure modes:
+
+- **Liveness-file write permission errors (`~/.claude/run/` not writable by
+  the user).** The wrapper's `mkdir -p` or temp-file write fails with
+  `Permission denied`; no liveness file appears for the session.
+  Remediation: `chown -R "$USER" ~/.claude/run/` (or delete the directory and
+  let the wrapper recreate it on next launch).
+- **Wrapper crashed before atomic-rename so a temp file is orphaned
+  (`~/.claude/run/<pid>.live.tmp` left behind).** Symptom: stale `.tmp`
+  files accumulate alongside real `.live` files; `scan` ignores them but
+  they consume inodes. Remediation: `find ~/.claude/run/ -name '*.live.tmp'
+  -delete` (safe to run any time; the wrapper writes the final `.live` name
+  via atomic rename, so a `.tmp` file is by definition not in use).
+- **Writer/reader on different filesystems (NFS-mounted home with
+  local-only `/run`, or the reverse).** The wrapper writes to its
+  `CRASH_RECOVERY_RUN_DIR` (default `~/.claude/run/`); `scan` reads from
+  whatever `CRASH_RECOVERY_RUN_DIR` it sees at scan time. If those resolve
+  to different paths, `scan` sees no liveness files. Remediation: set
+  `CRASH_RECOVERY_RUN_DIR` consistently in both the wrapper's environment
+  and the shell that invokes `scan` (e.g. export it from `~/.bashrc` or
+  `~/.zshrc` so both inherit it).
+- **`boot_id=unknown` in a liveness file written before
+  `/proc/sys/kernel/random/boot_id` was readable.** Indicates the wrapper
+  ran on Linux but the boot-id file was not yet present (early boot, or a
+  pathological container without `/proc`). `scan` will classify such files
+  as `liveness_boot_id_mismatch` against the current kernel's boot_id
+  (which definitionally is not `"unknown"`), so they route to `hard_crash`.
+  Remediation: usually none needed — the classification is correct
+  (the wrapper could not survive a reboot anyway). If `boot_id=unknown`
+  appears repeatedly on a healthy system, verify `/proc` is mounted
+  (`mount | grep proc`) and that `/proc/sys/kernel/random/boot_id` is
+  readable as the wrapper's user.
 
 ## Status
 

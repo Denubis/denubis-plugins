@@ -1,5 +1,26 @@
 # Changelog
 
+## [denubis-crash-recovery] 1.0.0
+
+First user-ready release. Identifies and resumes Claude Code sessions that ended abnormally (kernel kill, terminal disconnect, process crash). Combines liveness-file detection (via `denubis-plan-and-execute`'s patched wrapper, ≥2.32.2) with JSONL-tail-only heuristics; deterministic Python rule table classifies every session as `live`, `hard_crash`, `borderline`, `concluded`, or `irrecoverable`; SQLite at `~/.claude/crash-recovery.db` is the source of truth; `~/llm-resume.md` regenerates byte-identically from DB state.
+
+**New:**
+- `crash-recovery` CLI with nine subcommands: `init`, `scan`, `render`, `triage`, `regenerate`, `note`, `history`, `prune`, `list-live`.
+- `denubis-crash-recovery:triage` skill orchestrates scan + annotation prompt + gated prune.
+- SQLite schema: `sessions`, `scan_runs`, `classification_history` with `classifier_version` column for forward-compat re-classification.
+- Deterministic rule table; one assertion per row via parametrised tests.
+- Atomic resume-file write (`tempfile + os.replace`).
+
+**Requires:**
+- `denubis-plan-and-execute ≥ 2.32.2` for the wrapper patch.
+- Linux for the `scan` subcommand: it reads `/proc/sys/kernel/random/boot_id` for reboot detection and exits with code 2 on non-Linux platforms. The remaining subcommands (`init`, `render`, `triage`, `note`, `history`, `prune`, `list-live`) are filesystem/DB-only and run anywhere — but `triage` invokes `scan` internally, so the practical effect is "this plugin needs Linux".
+
+**Out of scope (future plans):**
+- byobu/tmux-resurrect helpers.
+- OOM-hardening for the wrapper itself.
+- LLM judgement on borderline cases (deterministic rules only; user annotates manually via `crash-recovery note`).
+- Automatic pruning (explicit `prune --dry-run` then `--confirm` only).
+
 ## [denubis-plan-and-execute] 2.32.2
 
 Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claude/run/<pid>.live` containing `cwd`, `started`, `argv`, and `boot_id` at startup; on clean exit (status 0) or Ctrl-C (status 130), the file is removed. Any other exit status leaves the file in place. This is the writer side of the denubis-crash-recovery plugin's session triage; install both plugins together for the full crash-recovery workflow.
