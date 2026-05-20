@@ -27,6 +27,7 @@ Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claud
 
 **Changed:**
 - `claude-wrapper.sh`: write `~/.claude/run/$$.live` at startup (atomic via temp+mv), inspect Claude's exit status post-invocation, conditionally remove the liveness file.
+- `claude-wrapper.sh`: the post-session transcript-archive prompt ("Press Enter to archive transcript") now fires only on clean Claude exit (status 0). Previously, abnormal exits (SIGKILL 137, SIGSEGV 139, generic non-zero 1, Ctrl-C 130) silently bypassed the prompt because `set -euo pipefail` aborted the wrapper before reaching it; making the cleanup block reachable for non-zero exits required adding `|| EXIT_CODE=$?` to the claude invocation, which also made the transcript-archive block reachable. The exit-0 gate preserves the previous effective behaviour intentionally.
 
 **Compatibility:**
 - The wrapper itself runs cross-platform: on non-Linux hosts the `cat /proc/sys/kernel/random/boot_id` falls through to `echo unknown`, so the wrapper writes `boot_id=unknown` rather than crashing.

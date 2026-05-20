@@ -126,3 +126,37 @@ EOF
   # After completion, no .tmp leftovers
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.tmp 2>/dev/null | wc -l)" -eq 0 ]
 }
+
+@test "M1 fitness — abnormal claude exit skips transcript-archive prompt" {
+  # Phase 8 coherence-review M1: the `|| EXIT_CODE=$?` fix made the transcript-archive
+  # block structurally reachable for non-zero exits, where pre-Phase-8 `set -e` would
+  # have aborted before reaching it. The exit-0 gate preserves the pre-Phase-8
+  # effective contract. This test locks the gate: on a non-zero claude exit, the
+  # "Press Enter to archive transcript" prompt MUST NOT fire even when the cwd is a
+  # transcripting project and a transcript JSONL exists.
+  export HOME="$CR_TEST_DIR/home"
+  mkdir -p "$HOME/.claude/projects/test-project"
+
+  PROJECT_DIR="$CR_TEST_DIR/project"
+  mkdir -p "$PROJECT_DIR/.ai-transcripts"
+
+  # Stub that creates the JSONL the wrapper's transcript-lookup expects, then exits 1.
+  cat > "$CR_TEST_DIR/jsonl-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+session_id=""
+prev=""
+for arg in "$@"; do
+  [[ "$prev" == "--session-id" ]] && { session_id="$arg"; break; }
+  prev="$arg"
+done
+[[ -n "$session_id" ]] && touch "$HOME/.claude/projects/test-project/${session_id}.jsonl"
+exit 1
+EOF
+  chmod +x "$CR_TEST_DIR/jsonl-claude.sh"
+
+  cd "$PROJECT_DIR"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/jsonl-claude.sh" run "$WRAPPER"
+
+  [ "$status" -eq 1 ]
+  ! echo "$output" | grep -q "Press Enter to archive transcript"
+}
