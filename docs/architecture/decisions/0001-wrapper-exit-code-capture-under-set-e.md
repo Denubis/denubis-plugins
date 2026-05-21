@@ -1,6 +1,6 @@
 # ADR 0001 — Wrapper exit-code capture under `set -e`
 
-**Status:** Proposed (2026-05-20)
+**Status:** Accepted (2026-05-20)
 
 **Decision authors:** Phase 8 implementor + orchestrator + user (authorisation
 2026-05-19)

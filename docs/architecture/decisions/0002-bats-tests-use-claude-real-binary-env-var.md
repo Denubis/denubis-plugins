@@ -1,6 +1,6 @@
 # ADR 0002 — bats tests use `CLAUDE_REAL_BINARY` (not `REAL_CLAUDE`)
 
-**Status:** Proposed (2026-05-20)
+**Status:** Accepted (2026-05-20)
 
 **Decision authors:** Phase 8 implementor
 

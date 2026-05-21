@@ -102,7 +102,7 @@ The following private symbols (leading underscore) are intentionally shared acro
 
 | Symbol | Defined in | Imported by | Rationale |
 |--------|-----------|-------------|-----------|
-| `_project_dir_for_cwd` | `correlate.py` | `scan.py` | Read-only path helper needed by the scan orchestrator. Kept private (not in `correlate.__all__`) because it is an implementation detail of the correlation algorithm; `scan.py` is the sole caller. If `correlate.py` ever defines `__all__`, this symbol must be included explicitly or the import at `scan.py:31` will fail at runtime. |
+| `_project_dir_for_cwd` | `correlate.py` | `scan.py` | Read-only path helper needed by the scan orchestrator. Kept private (not in `correlate.__all__`) because it is an implementation detail of the correlation algorithm; `scan.py` is the sole caller. If `correlate.py` ever defines `__all__`, this symbol must be included explicitly or the `from crash_recovery.correlate import _project_dir_for_cwd` line in `scan.py` will fail at runtime. |
 
 The four `scan_db.py` helpers (`_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`) are private-to-the-scan-subsystem by convention: `scan.py` is their only consumer and they are not part of any public API. They do not cross a package boundary.
 
