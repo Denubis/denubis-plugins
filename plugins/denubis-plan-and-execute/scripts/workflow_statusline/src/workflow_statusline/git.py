@@ -50,8 +50,11 @@ def git_location(cwd: str) -> LocationInfo:
 
     try:
         toplevel = _git(cwd, "rev-parse", "--show-toplevel")
+        # git-common-dir is relative to cwd when not a worktree; resolve against
+        # cwd, not Python's CWD, or we mis-detect when Python runs from a dir
+        # that happens to have its own .git.
         common_dir = os.path.realpath(
-            _git(cwd, "rev-parse", "--git-common-dir")
+            os.path.join(cwd, _git(cwd, "rev-parse", "--git-common-dir"))
         )
         is_worktree = (
             common_dir != os.path.realpath(os.path.join(toplevel, ".git"))
