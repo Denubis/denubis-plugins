@@ -127,6 +127,110 @@ EOF
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.tmp 2>/dev/null | wc -l)" -eq 0 ]
 }
 
+@test "M3 — wrapper liveness format flows through scan → render to Idle-live killed" {
+  # Closes Phase 8 coherence-review gap: no automated test pins the chain
+  # "wrapper writes <pid>.live → crash-recovery scan reads it → render emits
+  # the UUID in the right section". Each layer is tested separately; this
+  # test exercises the full path so a format-skew regression on either side
+  # is caught immediately.
+  #
+  # Flow:
+  #   1. Run the wrapper to clean completion so AC5.2 lifecycle is observed
+  #      (file written, then removed on exit 0).
+  #   2. Synthesise a post-crash liveness file by hand, using the exact
+  #      key=value format the wrapper writes (cwd / started / argv / boot_id),
+  #      a dead PID in the filename, and the current kernel boot_id.
+  #   3. Build a matching JSONL under projects_root with a TOOL_USE_NO_RESULT
+  #      tail so the classifier returns hard_crash via the dead-pid rule.
+  #   4. Drive `crash-recovery init`, `scan`, `render` from the same dirs.
+  #   5. Assert the rendered markdown shows the UUID under "Idle-live killed".
+  FAKE_CLAUDE_EXIT_CODE=0 "$WRAPPER" --print "lifecycle-warmup"
+  [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 0 ]
+
+  # Hand-crafted post-crash liveness file.
+  CRASHED_UUID="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+  CRASHED_CWD="/tmp/crash-recovery-m3-cwd"
+  STARTED=$(($(date +%s) - 3600))
+  BOOT_ID=$(cat /proc/sys/kernel/random/boot_id)
+  # Dead PID: large number unlikely to be in use; bats teardown will not
+  # collide because the file is under the per-test CR_TEST_DIR.
+  DEAD_PID=999999
+  printf 'cwd=%s\nstarted=%s\nargv=--resume %s\nboot_id=%s\n' \
+    "$CRASHED_CWD" "$STARTED" "$CRASHED_UUID" "$BOOT_ID" \
+    > "$CRASH_RECOVERY_RUN_DIR/$DEAD_PID.live"
+
+  # Matching JSONL with cwd header + tool_use-no-result tail.
+  PROJECTS_ROOT="$CR_TEST_DIR/projects"
+  ENCODED_DIR="$PROJECTS_ROOT/-tmp-crash-recovery-m3-cwd"
+  mkdir -p "$ENCODED_DIR"
+  JSONL="$ENCODED_DIR/$CRASHED_UUID.jsonl"
+  # ISO-8601 UTC with millisecond precision; entry timestamp >= started.
+  ISO_TS=$(date -u -d "@$((STARTED + 1))" '+%Y-%m-%dT%H:%M:%S.000Z')
+  printf '%s\n%s\n' \
+    "{\"type\":\"user\",\"cwd\":\"$CRASHED_CWD\",\"timestamp\":\"$ISO_TS\",\"message\":{\"content\":[]}}" \
+    "{\"type\":\"assistant\",\"timestamp\":\"$ISO_TS\",\"message\":{\"stop_reason\":\"tool_use\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_m3_001\",\"name\":\"Bash\",\"input\":{}}]}}" \
+    > "$JSONL"
+
+  # Run init → scan → render via the same CLI invocation form the smoke
+  # bats test uses (uv run --project ... crash-recovery).
+  CR_CLI="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
+  DB_PATH="$CR_TEST_DIR/crash-recovery.db"
+  RESUME_PATH="$CR_TEST_DIR/llm-resume.md"
+
+  run $CR_CLI init --db "$DB_PATH"
+  [ "$status" -eq 0 ]
+
+  run $CR_CLI scan --db "$DB_PATH" --run-dir "$CRASH_RECOVERY_RUN_DIR" --projects-root "$PROJECTS_ROOT"
+  [ "$status" -eq 0 ]
+
+  run $CR_CLI render --db "$DB_PATH" --output "$RESUME_PATH"
+  [ "$status" -eq 0 ]
+
+  # The synthesised session must appear under "Idle-live killed".
+  grep -q "^## Idle-live killed" "$RESUME_PATH"
+  # awk extracts the body of the section: lines after the "Idle-live killed"
+  # header and before the next "## " heading. A naive range pattern
+  # /header/,/^## / would stop at the header line itself; this flag-based
+  # form is the conventional awk idiom for "everything between two headings".
+  section=$(awk '/^## Idle-live killed/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  echo "$section" | grep -q "${CRASHED_UUID:0:8}"
+  echo "$section" | grep -q "$CRASHED_UUID"
+}
+
+@test "M4 — user-supplied argv reaches the real claude binary intact" {
+  # Closes Phase 8 coherence-review gap: the wrapper invokes
+  #   "$REAL_CLAUDE" --disallowedTools ... --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@"
+  # but no test asserts that "$@" actually arrives at the real binary. A
+  # regression that dropped or mangled "$@" would be invisible. This test
+  # replaces the fake-claude stub with one that captures argv to a file,
+  # then asserts the user-supplied tokens are present.
+  CAPTURE_FILE="$BATS_TEST_TMPDIR/captured-argv.txt"
+  cat > "$CR_TEST_DIR/capture-claude.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$@" > "$CAPTURE_FILE"
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/capture-claude.sh"
+
+  # --resume short-circuits the wrapper's EXTRA_ARGS so the captured argv
+  # mirrors the user's tokens cleanly (no injected --session-id). The
+  # primary assertion is that --resume + its UUID + --print + "hello world"
+  # all survive verbatim.
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/capture-claude.sh" \
+    "$WRAPPER" --resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b --print "hello world"
+  [ -f "$CAPTURE_FILE" ]
+
+  # Positive: user-supplied tokens survive verbatim.
+  grep -qx -- "--resume" "$CAPTURE_FILE"
+  grep -qx "db0cc58f-dc30-4195-a64a-4f25a5c19d6b" "$CAPTURE_FILE"
+  grep -qx -- "--print" "$CAPTURE_FILE"
+  grep -qx "hello world" "$CAPTURE_FILE"
+
+  # Positive evidence the wrapper also injected its own flags ahead of "$@".
+  grep -qx -- "--disallowedTools" "$CAPTURE_FILE"
+  grep -qx -- "--teammate-mode=auto" "$CAPTURE_FILE"
+}
+
 @test "M1 fitness — abnormal claude exit skips transcript-archive prompt" {
   # Phase 8 coherence-review M1: the `|| EXIT_CODE=$?` fix made the transcript-archive
   # block structurally reachable for non-zero exits, where pre-Phase-8 `set -e` would
