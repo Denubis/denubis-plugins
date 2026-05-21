@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-      "version": "2.32.1",
+      "version": "2.32.2",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -203,6 +203,24 @@
         "academic",
         "research",
         "markdown"
+      ]
+    },
+    {
+      "name": "denubis-crash-recovery",
+      "description": "Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders ~/llm-resume.md.",
+      "version": "1.0.0",
+      "source": "./plugins/denubis-crash-recovery",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "claude-code",
+        "session-recovery",
+        "triage",
+        "sqlite",
+        "resume"
       ]
     }
   ]

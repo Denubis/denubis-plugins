@@ -86,36 +86,64 @@ has_transcripts_dir() {
     return 1
 }
 
-"$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@"
-EXIT_CODE=$?
+# --- crash-recovery liveness file write (atomic) ---
+CR_RUN_DIR="${CRASH_RECOVERY_RUN_DIR:-$HOME/.claude/run}"
+mkdir -p "$CR_RUN_DIR"
+CR_LIVE_FILE="$CR_RUN_DIR/$$.live"
+CR_LIVE_TMP="$CR_RUN_DIR/$$.live.tmp"
+{
+    printf 'cwd=%s\n' "$PWD"
+    printf 'started=%s\n' "$(date +%s)"
+    printf 'argv=%s\n' "$*"
+    printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)"
+} > "$CR_LIVE_TMP"
+mv "$CR_LIVE_TMP" "$CR_LIVE_FILE"  # atomic via rename(2) on the same filesystem
+# --- end crash-recovery liveness file write ---
 
-if [[ "$SHOULD_TRANSCRIPT" == true ]] && has_transcripts_dir; then
-    # Locate the JSONL by exact session_id match — deterministic against
-    # concurrent sessions in other worktrees.
-    TRANSCRIPT_PATH=""
-    for f in "$HOME"/.claude/projects/*/"$SESSION_ID".jsonl; do
-        if [[ -f "$f" ]]; then
-            TRANSCRIPT_PATH="$f"
-            break
-        fi
-    done
+"$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@" || EXIT_CODE=$?
+EXIT_CODE=${EXIT_CODE:-0}
 
-    if [[ -n "$TRANSCRIPT_PATH" ]]; then
-        echo ""
-        echo "Press Enter to archive transcript, or Ctrl-C to skip."
-        if read -r 2>/dev/null; then
-            if command -v claude-research-transcript >/dev/null 2>&1; then
-                claude-research-transcript archive \
-                    --transcript "$TRANSCRIPT_PATH" \
-                    --session-id "$SESSION_ID"
-            else
-                echo "warning: claude-research-transcript not on PATH; skipping archive." >&2
+# The transcript-archive prompt only makes sense for clean exits. Before the
+# || EXIT_CODE=$? fix at line 103, set -e made these blocks unreachable on
+# non-zero exits; that guard is now explicit to preserve the intended contract.
+if [[ "$EXIT_CODE" -eq 0 ]]; then
+    if [[ "$SHOULD_TRANSCRIPT" == true ]] && has_transcripts_dir; then
+        # Locate the JSONL by exact session_id match — deterministic against
+        # concurrent sessions in other worktrees.
+        TRANSCRIPT_PATH=""
+        for f in "$HOME"/.claude/projects/*/"$SESSION_ID".jsonl; do
+            if [[ -f "$f" ]]; then
+                TRANSCRIPT_PATH="$f"
+                break
+            fi
+        done
+
+        if [[ -n "$TRANSCRIPT_PATH" ]]; then
+            echo ""
+            echo "Press Enter to archive transcript, or Ctrl-C to skip."
+            if read -r 2>/dev/null; then
+                if command -v claude-research-transcript >/dev/null 2>&1; then
+                    claude-research-transcript archive \
+                        --transcript "$TRANSCRIPT_PATH" \
+                        --session-id "$SESSION_ID"
+                else
+                    echo "warning: claude-research-transcript not on PATH; skipping archive." >&2
+                fi
             fi
         fi
+    elif [[ "$IS_RESUMED" == true ]] && has_transcripts_dir; then
+        echo ""
+        echo "Reminder: resumed sessions aren't auto-archived. Run /transcript before exiting next time."
     fi
-elif [[ "$IS_RESUMED" == true ]] && has_transcripts_dir; then
-    echo ""
-    echo "Reminder: resumed sessions aren't auto-archived. Run /transcript before exiting next time."
 fi
+
+# --- crash-recovery liveness file cleanup ---
+# DR8: remove the liveness file only on clean (0) or Ctrl-C (130) exit.
+# Any other code (137 SIGKILL, 139 SIGSEGV, generic non-zero) leaves the file
+# in place as evidence of an abnormal termination.
+if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ]; then
+    rm -f "$CR_LIVE_FILE"
+fi
+# --- end crash-recovery liveness file cleanup ---
 
 exit $EXIT_CODE

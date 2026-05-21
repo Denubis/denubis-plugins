@@ -7,5 +7,15 @@ requires-python = ">=3.12"
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
+[tool.uv.workspace]
+members = [
+    "plugins/denubis-plan-and-execute/scripts/workflow_statusline",
+    "plugins/denubis-crash-recovery/scripts/crash_recovery",
+]
+
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+    "plugins/denubis-plan-and-execute/scripts/workflow_statusline/tests",
+    "plugins/denubis-crash-recovery/scripts/crash_recovery/tests",
+]

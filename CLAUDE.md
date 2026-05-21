@@ -42,6 +42,14 @@ This format keeps the model on-rails better than fenced code blocks with plain t
 
 **Do not** write Task invocations as prose like "Use the Task tool with subagent_type X and prompt Y". Use the XML block format.
 
+### Schema Constants from Authoritative Source
+
+When a subagent prompt references a schema-level value set (a CHECK constraint's allowed values, a StrEnum's members, a tuple defining valid states), derive the list by reading the authoritative implementation file at dispatch time — not from documentation, summaries, or memory. Documentation drifts; memory hallucinates; subagents inherit whatever the orchestrator passes in.
+
+**Authoritative sources**: the implementation file (e.g., `db.py`'s `CLASSIFICATION_VALUES`), not the design plan or architecture doc that describes it.
+
+**Why**: a Critical in Phase 1 review of denubis-crash-recovery traced to passing composite section-key strings (`borderline+ambiguous_match`) as if they were the DB column values that the rest of the plan used (bare `borderline` + separate reason column). The CHECK constraint was schema-locked to the wrong shape until caught on re-review. The slip happened because the value list was generated from memory rather than read from `db.py`.
+
 ### Version Updates Require Marketplace and Changelog Sync
 
 When updating a plugin's version in its `.claude-plugin/plugin.json`, you must also:

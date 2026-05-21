@@ -1,5 +1,40 @@
 # Changelog
 
+## [denubis-crash-recovery] 1.0.0
+
+First user-ready release. Identifies and resumes Claude Code sessions that ended abnormally (kernel kill, terminal disconnect, process crash). Combines liveness-file detection (via `denubis-plan-and-execute`'s patched wrapper, ≥2.32.2) with JSONL-tail-only heuristics; deterministic Python rule table classifies every session as `live`, `hard_crash`, `borderline`, `concluded`, or `irrecoverable`; SQLite at `~/.claude/crash-recovery.db` is the source of truth; `~/llm-resume.md` regenerates byte-identically from DB state.
+
+**New:**
+- `crash-recovery` CLI with nine subcommands: `init`, `scan`, `render`, `triage`, `regenerate`, `note`, `history`, `prune`, `list-live`.
+- `denubis-crash-recovery:triage` skill orchestrates scan + annotation prompt + gated prune.
+- SQLite schema: `sessions`, `scan_runs`, `classification_history` with `classifier_version` column for forward-compat re-classification.
+- Deterministic rule table; one assertion per row via parametrised tests.
+- Atomic resume-file write (`tempfile + os.replace`).
+
+**Requires:**
+- `denubis-plan-and-execute ≥ 2.32.2` for the wrapper patch.
+- Linux for the `scan` subcommand: it reads `/proc/sys/kernel/random/boot_id` for reboot detection and exits with code 2 on non-Linux platforms. The remaining subcommands (`init`, `render`, `triage`, `note`, `history`, `prune`, `list-live`) are filesystem/DB-only and run anywhere — but `triage` invokes `scan` internally, so the practical effect is "this plugin needs Linux".
+
+**Out of scope (future plans):**
+- byobu/tmux-resurrect helpers.
+- OOM-hardening for the wrapper itself.
+- LLM judgement on borderline cases (deterministic rules only; user annotates manually via `crash-recovery note`).
+- Automatic pruning (explicit `prune --dry-run` then `--confirm` only).
+
+## [denubis-plan-and-execute] 2.32.2
+
+Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claude/run/<pid>.live` containing `cwd`, `started`, `argv`, and `boot_id` at startup; on clean exit (status 0) or Ctrl-C (status 130), the file is removed. Any other exit status leaves the file in place. This is the writer side of the denubis-crash-recovery plugin's session triage; install both plugins together for the full crash-recovery workflow.
+
+**Changed:**
+- `claude-wrapper.sh`: write `~/.claude/run/$$.live` at startup (atomic via temp+mv), inspect Claude's exit status post-invocation, conditionally remove the liveness file.
+- `claude-wrapper.sh`: the post-session transcript-archive prompt ("Press Enter to archive transcript") now fires only on clean Claude exit (status 0). Previously, abnormal exits (SIGKILL 137, SIGSEGV 139, generic non-zero 1, Ctrl-C 130) silently bypassed the prompt because `set -euo pipefail` aborted the wrapper before reaching it; making the cleanup block reachable for non-zero exits required adding `|| EXIT_CODE=$?` to the claude invocation, which also made the transcript-archive block reachable. The exit-0 gate preserves the previous effective behaviour intentionally.
+
+**Compatibility:**
+- The wrapper itself runs cross-platform: on non-Linux hosts the `cat /proc/sys/kernel/random/boot_id` falls through to `echo unknown`, so the wrapper writes `boot_id=unknown` rather than crashing.
+- `crash-recovery scan` (the reader side, in the `denubis-crash-recovery` plugin) is Linux-only by design — it exits with code 2 and a clear error on non-Linux platforms. The wrapper-side fallback exists so that the `denubis-plan-and-execute` plugin remains usable on macOS / BSD for the rest of its features.
+- `crash-recovery scan` also refuses to run when `CRASH_RECOVERY_RUN_DIR` is on a network or union filesystem (NFS, CIFS, sshfs, FUSE-family, etc.) because the atomic-rename semantics liveness-file writes depend on are not guaranteed there. The wrapper itself does NOT make this check — it just writes the file; the reader-side guard catches the unsafe configuration before any scan-time damage.
+- `CRASH_RECOVERY_RUN_DIR` env-var overrides the default `~/.claude/run/` path (used in tests, and as the workaround for users whose `$HOME` is network-mounted).
+
 ## [denubis-bibliography] 0.2.3
 
 Cascade now catches image-only pages that pymupdf4llm renders as placeholder markers. Discovered when Levenson 1973 (`10.1037/h0035357`, J. Consulting and Clinical Psychology) needed a manual `docling+OCR` one-off under 0.2.2 — the paper's 8 pages were emitted as `**==> picture [W x H] intentionally omitted <==**` markers, which are ~50 chars and slipped just above the empty-page threshold, so the cascade did not escalate.
@@ -68,6 +103,14 @@ Documentation patch from the BJET-RR 42-paper rendering pass on 2026-05-12. No b
 - `SKILL.md` — four new Common-mistakes rows: bouncing the user to the Zotero UI for a stale auto-export refresh; assuming the first `item.search` hit is the canonical copy when items live in multiple libraries; Wiley chapter DOIs (`10.1002/<book>.chN`) failing `ingest.py` because Crossref returns empty `author` for them; giving up on `blockquote.py` NO MATCH without trying adjusted substrings (Unicode apostrophes, HTML-rendered table cells, paraphrases).
 - `SKILL.md` — Provenance addendum noting the 2026-05-12 BJET-RR session and the empirical scope (35 articles + 8 burst chapter PDFs + 7 late adds = 42 papers, 0 render failures).
 
+## [denubis-crash-recovery] 0.1.0
+
+New plugin. Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders `~/llm-resume.md`. This release ships the plugin scaffold, SQLite schema, and `crash-recovery init` subcommand. Subsequent phases land the classification rule table, scan/render/note/prune subcommands, the triage skill, and the wrapper patch in `denubis-plan-and-execute`.
+
+**New:**
+- `plugins/denubis-crash-recovery/` plugin scaffold (plugin.json, LICENSE, README).
+- `crash-recovery` CLI (typer-based) with `init` subcommand creating `~/.claude/crash-recovery.db` (overridable via `CRASH_RECOVERY_DB`).
+- SQLite schema for `sessions`, `scan_runs`, `classification_history` tables; WAL journal mode set persistently in init.
 ## [denubis-bibliography] 0.1.0
 
 New plugin. Renders PDFs from a Zotero corpus to per-page markdown so future Claude sessions can engage with paper content via verified, page-keyed blockquotes. WIP — documents only what has been proven end-to-end.
