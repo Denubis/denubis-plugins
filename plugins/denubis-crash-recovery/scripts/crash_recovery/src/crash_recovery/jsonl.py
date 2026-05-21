@@ -33,28 +33,29 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-# Deny-list filter: keep only top-level ``type`` values that carry real
-# signal; everything else is treated as bookkeeping and dropped before the
-# tail-shape walk.
+# Allow-list filter: keep only top-level ``type`` values in ``_REAL_TYPES``
+# that carry real signal; everything else is treated as bookkeeping and
+# dropped before the tail-shape walk.
 #
-# Deny-list approach (Phase 2 review, 2026-05-16): earlier allow-list held
-# ``{"assistant", "user", "system", "attachment", ...}`` but empirical
+# Allow-list approach (Phase 2 review, 2026-05-16): an earlier broader set
+# held ``{"assistant", "user", "system", "attachment", ...}`` but empirical
 # verification found ``custom-title``, ``agent-name``, ``agent-color``, and
 # ``pr-link`` at the tails of main-session JSONLs — types the Phase 2B
-# investigator's allow-list did not record. A smoking-gun session ended with
-# 5 bookkeeping entries; the allow-list would have walked back through 3
-# unfiltered ones and mis-classified a cleanly-concluded session as
-# ``borderline_unknown_tail``. The deny-list is robust to new bookkeeping
-# types Claude Code adds in future: any unknown ``type`` is conservatively
-# filtered so it can never silently mask a concluded-tail signal. The failure
-# mode runs the other direction (a future *real* type would be misclassified
-# as bookkeeping) but that failure is visible (session falls to UNKNOWN /
-# borderline) rather than silent — load-bearing on Phase 5 surfacing
-# ``classification_reason`` row-level (anchored in phase_05.md).
+# investigator's broader set did not exclude. A smoking-gun session ended
+# with 5 bookkeeping entries; the broader set would have walked back through
+# 3 unfiltered ones and mis-classified a cleanly-concluded session as
+# ``borderline_unknown_tail``. The allow-list approach (keep only types in
+# ``_REAL_TYPES``; everything else is filtered as bookkeeping) is robust to
+# new bookkeeping types Claude Code adds in future: any unknown ``type`` is
+# conservatively filtered so it can never silently mask a concluded-tail
+# signal. The failure mode runs the other direction (a future *real* type
+# would be misclassified as bookkeeping) but that failure is visible (session
+# falls to UNKNOWN / borderline) rather than silent — load-bearing on Phase
+# 5 surfacing ``classification_reason`` row-level (anchored in phase_05.md).
 #
 # Full rationale and the empirical verification details live in
 # ``docs/implementation-plans/2026-05-08-crash-recovery/phase_02.md`` Task 1.
-# Do NOT revert to an allow-list without re-running that verification.
+# Do NOT revert to a deny-list approach without re-running that verification.
 _REAL_TYPES: frozenset[str] = frozenset({"assistant", "user"})
 
 

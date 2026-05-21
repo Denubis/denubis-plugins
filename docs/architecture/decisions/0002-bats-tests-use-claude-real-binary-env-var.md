@@ -72,5 +72,5 @@ for similar plan-vs-code drift, not just verify the two known defects.
   returns one match per test that overrides the binary (currently the
   `setup()` function plus several inline overrides for sleep-claude /
   jsonl-claude variants).
-- All 11 tests in `tests/test_claude_wrapper_liveness.bats` pass against
+- All 13 tests in `tests/test_claude_wrapper_liveness.bats` pass against
   the patched wrapper, confirming the env-var routing works end-to-end.

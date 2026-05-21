@@ -14,7 +14,7 @@
 - **New boot:** `2026-05-20 15:15:23 AEST` (47 s gap; no `shutdown` row between the two `reboot` rows — canonical crash pattern in `last -F`).
 - **Boundary confidence:** **HIGH (VERIFIED).** Two independent signals agree:
   1. `last -F` shows the prior boot terminus at `15:14:38` with no graceful shutdown row preceding it.
-  2. Five JSONL transcripts (different `~/.claude/projects/` subdirs, unrelated workloads) all fsync'd within a 11 ms window at `15:14:32.95–.97 AEST`, exactly 5.4–6.0 s before the boundary. This is the cluster signature described in `2026-05-19-post-mortem-crash-detection.md` §"Empirical algorithm".
+  2. Five JSONL transcripts (different `~/.claude/projects/` subdirs, unrelated workloads) all fsync'd within a 11 ms window at `15:14:32.95–.97 AEST`, approximately 5.0 s before the boundary. This is the cluster signature described in `2026-05-19-post-mortem-crash-detection.md` §"Empirical algorithm".
 
 ## Live-process cross-check
 
@@ -41,7 +41,7 @@ All four are members of the `15:14:32.95–.97 AEST` fsync cluster (within 6 s o
   - `assistant` (`claude-opus-4-7`), `stop_reason=tool_use`, dispatched:
     `Bash{description: "Clean preview of pick.sh output", command: "echo '=== what pick.sh actually pipes to fzf (raw rows before sort) ==='; cache=\"$HOME/.cache/tmux-agent-status\"; sessio…"}`
   - Prior assistant text: "The mangling was my test harness, not the script. Real test by sourcing pick.sh's logic in isolation:"
-- **Why HIGH:** REASONED-UNVERIFIED. Cluster signature (5-file 11 ms fsync cluster at crash boundary − 6 s) + VERIFIED mid_tool_call tail (Bash dispatched, no result) + active project (session-runner is one of the user's live tools).
+- **Why HIGH:** REASONED-UNVERIFIED. VERIFIED mid_tool_call tail (Bash dispatched, no result — assistant interrupted mid-work) + confirmed dead in post-reboot `ps -ef` cross-check; cluster signature (5-file 11 ms fsync cluster ~5 s before crash boundary) is the discovery anchor that surfaced this candidate.
 - **Suggested action:** `crash-recovery note 1db0be1f-f2bb-49aa-83fa-919e30a0c872 "killed by 2026-05-20 15:14:38 AEST system crash (cluster member)"`
 
 ### `2f14a072-5507-4c89-9ca9-df55aedc9b96`
@@ -53,7 +53,7 @@ All four are members of the `15:14:32.95–.97 AEST` fsync cluster (within 6 s o
   - `assistant`, `stop_reason=tool_use`, dispatched:
     `Agent{subagent_type: "denubis-plan-and-execute:task-implementor", description: "Phase 6 fixup: Task 4 revision + new Task 4B (secrets_mutator)"}`
   - Prior text: "Dispatching task-implementor for the fixup commits."
-- **Why HIGH:** REASONED-UNVERIFIED. Cluster signature + VERIFIED active subagent dispatch ~57 s before crash + active worktree project. The dispatched `task-implementor` did not get a chance to complete; whatever Phase 6 fixup commits it was meant to produce are lost unless the subagent transcript was checkpointed elsewhere.
+- **Why HIGH:** REASONED-UNVERIFIED. VERIFIED mid_tool_call tail (Agent dispatch no result — `task-implementor` subagent dispatched ~57 s before crash, no result returned) + confirmed dead in post-reboot `ps -ef` cross-check; cluster signature (5-file 11 ms fsync cluster ~5 s before crash boundary) is the discovery anchor that surfaced this candidate. The dispatched `task-implementor` did not get a chance to complete; whatever Phase 6 fixup commits it was meant to produce are lost unless the subagent transcript was checkpointed elsewhere.
 - **Suggested action:** `crash-recovery note 2f14a072-5507-4c89-9ca9-df55aedc9b96 "killed by 2026-05-20 15:14:38 AEST crash mid-Agent dispatch (Phase 6 fixup task-implementor) — check whether task-implementor commits landed"`
 
 ### `6ec92e86-0c6f-4090-8979-71695d0760ee`
@@ -65,7 +65,7 @@ All four are members of the `15:14:32.95–.97 AEST` fsync cluster (within 6 s o
   - `user` (tool_result wrapper) carrying:
     `"audit written for feedback_honour-prior-architectural-decisions: 5 evidence lines, 3 code-artefact entries. The origin session (cc926ca0) is present in the transcript window. Both trigger instances d…"`
   - Prior tool_result: `"audit written for feedback_absencejudgement-codes-fabricated: 5 evidence lines, 5 code-artefact entries agentId: a2c64a2cdccb0eafc"`
-- **Why HIGH:** REASONED-UNVERIFIED. Cluster signature + VERIFIED tool_result with no follow-up assistant turn (the assistant was preparing to consume the second audit's tool_result when the crash hit; the mtime gap between last substantive event 12:46 and final fsync 15:14 indicates an idle/save state).
+- **Why HIGH:** REASONED-UNVERIFIED. VERIFIED mid_tool_call tail (tool_result received, no follow-up assistant turn — assistant was preparing to consume the audit result when the crash hit) + confirmed dead in post-reboot `ps -ef` cross-check; cluster signature (5-file 11 ms fsync cluster ~5 s before crash boundary) is the discovery anchor that surfaced this candidate. The mtime gap between last substantive event 12:46 and final fsync 15:14 indicates an idle/save state before the kill.
 - **Suggested action:** `crash-recovery note 6ec92e86-0c6f-4090-8979-71695d0760ee "killed by 2026-05-20 15:14:38 AEST crash; was mid-audit consumption of feedback_honour-prior-architectural-decisions"`
 
 ### `28d8e6cc-9ff1-4dbe-bdb1-0defe289a03b`
@@ -76,7 +76,7 @@ All four are members of the `15:14:32.95–.97 AEST` fsync cluster (within 6 s o
 - **Last substantive event (idx 414, `2026-05-20T02:46:21 UTC` = `12:46:21 AEST`):**
   - `user`: "Quoting hell with the awk regex. Let me write the block to a temp script and run that. ● Write(/tmp/dream-prewindow.sh) ⎿ Wrote 81 lines to ../../../../../../../tmp/dream-prewindow.sh 1 #!/usr/bin/env bash 2 set -euo pipefail 3 …"
   - Followed by an `attachment` carrying the script content; no assistant response after.
-- **Why HIGH:** REASONED-UNVERIFIED. Cluster signature + VERIFIED user submitted prompt + attachment with no assistant reply. Despite the >2 h gap between last substantive event and final fsync, the cluster co-membership with four other unrelated active sessions makes mass-kill far more plausible than four-way coincidence.
+- **Why HIGH:** REASONED-UNVERIFIED. VERIFIED user message + attachment with no assistant reply (assistant interrupted before it could respond) + confirmed dead in post-reboot `ps -ef` cross-check; cluster signature (5-file 11 ms fsync cluster ~5 s before crash boundary) is the discovery anchor that surfaced this candidate. Despite the >2 h gap between last substantive event and final fsync, cluster co-membership with four other unrelated active sessions makes mass-kill far more plausible than four-way coincidence.
 - **Suggested action:** `crash-recovery note 28d8e6cc-9ff1-4dbe-bdb1-0defe289a03b "killed by 2026-05-20 15:14:38 AEST crash; user prompt + dream-prewindow.sh attachment never received assistant reply"`
 
 ## Candidates (MEDIUM confidence) — 2 sessions

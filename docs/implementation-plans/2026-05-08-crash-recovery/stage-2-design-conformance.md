@@ -127,7 +127,7 @@ Spot-check of phase_01.md through phase_07.md for the "specified an identifier f
 |---|---|---|---|---|
 | DR1 | SQLite as truth, markdown as render | `db.py`, `render.py`, `__main__.py::regenerate` | `test_render.py::test_render_overwrites_user_edits`, AC4.4 in `test_render.py` | constraints.md "Deterministic render", design-plan |
 | DR2 | PID-keyed liveness, post-hoc UUID resolve | `liveness.py` (filename = `$$.live`), `correlate.py` (DIRECT/MTIME/AMBIGUOUS/NO_MATCH) | `test_correlate.py::test_project_dir_for_cwd_handles_encoding_collision` + AC6.1 fixtures | constraints.md "Liveness file four-key format", "Lossy-encoding collision safety" |
-| DR3 | Patch `denubis-plan-and-execute` wrapper directly | `claude-wrapper.sh` Blocks A+B | `test_claude_wrapper_liveness.bats` (11 tests) | CHANGELOG.md `[denubis-plan-and-execute] 2.32.2`, constraints.md "Writer-side liveness lifecycle" |
+| DR3 | Patch `denubis-plan-and-execute` wrapper directly | `claude-wrapper.sh` Blocks A+B | `test_claude_wrapper_liveness.bats` (13 tests) | CHANGELOG.md `[denubis-plan-and-execute] 2.32.2`, constraints.md "Writer-side liveness lifecycle" |
 | DR4 | Triage-only scope (no byobu/OOM) | Plugin scope: no byobu/OOM in `plugins/denubis-crash-recovery/` | n/a (negative space) | design-plan "Explicitly OUT of scope", README "Out of scope" |
 | DR5 | Deterministic Python rules, no LLM | `classify.py::RULES` + `classify()` (pure) | `test_classify.py::test_every_rule_classifies_its_fixture` (parametrised, one per rule); `test_render.py` snapshots | constraints.md "Deterministic classification" |
 | DR6 | No automatic pruning | `prune.py::survey` + `delete_candidates`; CLI requires `--confirm` | `test_prune.py::test_prune_without_confirm_refuses`, `..._dry_run_is_read_only` | constraints.md "No auto-prune" |
@@ -287,7 +287,7 @@ Per the brief — verify Stage 1's architecture docs are consistent with the imp
 
 Reviewed: the 8 new constraint rows + 4 updated rows. Cross-check each against code:
 
-- **Writer-side liveness lifecycle:** matches `claude-wrapper.sh` Blocks A+B; pinned by `test_claude_wrapper_liveness.bats` (11 tests). Consistent.
+- **Writer-side liveness lifecycle:** matches `claude-wrapper.sh` Blocks A+B; pinned by `test_claude_wrapper_liveness.bats` (13 tests). Consistent.
 - **Wrapper exit-code capture + transcript-archive gate:** matches `|| EXIT_CODE=$?` line + `if [[ "$EXIT_CODE" -eq 0 ]]` gate. Consistent. ADR 0001 paired.
 - **Bats env-var contract:** matches `CLAUDE_REAL_BINARY` usage in tests. Consistent. ADR 0002 paired.
 - **AC5.6 / AC6.4 UAT deferral:** documented; matches README runbook structure. Consistent.
