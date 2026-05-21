@@ -43,7 +43,7 @@ class WriteContext:
     allocates ``scan_run_id``.
     """
 
-    conn: object
+    conn: object  # typed as object to allow mock connections in tests; callers always pass sqlite3.Connection
     ctx: ScanContext
     scan_run_id: int
 

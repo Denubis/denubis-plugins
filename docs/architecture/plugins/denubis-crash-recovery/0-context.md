@@ -96,6 +96,16 @@ flowchart LR
 | `render.py` | Section model + `render()` byte-stable markdown emitter. Signature `render(db_path) -> tuple[str, int]` (string + entry count; tuple form lands in Phase 6 to resolve a TOCTOU window — the Phase 5 plan documents the single-string form). |
 | `note.py` / `history.py` / `prune.py` / `list_live.py` | One module per CLI subcommand of similar name. |
 
+### Module Inventory — deliberate private-symbol cross-imports
+
+The following private symbols (leading underscore) are intentionally shared across module boundaries as part of the FCIS module split documented in "Departures from design plan" below:
+
+| Symbol | Defined in | Imported by | Rationale |
+|--------|-----------|-------------|-----------|
+| `_project_dir_for_cwd` | `correlate.py` | `scan.py` | Read-only path helper needed by the scan orchestrator. Kept private (not in `correlate.__all__`) because it is an implementation detail of the correlation algorithm; `scan.py` is the sole caller. If `correlate.py` ever defines `__all__`, this symbol must be included explicitly or the import at `scan.py:31` will fail at runtime. |
+
+The four `scan_db.py` helpers (`_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`) are private-to-the-scan-subsystem by convention: `scan.py` is their only consumer and they are not part of any public API. They do not cross a package boundary.
+
 ### Environment variables
 
 | Variable | Default | Purpose |
