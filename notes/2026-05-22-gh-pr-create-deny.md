@@ -29,15 +29,28 @@ Full suite: 369 tests passing.
 }
 ```
 
-## Scope of the deny (narrow on purpose)
+## Scope of the deny
 
-Only `gh pr create` is denied. Adjacent risks intentionally NOT covered yet:
+Two explicit denies in `classify_gh()`:
 
-- **`gh api ... -X POST .../pulls`** — already returns no-opinion (Claude Code prompts user). Could be upgraded to deny if `gh pr create` deny is bypassed via the API. Currently logged at `rules/gh.py:_TOP_LEVEL_READS` handling of `gh api -f/-F/-X`.
-- **`gh repo create`**, **`gh repo fork`** — currently no-opinion. Fork is supposed to be handled by `denubis-hook-gh-fork-guard` which failed in this incident; needs its own investigation before adding redundant approver deny.
-- **`gh release create`** — currently no-opinion.
+1. **`gh pr create`** (any flags) — original incident response.
+2. **`gh api` with any write method or field flags** — closes the workaround. Covers `-X POST/PUT/PATCH/DELETE` (case-insensitive), `--method=X` long form, and `-f`/`-F`/`--field`/`--raw-field` (which auto-trigger POST in `gh api`). Rule of thumb per user: "get the human to run this".
 
-If the incident pattern recurs through any of these paths, add a parallel deny rule for that specific command using the same shape as the `pr create` block in `classify_gh()`.
+Live verified — `gh api repos/owner/repo/pulls -X POST -f title=x -f head=br -f base=main` returns:
+
+```
+permissionDecision: deny
+permissionDecisionReason: pipeline_deny: gh: gh api write (-X POST) is denied by approver — github API writes can be used to bypass the gh pr create deny (e.g. POST to /repos/*/pulls). Do NOT autonomously call the github API for writes. STOP, describe the request (repo, endpoint, method, payload) and ask the user to run it themselves. If the user explicitly authorises you to lift this deny, edit ~/.claude/hooks/approver/rules/gh.py.
+```
+
+GET still allows: `gh api repos/owner/repo/issues/1` → `permissionDecision: allow`.
+
+Adjacent risks still NOT covered (intentionally — they aren't in `settings.json` allow, so Claude Code prompts the user naturally rather than auto-executing):
+
+- **`gh issue create`, `gh repo create`, `gh release create`** — these write commands return no-opinion from the approver and there's no settings.json allow rule for them, so Claude Code surfaces a permission prompt. No deny needed unless they later get added to the allow list and the prompt is bypassed.
+- **`gh repo fork`** — supposed to be handled by `denubis-hook-gh-fork-guard` which failed in this incident; needs its own investigation (see below) before adding redundant approver deny.
+
+If a NEW workaround appears (e.g. a new `gh foo create` subcommand, or a `git push` to a fork), add a parallel deny rule for that specific case using the same shape as the existing blocks in `classify_gh()`.
 
 ## Follow-up: investigate `denubis-hook-gh-fork-guard`
 
