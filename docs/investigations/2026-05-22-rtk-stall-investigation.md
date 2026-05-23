@@ -1,8 +1,10 @@
 # RTK / Approver Stall Investigation
 
 **Date:** 2026-05-22
-**Session:** `154eb6de-9fbf-44a6-8bef-9e4bf8cf6a40` (in `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/`)
-**Status:** Phase 1 closed — root cause narrowed, immediate mitigation applied. Follow-up work flagged below.
+**Sessions:**
+- Phase 1: `154eb6de-9fbf-44a6-8bef-9e4bf8cf6a40` (in `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/`)
+- Phase 2: `1119a896-2eff-4dda-bafe-7eec18a14525` (in `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-approver-rtk/`)
+**Status:** Phase 2 closed — Phase 1's rtk hypothesis refined to "no-opinion approver decision" hypothesis; narrow intervention shipped to approver. Awaiting post-fix observation to upgrade evidence grade from plausible to demonstrated.
 
 ## Symptom
 
@@ -143,3 +145,106 @@ No changes were made to the `denubis-hook-rtk-rewrite` plugin's source in this r
 - `denubis-hook-rtk-rewrite` plugin in this repo: `plugins/denubis-hook-rtk-rewrite/`.
 - Original investigation session: `154eb6de-9fbf-44a6-8bef-9e4bf8cf6a40.jsonl`.
 - Most stall-dense sessions: `7536943f-4a84-…` and `65ed22e7-05f2-…` in `~/.claude/projects/-home-brian-people-Brian-sillytavern-deploy--worktrees-implement-tavern-laws5000/`.
+
+---
+
+# Phase 2: post-mitigation re-investigation (2026-05-22 evening)
+
+## Symptom continued
+
+After the Phase 1 rtk mitigation (04:57Z), stalls persisted. Two were observed inside the Phase 2 session itself (`1119a896…`): one at 05:25:26 on a `cc-search-chats | python3` pipeline that errored with a Python KeyError, and one at 05:26:20 on a clean successful `tail | python3 -c …` retry. Critically, the second stall had `is_error=False` — so the Phase 1 framing of "rtk-mangled output content confuses the model" could not be the whole story.
+
+## Refined signature
+
+Stalls correlate strongly with PreToolUse approver decisions of **`no-opinion`** — the case where no rule fires, the cache misses, the decision dict stays `None`, and `run_hook` exits 0 with no stdout. This is distinct from `allow` (rule fired with explicit decision) and `deny` (rule explicitly blocked).
+
+## Evidence (n=10 across 5 projects)
+
+A Sonnet subagent scan of all `~/.claude/projects/*/*.jsonl` files modified at or after 2026-05-22T04:57Z (the rtk-mitigation timestamp). Across 12 sessions:
+
+| Group | Total turns | Stalls | Stall rate |
+|---|---|---|---|
+| `allow` decision | 24 | 0 | 0% |
+| `no-opinion` decision | 10 | 10 | **100%** |
+| `deny` decision | 0 | 0 | n/a |
+
+The correlation holds across all 5 projects involved (`approver-rtk`, `brian-ed3d-plugins`, `sillytavern-deploy`, `morning-assistant`, `brian-ed3d-plugins-crash-recovery`) — not project-specific.
+
+Lookup methodology: the subagent's first pass used the tool_result timestamp to query approver logs and found "absent" entries for several stalls. Switching to the **PreToolUse dispatch timestamp** resolved all 10 stalls to logged `no-opinion` entries. Long-running commands (a 20-minute `uv run`, a 3-minute font enumeration) had wide gaps between dispatch and result, hence the lookup-window bug. Fixed before reporting.
+
+## Refined causal chain
+
+Phase 1's "rtk → mangled output → model confusion → stall" was incomplete. The corrected understanding:
+
+1. rtk rewrites Bash commands (e.g. `find` → `rtk find`, `tail file` → `rtk read file --tail-lines N`).
+2. The rewritten command has a different pipe signature than the approver's whitelists expect (e.g. `rtk|jq|find` instead of `find`).
+3. The approver finds no matching rule and no cached signature.
+4. `run_hook` returns silently (no JSON to stdout).
+5. The harness… does something with that silence that breaks the tool_result → model_response cycle.
+6. Tool runs, result returns, model produces nothing, Stop fires.
+
+Step 5 mechanism remains speculative — only the harness team knows for sure. But the correlation gives us a clean place to intervene: eliminate the silence.
+
+This reframes Phase 1's findings: the rtk `exclude_commands` mitigation worked partially because it reduced the number of commands rtk transformed into approver-unknown shapes. Stalls dropped (the original observation of 8 stalls in 1.7 days became less frequent) but didn't vanish, because any Bash pipeline involving a non-whitelisted leading (python3, awk, fc-list, custom binaries) still produces no-opinion → silence → stall.
+
+## Intervention
+
+**Modified `~/.claude/hooks/approver/approver.py:274-285`** (inside `run_hook`):
+
+```python
+if decision is None and tool == "Bash" and sig is not None:
+    decision = {
+        "name": "fallback_ask",
+        "decision": "ask",
+        "reason": "approver had no opinion; deferring to user",
+    }
+```
+
+Narrow scope chosen deliberately:
+- **`tool == "Bash"`** — non-Bash tools (Edit, Write, Read) keep their silent fallthrough so `acceptEdits` UX is preserved. The stall pattern was Bash-only in the dataset.
+- **`sig is not None`** — Bash with a dangerous leading (`rm`, `sudo`, `ssh`, `bash`, `xargs`, etc.) keeps its silent fallthrough so `settings.json` hard-deny rules apply unchanged. Emitting `ask` here would risk overriding the harness's deny with a user prompt.
+
+Logging: previously-silent no-opinion turns now log as `decision: "ask"`, `rule: "fallback_ask"` — distinguishable from real allow/deny entries, giving future visibility into how often the fallback fires.
+
+## Tests added
+
+`~/.claude/hooks/approver/tests/test_hook.py`:
+- `test_run_hook_emits_ask_when_no_rule_matches` — RED-then-GREEN driving the new behaviour.
+- `test_pretooluse_bash_safe_leading_always_emits` (parametrised, 8 cases) — contract: any Bash with a safe leading emits a permissionDecision.
+- `test_pretooluse_dangerous_bash_stays_silent` (parametrised, 6 cases) — negative border: dangerous leadings still silent.
+- `test_pretooluse_non_bash_stays_silent` (parametrised, 3 cases) — negative border: Edit/Write/Read still silent.
+
+**Suite: 406 passing** (388 prior + 1 new test + 17 new contract cases). Zero regressions.
+
+## Evidence grade
+
+- **Demonstrated** (one border): silent `no-opinion` returns from the approver correlate 10/10 with model stalls, across 5 projects, over the post-mitigation observation window. No `allow` decision in the dataset stalled.
+- **Plausible** (not yet demonstrated): silent return *causes* stalls. The other border (removing silence eliminates stalls) is not yet shown in production. The intervention is now live; observation pending.
+
+To upgrade to demonstrated: continue normal work, count stalls in subsequent sessions, confirm rate drops to the pre-2026-05-21 baseline (0 in 631 turn-ends across 6 days).
+
+## Confound to flag
+
+The correlation is between `no-opinion` and stalls. The causal claim could be either:
+- **(a) Direct:** approver's silence itself breaks the harness/model response cycle.
+- **(b) Indirect:** "unusual command shapes" produce both no-opinion (because they're not in the safe whitelist) and stalls (for some other reason — harness fallthrough timing, missing injected context, etc.).
+
+These have the same observational signature on the existing dataset. The intervention distinguishes them — if (a), stalls drop to ~0; if (b), they persist at similar rates after the change. The post-fix observation IS the experiment that disambiguates.
+
+## Phase 2 files changed
+
+| File | Change |
+|---|---|
+| `~/.claude/hooks/approver/approver.py` | lines 274-285: fallback_ask block added inside `run_hook` PreToolUse branch |
+| `~/.claude/hooks/approver/tests/test_hook.py` | new file: 4 tests (1 driver + 3 contract groups), 18 cases total |
+
+The approver dir is not git-versioned. No commit is made by this Phase. Pre-change `approver.py` content remains recoverable from this session's JSONL.
+
+## Hand-off for next agent
+
+If you're picking this up:
+
+1. **Falsification observation:** check whether stalls have continued in any session modified after 2026-05-22T06:30Z (when the approver fix went live). Use the same scan methodology — JSONL stall signature + approver log cross-reference. Look for `rule: "fallback_ask"` entries paired with stop_hook_summary events (still a stall) vs paired with normal assistant response events (the fix working).
+2. **If stalls persisted after fix**: hypothesis (a) falsified, look at what additionalContext content gets injected and whether `additionalContext: null` or missing affects the model.
+3. **If stalls dropped to baseline**: upgrade Phase 2 finding to demonstrated, write up as a closed investigation.
+4. **Separately**, the user wants an AST-walking enhancement to the approver: instead of only matching on pipe shape (leadings), inspect the actual arg shape for `python3 -c …`, `awk …`, `xargs …`, etc., and produce confident allows for benign call shapes. This is a design conversation, not yet a plan.
