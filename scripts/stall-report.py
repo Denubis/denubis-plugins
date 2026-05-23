@@ -39,6 +39,9 @@ class Stall:
     tool_command: str
     result_excerpt: str
     is_error: bool
+    stop_line: int            # 1-indexed line of the stop_hook_summary event
+    tool_result_line: int     # 1-indexed line of the user[tool_result] event
+    tool_use_line: int | None # 1-indexed line of the matching assistant[tool_use], if found
 
 
 def _has_assistant_content(event: dict) -> bool:
@@ -67,10 +70,10 @@ def _get_tool_result(event: dict) -> dict | None:
     return None
 
 
-def _index_tool_uses(events: list[dict]) -> dict[str, tuple[str, str]]:
-    """Build {tool_use_id: (tool_name, command_str)} for command-excerpt lookup."""
-    out: dict[str, tuple[str, str]] = {}
-    for e in events:
+def _index_tool_uses(events: list[tuple[int, dict]]) -> dict[str, tuple[str, str, int]]:
+    """Build {tool_use_id: (tool_name, command_str, line_no)} for command lookup."""
+    out: dict[str, tuple[str, str, int]] = {}
+    for line_no, e in events:
         if e.get("type") != "assistant":
             continue
         msg = e.get("message")
@@ -82,7 +85,7 @@ def _index_tool_uses(events: list[dict]) -> dict[str, tuple[str, str]]:
             tu_id = c.get("id", "")
             inp = c.get("input") or {}
             cmd = inp.get("command", "") if isinstance(inp, dict) else ""
-            out[tu_id] = (c.get("name", ""), str(cmd))
+            out[tu_id] = (c.get("name", ""), str(cmd), line_no)
     return out
 
 
@@ -111,18 +114,18 @@ def find_stalls_in_file(path: Path) -> list[Stall]:
     except OSError:
         return []
 
-    events: list[dict] = []
-    for line in text.splitlines():
+    events: list[tuple[int, dict]] = []
+    for line_no, line in enumerate(text.splitlines(), start=1):
         try:
-            events.append(json.loads(line))
+            events.append((line_no, json.loads(line)))
         except json.JSONDecodeError:
             continue
 
     tool_uses = _index_tool_uses(events)
     stalls: list[Stall] = []
-    pending_tool_result: tuple[dict, dict] | None = None
+    pending_tool_result: tuple[int, dict, dict] | None = None
 
-    for e in events:
+    for line_no, e in events:
         et = e.get("type")
 
         if et == "assistant" and _has_assistant_content(e):
@@ -132,16 +135,16 @@ def find_stalls_in_file(path: Path) -> list[Stall]:
         if et == "user":
             tr = _get_tool_result(e)
             if tr is not None:
-                pending_tool_result = (e, tr)
+                pending_tool_result = (line_no, e, tr)
             else:
                 pending_tool_result = None
             continue
 
         if et == "system" and e.get("subtype") == "stop_hook_summary":
             if pending_tool_result is not None:
-                event, tr = pending_tool_result
+                tr_line, event, tr = pending_tool_result
                 tu_id = tr.get("tool_use_id", "")
-                tool_name, tool_cmd = tool_uses.get(tu_id, ("?", ""))
+                tool_name, tool_cmd, tu_line = tool_uses.get(tu_id, ("?", "", None))
                 stalls.append(Stall(
                     session_id=event.get("sessionId", ""),
                     project_dir=path.parent.name,
@@ -150,6 +153,9 @@ def find_stalls_in_file(path: Path) -> list[Stall]:
                     tool_command=tool_cmd[:200],
                     result_excerpt=_result_to_text(tr.get("content", ""))[:200],
                     is_error=bool(tr.get("is_error", False)),
+                    stop_line=line_no,
+                    tool_result_line=tr_line,
+                    tool_use_line=tu_line,
                 ))
             pending_tool_result = None
             continue
@@ -180,6 +186,11 @@ def main(argv: list[str] | None = None) -> int:
         "--json",
         action="store_true",
         help="Emit JSON instead of human-readable table.",
+    )
+    parser.add_argument(
+        "--lines",
+        action="store_true",
+        help="Show JSONL line numbers (stop / tool_result / tool_use) for citation.",
     )
     args = parser.parse_args(argv)
 
@@ -243,12 +254,23 @@ def main(argv: list[str] | None = None) -> int:
     print()
 
     print("Stall details:")
-    print(f"  {'TIMESTAMP':<24} {'TOOL':<8} {'ERR':<4} COMMAND")
-    print("  " + "-" * 96)
-    for s in all_stalls:
-        cmd = s.tool_command.replace("\n", "↵")[:60]
-        err = "yes" if s.is_error else " no"
-        print(f"  {s.timestamp[:23]:<24} {s.tool_name:<8} {err:<4} {cmd}")
+    if args.lines:
+        # Lines column shows: stop_hook_summary line / tool_result line / tool_use line
+        print(f"  {'TIMESTAMP':<24} {'LINES (stop/tr/tu)':<20} {'TOOL':<8} {'ERR':<4} COMMAND")
+        print("  " + "-" * 110)
+        for s in all_stalls:
+            cmd = s.tool_command.replace("\n", "↵")[:50]
+            err = "yes" if s.is_error else " no"
+            tu = str(s.tool_use_line) if s.tool_use_line is not None else "?"
+            lines_col = f"{s.stop_line}/{s.tool_result_line}/{tu}"
+            print(f"  {s.timestamp[:23]:<24} {lines_col:<20} {s.tool_name:<8} {err:<4} {cmd}")
+    else:
+        print(f"  {'TIMESTAMP':<24} {'TOOL':<8} {'ERR':<4} COMMAND")
+        print("  " + "-" * 96)
+        for s in all_stalls:
+            cmd = s.tool_command.replace("\n", "↵")[:60]
+            err = "yes" if s.is_error else " no"
+            print(f"  {s.timestamp[:23]:<24} {s.tool_name:<8} {err:<4} {cmd}")
 
     return 0
 
