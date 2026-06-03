@@ -1,6 +1,6 @@
 ---
 name: using-bibliography
-description: Use when the user wants to render a Zotero PDF into per-page markdown, or surface page-keyed blockquotes from a rendered paper. Reads from Zotero via Better BibTeX; optionally fetches a missing paper via zotero-api-plus behind explicit user confirmation.
+description: Use when rendering a Zotero PDF to per-page markdown, surfacing page-keyed blockquotes from a rendered paper, or fetching a missing paper into Zotero behind explicit confirmation.
 user-invocable: true
 last-reviewed: 2026-06-03
 ---
@@ -108,17 +108,30 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
    "Attention Is All You Need" appeared on 2026-06-02). Fetch only when
    resolution returns nothing.
 
-2. **Choose the target collection — never assume one.**
+2. **Resolve the target + preview with `fetch.py` — do not hand-parse JSON.**
+   Turning a human group + collection name into the numeric `groupID` and
+   `collectionKey` that `add-item-by-id` needs is exactly the step that used to
+   be improvised as a multi-line `python3 -c "…"` block in bash and broke on
+   quoting. Use the helper. A bare run resolves the target and previews
+   **without writing**:
 
    ```bash
-   curl -sS http://localhost:23119/api/plus/selected-collection
-   # → {"name","key","libraryID","groupID"}  — the collection open in the UI
-   # → 500 "No Collection selected."         — nothing selected; pick explicitly
+   uv run plugins/denubis-bibliography/skills/using-bibliography/fetch.py \
+       --group "<group name or numeric groupID>" \
+       --collection "<collection name>" \
+       <DOI/ISBN/PMID/arXiv> ...
    ```
 
-   List targets with `GET /api/plus/libraries` (My Library + every group, each
-   with `{key,name,parentKey}` collections and the group's `groupID`). Create a
-   new target idempotently:
+   - Omit `--group` for My Library; omit `--collection` to target the library root.
+   - On an unknown or ambiguous name the helper lists the available groups /
+     collections and exits non-zero. Copy the right name, or pass
+     `--collection-key <KEY>` directly. Never guess a key.
+   - To inspect targets by hand: `GET /api/plus/selected-collection` (the
+     collection open in the UI; `500 "No Collection selected."` if none) and
+     `GET /api/plus/libraries` (My Library + every group with `{key,name,
+     parentKey}` collections and the group's `groupID`).
+
+   Need a **new** collection? Create it idempotently first, then pass its key:
 
    ```bash
    curl -sS -X POST http://localhost:23119/api/plus/create-collection \
@@ -127,31 +140,30 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
    # → {"created":true|false,"collection":{"key":"…",…}}
    ```
 
-3. **HALT and confirm — both halves.** State exactly what will be written and
-   where: *"<title/DOI> is not in Zotero. Fetch it into <collection> (<library>)
-   and attach the PDF? This adds an item to your library."* Proceed only on an
-   explicit yes. **Do not infer consent** from an earlier "ingest these DOIs"
-   instruction — adding to the library is a distinct write the user has not yet
-   authorised.
+3. **HALT and confirm — both halves.** The preview from step 2 is what you
+   confirm. State exactly what will be written and where: *"<title/DOI> is not in
+   Zotero. Fetch it into <collection> (<library>) and attach the PDF? This adds
+   an item to your library."* Proceed only on an explicit yes. **Do not infer
+   consent** from an earlier "ingest these DOIs" instruction — adding to the
+   library is a distinct write the user has not yet authorised.
 
-4. **Fetch.**
+4. **Fetch** — re-run the same command with `--fetch` to write:
 
    ```bash
-   curl -sS -X POST http://localhost:23119/api/plus/add-item-by-id \
-     -H 'Content-Type: application/json' \
-     -d '{"identifier":"<DOI/ISBN/PMID/arXiv>","groupID":<groupID?>,"collectionKey":"<key?>"}'
+   uv run plugins/denubis-bibliography/skills/using-bibliography/fetch.py \
+       --group "<…>" --collection "<…>" --fetch <DOI> ...
    ```
 
-   → `{status,addedCount,titles[],items:[{title,key,pdf,attachmentID?}]}` (`404`
-   if nothing could be saved). Read each item's `pdf`:
+   The helper POSTs `add-item-by-id` and prints `pdf=<status>` per added item,
+   from the response `{status,addedCount,titles[],items:[{title,key,pdf,
+   attachmentID?}]}`:
 
    - `present` — translator attached the PDF during this add. On disk; render.
    - `fetched` — translator gave metadata only; the `addAvailableFile` fallback
      attached an open-access PDF. On disk; render.
    - `unavailable` — item added, **no PDF** (no OA copy; likely paywalled with no
-     institutional session). Tell the user; they attach via the connector, then
-     re-run the render.
-   - `error` — report verbatim; do not retry blindly.
+     institutional session). Attach via the connector, then re-run the render.
+   - `error` — the helper surfaces the server message verbatim; do not retry blindly.
 
 5. **Render** via the normal pipeline once a PDF is present. BBT may lag a few
    seconds indexing the new item; if the first `ingest.py` run reports
@@ -160,7 +172,10 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
 **Batch (a list of DOIs):** resolve them all first, surface the
 missing-and-fetchable set as ONE list, confirm the set + target collection in a
 single prompt, then fetch the confirmed set and render. One confirmation for the
-batch — never silent per-item writes.
+batch — never silent per-item writes. `fetch.py` takes the whole identifier list
+in a single invocation against one `--group`/`--collection`, so the no-`--fetch`
+preview shows the entire batch and one `--fetch` run writes it after the single
+confirmation.
 
 **Verified end-to-end 2026-06-03:** `10.1007/s13347-024-00760-w` (Conradie &
 Nagel, CC-BY) — `create-collection` "test" in a group → `add-item-by-id`
@@ -610,6 +625,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Bypassing the cascade by hand-running pymupdf4llm and missing the empty-page case | The render functions in `renderer.py` quality-check output (>50% empty pages, or >0.5% U+FFFD) and escalate. If you skip the cascade, you silently get empty pages on no-text-layer PDFs (Schraw 1994 case) or U+FFFD-saturated text (Stephens 2000 case). Use `render_pdf_with_fallback` rather than calling `pymupdf4llm.to_markdown` directly. |
 | Reaching for PowerShell's `curl` to ping Zotero on Windows | `curl` in PowerShell is `Invoke-WebRequest` with different syntax; the `-sS --max-time` flags don't exist. Use `curl.exe ...` (real curl, shipped with Windows 10+) or `Invoke-RestMethod -Uri ... -TimeoutSec 3`. |
 | Running 0.2.1 or earlier on Windows and getting "no PDF attachment" for items that clearly have one | `parse_pdf_paths` in 0.2.1 and earlier collided with the Windows drive-letter colon (`C:\...`) and returned no path. Upgrade to 0.2.2+. |
+| Hand-writing a multi-line `python3 -c "…"` block in bash to dig a `collectionKey` out of `/api/plus/libraries` | That improvisation is what broke (shell mangled the multi-line quoting). Use `fetch.py --group … --collection …` — it resolves the key in one call and previews before writing. |
 
 ## Provenance
 
@@ -701,3 +717,23 @@ discovery):
   `add-item-by-id` (`pdf: present`, PDF on disk) → `ingest.py` rendered 24 pages
   via pymupdf4llm. Endpoint contracts read from
   `~/people/Brian/zotero-api-plus/src/addon.ts`, not transcribed from a summary.
+
+**2026-06-03 second pass** (`fetch.py` helper for the resolve + fetch step):
+
+- Added `fetch.py`. The group/collection-name → `groupID`+`collectionKey`
+  resolution and the `add-item-by-id` call now live in one tested helper instead
+  of being improvised as raw curl + a multi-line `python3 -c "…"` block in bash.
+  That improvisation broke on shell quoting (`/bin/bash: eval: line 15: syntax
+  error near unexpected token '('` while fetching `10.1007/s11136-018-1798-3`
+  into group 6549571) — the resolution intent was correct; only the hand-written
+  bash failed.
+- `fetch.py` separates a pure functional core (`resolve_target`,
+  `parse_add_item_response`) from a thin httpx shell. The core is covered by 13
+  unit tests under `tests/test_bibliography_fetch.py` (group by name / numeric
+  ID / My Library, collection found / missing / ambiguous, case-insensitivity,
+  and the 200/400/404 response contract).
+- The confirm-gate is now structural: a bare run resolves and previews without
+  writing; `--fetch` is required to POST to the library. Verified the live
+  preview resolves `Bayesian / Methods` → key `VPN6BBUC` in group 6549571.
+- Endpoint and `pdf`-status contracts read from
+  `~/people/Brian/zotero-api-plus/src/addon.ts` and `utils/pdf-status.ts`.
