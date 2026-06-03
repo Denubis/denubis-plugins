@@ -62,7 +62,6 @@ These bash-heavy hooks do not work on Windows (even with Git Bash). Skip them on
 | Plugin | What it does | Requires |
 |--------|-------------|----------|
 | **`denubis-hook-pretooluse-dispatcher`** | Dispatcher that auto-discovers and runs PreToolUse:Bash hooks from plugins. | bash, Unix paths |
-| **`denubis-hook-rtk-rewrite`** | Rewrites CLI commands to RTK equivalents for 60-90% token savings. | dispatcher, `rtk`, `jq` |
 | **`denubis-hook-gh-fork-guard`** | Blocks `gh` CLI commands targeting repos you don't own. | dispatcher, `gh` |
 
 ### Terminal-specific
@@ -107,8 +106,7 @@ Transcript archiving is provided by the separate [`transcript-archive`](https://
 
 | Tool | Required for | Install |
 |------|-------------|---------|
-| **rtk** | Token-optimized output | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) |
-| **jq** | RTK rewrite hook | Package manager (`apt`, `brew`) |
+| **jq** | Dispatcher / gh-fork-guard hooks | Package manager (`apt`, `brew`) |
 
 ## Installation
 
@@ -137,7 +135,6 @@ Inside Claude Code:
 **Add infrastructure hooks** (Linux/macOS only):
 ```
 /plugin install denubis-hook-pretooluse-dispatcher@denubis-plugins
-/plugin install denubis-hook-rtk-rewrite@denubis-plugins
 /plugin install denubis-hook-gh-fork-guard@denubis-plugins
 ```
 
@@ -184,7 +181,7 @@ If not found, add uv's install directory to your Windows PATH (typically `%USERP
 
 ### 3. Install the recommended plugin set
 
-Install the **recommended set** listed above. **Do not install** the infrastructure hooks (`pretooluse-dispatcher`, `rtk-rewrite`, `gh-fork-guard`) or `branch-bg` — they require Unix-only tooling.
+Install the **recommended set** listed above. **Do not install** the infrastructure hooks (`pretooluse-dispatcher`, `gh-fork-guard`) or `branch-bg` — they require Unix-only tooling.
 
 ### 4. Run setup
 
@@ -196,7 +193,6 @@ The setup skill detects Windows and adjusts its checks accordingly.
 
 ### Known limitations on Windows
 
-- **No RTK token savings** — RTK and its dispatcher are bash-only. Token usage will be higher.
 - **No fork guard** — The `gh` CLI guard depends on the dispatcher. Be careful with `gh` commands on repos you don't own.
 - **No terminal background colouring** — OSC 11 support varies across Windows terminals.
 - **Hook performance** — Some users report [hook-related hangs on Windows](https://github.com/anthropics/claude-code/issues/34457). If Claude Code becomes sluggish, disable hooks one at a time to isolate the problem.
@@ -227,7 +223,6 @@ denubis-plugins/
 │   ├── denubis-hook-shortcut-detection/
 │   ├── denubis-hook-claudemd-reminder/
 │   ├── denubis-hook-pretooluse-dispatcher/
-│   ├── denubis-hook-rtk-rewrite/
 │   ├── denubis-hook-gh-fork-guard/
 │   └── denubis-hook-branch-bg/
 ├── CHANGELOG.md

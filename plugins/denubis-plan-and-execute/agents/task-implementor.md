@@ -87,7 +87,7 @@ Read the task specification. Identify:
 
 This is where you run the **full** test suite and linter — not the fast/debug command from TDD cycles.
 
-Find the test and lint commands in CLAUDE.md (or project config) and run them. For Python projects, use `uv run` for test commands (e.g. `uv run pytest`) and `uv run rtk` for lint commands (e.g. `uv run rtk ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
+Find the test and lint commands in CLAUDE.md (or project config) and run them. For Python projects, use `uv run` for test and lint commands (e.g. `uv run pytest`, `uv run ruff check .`). Never invoke bare `python3`, `pytest`, or `ruff`.
 
 Run and examine output:
 ```bash

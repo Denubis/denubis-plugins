@@ -124,8 +124,8 @@ This is NOT a transient error and retrying with the same budget will produce the
 **Recovery — check for checkpointed state before halting:**
 
 1. **For code-producing agents** (task-implementor, task-bug-fixer, refactoring-executor):
-   - Run `rtk git log -1 --oneline` to check for a WIP commit
-   - Run `rtk git diff --stat HEAD~1..HEAD` to see what work was preserved
+   - Run `git log -1 --oneline` to check for a WIP commit
+   - Run `git diff --stat HEAD~1..HEAD` to see what work was preserved
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
 2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review, coherence-reviewer):
@@ -780,7 +780,7 @@ Commit refactoring separately from implementation.
 
 **Print the full refactoring-executor response** (transparency rules).
 
-**If refactoring-executor returns null/empty:** Check for WIP commit (`rtk git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved. Ask the human whether to continue with the partial refactoring as-is, revert it, or proceed to final verification.
+**If refactoring-executor returns null/empty:** Check for WIP commit (`git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved. Ask the human whether to continue with the partial refactoring as-is, revert it, or proceed to final verification.
 
 ##### 3d.7: After refactoring (final verification)
 

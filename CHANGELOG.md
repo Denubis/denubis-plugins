@@ -1,5 +1,29 @@
 # Changelog
 
+## [denubis-hook-rtk-rewrite] REMOVED
+
+Plugin deleted. RTK (Rust Token Killer) ambient command-rewriting corrupted verbatim-read output — `rtk read --max-lines` cherry-picks non-contiguous lines, `rtk grep` reorders and caps results, `rtk find`/`ls` truncate file lists. RTK is no longer used anywhere in this marketplace. Removed the plugin directory, its test (`test_rtk_rewrite.bats`), and its architecture context doc.
+
+## [denubis-00-getting-started] 1.4.2
+
+Removes all RTK handling from `/setup` (supersedes 1.4.1 — there is no RTK plugin left to disable).
+
+**Changed:**
+- Step 2 no longer references `denubis-hook-rtk-rewrite` (deleted) in its enablement checks.
+- Removed the RTK wiring step (old 5d) and renumbered; the standalone-hook-removal step now exempts the approver (`approver.py`), which is intentionally standalone.
+
+## [denubis-plan-and-execute] 2.32.3
+
+Removes RTK from agent and skill commands so subagents never invoke the deleted `rtk` binary.
+
+**Changed:**
+- code-reviewer, task-implementor, task-bug-fixer, systematic-debugging, requesting-code-review, design-write, executing-an-implementation-plan, impl-plan-write: `rtk git …` → `git …`, `uv run rtk ruff …` → `uv run ruff …`.
+
+## [denubis-hook-claudemd-reminder] 1.1.3
+
+**Changed:**
+- `git-command-reminder` no longer matches `rtk`-prefixed git commands (RTK purged); regex simplified from `^(rtk\s+)?git\s+…` to `^git\s+…`. Removed the two `rtk`-specific tests.
+
 ## [denubis-00-getting-started] 1.4.1
 
 Stops `/setup` from re-enabling RTK ambient command-rewriting. RTK's output

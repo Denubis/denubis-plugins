@@ -68,8 +68,8 @@ Code Review Progress:
 **This is your primary input.** Run these commands first:
 
 ```bash
-rtk git diff --stat {BASE_SHA}..{HEAD_SHA}
-rtk git diff {BASE_SHA}..{HEAD_SHA}
+git diff --stat {BASE_SHA}..{HEAD_SHA}
+git diff {BASE_SHA}..{HEAD_SHA}
 ```
 
 Read the diff output carefully. This is what you are reviewing — nothing else unless a specific hunk is ambiguous without surrounding context.
@@ -83,7 +83,7 @@ Run the project's test and lint commands (find them in CLAUDE.md or project conf
 **For Python tooling: every invocation MUST be wrapped in `uv run`.** This is mandatory, not a default — examples:
 
 - Tests: `uv run pytest`
-- Lint: `uv run ruff check .` (or `uv run rtk ruff check .` if the project uses the rtk proxy)
+- Lint: `uv run ruff check .`
 - Type-check: `uv run ty check` / `uv run mypy`
 - Any other Python tool: `uv run <tool> ...`
 

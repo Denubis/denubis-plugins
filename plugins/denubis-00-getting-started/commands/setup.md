@@ -28,19 +28,16 @@ The denubis-plugins marketplace should be at `~/.claude/plugins/marketplaces/den
 
 ### 2. Verify all plugins are enabled
 
-Read `~/.claude/settings.json` and check that every plugin listed in `.claude-plugin/marketplace.json` has a corresponding `true` entry in `enabledPlugins` (except `denubis-00-getting-started` which may be `false`, and `denubis-hook-rtk-rewrite` which is intentionally `false` — see the RTK note at the end of this step).
+Read `~/.claude/settings.json` and check that every plugin listed in `.claude-plugin/marketplace.json` has a corresponding `true` entry in `enabledPlugins` (except `denubis-00-getting-started` which may be `false`).
 
 **Windows (Git Bash):** The following plugins should be **disabled** (`false`) because they require Unix-only tooling:
 - `denubis-hook-pretooluse-dispatcher`
-- `denubis-hook-rtk-rewrite`
 - `denubis-hook-gh-fork-guard`
 - `denubis-hook-branch-bg`
 
 If any of these are enabled on Windows, warn the user and offer to disable them.
 
-If any cross-platform plugins are missing, add them with `true` and tell the user what you added. **Do not** add or re-enable `denubis-hook-rtk-rewrite` — it is intentionally disabled (see RTK note below). If it is currently `true`, warn the user and offer to set it to `false`.
-
-**RTK note:** `denubis-hook-rtk-rewrite` ambient auto-rewriting is disabled by design. rtk corrupts verbatim-read output (`rtk read --max-lines` cherry-picks non-contiguous lines; `rtk grep` reorders and caps results; `rtk find`/`ls` truncate file lists). rtk is opt-in only — invoke it by hand for build/test/lint noise (`rtk err`, `rtk test`). See `~/.claude/RTK.md`. Leave this plugin `false`.
+If any cross-platform plugins are missing, add them with `true` and tell the user what you added.
 
 ### 3. Check version sync
 
@@ -88,23 +85,11 @@ Plugin hooks are auto-discovered. The dispatcher finds any enabled plugin with a
 mkdir -p ~/.claude/hooks/pretooluse-bash.d
 ```
 
-**5d. RTK is opt-in — do not wire it as an ambient hook:**
+**5d. Remove standalone PreToolUse:Bash hooks from settings.json:**
 
-rtk is invoked by hand only, for build/test/lint noise extraction (`rtk err`, `rtk test`). It is never an automatic command rewriter — its output corrupts verbatim-read commands (grep/find/ls/cat/head). See `~/.claude/RTK.md`.
+Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash` other than the approver (`approver.py`), which is intentionally standalone. The dispatcher replaces non-plugin rewrite hooks — any such entries must be removed or they will conflict. Remove them from settings.json (the dispatcher calls them via the drop directory instead).
 
-Do **not** symlink `rtk-rewrite.sh` into the drop directory, and do **not** add a `rtk hook claude` PreToolUse entry. If either already exists from a prior setup, remove it:
-- drop-dir symlink: `~/.claude/hooks/pretooluse-bash.d/50-rtk-rewrite`
-- native hook: a `PreToolUse` Bash entry running `rtk hook claude` in `~/.claude/settings.json`
-
-**5e. Remove standalone PreToolUse:Bash hooks from settings.json:**
-
-Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash`. The dispatcher replaces these — they must be removed or they will conflict. Specifically look for:
-- `rtk-rewrite.sh` registered directly in settings.json hooks
-- Any other PreToolUse:Bash entries
-
-Remove them from settings.json (the dispatcher calls them via the drop directory instead).
-
-**5f. Verify with diagnostics:**
+**5e. Verify with diagnostics:**
 
 Run the dispatcher's `--list` flag to verify all hooks are discovered correctly:
 ```bash

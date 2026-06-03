@@ -226,7 +226,7 @@ The design plan distinguishes between infrastructure phases (verified operationa
 
 **Infrastructure tasks** (project setup, config files, dependencies):
 - Don't force TDD on scaffolding
-- Verification = operational success (`uv sync`, `uv run rtk ruff check`)
+- Verification = operational success (`uv sync`, `uv run ruff check`)
 - **Verifies: None** — explicitly state this, don't invent ACs for setup phases
 
 **Functionality tasks** (code that does something):
@@ -928,7 +928,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
 Run: `uv sync`
 Expected: Dependencies install without errors
 
-Run: `uv run rtk ruff check .`
+Run: `uv run ruff check .`
 Expected: No lint errors
 
 **Step 3: Commit**
