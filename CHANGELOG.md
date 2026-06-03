@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-00-getting-started] 1.4.1
+
+Stops `/setup` from re-enabling RTK ambient command-rewriting. RTK's output
+filtering corrupts verbatim-read commands (grep/find/ls/cat/head); it is now
+opt-in only, invoked by hand for build/test/lint noise.
+
+**Changed:**
+- Step 2 treats `denubis-hook-rtk-rewrite` as intentionally disabled (no longer
+  flagged as a missing plugin to enable) and warns if it is `true`.
+- Step 5d no longer symlinks `rtk-rewrite.sh` into the dispatcher drop directory;
+  it now verifies RTK is *not* wired as an ambient hook. See `~/.claude/RTK.md`.
+
 ## [denubis-bibliography] 0.3.0
 
 Documents a confirm-gated path to fetch a missing paper into Zotero via the
