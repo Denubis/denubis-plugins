@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-bibliography] 0.4.0
+
+Adds `fetch.py`, a helper for the missing-paper fetch path. Resolving a human group + collection name into the numeric `groupID` and `collectionKey` that `add-item-by-id` needs used to be improvised as a multi-line `python3 -c "…"` block in bash, which broke on shell quoting. The helper does it in one tested call.
+
+**New:**
+- `fetch.py` — resolves `--group`/`--collection` (by name or numeric groupID) to a target and fetches via `add-item-by-id`. Pure functional core (`resolve_target`, `parse_add_item_response`) with 13 unit tests in `tests/test_bibliography_fetch.py`; thin httpx shell.
+- Structural confirm-gate: a bare run resolves and previews without writing; `--fetch` is required to write to the library. Unknown/ambiguous names list the available targets and exit non-zero.
+
+**Changed:**
+- SKILL.md "Fetching a missing paper" now drives resolution + fetch through `fetch.py` instead of raw curl plus hand-parsed JSON. `create-collection` remains a raw-curl escape hatch for new collections.
+
 ## [denubis-hook-rtk-rewrite] REMOVED
 
 Plugin deleted. RTK (Rust Token Killer) ambient command-rewriting corrupted verbatim-read output — `rtk read --max-lines` cherry-picks non-contiguous lines, `rtk grep` reorders and caps results, `rtk find`/`ls` truncate file lists. RTK is no longer used anywhere in this marketplace. Removed the plugin directory, its test (`test_rtk_rewrite.bats`), and its architecture context doc.
