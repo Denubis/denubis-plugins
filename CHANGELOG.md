@@ -1,5 +1,29 @@
 # Changelog
 
+## [denubis-bibliography] 0.3.0
+
+Documents a confirm-gated path to fetch a missing paper into Zotero via the
+`zotero-api-plus` plugin (v0.3.0+), closing the skill's long-standing "does not
+fetch papers" gap. Documentation-only in this plugin; the HTTP capability lives
+in the separate `zotero-api-plus` Zotero plugin.
+
+**New:**
+- SKILL.md "Fetching a missing paper" section: capability probe (`/api/plus`),
+  resolve-first dedup guard, target selection via `selected-collection` /
+  `libraries` / `create-collection`, and a mandatory HALT-and-confirm before any
+  write to the user's library. Per-item `pdf` status handling
+  (`present` / `fetched` / `unavailable` / `error`).
+
+**Changed:**
+- Removed the now-false "never fetches papers" / "does not fetch papers" claims.
+  Fetching is supported behind explicit confirmation when `zotero-api-plus` is
+  installed; paywalled papers with no open-access copy remain metadata-only.
+
+**Verified:**
+- End-to-end on `10.1007/s13347-024-00760-w` (Conradie & Nagel, CC-BY):
+  `create-collection` → `add-item-by-id` (PDF attached) → `ingest.py` rendered
+  24 pages via pymupdf4llm.
+
 ## [denubis-crash-recovery] 1.0.0
 
 First user-ready release. Identifies and resumes Claude Code sessions that ended abnormally (kernel kill, terminal disconnect, process crash). Combines liveness-file detection (via `denubis-plan-and-execute`'s patched wrapper, ≥2.32.2) with JSONL-tail-only heuristics; deterministic Python rule table classifies every session as `live`, `hard_crash`, `borderline`, `concluded`, or `irrecoverable`; SQLite at `~/.claude/crash-recovery.db` is the source of truth; `~/llm-resume.md` regenerates byte-identically from DB state.
