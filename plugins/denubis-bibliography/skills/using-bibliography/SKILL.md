@@ -1,8 +1,8 @@
 ---
 name: using-bibliography
-description: Use when the user wants to render a Zotero PDF into per-page markdown, or surface page-keyed blockquotes from a rendered paper. Reads from Zotero via Better BibTeX; never fetches papers.
+description: Use when the user wants to render a Zotero PDF into per-page markdown, or surface page-keyed blockquotes from a rendered paper. Reads from Zotero via Better BibTeX; optionally fetches a missing paper via zotero-api-plus behind explicit user confirmation.
 user-invocable: true
-last-reviewed: 2026-05-14
+last-reviewed: 2026-06-03
 ---
 
 # Using Bibliography
@@ -26,9 +26,13 @@ yet validated.
 
 **When NOT to use:**
 
-- Fetching papers from the internet — not implemented. The user adds papers
-  via the Zotero connector (which handles EZProxy, SSL, publisher quirks).
-  Only invoke this skill once the paper is in Zotero with a PDF attached.
+- Fetching papers from the internet — supported **only** when the
+  `zotero-api-plus` plugin is installed (v0.3.0+), and **only** behind explicit
+  user confirmation (see "Fetching a missing paper"). Even then, a paywalled
+  paper with no open-access copy comes back metadata-only; the Zotero connector
+  (EZProxy, SSL, publisher quirks) remains the path for those. Without the
+  plugin, the user adds papers via the connector and you render only what is
+  already in Zotero with a PDF attached.
 - Editing the user's permanent notes without explicit instruction — the
   zettelkasten's `AGENTS.md` rules apply (treat permanent notes as user IP;
   draft, don't assert).
@@ -79,6 +83,88 @@ re-runs skip cite keys whose SHA-prefix matches; pass `--force` to re-render.
 Verified end-to-end on 2026-05-11 against 8 methodology DOIs (Keshav 2007,
 Scherbakov 2025, Wohlin 2014, Arksey 2005, Levac 2010, Tricco 2018, Naeem
 2024, Magesh 2025). 8/8 succeeded.
+
+## Fetching a missing paper (requires zotero-api-plus)
+
+The pipeline below renders papers **already in Zotero**. When a paper is *not*
+in Zotero, the `zotero-api-plus` plugin (v0.3.0+) can fetch it by identifier and
+attach the PDF. This **WRITES to the user's library**, so it is gated on
+explicit confirmation. Without the plugin, fall back to the connector (see
+"When NOT to use").
+
+**Capability probe** — is the plugin present?
+
+```bash
+curl -sS --max-time 3 http://localhost:23119/api/plus
+# → "Zotero Local API Plus is running."   (anything else: not available, fall back)
+```
+
+**The flow — the HALT in step 3 is not optional:**
+
+1. **Confirm the paper is genuinely absent.** Resolve it first (`ingest.py`
+   prints `NOT FOUND in Zotero`, or run the surname→DOI-filter search). The
+   endpoint does **not** dedup — it always saves a new item — so fetching a
+   paper that is already present creates a duplicate (this is how a second
+   "Attention Is All You Need" appeared on 2026-06-02). Fetch only when
+   resolution returns nothing.
+
+2. **Choose the target collection — never assume one.**
+
+   ```bash
+   curl -sS http://localhost:23119/api/plus/selected-collection
+   # → {"name","key","libraryID","groupID"}  — the collection open in the UI
+   # → 500 "No Collection selected."         — nothing selected; pick explicitly
+   ```
+
+   List targets with `GET /api/plus/libraries` (My Library + every group, each
+   with `{key,name,parentKey}` collections and the group's `groupID`). Create a
+   new target idempotently:
+
+   ```bash
+   curl -sS -X POST http://localhost:23119/api/plus/create-collection \
+     -H 'Content-Type: application/json' \
+     -d '{"name":"<name>","groupID":<groupID, or omit for My Library>}'
+   # → {"created":true|false,"collection":{"key":"…",…}}
+   ```
+
+3. **HALT and confirm — both halves.** State exactly what will be written and
+   where: *"<title/DOI> is not in Zotero. Fetch it into <collection> (<library>)
+   and attach the PDF? This adds an item to your library."* Proceed only on an
+   explicit yes. **Do not infer consent** from an earlier "ingest these DOIs"
+   instruction — adding to the library is a distinct write the user has not yet
+   authorised.
+
+4. **Fetch.**
+
+   ```bash
+   curl -sS -X POST http://localhost:23119/api/plus/add-item-by-id \
+     -H 'Content-Type: application/json' \
+     -d '{"identifier":"<DOI/ISBN/PMID/arXiv>","groupID":<groupID?>,"collectionKey":"<key?>"}'
+   ```
+
+   → `{status,addedCount,titles[],items:[{title,key,pdf,attachmentID?}]}` (`404`
+   if nothing could be saved). Read each item's `pdf`:
+
+   - `present` — translator attached the PDF during this add. On disk; render.
+   - `fetched` — translator gave metadata only; the `addAvailableFile` fallback
+     attached an open-access PDF. On disk; render.
+   - `unavailable` — item added, **no PDF** (no OA copy; likely paywalled with no
+     institutional session). Tell the user; they attach via the connector, then
+     re-run the render.
+   - `error` — report verbatim; do not retry blindly.
+
+5. **Render** via the normal pipeline once a PDF is present. BBT may lag a few
+   seconds indexing the new item; if the first `ingest.py` run reports
+   `NOT FOUND`, retry once.
+
+**Batch (a list of DOIs):** resolve them all first, surface the
+missing-and-fetchable set as ONE list, confirm the set + target collection in a
+single prompt, then fetch the confirmed set and render. One confirmation for the
+batch — never silent per-item writes.
+
+**Verified end-to-end 2026-06-03:** `10.1007/s13347-024-00760-w` (Conradie &
+Nagel, CC-BY) — `create-collection` "test" in a group → `add-item-by-id`
+(`pdf: present`, PDF on disk) → `ingest.py` rendered 24 pages via pymupdf4llm.
 
 ## The proven workflow
 
@@ -484,7 +570,10 @@ quirks worth knowing:
 
 ## What this skill does NOT do (yet)
 
-- **Does not fetch papers.** Zotero is the only thing that talks to publishers.
+- **Fetches papers only via `zotero-api-plus` (v0.3.0+), behind confirmation.**
+  Without that plugin it does not fetch — the Zotero connector is the only thing
+  that talks to publishers. With it, see "Fetching a missing paper"; a paywalled
+  paper with no open-access copy still returns metadata-only.
 - **Does not build the central `references.bib`.** The zettelkasten's
   auto-build of `references.bib` from `[@key]` tokens in `permanent/` is
   designed but not implemented here.
@@ -599,3 +688,16 @@ discovery):
   `<label>:C:\path:application/pdf` shape; if Windows BBT emits something
   unexpected, the unit tests under `tests/test_bibliography_bbt.py` are
   the place to add the new case before another parser change.
+
+**2026-06-03 addendum** (zotero-api-plus fetch integration):
+
+- New section "Fetching a missing paper" documents the confirm-gated fetch path
+  via `zotero-api-plus` v0.3.0 (`add-item-by-id`, `create-collection`,
+  `libraries`, `selected-collection`). The skill no longer claims "never fetches
+  papers" — it fetches behind explicit confirmation when the plugin is present,
+  and resolves-first to avoid duplicates (the endpoint does not dedup).
+- Verified end-to-end on `10.1007/s13347-024-00760-w` (Conradie & Nagel,
+  CC-BY): `create-collection` "test" in the `bbs-cat-agent` group →
+  `add-item-by-id` (`pdf: present`, PDF on disk) → `ingest.py` rendered 24 pages
+  via pymupdf4llm. Endpoint contracts read from
+  `~/people/Brian/zotero-api-plus/src/addon.ts`, not transcribed from a summary.
