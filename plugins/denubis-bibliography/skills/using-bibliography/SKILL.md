@@ -252,6 +252,13 @@ uv run --with pymupdf4llm --with docling --with easyocr \
     python render.py "<absolute-pdf-path>" ~/zettelkasten/papers/<citekey>/
 ```
 
+> **PDF → text is ALWAYS this Python cascade. Never improvise.** Do not call
+> `pdftotext`, `pdf2txt`, `tesseract`, `ocrmypdf`, hand-run `pymupdf4llm`/docling,
+> or stand up an OCR tool by hand and write a one-off converter. The cascade
+> below handles the whole escalation, including GPU OCR. If it reports
+> `NEEDS MOCR`, confirm with the user and re-run with `--allow-mocr` — that is the
+> escalation path; there is no other.
+
 `render.py` and `ingest.py` both delegate to `renderer.py`, which tries
 renderers in cost order and uses the first whose output passes a quality
 check:
@@ -262,20 +269,31 @@ check:
 3. `docling` + EasyOCR (Apache-2.0, slowest, GPU-friendly) — handles
    scanned PDFs and old PDFWriter output with no text layer (e.g.
    Schraw 1994).
+4. `dots.mocr` (VLM OCR on a local vLLM server) — **confirm-gated, off by
+   default.** Only runs with `--allow-mocr`; for scanned books where even
+   docling+OCR drops too many pages (e.g. Polanyi's *Tacit Dimension*).
 
-Quality check fails a render if either:
+Quality check fails a render if any of:
 
-- more than 50% of pages have <50 chars of *real content* (no-text-layer
-  case). "Real content" is measured after stripping pymupdf4llm's
-  `==> picture [WxH] intentionally omitted <==` image placeholder, so a
-  page whose only content is one or more such markers correctly registers
-  as empty (Levenson 1973 case, added in 0.2.3).
+- more than **30%** of pages have <50 chars of *real content*. "Real content"
+  is measured after stripping pymupdf4llm's `==> picture [WxH] intentionally
+  omitted <==` image placeholder (Levenson 1973 case, 0.2.3). The gate was
+  tightened from 50% in 0.5.0: docling+OCR rendered Polanyi with 40/102 pages
+  near-empty (39%), losing ~46% of the book, and the old 50% gate let it pass.
 - U+FFFD ('replacement character') covers more than 0.5% of all chars
   (broken-encoding case).
 
-If every renderer fails the quality check (unlikely outside corrupt PDFs),
-`render.py` exits non-zero and `ingest.py` logs the paper as a per-paper
-failure rather than writing empty pages.
+When tiers 1–3 are exhausted, the render is **refused** (no lossy pages
+written):
+
+- **without `--allow-mocr`** → `render.py` exits `3` / `ingest.py` logs
+  `NEEDS MOCR`, reporting the near-empty fraction. Surface this to the user;
+  on a yes, re-run the *same command* with `--allow-mocr`.
+- **with `--allow-mocr`** → the cascade starts the `dots.mocr` vLLM server once,
+  OCRs every flagged paper, folds the result into the standard `papers/`
+  layout (`renderer: "mocr"`), and stops the server (freeing VRAM) on exit.
+  Requires a `[mocr]` section in `config.toml` (see Dependencies); inert and
+  reported if absent.
 
 Output (verified on 28-page Yim 2024 via pymupdf4llm and 16-page Schraw
 1994 via docling+OCR):
@@ -542,6 +560,22 @@ First docling install is heavy (~1-2 GB: torch + CUDA wheels + EasyOCR
 models) and cached afterward in `~/.cache/uv/`. EasyOCR English models
 download from JaidedAI on first OCR run (~50 MB).
 
+**mocr tier (optional, `--allow-mocr`).** The fourth renderer escalates to a
+local `dots.mocr` vLLM server — a machine-specific GPU deploy, not bundled. The
+plugin calls the deploy's own `dots-serve.fish` / `dots-ocr.fish` /
+`dots-stop.fish` wrappers, so configure its path in
+`~/.config/denubis-academic-research/config.toml`:
+
+```toml
+[mocr]
+repo = "~/people/Brian/dots.mocr"   # the dots.mocr deploy checkout
+# port = 8000                       # vLLM server port (default)
+# startup_timeout = 300             # seconds to wait for model load (default)
+```
+
+Without `[mocr]`, `--allow-mocr` is inert (reported, not silent). `dots.mocr`
+carries its own licence (see the deploy); it is invoked, never redistributed.
+
 License summary:
 
 - `pymupdf4llm` is **AGPL-3** — propagates to anything that ships it. Do
@@ -626,6 +660,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Reaching for PowerShell's `curl` to ping Zotero on Windows | `curl` in PowerShell is `Invoke-WebRequest` with different syntax; the `-sS --max-time` flags don't exist. Use `curl.exe ...` (real curl, shipped with Windows 10+) or `Invoke-RestMethod -Uri ... -TimeoutSec 3`. |
 | Running 0.2.1 or earlier on Windows and getting "no PDF attachment" for items that clearly have one | `parse_pdf_paths` in 0.2.1 and earlier collided with the Windows drive-letter colon (`C:\...`) and returned no path. Upgrade to 0.2.2+. |
 | Hand-writing a multi-line `python3 -c "…"` block in bash to dig a `collectionKey` out of `/api/plus/libraries` | That improvisation is what broke (shell mangled the multi-line quoting). Use `fetch.py --group … --collection …` — it resolves the key in one call and previews before writing. |
+| Reaching for `pdftotext`/`tesseract`/manual docling, or standing up an OCR tool by hand + a one-off converter, when a render looks bad | PDF→text is always the `renderer.py` cascade. On `NEEDS MOCR`, confirm with the user and re-run with `--allow-mocr` — the cascade drives the dots.mocr spinup/OCR/spindown and folds output into `papers/` itself. |
 
 ## Provenance
 
@@ -737,3 +772,29 @@ discovery):
   preview resolves `Bayesian / Methods` → key `VPN6BBUC` in group 6549571.
 - Endpoint and `pdf`-status contracts read from
   `~/people/Brian/zotero-api-plus/src/addon.ts` and `utils/pdf-status.ts`.
+
+**0.5.0** (DOI-in-paper-out + mocr escalation tier):
+
+- `fetch.py --fetch` now renders by default (DOI in → fetched item → per-page
+  markdown out), delegating to `ingest.py` in a subprocess so render deps stay
+  off the lightweight resolve/preview path. `--no-render` opts out. Verified
+  live: fetched COSMIN (`10.1007/s11136-018-1798-3`) → handed to `ingest.py`,
+  which resolved the PDF and produced an 11-page render.
+- Near-empty-page gate tightened 50% → 30% after the Polanyi *Tacit Dimension*
+  failure: docling+OCR came out 39% near-empty (40/102 pages, ~46% of the book
+  lost) and passed the old gate. Empirically grounded: clean renders sit at
+  0–3% near-empty, the bad docling render at 39%. Word-likeness was tried first
+  and discarded — the garbled docling output scored 0.96, *higher* than clean,
+  because the failure was lost pages, not garbled words.
+- Added the `dots.mocr` escalation tier (`renderer.mocr_server` + the `mocr`
+  branch in `render_pdf_with_fallback`). On cascade exhaustion the render is
+  refused (`NeedsMocr`, exit 3) unless `--allow-mocr`, which starts the vLLM
+  server once, OCRs, folds the combined `_nohf.md` into `papers/` via
+  `fold_mocr_markdown` (replacing the throwaway `convert_polanyi.py`), and stops
+  the server on exit. Calls the deploy's own fish wrappers; output contract read
+  from `dots_mocr/parser.py` + `tools/combine_markdown.py`, not assumed.
+- Live-verified end-to-end on 2026-06-04: `mocr_server` spun vLLM up, OCR'd
+  COSMIN (11 pages, 0 near-empty), folded, and stopped the server (VRAM freed),
+  total ~63 s. The run surfaced that dots.mocr's `_nohf.md` embeds a full-page
+  PNG atop each page (~86% of the file's bytes on COSMIN); `fold_mocr_markdown`
+  now strips those base64 data-images, keeping only the OCR text.
