@@ -182,3 +182,40 @@ def test_parse_404_raises_with_server_message():
 def test_parse_non_json_200_raises():
     with pytest.raises(fetch.FetchError):
         fetch.parse_add_item_response(200, "not json at all", "text/plain")
+
+
+# --- should_render -----------------------------------------------------------
+
+
+def test_should_render_present():
+    assert fetch.should_render("present") is True
+
+
+def test_should_render_fetched():
+    assert fetch.should_render("fetched") is True
+
+
+def test_should_render_unavailable():
+    # item added but no PDF on disk — nothing to render
+    assert fetch.should_render("unavailable") is False
+
+
+def test_should_render_error():
+    assert fetch.should_render("error") is False
+
+
+def test_should_render_unknown_status():
+    assert fetch.should_render("") is False
+    assert fetch.should_render("something-new") is False
+
+
+def test_renderable_dois_filters_to_pdf_bearing_items():
+    # Given add-item results keyed by DOI, only DOIs whose item has a
+    # renderable PDF should be selected for the render pass.
+    results = {
+        "10.1/present": {"items": [{"key": "A", "pdf": "present"}]},
+        "10.2/unavailable": {"items": [{"key": "B", "pdf": "unavailable"}]},
+        "10.3/fetched": {"items": [{"key": "C", "pdf": "fetched"}]},
+        "10.4/empty": {"items": []},
+    }
+    assert fetch.renderable_dois(results) == ["10.1/present", "10.3/fetched"]

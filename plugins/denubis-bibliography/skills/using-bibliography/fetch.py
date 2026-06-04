@@ -11,18 +11,24 @@ a pure function with unit tests.
 Usage (resolve + preview only — NO write):
     uv run fetch.py --group 6549571 --collection "Bayesian / Methods" 10.1007/s11136-018-1798-3
 
-Usage (actually write to the library — gated behind --fetch):
+Usage (DOI in, working paper out — fetch then render, gated behind --fetch):
     uv run fetch.py --group 6549571 --collection "Bayesian / Methods" --fetch 10.1007/s11136-018-1798-3
+
+With --fetch the item is written to the library and then rendered to per-page
+markdown under <zettelkasten_root>/papers/<citekey>/ (via ingest.py). Pass
+--no-render to fetch without rendering.
 
 Target selection:
   --group           group name OR numeric groupID. Omit for My Library.
   --collection      collection name within the resolved library.
   --collection-key  explicit collection key (bypasses name resolution; use this
                     when --collection reports an ambiguous name).
+  --no-render       fetch only; skip the render step.
 
-The default run resolves and previews the target without writing. add-item-by-id
-does NOT deduplicate, so confirm each identifier is genuinely absent from Zotero
-(e.g. `ingest.py` prints NOT FOUND) before re-running with --fetch.
+The default run (no --fetch) resolves and previews the target without writing.
+add-item-by-id does NOT deduplicate, so confirm each identifier is genuinely
+absent from Zotero (e.g. `ingest.py` prints NOT FOUND) before re-running with
+--fetch.
 
 Endpoint contracts read from ~/people/Brian/zotero-api-plus/src/addon.ts and
 utils/pdf-status.ts, not transcribed from documentation.
@@ -39,6 +45,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 # httpx is imported lazily inside the shell functions (probe_plus / get_libraries
 # / add_item) so the functional core stays importable without the PEP 723 deps —
@@ -47,6 +54,13 @@ from dataclasses import dataclass
 PLUS_PROBE = "http://localhost:23119/api/plus"
 LIBRARIES_ENDPOINT = "http://localhost:23119/api/plus/libraries"
 ADD_ITEM_ENDPOINT = "http://localhost:23119/api/plus/add-item-by-id"
+
+# A fetched item is worth rendering only when a PDF is actually on disk.
+RENDERABLE_PDF_STATUSES = ("present", "fetched")
+# Rendering reuses ingest.py (DOI -> per-page markdown) via a subprocess, so its
+# heavy deps (pymupdf4llm/docling/easyocr) load in their own uv env and never
+# burden the lightweight resolve/preview path.
+INGEST_SCRIPT = Path(__file__).resolve().parent / "ingest.py"
 
 
 # --- Functional core (pure, unit-tested) ------------------------------------
@@ -183,6 +197,25 @@ def parse_add_item_response(status_code: int, body: str, content_type: str) -> d
     raise FetchError(f"add-item-by-id failed ({status_code}): {body.strip()}")
 
 
+def should_render(pdf_status: str) -> bool:
+    """A fetched item is worth rendering only when a PDF is on disk."""
+    return pdf_status in RENDERABLE_PDF_STATUSES
+
+
+def renderable_dois(results: dict) -> list[str]:
+    """Select DOIs whose add-item result has at least one renderable PDF.
+
+    `results` maps a fetched DOI to its parsed add-item-by-id response. Input
+    order is preserved so the render pass follows fetch order.
+    """
+    out: list[str] = []
+    for doi, res in results.items():
+        items = res.get("items", []) if isinstance(res, dict) else []
+        if any(should_render(it.get("pdf", "")) for it in items):
+            out.append(doi)
+    return out
+
+
 # --- Imperative shell (HTTP) ------------------------------------------------
 
 
@@ -226,6 +259,46 @@ def add_item(identifier: str, group_id: int | None, collection_key: str | None) 
     )
 
 
+def render_dois(
+    dois: list[str], *, allow_mocr: bool = False, retries: int = 1, retry_wait: float = 4.0
+) -> int:
+    """Render freshly fetched papers by delegating to ingest.py (DOI -> per-page
+    markdown under <zettelkasten_root>/papers/<citekey>/).
+
+    Runs ingest.py in a subprocess so its render dependencies resolve in their
+    own uv environment. BBT can lag a few seconds indexing a just-added item, so
+    a failed run is retried once. `allow_mocr` is passed through to ingest.py.
+    Returns ingest.py's exit code (0 = success).
+    """
+    import subprocess
+    import time
+
+    cmd = ["uv", "run", str(INGEST_SCRIPT)]
+    if allow_mocr:
+        cmd.append("--allow-mocr")
+    cmd += dois
+    attempt = 0
+    while True:
+        print(f"\n=== render {dois} (via ingest.py) ===", flush=True)
+        proc = subprocess.run(cmd)
+        if proc.returncode == 0:
+            return 0
+        attempt += 1
+        if attempt > retries:
+            print(
+                f"  render failed (ingest.py exit {proc.returncode}). The item "
+                "may still be indexing in BBT; re-run the render once it appears.",
+                flush=True,
+            )
+            return proc.returncode
+        print(
+            f"  ingest.py exit {proc.returncode}; retrying in {retry_wait:.0f}s "
+            "(BBT may still be indexing the new item)",
+            flush=True,
+        )
+        time.sleep(retry_wait)
+
+
 def _print_target(target: ResolvedTarget, identifiers: list[str]) -> None:
     print("=== resolved target ===", flush=True)
     if target.group_id is not None:
@@ -261,6 +334,18 @@ def main() -> int:
         "--fetch",
         action="store_true",
         help="Write to the library. Without it, only resolves the target and previews.",
+    )
+    parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="After --fetch, do NOT render. Default is to render each fetched "
+        "paper to per-page markdown via ingest.py.",
+    )
+    parser.add_argument(
+        "--allow-mocr",
+        action="store_true",
+        help="Pass through to the render step: permit GPU escalation to dots.mocr "
+        "when the cascade can't produce a usable render.",
     )
     args = parser.parse_args()
 
@@ -299,6 +384,7 @@ def main() -> int:
         )
         return 0
 
+    results_by_doi: dict = {}
     failures = 0
     for ident in args.identifiers:
         print(f"\n=== fetch {ident} ===", flush=True)
@@ -313,6 +399,7 @@ def main() -> int:
             print("  no items added", flush=True)
             failures += 1
             continue
+        results_by_doi[ident] = result
         for item in items:
             print(
                 f"  added: {item.get('title')!r} (key {item.get('key')}) "
@@ -325,8 +412,27 @@ def main() -> int:
                     flush=True,
                 )
 
-    print(f"\n=== summary: {len(args.identifiers) - failures} ok, {failures} failed ===")
-    return 1 if failures else 0
+    to_render = renderable_dois(results_by_doi)
+    render_rc = 0
+    if args.no_render:
+        if to_render:
+            print(f"\n--no-render: skipping render of {to_render}", flush=True)
+    elif to_render:
+        render_rc = render_dois(to_render, allow_mocr=args.allow_mocr)
+    elif results_by_doi:
+        print(
+            "\nNothing to render — no PDF landed on disk for the fetched items.",
+            flush=True,
+        )
+
+    render_note = ""
+    if not args.no_render and to_render:
+        render_note = f", render {'ok' if render_rc == 0 else 'FAILED'}"
+    print(
+        f"\n=== summary: {len(args.identifiers) - failures} fetched, "
+        f"{failures} failed{render_note} ==="
+    )
+    return 1 if (failures or render_rc) else 0
 
 
 if __name__ == "__main__":
