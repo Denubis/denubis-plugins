@@ -1,7 +1,7 @@
 {
     "name": "denubis-bibliography",
     "description": "Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations. WIP — documents only the workflow proven end-to-end so far.",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

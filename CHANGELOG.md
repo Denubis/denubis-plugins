@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-bibliography] 0.5.0
+
+DOI in, working paper out — `fetch.py` now renders by default — plus a `dots.mocr` GPU escalation tier for scanned books the docling cascade can't handle.
+
+**New:**
+- `fetch.py --fetch` renders each fetched paper to per-page markdown by default (delegating to `ingest.py`); `--no-render` opts out.
+- Fourth renderer tier: `dots.mocr` (local vLLM VLM-OCR), confirm-gated behind `--allow-mocr`. The cascade starts the server once, OCRs, folds output into the standard `papers/` layout (`renderer.fold_mocr_markdown`, `renderer.mocr_server`), and stops the server on exit. Configured via a `[mocr]` section in `config.toml`; inert if absent.
+- `--allow-mocr` plumbed through `render.py`, `ingest.py`, and `fetch.py`.
+
+**Changed:**
+- Near-empty-page quality gate tightened from 50% to 30%. The Polanyi *Tacit Dimension* docling+OCR render came out 39% near-empty (~46% of the book lost) and silently passed the old gate. On cascade exhaustion a render is now refused (`NeedsMocr`, `render.py` exit 3) rather than writing lossy pages; re-run with `--allow-mocr` to escalate.
+- SKILL.md: explicit directive that PDF→text is always the Python cascade (never `pdftotext`/manual OCR/hand-rolled mocr); `[mocr]` config docs; common-mistakes row.
+
 ## [denubis-bibliography] 0.4.0
 
 Adds `fetch.py`, a helper for the missing-paper fetch path. Resolving a human group + collection name into the numeric `groupID` and `collectionKey` that `add-item-by-id` needs used to be improvised as a multi-line `python3 -c "…"` block in bash, which broke on shell quoting. The helper does it in one tested call.
