@@ -26,13 +26,14 @@ import hashlib
 import json
 import sys
 import tomllib
+from contextlib import nullcontext
 from pathlib import Path
 
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bbt import parse_pdf_paths  # noqa: E402
-from renderer import render_pdf_with_fallback  # noqa: E402
+from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback  # noqa: E402
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -54,7 +55,15 @@ def load_config() -> dict:
             f"zettelkasten_root does not exist on disk: {zk}\n"
             "Create the directory first; this script will not create it silently."
         )
-    return {"zettelkasten_root": zk}
+    result: dict = {"zettelkasten_root": zk}
+    mocr = cfg.get("mocr")
+    if isinstance(mocr, dict) and mocr.get("repo"):
+        result["mocr"] = {
+            "repo": Path(mocr["repo"]).expanduser(),
+            "port": int(mocr.get("port", 8000)),
+            "startup_timeout": float(mocr.get("startup_timeout", 300)),
+        }
+    return result
 
 
 def rpc(method: str, params: list, timeout: float = 30.0):
@@ -165,19 +174,30 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
     return m.get("sha256_prefix") == expected
 
 
-def render_pdf(pdf: Path, out_dir: Path) -> dict:
-    """Render PDF -> markdown with auto-escalation (pymupdf4llm -> docling -> +OCR).
+def render_pdf(pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_session=None) -> dict:
+    """Render PDF -> markdown with auto-escalation (pymupdf4llm -> docling ->
+    +OCR -> mocr when allowed).
 
-    Returns the meta dict written to meta.json. Raises RuntimeError if every
-    renderer's output fails the quality check.
+    Returns the meta dict written to meta.json. Raises NeedsMocr if the cascade
+    is exhausted and mocr is not enabled; RuntimeError if a render genuinely
+    fails (including mocr).
     """
-    return render_pdf_with_fallback(pdf, out_dir)
+    return render_pdf_with_fallback(
+        pdf, out_dir, allow_mocr=allow_mocr, mocr_session=mocr_session
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dois", nargs="*", help="DOIs to ingest. Use '-' to read from stdin.")
     parser.add_argument("--force", action="store_true", help="Re-render even if cached output is current.")
+    parser.add_argument(
+        "--allow-mocr",
+        action="store_true",
+        help="Permit GPU escalation to dots.mocr when the cascade cannot produce "
+        "a usable render. Starts the vLLM server once and stops it after. "
+        "Requires a [mocr] section in config.toml.",
+    )
     args = parser.parse_args()
 
     if args.dois == ["-"]:
@@ -199,43 +219,65 @@ def main() -> int:
         sys.exit(f"user.groups failed: {e}")
     library_map = {g["name"]: g["id"] for g in groups}
 
+    mocr_cfg = cfg.get("mocr")
+    if args.allow_mocr and not mocr_cfg:
+        print(
+            "  --allow-mocr given but [mocr] is not configured in config.toml; "
+            "escalation unavailable.",
+            flush=True,
+        )
+    if args.allow_mocr and mocr_cfg:
+        mocr_ctx = mocr_server(
+            mocr_cfg["repo"],
+            port=mocr_cfg["port"],
+            startup_timeout=mocr_cfg["startup_timeout"],
+        )
+    else:
+        mocr_ctx = nullcontext(None)
+
     successes = 0
     failures = 0
     skipped = 0
 
-    for doi in dois:
-        print(f"\n=== {doi} ===", flush=True)
-        try:
-            item = find_by_doi(doi)
-            if item is None:
-                print("  NOT FOUND in Zotero", flush=True)
+    with mocr_ctx as mocr_session:
+        for doi in dois:
+            print(f"\n=== {doi} ===", flush=True)
+            try:
+                item = find_by_doi(doi)
+                if item is None:
+                    print("  NOT FOUND in Zotero", flush=True)
+                    failures += 1
+                    continue
+                citekey = item["citation-key"]
+                library = item["library"]
+                print(f"  cite key: {citekey}", flush=True)
+                print(f"  library:  {library}", flush=True)
+                pdf = resolve_pdf(item, library_map)
+                if pdf is None:
+                    print("  no PDF attachment in this item", flush=True)
+                    failures += 1
+                    continue
+                if not pdf.is_file():
+                    print(f"  PDF path on disk missing: {pdf}", flush=True)
+                    failures += 1
+                    continue
+                out = papers_dir / citekey
+                if not args.force and current_render_matches(out, pdf):
+                    print(f"  cache current — skipped (use --force to re-render)", flush=True)
+                    skipped += 1
+                    continue
+                meta = render_pdf(
+                    pdf, out, allow_mocr=args.allow_mocr, mocr_session=mocr_session
+                )
+                label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
+                print(f"  rendered {meta['page_count']} pages via {label} → {out}", flush=True)
+                successes += 1
+            except NeedsMocr as e:
+                print(f"  NEEDS MOCR: {e}", flush=True)
                 failures += 1
-                continue
-            citekey = item["citation-key"]
-            library = item["library"]
-            print(f"  cite key: {citekey}", flush=True)
-            print(f"  library:  {library}", flush=True)
-            pdf = resolve_pdf(item, library_map)
-            if pdf is None:
-                print("  no PDF attachment in this item", flush=True)
+            except Exception as e:
+                print(f"  ERROR: {e}", flush=True)
                 failures += 1
-                continue
-            if not pdf.is_file():
-                print(f"  PDF path on disk missing: {pdf}", flush=True)
-                failures += 1
-                continue
-            out = papers_dir / citekey
-            if not args.force and current_render_matches(out, pdf):
-                print(f"  cache current — skipped (use --force to re-render)", flush=True)
-                skipped += 1
-                continue
-            meta = render_pdf(pdf, out)
-            label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
-            print(f"  rendered {meta['page_count']} pages via {label} → {out}", flush=True)
-            successes += 1
-        except Exception as e:
-            print(f"  ERROR: {e}", flush=True)
-            failures += 1
 
     print(f"\n=== summary: {successes} rendered, {skipped} cached, {failures} failed ===")
     return 0 if failures == 0 else 1
