@@ -340,22 +340,26 @@ _NEVER_MATCH_BOOT_ID = "00000000-0000-0000-0000-000000000000"
 
 
 def _pick_dead_pid() -> int:
-    """Return a PID guaranteed not to be alive.
+    """Return a PID guaranteed not to be alive — now and for the whole run.
 
-    Walks ``/proc`` to collect every numeric entry (every running PID) and
-    returns one greater than the maximum. The kernel hasn't assigned this
-    number to a process yet, so ``kill -0`` against it produces
+    Returns one greater than ``/proc/sys/kernel/pid_max``. The kernel never
+    assigns a PID above that ceiling, so ``kill -0`` always raises
     ``ProcessLookupError`` → ``pid_alive`` returns ``False``.
 
-    Fallback to a high constant ``999_999`` if ``/proc`` isn't readable
-    (e.g. someone runs the suite on non-Linux). The constant is still
-    almost-certainly dead but the ``/proc`` walk is the tight bound.
+    The previous implementation returned ``max(/proc PIDs) + 1`` — which is
+    precisely the PID the kernel is about to hand to the next ``fork()``. On a
+    busy test run (subprocess-spawning tests, concurrent ``uv`` invocations) a
+    freshly-spawned process could claim that PID before the scan's liveness
+    check ran, so a ``pid_alive=False`` session read as *live* — an
+    order-dependent flake. A PID above ``pid_max`` can never collide.
+
+    Fallback to ``2**22 + 1`` if ``pid_max`` isn't readable (non-Linux).
     """
     try:
-        pids = [int(name) for name in os.listdir("/proc") if name.isdigit()]
-    except OSError:
-        return 999_999
-    return max(pids) + 1 if pids else 999_999
+        with open("/proc/sys/kernel/pid_max") as f:
+            return int(f.read().strip()) + 1
+    except (OSError, ValueError):
+        return 2**22 + 1
 
 
 def _iso_ts(epoch: int) -> str:

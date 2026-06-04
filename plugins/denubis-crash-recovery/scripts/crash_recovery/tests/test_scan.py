@@ -37,6 +37,22 @@ from fixtures.jsonl_builder import (
 )
 
 
+def test_pick_dead_pid_is_truly_dead_and_above_pid_max():
+    """Regression: a `pid_alive=False` fixture PID must never collide with a
+    real process. `_pick_dead_pid` used to return max(/proc PIDs)+1 — the next
+    PID the kernel hands out — so a subprocess spawned by another test could
+    claim it and the 'dead' session read as live (order-dependent flake). It
+    must now sit above pid_max, which the kernel can never assign."""
+    from fixtures.jsonl_builder import _pick_dead_pid
+
+    pid = _pick_dead_pid()
+    with open("/proc/sys/kernel/pid_max") as f:
+        pid_max = int(f.read().strip())
+    assert pid > pid_max
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
 def _init_db(db_dir: Path) -> Path:
     """Create the DB file and apply schema; return the path."""
     db_path = db_dir / "crash-recovery.db"
