@@ -18,6 +18,8 @@
 - <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8>
 - <https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices>
 - Rubric-for-rubrics draft: `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (R3, R5, R7, R10 cost-gate)
+- <https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool> (added by 2026-06-10 post-GREEN addendum: advisor pairing pattern and cost-gate protection)
+- <https://platform.claude.com/docs/en/build-with-claude/effort> (added by 2026-06-10 post-GREEN addendum: effort parameter, task budgets)
 
 ---
 

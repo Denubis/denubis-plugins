@@ -222,7 +222,7 @@ Do not jump into implementation or change files unless clearly instructed. When 
 
 ## Overengineering Prevention
 
-Current Opus and Fable models tend to overengineer — adding files, abstractions, or unrequested tidying, especially at higher effort. Include this when needed (per-model specifics in [`model-tier-notes.md`](model-tier-notes.md)):
+Current Opus 4.8 and Fable 5 models tend to overengineer — adding files, abstractions, or unrequested tidying, especially at higher effort (verified 2026-06-10; per-model specifics in [`model-tier-notes.md`](model-tier-notes.md) → Cross-model patterns):
 
 ```markdown
 Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
