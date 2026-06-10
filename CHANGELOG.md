@@ -1,5 +1,257 @@
 # Changelog
 
+## [denubis-bibliography] 0.5.0
+
+DOI in, working paper out — `fetch.py` now renders by default — plus a `dots.mocr` GPU escalation tier for scanned books the docling cascade can't handle.
+
+**New:**
+- `fetch.py --fetch` renders each fetched paper to per-page markdown by default (delegating to `ingest.py`); `--no-render` opts out.
+- Fourth renderer tier: `dots.mocr` (local vLLM VLM-OCR), confirm-gated behind `--allow-mocr`. The cascade starts the server once, OCRs, folds output into the standard `papers/` layout (`renderer.fold_mocr_markdown`, `renderer.mocr_server`), and stops the server on exit. Configured via a `[mocr]` section in `config.toml`; inert if absent.
+- `--allow-mocr` plumbed through `render.py`, `ingest.py`, and `fetch.py`.
+
+**Changed:**
+- Near-empty-page quality gate tightened from 50% to 30%. The Polanyi *Tacit Dimension* docling+OCR render came out 39% near-empty (~46% of the book lost) and silently passed the old gate. On cascade exhaustion a render is now refused (`NeedsMocr`, `render.py` exit 3) rather than writing lossy pages; re-run with `--allow-mocr` to escalate.
+- SKILL.md: explicit directive that PDF→text is always the Python cascade (never `pdftotext`/manual OCR/hand-rolled mocr); `[mocr]` config docs; common-mistakes row.
+
+## [denubis-bibliography] 0.4.0
+
+Adds `fetch.py`, a helper for the missing-paper fetch path. Resolving a human group + collection name into the numeric `groupID` and `collectionKey` that `add-item-by-id` needs used to be improvised as a multi-line `python3 -c "…"` block in bash, which broke on shell quoting. The helper does it in one tested call.
+
+**New:**
+- `fetch.py` — resolves `--group`/`--collection` (by name or numeric groupID) to a target and fetches via `add-item-by-id`. Pure functional core (`resolve_target`, `parse_add_item_response`) with 13 unit tests in `tests/test_bibliography_fetch.py`; thin httpx shell.
+- Structural confirm-gate: a bare run resolves and previews without writing; `--fetch` is required to write to the library. Unknown/ambiguous names list the available targets and exit non-zero.
+
+**Changed:**
+- SKILL.md "Fetching a missing paper" now drives resolution + fetch through `fetch.py` instead of raw curl plus hand-parsed JSON. `create-collection` remains a raw-curl escape hatch for new collections.
+
+## [denubis-hook-rtk-rewrite] REMOVED
+
+Plugin deleted. RTK (Rust Token Killer) ambient command-rewriting corrupted verbatim-read output — `rtk read --max-lines` cherry-picks non-contiguous lines, `rtk grep` reorders and caps results, `rtk find`/`ls` truncate file lists. RTK is no longer used anywhere in this marketplace. Removed the plugin directory, its test (`test_rtk_rewrite.bats`), and its architecture context doc.
+
+## [denubis-00-getting-started] 1.4.2
+
+Removes all RTK handling from `/setup` (supersedes 1.4.1 — there is no RTK plugin left to disable).
+
+**Changed:**
+- Step 2 no longer references `denubis-hook-rtk-rewrite` (deleted) in its enablement checks.
+- Removed the RTK wiring step (old 5d) and renumbered; the standalone-hook-removal step now exempts the approver (`approver.py`), which is intentionally standalone.
+
+## [denubis-plan-and-execute] 2.32.3
+
+Removes RTK from agent and skill commands so subagents never invoke the deleted `rtk` binary.
+
+**Changed:**
+- code-reviewer, task-implementor, task-bug-fixer, systematic-debugging, requesting-code-review, design-write, executing-an-implementation-plan, impl-plan-write: `rtk git …` → `git …`, `uv run rtk ruff …` → `uv run ruff …`.
+
+## [denubis-hook-claudemd-reminder] 1.1.3
+
+**Changed:**
+- `git-command-reminder` no longer matches `rtk`-prefixed git commands (RTK purged); regex simplified from `^(rtk\s+)?git\s+…` to `^git\s+…`. Removed the two `rtk`-specific tests.
+
+## [denubis-00-getting-started] 1.4.1
+
+Stops `/setup` from re-enabling RTK ambient command-rewriting. RTK's output
+filtering corrupts verbatim-read commands (grep/find/ls/cat/head); it is now
+opt-in only, invoked by hand for build/test/lint noise.
+
+**Changed:**
+- Step 2 treats `denubis-hook-rtk-rewrite` as intentionally disabled (no longer
+  flagged as a missing plugin to enable) and warns if it is `true`.
+- Step 5d no longer symlinks `rtk-rewrite.sh` into the dispatcher drop directory;
+  it now verifies RTK is *not* wired as an ambient hook. See `~/.claude/RTK.md`.
+
+## [denubis-bibliography] 0.3.0
+
+Documents a confirm-gated path to fetch a missing paper into Zotero via the
+`zotero-api-plus` plugin (v0.3.0+), closing the skill's long-standing "does not
+fetch papers" gap. Documentation-only in this plugin; the HTTP capability lives
+in the separate `zotero-api-plus` Zotero plugin.
+
+**New:**
+- SKILL.md "Fetching a missing paper" section: capability probe (`/api/plus`),
+  resolve-first dedup guard, target selection via `selected-collection` /
+  `libraries` / `create-collection`, and a mandatory HALT-and-confirm before any
+  write to the user's library. Per-item `pdf` status handling
+  (`present` / `fetched` / `unavailable` / `error`).
+
+**Changed:**
+- Removed the now-false "never fetches papers" / "does not fetch papers" claims.
+  Fetching is supported behind explicit confirmation when `zotero-api-plus` is
+  installed; paywalled papers with no open-access copy remain metadata-only.
+
+**Verified:**
+- End-to-end on `10.1007/s13347-024-00760-w` (Conradie & Nagel, CC-BY):
+  `create-collection` → `add-item-by-id` (PDF attached) → `ingest.py` rendered
+  24 pages via pymupdf4llm.
+
+## [denubis-crash-recovery] 1.0.0
+
+First user-ready release. Identifies and resumes Claude Code sessions that ended abnormally (kernel kill, terminal disconnect, process crash). Combines liveness-file detection (via `denubis-plan-and-execute`'s patched wrapper, ≥2.32.2) with JSONL-tail-only heuristics; deterministic Python rule table classifies every session as `live`, `hard_crash`, `borderline`, `concluded`, or `irrecoverable`; SQLite at `~/.claude/crash-recovery.db` is the source of truth; `~/llm-resume.md` regenerates byte-identically from DB state.
+
+**New:**
+- `crash-recovery` CLI with nine subcommands: `init`, `scan`, `render`, `triage`, `regenerate`, `note`, `history`, `prune`, `list-live`.
+- `denubis-crash-recovery:triage` skill orchestrates scan + annotation prompt + gated prune.
+- SQLite schema: `sessions`, `scan_runs`, `classification_history` with `classifier_version` column for forward-compat re-classification.
+- Deterministic rule table; one assertion per row via parametrised tests.
+- Atomic resume-file write (`tempfile + os.replace`).
+
+**Requires:**
+- `denubis-plan-and-execute ≥ 2.32.2` for the wrapper patch.
+- Linux for the `scan` subcommand: it reads `/proc/sys/kernel/random/boot_id` for reboot detection and exits with code 2 on non-Linux platforms. The remaining subcommands (`init`, `render`, `triage`, `note`, `history`, `prune`, `list-live`) are filesystem/DB-only and run anywhere — but `triage` invokes `scan` internally, so the practical effect is "this plugin needs Linux".
+
+**Out of scope (future plans):**
+- byobu/tmux-resurrect helpers.
+- OOM-hardening for the wrapper itself.
+- LLM judgement on borderline cases (deterministic rules only; user annotates manually via `crash-recovery note`).
+- Automatic pruning (explicit `prune --dry-run` then `--confirm` only).
+
+## [denubis-plan-and-execute] 2.32.2
+
+Wrapper patch: claude-wrapper.sh now writes a per-PID liveness file at `~/.claude/run/<pid>.live` containing `cwd`, `started`, `argv`, and `boot_id` at startup; on clean exit (status 0) or Ctrl-C (status 130), the file is removed. Any other exit status leaves the file in place. This is the writer side of the denubis-crash-recovery plugin's session triage; install both plugins together for the full crash-recovery workflow.
+
+**Changed:**
+- `claude-wrapper.sh`: write `~/.claude/run/$$.live` at startup (atomic via temp+mv), inspect Claude's exit status post-invocation, conditionally remove the liveness file.
+- `claude-wrapper.sh`: the post-session transcript-archive prompt ("Press Enter to archive transcript") now fires only on clean Claude exit (status 0). Previously, abnormal exits (SIGKILL 137, SIGSEGV 139, generic non-zero 1, Ctrl-C 130) silently bypassed the prompt because `set -euo pipefail` aborted the wrapper before reaching it; making the cleanup block reachable for non-zero exits required adding `|| EXIT_CODE=$?` to the claude invocation, which also made the transcript-archive block reachable. The exit-0 gate preserves the previous effective behaviour intentionally.
+
+**Compatibility:**
+- The wrapper itself runs cross-platform: on non-Linux hosts the `cat /proc/sys/kernel/random/boot_id` falls through to `echo unknown`, so the wrapper writes `boot_id=unknown` rather than crashing.
+- `crash-recovery scan` (the reader side, in the `denubis-crash-recovery` plugin) is Linux-only by design — it exits with code 2 and a clear error on non-Linux platforms. The wrapper-side fallback exists so that the `denubis-plan-and-execute` plugin remains usable on macOS / BSD for the rest of its features.
+- `crash-recovery scan` also refuses to run when `CRASH_RECOVERY_RUN_DIR` is on a network or union filesystem (NFS, CIFS, sshfs, FUSE-family, etc.) because the atomic-rename semantics liveness-file writes depend on are not guaranteed there. The wrapper itself does NOT make this check — it just writes the file; the reader-side guard catches the unsafe configuration before any scan-time damage.
+- `CRASH_RECOVERY_RUN_DIR` env-var overrides the default `~/.claude/run/` path (used in tests, and as the workaround for users whose `$HOME` is network-mounted).
+
+## [denubis-bibliography] 0.2.3
+
+Cascade now catches image-only pages that pymupdf4llm renders as placeholder markers. Discovered when Levenson 1973 (`10.1037/h0035357`, J. Consulting and Clinical Psychology) needed a manual `docling+OCR` one-off under 0.2.2 — the paper's 8 pages were emitted as `**==> picture [W x H] intentionally omitted <==**` markers, which are ~50 chars and slipped just above the empty-page threshold, so the cascade did not escalate.
+
+**Fixed:**
+- `renderer.quality_assessment` now strips pymupdf4llm's `==> picture [WxH] intentionally omitted <==` placeholder before measuring page content length. A page whose only content is one or more such markers correctly registers as empty and triggers cascade escalation. Real pages with embedded image markers (e.g. Vanlissa 2024 page 1, with three markers in 1908 chars of real content) still pass — only the marker-only case changes behaviour.
+
+**New:**
+- `tests/test_bibliography_renderer.py` — 14 unit tests covering empty pages, marker-only pages, marker+content pages, multi-marker pages, U+FFFD ratio (Stephens 2000 regression), and threshold edges.
+- `SKILL.md` — quality-check description updated to explain the marker-stripping; provenance addendum records the discovery.
+
+**Verified:**
+- Existing unit tests for `bbt.parse_pdf_paths` and skill descriptions still pass (485 tests in the python suite).
+- Heuristic is renderer-specific: docling and EasyOCR don't emit image placeholders for image-only pages (they produce actual empty pages, which the existing heuristic catches).
+
+## [denubis-bibliography] 0.2.2
+
+Defensive Windows hardening ahead of a colleague's first run on Windows. No behaviour change on Linux/macOS.
+
+**Fixed:**
+- `parse_pdf_paths` did not handle Windows drive-letter colons. The BBT `file = {label:path:mime}` field on Windows contains `C:\Users\...`, whose colon collided with the previous naive `split(":")`. Symptom on 0.2.0–0.2.1: `ingest.py` reported `no PDF attachment in this item` for items that clearly had a PDF. Parser now handles both unescaped (`C:\...`) and BibLaTeX-escaped (`C\:\...`) forms, plus forward-slash variants (`C:/...`).
+
+**New:**
+- `bbt.py` — Better BibTeX parsing helpers, extracted from `ingest.py` so the parser is unit-testable without httpx or a running Zotero. Single public function so far (`parse_pdf_paths`); add to it when BBT formats change.
+- `tests/test_bibliography_bbt.py` — 14 unit tests covering Linux/macOS, Windows unescaped, Windows escaped, forward-slash variants, multi-attachment entries (PDF + HTML snapshot), multiple PDFs per item, case variations, and negative cases.
+- `SKILL.md` — new **Platform notes** section documenting PowerShell quirks (`curl.exe`/`Invoke-RestMethod` instead of BSD `curl`; `Get-Content` for stdin batch DOIs; drive-letter colon handling), plus two new Common-mistakes rows for the PowerShell `curl` alias and the 0.2.1-on-Windows symptom.
+
+**Untested:**
+- Windows is still not exercised end-to-end. Hardening done defensively from the Linux side based on parser mental-simulation. If Windows BBT emits a shape the tests don't cover, add it to `tests/test_bibliography_bbt.py` before re-tuning the parser.
+
+## [denubis-bibliography] 0.2.1
+
+Patch: `ingest.py`'s PEP 723 dependency block was missing `easyocr`, so the docling+OCR fallback path crashed with `ImportError: EasyOCR is not installed` whenever the cascade escalated past docling-no-OCR. Caught when `ingest.py 10.1006/ceps.1994.1033` (Schraw 1994) reached the OCR step in a fresh uv environment.
+
+**Fixed:**
+- `ingest.py` — `dependencies = [..., "easyocr"]` added to the PEP 723 block. Verified by re-running the Schraw DOI end-to-end through ingest.py: `1 rendered, 0 cached, 0 failed`.
+
+The 0.2.0 release was only manually verified via `render.py` invoked with `--with easyocr` explicitly; the ingest.py path was not exercised end-to-end before release.
+
+## [denubis-bibliography] 0.2.0
+
+Auto-escalating renderer cascade. PDFs that pymupdf4llm can't handle — Unicode-replacement-character output (Stephens 2000) or no-text-layer scans (Schraw 1994) — now fall back automatically to docling, then docling+OCR, without the user dropping into one-off shell scripts.
+
+**New:**
+- `renderer.py` — shared rendering module with quality heuristic (>50% near-empty pages or >0.5% U+FFFD chars triggers escalation) and cascade orchestrator `render_pdf_with_fallback`. `render.py` and `ingest.py` both delegate to it, removing the previously duplicated render block.
+- docling+EasyOCR fallback path. `EasyOcrOptions(lang=["en"])` pinned explicitly because recent docling builds default to RapidOCR (downloads ONNX models from `modelscope.cn`; unreliable outside China).
+- `meta.json` schema additions: `renderer` (`pymupdf4llm` or `docling`), `ocr` (bool), and `renderer_note` (only when escalation fired; records the chain). Pre-existing fields (`source_pdf`, `page_count`, `sha256_prefix`) are unchanged.
+- `SKILL.md` — "auto-escalating cascade" section under Render. New Dependencies subsection documents docling + easyocr install (~1-2 GB first run; cached afterward), Apache-2.0 licence summary, and the EasyOCR pin rationale.
+- `SKILL.md` — three new Common-mistakes rows: treating OCR substitutions as faithful transcription, assuming docling defaults to EasyOCR, bypassing the cascade and silently rendering empty pages.
+
+**Changed:**
+- `ingest.py` PEP 723 dependency block adds `docling`.
+- `render.py` is now a thin CLI entry into `renderer.render_pdf_with_fallback`.
+- Render-failure semantics: previously, a PDF with no text layer silently produced 16 empty `.md` files. Now, if every renderer fails the quality check, `render.py` exits non-zero and `ingest.py` logs the paper as a per-paper failure.
+
+**Verified:**
+- Schraw 1994 (`schrawAssessingMetacognitiveAwareness1994`) — 1980s Acrobat PDFWriter PDF, no embedded text layer. pymupdf4llm and docling-no-OCR both produced 16/16 empty pages; docling+OCR produced 43 KB of clean text across 16 pages, structurally usable for quote location.
+- Regression: Arksey & O'Malley 2005 still renders via pymupdf4llm on the first try (`renderer: pymupdf4llm`, `ocr: false` in `meta.json`); no spurious escalation.
+
+## [denubis-bibliography] 0.1.1
+
+Documentation patch from the BJET-RR 42-paper rendering pass on 2026-05-12. No behaviour changes; closes a workflow gap that was sending the user to the Zotero UI when the on-disk bib looked stale.
+
+**New:**
+- `SKILL.md` — "Refreshing the on-disk bib" section. Documents BBT's HTTP pull-export endpoint (`curl http://localhost:23119/better-bibtex/library?/<libraryID>/library.biblatex`) as the on-demand refresh path. Explicit note that BBT JSON-RPC has no `autoexport.run`-style method, verified against the published method list at <https://retorque.re/zotero-better-bibtex/exporting/json-rpc/>. Output is byte-identical to BBT's auto-export — verified against `2026-bbs-jt-em-bjet-AI-metacognitive-1` (libraryID 27, 42 entries, 47 KB).
+- `SKILL.md` — four new Common-mistakes rows: bouncing the user to the Zotero UI for a stale auto-export refresh; assuming the first `item.search` hit is the canonical copy when items live in multiple libraries; Wiley chapter DOIs (`10.1002/<book>.chN`) failing `ingest.py` because Crossref returns empty `author` for them; giving up on `blockquote.py` NO MATCH without trying adjusted substrings (Unicode apostrophes, HTML-rendered table cells, paraphrases).
+- `SKILL.md` — Provenance addendum noting the 2026-05-12 BJET-RR session and the empirical scope (35 articles + 8 burst chapter PDFs + 7 late adds = 42 papers, 0 render failures).
+
+## [denubis-crash-recovery] 0.1.0
+
+New plugin. Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders `~/llm-resume.md`. This release ships the plugin scaffold, SQLite schema, and `crash-recovery init` subcommand. Subsequent phases land the classification rule table, scan/render/note/prune subcommands, the triage skill, and the wrapper patch in `denubis-plan-and-execute`.
+
+**New:**
+- `plugins/denubis-crash-recovery/` plugin scaffold (plugin.json, LICENSE, README).
+- `crash-recovery` CLI (typer-based) with `init` subcommand creating `~/.claude/crash-recovery.db` (overridable via `CRASH_RECOVERY_DB`).
+- SQLite schema for `sessions`, `scan_runs`, `classification_history` tables; WAL journal mode set persistently in init.
+## [denubis-bibliography] 0.1.0
+
+New plugin. Renders PDFs from a Zotero corpus to per-page markdown so future Claude sessions can engage with paper content via verified, page-keyed blockquotes. WIP — documents only what has been proven end-to-end.
+
+**New:**
+- `using-bibliography` skill: cite-key → BBT lookup → PDF file path → per-page markdown render under `~/zettelkasten/papers/<citekey>/`. Hard preconditions documented (Zotero running, BBT loaded, config + zettelkasten present, `pymupdf4llm` installed).
+- `ingest.py`: PEP 723 self-contained CLI. Takes DOIs, resolves first-author surname via Crossref (BBT search does not index DOIs), filters BBT search results by exact DOI, exports BibLaTeX, parses the `file = {…}` field, renders idempotently with SHA-prefix cache. `--force` to re-render. Verified end-to-end on 8 methodology DOIs (Keshav 2007, Scherbakov 2025, Wohlin 2014, Arksey 2005, Levac 2010, Tricco 2018, Naeem 2024, Magesh 2025).
+- `render.py` and `blockquote.py`: standalone single-purpose utilities. `blockquote.py` exits non-zero with `NO MATCH` rather than fabricating a quote, per Magesh & Scherbakov span-verification grounding.
+- Documented note-creation process: literature-note template (per-project, in git) and permanent-note template (central zettelkasten, in git). Wikilinks for note↔note, pandoc cite syntax for note→source. Two-bib resolution at pandoc render time.
+- Bootstrap-in-fresh-project section: skill prompts user with the BBT auto-export setup steps rather than silently creating directories.
+
+**Known gaps (explicit in SKILL.md):**
+- No paper fetching — Zotero is the only thing that talks to publishers.
+- No auto-build of central `~/zettelkasten/references.bib` (designed only).
+- No `note new` command — literature notes are written by hand from the template.
+- No post-hoc quote verification across an existing note.
+- No SSL bypass for EZProxy (designed: dated stamp file in project dir).
+
+## [denubis-git-commit] 1.2.1
+
+Tune commit-splitting guidance to concern-driven rather than file-count.
+
+**Changed:**
+- `commit` skill: replaced file-count splitting table (1-2 = 1 commit, 3-4 = 2 commits, 5+ = 3+ commits) with concern-driven guidance. A 30-file refactor doing one thing is one commit; two unrelated fixes in one file are two commits.
+
+## [denubis-extending-claude] 1.7.2
+
+Shorten skill descriptions to reduce skill-listing budget pressure.
+
+**Changed:**
+- 6 skill descriptions tightened to ~110-170 chars: `creating-a-plugin`, `maintaining-a-marketplace`, `maintaining-project-context`, `testing-skills-with-subagents`, `writing-claude-md-files`, `writing-skills`. Triggers preserved; trailing rationale clauses dropped.
+
+## [denubis-plan-and-execute] 2.32.1
+
+Shorten skill descriptions to reduce skill-listing budget pressure; remove scholar name-drops and parenthetical enumerations.
+
+**Changed:**
+- 22 skill descriptions tightened. Notable cuts: `using-ast-grep` (378→176), `systematic-debugging` (345→120, drops Toulmin), `critical-peer-review` (310→159), `impl-plan-write` (273→148), `restate-our-assumptions` (258→162, drops Popper/Lakatos/Haraway), `exec-refactoring-rubric` (drops Mantyla/Fowler). Triggers preserved; trailing rationale and technique-name dropping removed since user-side trigger words don't include scholar surnames.
+
+## [denubis-research-agents] 1.1.1
+
+Shorten skill descriptions to reduce skill-listing budget pressure.
+
+**Changed:**
+- 3 skill descriptions tightened: `investigating-a-codebase` (309→136), `researching-on-the-internet` (297→138), `using-research-agents` (226→171, fixes parenthetical enumeration).
+
+## [denubis-plan-and-execute] 2.32.0
+
+Bound the code-review fix loop to a single re-review cycle, then HALT for user direction. The previous unbounded "review → fix → re-review until zero issues" loop generated runaway agent ceremony for tiny edits.
+
+**Changed:**
+- `requesting-code-review` skill: at most one fix-then-re-review cycle, then HALT. Four user-resolution options on HALT: fix-now (user-authorised), defer to a future phase plan (mark review complete and append issues to the named plan file), accept remaining issues, or halt for discussion.
+- `code-reviewer` agent: writes findings to `code-review-findings-{SCOPE}.md` (e.g. `phase-2`, `pre-merge`, `plan-validation`) in the plan directory so per-scope findings coexist rather than clobbering each other. Re-review mode reads `PRIOR_FINDINGS_FILE` and reports each prior issue as Resolved / Partially resolved / Unresolved.
+- `code-reviewer` agent: Python tooling MUST be wrapped in `uv run` (e.g. `uv run pytest`, `uv run ruff check`); bare invocations are forbidden.
+- `executing-an-implementation-plan` skill: per-phase and pre-merge review sections updated to call the bounded skill with `SCOPE: phase-N` / `SCOPE: pre-merge`. Removed the now-unreachable three-strike rule. Test analysis (5b) gates on terminal outcome rather than strict zero-issues so accept/defer paths still proceed to test coverage.
+- `impl-plan-write` skill: plan-validation finalization uses the bounded one-cycle behaviour with `SCOPE: plan-validation`. Step 3 finalization completes on terminal outcome rather than strict zero-issues.
+
 ## [denubis-plan-and-execute] 2.31.0
 
 Revise `exec-session-naming` skill: structured slug format with project code, verb-noun slot, issue number, and phase; anti-drift pane targeting so tmux window names no longer get schmeared onto the focused window.

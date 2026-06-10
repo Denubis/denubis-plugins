@@ -1,7 +1,7 @@
 ---
 name: exec-session-naming
 family: executing-an-implementation-plan,starting-an-implementation-plan,starting-a-design-plan,systematic-debugging
-description: Build a compact structured session slug (person/project:verb-noun:#issue:Pphase) and rename the current tmux pane's window, with anti-drift pane targeting
+description: Use when starting an implementation, design, or debugging session - builds a structured slug and renames the current tmux pane's window
 user-invocable: false
 ---
 

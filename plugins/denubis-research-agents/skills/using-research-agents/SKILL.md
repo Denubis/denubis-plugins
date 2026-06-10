@@ -1,6 +1,6 @@
 ---
 name: using-research-agents
-description: Use when dispatching research agents - covers agent selection (internet, codebase, combined, remote-code), academic research protocol with bibliography workflow and DOI citations, and anti-patterns for citation without reading
+description: Use when dispatching research agents - covers agent selection across internet/codebase/combined/remote-code, academic research protocol with DOI citations, and anti-patterns
 user-invocable: false
 ---
 

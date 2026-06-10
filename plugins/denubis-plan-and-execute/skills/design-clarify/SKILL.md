@@ -1,7 +1,7 @@
 ---
 name: design-clarify
 family: starting-a-design-plan
-description: Use after initial design context is gathered, before brainstorming - resolves contradictions in requirements, disambiguates terminology, clarifies scope boundaries, and verifies assumptions to prevent building the wrong solution
+description: Use after design context is gathered, before brainstorming - resolves requirement contradictions, disambiguates terminology, and clarifies scope
 user-invocable: false
 ---
 

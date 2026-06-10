@@ -1,6 +1,6 @@
 ---
 name: controlled-dependency-upgrade
-description: Use when upgrading Python dependencies, auditing unused packages, or reviewing dependency health - methodical one-at-a-time upgrade cycle with changelog review, falsifiable justification audit, and per-package commits using uv
+description: Use when upgrading Python dependencies or auditing dependency health - one-at-a-time uv cycle with changelog review and per-package commits
 user-invocable: true
 ---
 

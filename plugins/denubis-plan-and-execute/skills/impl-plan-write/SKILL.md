@@ -1,7 +1,7 @@
 ---
 name: impl-plan-write
 family: starting-an-implementation-plan
-description: Use when design is complete and you need detailed implementation tasks for engineers with zero codebase context - creates comprehensive implementation plans with exact file paths, complete code examples, and verification steps assuming engineer has minimal domain knowledge
+description: Use when design is complete and you need detailed implementation tasks - produces plans with exact file paths, code examples, and verification steps
 user-invocable: false
 ---
 
@@ -226,7 +226,7 @@ The design plan distinguishes between infrastructure phases (verified operationa
 
 **Infrastructure tasks** (project setup, config files, dependencies):
 - Don't force TDD on scaffolding
-- Verification = operational success (`uv sync`, `uv run rtk ruff check`)
+- Verification = operational success (`uv sync`, `uv run ruff check`)
 - **Verifies: None** — explicitly state this, don't invent ACs for setup phases
 
 **Functionality tasks** (code that does something):
@@ -928,7 +928,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
 Run: `uv sync`
 Expected: Dependencies install without errors
 
-Run: `uv run rtk ruff check .`
+Run: `uv run ruff check .`
 Expected: No lint errors
 
 **Step 3: Commit**
@@ -1016,7 +1016,7 @@ These are violations of the skill requirements:
 | "Functionality phase but design forgot tests" | Surface to user. Functionality needs tests. Design gap, not your call to skip. |
 | "Plan looks complete, skip validation" | Always validate. Gaps found now are cheaper than gaps found during execution. |
 | "Validation is overkill for simple plans" | Simple plans validate quickly. Complex plans need it more. Always validate. |
-| "Finalization task is done, minor issues can wait" | NO. Task says "fix ALL issues including minor ones." Not done until zero issues. |
+| "Finalization task is done, minor issues can wait" | NO. Fix ALL issues — including Minor ones — in the first cycle. Finalization completes only when the bounded review reaches a terminal outcome (zero issues or a user-chosen resolution path), never by silently skipping the bug-fixer's first pass. |
 | "I'll skip creating granular tasks, one per phase is enough" | Granular tasks survive compaction. Create NA, NB, NC, ND per phase + Finalization. |
 | "Dependencies are obvious, don't need addBlockedBy" | Task list shows blocked status. Set dependencies explicitly with TaskUpdate. |
 | "Relative paths are fine in task descriptions" | After compaction, context is lost. Use absolute paths so tasks are self-contained. |
@@ -1115,10 +1115,11 @@ Which approach should I take?
 
 **Finalization (after all phase ND tasks completed):**
 - [ ] Mark Finalization task as in_progress
-- [ ] Dispatch code-reviewer to validate plan against design
-- [ ] Fix ALL issues including Minor ones
-- [ ] Re-run code-reviewer until APPROVED with zero issues
-- [ ] Mark Finalization task as completed
+- [ ] Dispatch code-reviewer to validate plan against design (SCOPE: `plan-validation`)
+- [ ] Fix ALL issues including Minor ones from the initial review
+- [ ] Re-run code-reviewer once to verify fixes (one cycle only — same SCOPE, PRIOR_FINDINGS_FILE pointing at `code-review-findings-plan-validation.md`)
+- [ ] If re-review finds anything unresolved or new, **HALT and present to the user** (options: fix now / accept remaining / halt for discussion). Do NOT auto-loop.
+- [ ] Mark Finalization task as completed when zero issues or user-chosen resolution path is taken
 - [ ] Proceed to Test Requirements
 
 **Test Requirements (after Finalization):**
@@ -1187,15 +1188,21 @@ After all phase D tasks are completed, mark the Finalization task as in_progress
   - MISALIGNMENTS: [list any divergence from design]
   - ISSUES: [Critical/Important/Minor issues in the plan itself]
   - ASSESSMENT: APPROVED / NEEDS_REVISION
+
+  SCOPE: plan-validation
+
+  Per the agent's standard protocol, write your full findings to
+  `code-review-findings-plan-validation.md` in the plan directory. Re-review
+  cycles will read this file rather than re-deriving issues.
 </parameter>
 </invoke>
 ```
 
-### Step 2: Fix ALL issues (including minor ones)
+### Step 2: Fix ALL issues (including minor ones) — first cycle
 
-**CRITICAL: You MUST fix ALL issues, including Minor ones.**
+**CRITICAL: In the first fix cycle, you MUST fix ALL issues including Minor ones.** The HALT introduced after re-review is not licence to silently skip Minor issues from the initial review — those still get fixed in the bug-fixer pass.
 
-Do NOT rationalize skipping minor issues. Do NOT mark Finalization as completed until ALL issues are resolved.
+Do NOT rationalize skipping minor issues during the first fix cycle. Mark Finalization complete only when the review reaches a terminal outcome: zero issues after the one re-review, or a user-chosen resolution path (fix-now / accept / halt-for-discussion).
 
 **If reviewer returns NEEDS_REVISION or reports ANY issues:**
 
@@ -1215,9 +1222,9 @@ Do NOT rationalize skipping minor issues. Do NOT mark Finalization as completed 
 3. Fix ALL of them - Critical, Important, AND Minor
 4. Update the relevant phase files
 5. Mark each fix task complete as you address it
-6. Re-run code-reviewer validation
-7. If more issues found, create new individual fix tasks and repeat
-8. Mark "Re-review" complete when zero issues
+6. Re-run code-reviewer validation **once** — pass `SCOPE: plan-validation` and `PRIOR_FINDINGS_FILE: <path to code-review-findings-plan-validation.md>` so it verifies against the recorded findings rather than starting fresh
+7. **HALT after the re-review.** If anything is unresolved or new, present the updated findings file to the user and ask which option they want: (a) another fix cycle (user-authorised), (b) accept the remaining issues as out-of-scope, or (c) halt for discussion. Do NOT auto-dispatch a third reviewer pass.
+8. Mark "Re-review" complete when the user-chosen resolution path concludes (zero issues, accepted, or explicit halt)
 
 **Common rationalizations to REJECT:**
 - "Minor issues can be fixed during execution" - NO. Fix them now.
@@ -1226,7 +1233,11 @@ Do NOT rationalize skipping minor issues. Do NOT mark Finalization as completed 
 
 ### Step 3: Complete finalization
 
-**Only when code-reviewer returns APPROVED with zero issues:**
+**When the bounded review reaches a terminal outcome:**
+
+- Zero issues on initial review, OR
+- Zero issues on the one re-review, OR
+- User-chosen resolution path resolved (fix-now cycle completed, issues accepted, or halt-for-discussion concluded with explicit direction).
 
 Mark the Finalization task as completed.
 

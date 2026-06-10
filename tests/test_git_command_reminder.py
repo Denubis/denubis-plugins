@@ -50,16 +50,6 @@ class TestMatchingCommands:
         _, output = _run(_bash_input("git log --stat"))
         assert output is not None
 
-    def test_rtk_git_status(self):
-        """rtk-rewritten commands should still match."""
-        _, output = _run(_bash_input("rtk git status"))
-        assert output is not None
-        assert "additionalContext" in output["hookSpecificOutput"]
-
-    def test_rtk_git_log(self):
-        _, output = _run(_bash_input("rtk git log"))
-        assert output is not None
-
 
 # ---------------------------------------------------------------------------
 # Commands that should NOT trigger the reminder

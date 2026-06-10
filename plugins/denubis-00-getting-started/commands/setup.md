@@ -32,7 +32,6 @@ Read `~/.claude/settings.json` and check that every plugin listed in `.claude-pl
 
 **Windows (Git Bash):** The following plugins should be **disabled** (`false`) because they require Unix-only tooling:
 - `denubis-hook-pretooluse-dispatcher`
-- `denubis-hook-rtk-rewrite`
 - `denubis-hook-gh-fork-guard`
 - `denubis-hook-branch-bg`
 
@@ -86,26 +85,11 @@ Plugin hooks are auto-discovered. The dispatcher finds any enabled plugin with a
 mkdir -p ~/.claude/hooks/pretooluse-bash.d
 ```
 
-**5d. Set up RTK (if installed):**
+**5d. Remove standalone PreToolUse:Bash hooks from settings.json:**
 
-Check if `rtk` is installed by running `rtk --version` via Bash. If not found, warn:
+Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash` other than the approver (`approver.py`), which is intentionally standalone. The dispatcher replaces non-plugin rewrite hooks — any such entries must be removed or they will conflict. Remove them from settings.json (the dispatcher calls them via the drop directory instead).
 
-> RTK is not installed. RTK (Rust Token Killer) reduces token usage by 60-90% on dev tool output. Install from https://github.com/rtk-ai/rtk
-
-If installed, verify `~/.claude/hooks/rtk-rewrite.sh` exists, then symlink it into the drop directory:
-```bash
-ln -sf ~/.claude/hooks/rtk-rewrite.sh ~/.claude/hooks/pretooluse-bash.d/50-rtk-rewrite
-```
-
-**5e. Remove standalone PreToolUse:Bash hooks from settings.json:**
-
-Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash`. The dispatcher replaces these — they must be removed or they will conflict. Specifically look for:
-- `rtk-rewrite.sh` registered directly in settings.json hooks
-- Any other PreToolUse:Bash entries
-
-Remove them from settings.json (the dispatcher calls them via the drop directory instead).
-
-**5f. Verify with diagnostics:**
+**5e. Verify with diagnostics:**
 
 Run the dispatcher's `--list` flag to verify all hooks are discovered correctly:
 ```bash

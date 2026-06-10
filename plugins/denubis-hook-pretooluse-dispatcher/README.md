@@ -23,18 +23,18 @@ Only plugins enabled in `settings.json` are discovered.
 
 ### 2. Drop directory (manual)
 
-`~/.claude/hooks/pretooluse-bash.d/` — for non-plugin hooks (e.g., rtk-rewrite.sh). Numeric prefix = priority:
+`~/.claude/hooks/pretooluse-bash.d/` — for non-plugin hooks. Numeric prefix = priority:
 
 ```
 ~/.claude/hooks/pretooluse-bash.d/
-  50-rtk-rewrite       # Symlink to ~/.claude/hooks/rtk-rewrite.sh
+  50-my-hook           # Symlink to ~/.claude/hooks/my-hook.sh
 ```
 
 ## Priority Ranges
 
 - **00-19:** Security and safety hooks (deny takes priority)
 - **20-49:** Validation and advisory hooks
-- **50-79:** Optimisation hooks (rtk, output filtering)
+- **50-79:** Optimisation and output-filtering hooks
 - **80-99:** Logging and telemetry hooks
 
 ## Merge Rules
@@ -73,7 +73,7 @@ The `/setup` command handles this automatically. Manual setup:
 2. For non-plugin hooks, create the drop directory and add entries:
    ```bash
    mkdir -p ~/.claude/hooks/pretooluse-bash.d
-   ln -sf ~/.claude/hooks/rtk-rewrite.sh ~/.claude/hooks/pretooluse-bash.d/50-rtk-rewrite
+   ln -sf /path/to/hook.sh ~/.claude/hooks/pretooluse-bash.d/50-my-hook
    ```
 
 3. For plugin hooks, add `hooks/pretooluse-bash.sh` to your plugin with a `# dispatcher-priority:` comment. The dispatcher discovers it automatically when the plugin is enabled.

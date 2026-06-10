@@ -1,6 +1,6 @@
 ---
 name: restate-our-assumptions
-description: Use for periodic review of dependency assumptions, when dependency-rationale.md may be stale, or before major releases - applies Popper (falsification), Lakatos (research programmes), and Haraway (situated knowledge) to each dependency with codebase evidence
+description: Use for periodic review of dependency assumptions or before major releases - applies falsification, research-programme analysis, and situated-knowledge questions
 user-invocable: true
 ---
 

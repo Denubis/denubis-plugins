@@ -1,6 +1,6 @@
 ---
 name: merge-to-main
-description: Use when merging a feature branch to main locally - discovers project test commands, runs all gates before AND after merge, cleans up branch and worktree; blocks on any test failure to prevent broken main
+description: Use when merging a feature branch to main locally - runs all test gates before AND after merge, blocks on failure
 user-invocable: true
 disable-model-invocation: true
 ---

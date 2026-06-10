@@ -213,7 +213,7 @@ Claude Code accumulates one-off permission entries in `~/.claude/settings.json` 
 ### What to Keep
 
 - **Generic command patterns:** `Bash(git add:*)`, `Bash(uv run *)`, `Bash(gh pr create:*)`, etc.
-- **Workflow infrastructure:** Workflow state scripts, claude-sync commands, rtk commands
+- **Workflow infrastructure:** Workflow state scripts, claude-sync commands
 - **MCP tools for active plugins:** `mcp__plugin_context7_context7__*`
 - **System tools:** `Bash(ls:*)`, `Bash(grep:*)`, `Bash(find:*)`, etc.
 - **Commonly used tool chains:** LaTeX, pandoc, libreoffice if project uses them

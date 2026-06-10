@@ -72,6 +72,21 @@ class TestGitLocation:
         assert result.is_on_main is False
         assert result.is_worktree is False
 
+    def test_result_is_independent_of_process_cwd(self, git_repo, tmp_path, monkeypatch):
+        # Regression: git_location must depend only on its cwd arg. Previously
+        # it resolved git's relative `--git-common-dir` output against
+        # os.getcwd(), so running from a directory with its own .git made every
+        # foreign repo look like a worktree.
+        trap = tmp_path / "trap"
+        trap.mkdir()
+        subprocess.run(["git", "init", "-b", "main", str(trap)], check=True, capture_output=True)
+        monkeypatch.chdir(trap)
+
+        result = git.git_location(str(git_repo))
+        assert result.display == git_repo.name
+        assert result.is_on_main is True
+        assert result.is_worktree is False
+
 
 class TestGitChanges:
     def test_no_changes_returns_zero(self, git_repo):

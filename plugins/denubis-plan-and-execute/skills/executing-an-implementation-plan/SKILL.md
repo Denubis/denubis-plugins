@@ -1,6 +1,6 @@
 ---
 name: executing-an-implementation-plan
-description: Use when executing implementation plans with independent tasks in the current session - dispatches fresh subagent for each task, reviews once per phase, loads phases just-in-time to minimize context usage
+description: Use when executing an implementation plan in the current session - dispatches a fresh subagent per task and reviews once per phase
 user-invocable: true
 ---
 
@@ -10,7 +10,7 @@ Execute plan phase-by-phase, loading each phase just-in-time to minimize context
 
 **Core principle:** Red-Green-Refactor at the macro level. Read one phase → execute all tasks → review + UAT (Green) → refactor → move to next phase. Never load all phases upfront.
 
-**REQUIRED SKILL:** `requesting-code-review` - The review loop (dispatch, fix, re-review until zero issues)
+**REQUIRED SKILL:** `requesting-code-review` - Bounded review (dispatch → fix → one re-review → HALT for user direction if anything remains; never auto-loops a third pass)
 
 ## Anti-Pattern: "I Think This Should Work"
 
@@ -124,8 +124,8 @@ This is NOT a transient error and retrying with the same budget will produce the
 **Recovery — check for checkpointed state before halting:**
 
 1. **For code-producing agents** (task-implementor, task-bug-fixer, refactoring-executor):
-   - Run `rtk git log -1 --oneline` to check for a WIP commit
-   - Run `rtk git diff --stat HEAD~1..HEAD` to see what work was preserved
+   - Run `git log -1 --oneline` to check for a WIP commit
+   - Run `git diff --stat HEAD~1..HEAD` to see what work was preserved
    - If a WIP commit exists, the agent made partial progress — report what was saved
 
 2. **For analysis agents** (code-reviewer, test-analyst, smell-assessor, critical-peer-review, coherence-reviewer):
@@ -532,20 +532,18 @@ The phase changed too much for a single review. Chunk the review:
 </invoke>
 ```
 
-3. **Mark "Fix issues" complete**, then re-review per the `requesting-code-review` skill.
+3. **Mark "Fix issues" complete**, then re-review per the `requesting-code-review` skill (pass `SCOPE: phase-N` so the findings file is `code-review-findings-phase-N.md`).
 
-4. **If re-review finds more issues**, create new fix/re-review tasks. Continue loop until zero issues.
+4. **The skill performs at most one re-review cycle, then HALTs.** If the re-review reports any unresolved or new issues, the skill presents the user with options: fix now (user-authorised), defer to a future phase plan (mark this review complete and append issues to the named plan file), accept remaining issues, or halt for discussion. Do NOT loop further without user direction.
 
-5. **Mark "Re-review" complete** when zero issues.
+5. **Mark "Re-review" complete** when the skill returns a terminal outcome (zero issues, or user-chosen resolution path).
 
-**Plan execution policy (stricter than general code review):**
-- ALL issues must be fixed (Critical, Important, AND Minor)
-- Ignore APPROVED/BLOCKED status - count issues only
-- **Three-strike rule:** If same issues persist after three review cycles, stop and ask human for help
+**Plan execution policy:**
+- The bounded one-cycle behaviour is owned by `requesting-code-review`. Don't reintroduce a "continue until zero" loop here.
+- Defer-to-future-phase is a valid resolution: the user names which plan file to append the issues to; once appended, the current code review is complete.
+- Accept-remaining is a valid resolution when the user explicitly accepts the issues as out-of-scope or false positives.
 
-**Minor issues are NOT optional.** Do not rationalize skipping them with "they're just style issues" or "we can fix those later." The reviewer flagged them for a reason. Fix every single one.
-
-**Exit condition:** Zero issues in all categories — including Minor.
+**Minor issues remain non-optional within a single fix cycle.** The bug-fixer must address every Minor issue from the initial review. The HALT is about not auto-dispatching a *second* fix cycle without user input — not about quietly dropping Minor issues from the first cycle.
 
 Mark "Phase Nc: Code review" as complete.
 
@@ -782,7 +780,7 @@ Commit refactoring separately from implementation.
 
 **Print the full refactoring-executor response** (transparency rules).
 
-**If refactoring-executor returns null/empty:** Check for WIP commit (`rtk git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved. Ask the human whether to continue with the partial refactoring as-is, revert it, or proceed to final verification.
+**If refactoring-executor returns null/empty:** Check for WIP commit (`git log -1 --oneline`). If WIP commit exists, partial refactoring was applied. Report to human with what was saved. Ask the human whether to continue with the partial refactoring as-is, revert it, or proceed to final verification.
 
 ##### 3d.7: After refactoring (final verification)
 
@@ -961,12 +959,13 @@ Use the `requesting-code-review` skill for final code review:
 - HEAD_SHA: current commit
 - IMPLEMENTATION_GUIDANCE: absolute path (if exists)
 - AC_COVERAGE_CHECK: "Verify all acceptance criteria (using scoped format `{slug}.AC*`) from the design plan are covered by at least one phase. Flag any ACs not addressed."
+- SCOPE: `pre-merge` (so the findings file is `code-review-findings-pre-merge.md`, separate from per-phase files)
 
-Continue the review loop until zero issues remain.
+The skill performs at most one fix-then-re-review cycle, then HALTs for user direction (zero issues → proceed; anything else → user chooses fix-now / defer-to-future-plan / accept / halt).
 
 #### 5b. Test Analysis
 
-**Only after final code review passes with zero issues.**
+**Only after final code review reaches a terminal outcome** (zero issues, or one of the user-chosen resolution paths from the bounded review). Test analysis is orthogonal to code-review verdict — it checks whether automated tests cover acceptance criteria, which still matters even if some issues were deferred or accepted.
 
 **Skip this step if test-requirements.md does not exist.**
 

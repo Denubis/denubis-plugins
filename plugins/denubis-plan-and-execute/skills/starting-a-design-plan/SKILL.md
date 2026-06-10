@@ -1,6 +1,6 @@
 ---
 name: starting-a-design-plan
-description: Use when beginning any design process - orchestrates gathering context, clarifying requirements, brainstorming solutions, and documenting validated designs to create implementation-ready design documents
+description: Use when beginning any design process - orchestrates context gathering, clarification, brainstorming, and design documentation
 user-invocable: true
 ---
 
@@ -87,7 +87,7 @@ Each gate is a hard checkpoint — the process cannot advance until the gate con
 | **3. Definition of Done** | Synthesize and confirm deliverables before brainstorming | Confirmed success criteria |
 | **4. Brainstorming** | Invoke brainstorming skill | Validated design (in conversation) |
 | **5. Design Documentation** | Invoke design-write skill | Committed design document |
-| **6. Planning Handoff** | Offer to invoke writing-plans skill | Implementation plan (optional) |
+| **6. Planning Handoff** | Offer to invoke starting-an-implementation-plan skill | Implementation plan (optional) |
 
 ## The Process
 

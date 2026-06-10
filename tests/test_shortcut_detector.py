@@ -136,7 +136,10 @@ class TestLockfileForSession:
 
     def test_returns_path_in_lockfile_dir(self):
         result = lockfile_for_session("/any/path")
-        assert result.parent == Path("/tmp/shortcut-detector")
+        # Lockfiles live in a "shortcut-detector" dir under the system temp dir.
+        # Derive the expectation from gettempdir() (the source of truth the code
+        # uses) rather than hardcoding /tmp — $TMPDIR is set on some hosts/CI.
+        assert result.parent == Path(tempfile.gettempdir()) / "shortcut-detector"
         assert result.name.endswith(".blocked")
 
 

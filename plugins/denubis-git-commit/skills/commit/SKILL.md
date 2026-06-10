@@ -76,18 +76,14 @@ Stop. Do not proceed to commit.
 
 ### Step 4: Plan Commits
 
-Follow the project's commit splitting rules:
-
-| Changed files | Minimum commits |
-|--------------|----------------|
-| 1-2 files | 1 commit |
-| 3-4 files | 2 commits |
-| 5+ files | 3+ commits |
+Split by **logical concern**, not by file count. One concern, one commit — even when the diff touches many files. A 30-file refactor that does one thing is one commit. Two unrelated fixes in the same file are two commits.
 
 **Splitting rules:**
-- Split by directory/module, then by concern
+- Use concern boundaries, not file-count thresholds
 - Test files go with their implementation in the same commit
 - Never separate a test from the code it tests
+- For genuinely mixed changes (bug fix + unrelated feature in the same diff), split by concern
+- When in doubt, ask the user how to split
 
 ### Step 5: Match Commit Style
 

@@ -1,7 +1,7 @@
 ---
 name: brainstorming
 family: starting-a-design-plan
-description: Use when creating or developing anything, before writing code or implementation plans - refines rough ideas into fully-formed designs through structured Socratic questioning, alternative exploration, and incremental validation
+description: Use when developing a new feature or design, before writing code - refines rough ideas into validated designs through Socratic questioning
 user-invocable: false
 ---
 
@@ -403,7 +403,7 @@ When Phase 3 is complete, announce:
 **You do NOT:**
 - Write design document (that's design-write)
 - Set up worktrees (that's later in workflow)
-- Create implementation plans (that's writing-plans)
+- Create implementation plans (that's impl-plan-write)
 
 **You DO:**
 - Hold validated design in conversation context

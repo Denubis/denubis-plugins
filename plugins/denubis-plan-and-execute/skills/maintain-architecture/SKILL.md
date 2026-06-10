@@ -1,6 +1,6 @@
 ---
 name: maintain-architecture
-description: Use for standalone architecture documentation maintenance - computes git diff baselines, dispatches subagents to read code and docs, asks targeted questions, and invokes architecture-update to propose changes
+description: Use for standalone architecture documentation maintenance - diffs against baselines, dispatches subagents to read code and docs, and proposes updates
 user-invocable: true
 ---
 

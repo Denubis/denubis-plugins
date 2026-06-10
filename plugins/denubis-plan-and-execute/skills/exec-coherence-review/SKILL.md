@@ -1,7 +1,7 @@
 ---
 name: exec-coherence-review
 family: executing-an-implementation-plan
-description: Use after code review and proleptic challenge for phases without human-judgment UAT - verifies implementation coheres with design intent, surfaces baked-in assumptions, and assesses forward fitness for future acceptance testing
+description: Use after code review for phases without human-judgment UAT - verifies implementation coheres with design intent and surfaces baked-in assumptions
 user-invocable: false
 ---
 

@@ -245,11 +245,11 @@ Design plans describe WHAT gets built. Implementation plans describe HOW to buil
 
 **Phase count:**
 - Target: 5-8 phases (sweet spot for planning)
-- Maximum: 8 phases (hard limit for writing-plans skill)
+- Maximum: 8 phases (hard limit for impl-plan-write skill)
 - If >8 phases needed: Note that multiple implementation plans will be required
 
 **Why <=8 phases matters:**
-- writing-plans skill has hard limit of 8 phases per implementation plan
+- impl-plan-write skill has hard limit of 8 phases per implementation plan
 - Exceeding 8 phases forces user to scope or split
 - This is by design to prevent overwhelming implementation plans
 
@@ -259,7 +259,7 @@ Add note to Additional Considerations:
 ```markdown
 ## Additional Considerations
 
-**Implementation scoping:** This design has [N] phases total. The writing-plans skill limits implementation plans to 8 phases. Consider:
+**Implementation scoping:** This design has [N] phases total. The impl-plan-write skill limits implementation plans to 8 phases. Consider:
 1. Implementing first 8 phases in initial plan
 2. Creating second implementation plan for remaining phases
 3. Simplifying design to fit within 8 phases
@@ -284,7 +284,7 @@ Good Phase definitions:
 
 **Dependencies:** None (first phase)
 
-**Done when:** `uv sync` succeeds, `uv run rtk ruff check .` clean
+**Done when:** `uv sync` succeeds, `uv run ruff check .` clean
 <!-- END_PHASE_1 -->
 ```
 
@@ -825,7 +825,7 @@ Example warning: "Could not apply `design-planned` label to #123 — `gh` return
 | "I can write Summary and Glossary myself, don't need subagent" | Subagent has fresh context and acts as forcing function. Use it. |
 | "Glossary isn't needed, terms are obvious" | Obvious to you after brainstorming. Not to fresh reviewer. Include it. |
 | "Design is simple, don't need phases" | Phases make implementation manageable. Always include. |
-| "Phases are obvious, don't need detail" | writing-plans needs component descriptions. Provide them. |
+| "Phases are obvious, don't need detail" | impl-plan-write needs component descriptions. Provide them. |
 | "Can have 10 phases if needed" | Hard limit is 8. Scope or split. |
 | "I'll include the code so implementation is easier" | No. Implementation plans generate code fresh from codebase state. Design provides direction only. |
 | "npm install succeeds is good enough" | Use `uv sync` — this is a Python-first toolchain. |

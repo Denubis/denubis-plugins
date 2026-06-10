@@ -37,9 +37,20 @@ cat > "${PLAN_DIR}/review-wip.md" << 'CHECKPOINT'
 CHECKPOINT
 ```
 
-Update this file after each step. At Step 5, your structured review replaces it (delete the file when delivering the final review).
+Update this file after each step. At Step 5, write your final structured review to `code-review-findings-{SCOPE}.md` in the same directory (the plan/design doc directory), where `{SCOPE}` is the value of the `SCOPE` parameter from the caller (e.g. `phase-2`, `pre-merge`, `task-3`). If no `SCOPE` is provided, fall back to `code-review-findings.md`. This file is the **persistent record of findings for this scope** — it is consulted by re-review cycles. If the file already exists from a prior cycle of the same scope, overwrite it with the current cycle's findings. Delete `review-wip.md` once the findings file is written.
+
+The first line of the findings file MUST be `# Code Review Findings — {SCOPE}` so the scope is visible without parsing the filename.
 
 **Do this even if you think you'll finish quickly.** You cannot predict turn exhaustion.
+
+## Re-Review Mode
+
+If the caller's prompt includes `PRIOR_FINDINGS_FILE: <path>`, you are in re-review mode:
+
+1. Read the prior findings file first. It lists every issue from the previous cycle.
+2. For each prior issue, check the current diff and report: **Resolved**, **Partially resolved**, or **Unresolved** with evidence (file:line in the new diff).
+3. Then perform Steps 1–4 normally on the new diff to surface any new issues introduced by the fixes.
+4. In Step 5, your structured review must include a `## Prior Findings Verification` section listing each prior issue with its current status, before the standard `## Issues` section. Overwrite `code-review-findings-{SCOPE}.md` (the same scoped filename Step 5 normally writes) with this new review.
 
 ## Review Process
 
@@ -57,8 +68,8 @@ Code Review Progress:
 **This is your primary input.** Run these commands first:
 
 ```bash
-rtk git diff --stat {BASE_SHA}..{HEAD_SHA}
-rtk git diff {BASE_SHA}..{HEAD_SHA}
+git diff --stat {BASE_SHA}..{HEAD_SHA}
+git diff {BASE_SHA}..{HEAD_SHA}
 ```
 
 Read the diff output carefully. This is what you are reviewing — nothing else unless a specific hunk is ambiguous without surrounding context.
@@ -67,7 +78,16 @@ Read the diff output carefully. This is what you are reviewing — nothing else 
 
 ### Step 2: Run Verification
 
-Run the project's test and lint commands (find them in CLAUDE.md or project config). For Python projects, use `uv run pytest` for tests and `uv run rtk ruff check .` for linting.
+Run the project's test and lint commands (find them in CLAUDE.md or project config).
+
+**For Python tooling: every invocation MUST be wrapped in `uv run`.** This is mandatory, not a default — examples:
+
+- Tests: `uv run pytest`
+- Lint: `uv run ruff check .`
+- Type-check: `uv run ty check` / `uv run mypy`
+- Any other Python tool: `uv run <tool> ...`
+
+Bare invocations (`pytest`, `ruff`, `python -m pytest`) are forbidden — they may resolve to the wrong environment and produce misleading pass/fail signals. If a project's documented command is a bare invocation, prepend `uv run`.
 
 **If tests fail or build breaks:** STOP review immediately. Return: "Tests failing / Build broken. Fix before review." Include specific failure output.
 
