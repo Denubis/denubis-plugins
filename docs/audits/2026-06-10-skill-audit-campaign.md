@@ -5,7 +5,7 @@ Durable tracker for the full-harness skill audit and its spin-off projects. Upda
 ## Status summary
 
 - Survey pass complete: 7 parallel subagent audits over 50 skills + global and project CLAUDE.md.
-- Hard-break batch: 1 of 4 fixed (see below). No commits yet — commit the batch together at the end.
+- Hard-break batch: 1 of 4 fixed and committed (see below).
 - Diverted (by Brian's decision) into building a writing-prose skill before resuming the walk.
 - BLOCKING DECISION: sequencing with the in-flight `skill-skills-upstream-sync` worktree (see Collisions).
 
@@ -13,7 +13,7 @@ Durable tracker for the full-harness skill audit and its spin-off projects. Upda
 
 | # | Item | Status |
 |---|---|---|
-| 1 | `writing-plans` dead skill name ×7 (design-write ×4, starting-a-design-plan L90, brainstorming L406) | FIXED on main (uncommitted). Renamed to impl-plan-write / starting-an-implementation-plan. Verified: grep clean. |
+| 1 | `writing-plans` dead skill name ×7 (design-write ×4, starting-a-design-plan L90, brainstorming L406) | FIXED, committed on main (6080357). Renamed to impl-plan-write / starting-an-implementation-plan. Verified: grep clean. |
 | 2 | `house-style:writing-for-a-technical-audience` REQUIRED ref in design-write L334 — plugin removed | DEFERRED: resolution is the writing-prose skill project (below). Repoint L334 when the skill exists. |
 | 3 | Repo CLAUDE.md L17 points at `…/memory/feedback_review-all-levels.md`; memory dir archived to `memory.archive-2026-05-22` | OPEN. Fix path or fold rule inline. |
 | 4 | `denubis-git-commit:commit` writes `Co-Authored-By: Claude`; global convention is `Claude Fable 5` | OPEN. |
