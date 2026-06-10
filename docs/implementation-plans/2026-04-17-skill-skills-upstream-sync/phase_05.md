@@ -2,6 +2,8 @@
 
 **⚠️ EXECUTION ORDER (L3 revision):** Phase files sort lexically as `phase_01, phase_02, phase_02_5, phase_03, phase_04, phase_05, phase_06` — but the design plan requires **Phase 6 to execute BEFORE Phase 5.** Phase 5 is the terminal phase; its coherent-set commit captures Phase 6's cross-plugin changes too. **Do not execute phase_05.md until phase_06.md is complete.** Lexical sort is not the execution order.
 
+**2026-06-10 Amendment:** Version baselines from Phase 5B (denubis-extending-claude 1.7.0, denubis-plan-and-execute 2.30.0, verified 2026-04-17) are stale — main has moved (extending-claude at 1.7.2+, 164 commits of drift at amendment time). Re-verify all version, marketplace.json, and CHANGELOG baselines at execution time, after the step-0 main merge (see RESUME-PROMPT). Phase 2.6 (model-tier refresh) is in scope for this phase's coherent-set commit and cross-reference audit. Full execution order: `phase_01 → phase_02 → phase_02_5 → phase_02_6 → phase_03 → phase_04 → phase_06 → phase_05`.
+
 **Goal:** Close the sync as a coherent set. Run an exhaustive cross-reference audit to confirm every sub-skill invocation and every supporting-file reference resolves. Bump both affected plugins' versions in lockstep (denubis-extending-claude for Phases 1-4; denubis-plan-and-execute for Phase 6). Sync `.claude-plugin/marketplace.json` at repo root. Append `CHANGELOG.md` entries for both plugins following repo convention. Commit per the user's global commit-split preference.
 
 **Architecture:** Terminal phase — runs after all content phases (1-4 and 6) land. Python audit script is re-runnable and checked into the plan directory for provenance. Version bumps are MINOR for both plugins (feature-level change; no breaking behaviour).
