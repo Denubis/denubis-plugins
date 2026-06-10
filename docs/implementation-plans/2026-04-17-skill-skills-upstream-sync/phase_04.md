@@ -63,6 +63,18 @@ done
 git -C /tmp/superpowers-obra log -1 --format='%H %s'  # record in first commit message
 ```
 
+## 2026-06-10 Amendment (operator-approved)
+
+Overrides matching instructions elsewhere in this file:
+
+1. **Pin to the up-most upstream.** All imports source from obra/superpowers (the origin of these files) at a recorded commit hash — never from ed3d's intermediate copies. Record the hash in the phase's first commit message AND in each imported file's denubis preface. (Task 0 of phase_03's amendment will already have cloned both upstreams; reuse those clones and hashes.)
+2. **Dated-import discipline (rubric R6).** `anthropic-best-practices.md` is a third party's snapshot of Anthropic guidance, necessarily pre-June-2026; a verbatim import without dating violates the version-pinning discipline this plan establishes. Each imported file's preface gains: source repo, commit hash, import date, and a last-verified-against-live-docs date. For `anthropic-best-practices.md` specifically, add a verification step: spot-check its claims against live platform.claude.com docs (2026-06 tier — Fable 5 / Opus 4.8 pages exist). Record deltas in a short dated denubis appendix rather than editing obra's text (attribution preserved). If deltas are material, surface to the operator before importing.
+3. **True-up sweep (new task).** Inventory the other denubis-extending-claude files descending from obra/ed3d — `graphviz-conventions.dot` (April byte-identity claim: re-verify), `examples/CLAUDE_MD_TESTING.md`, `long-running-state-patterns.md`, and anything else `syncing-with-upstream` knows about — and true them up against the same pinned obra hash. Record per file: identical / diverged-deliberately (cite the decision) / diverged-stale (true up).
+4. **Skill-type table fix.** The rewritten `writing-skills` SKILL.md skill-type table includes **Discipline** alongside Technique/Pattern/Reference (2026-06-10 audit: the omission in the definitional skill propagates to every new skill, and is inconsistent with `writing-claude-directives`' By-Skill-Type table).
+5. **GREEN tier note.** Task 5's "production-tier Opus" framing: cornerstone production tier now includes the Fable 5 main loop. GREEN subagent runs stay Sonnet. **Fable-tier verification is human-invoked only** (operator rule 2026-06-10) — manual checkpoint, never auto-dispatched.
+
+Reference: `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (R6, R9, R10), `docs/audits/2026-06-10-skill-audit-campaign.md`.
+
 **Current file state (Phase 4B direct inspection):**
 - `plugins/denubis-extending-claude/skills/writing-skills/SKILL.md`: 163 lines, 14 H2 sections (Core Principle, TDD Mapping, When to Create a Skill, Skill Types, Directory Structure, SKILL.md Template, RED-GREEN-REFACTOR Cycle, Testing by Skill Type, Common Rationalizations to Block, Anti-Patterns, Skill Creation Checklist).
 - Cross-references `denubis-extending-claude:writing-claude-directives` and `denubis-extending-claude:testing-skills-with-subagents` already present.
