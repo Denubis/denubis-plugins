@@ -106,3 +106,17 @@ Operator-approved follow-up after GREEN (precedent: Phase 2's post-GREEN touch-u
 - Haiku-no-judgement position and the Fable cost gate text unchanged (constraint honoured).
 - Header unchanged (2026-06-10; additions share its date). File 99 → 104 lines.
 - `uv run pytest -q` → 867 passed.
+
+## Correction addendum — advisor pairing claim overturned by Claude Code docs (2026-06-11)
+
+Operator-directed follow-up (proleptic counterarguments 1–2 disposition + advisor/subagent research). Existing content above is unchanged; the first bullet under the 2026-06-10 addendum ("no cross-tier route to Fable judgement... no other executor may name Fable 5 as advisor") is **superseded** — read it with this correction.
+
+**What changed:** <https://code.claude.com/docs/en/advisor> (verified 2026-06-11, fetched directly) lists Fable as an accepted advisor for Haiku 4.5 and Sonnet 4.6 mains and recommends "Sonnet main + Fable advisor" as a pairing (v2.1.170+, Fable 5 access required). This conflicts with the platform API docs' compatibility table, which has no Fable-advisor row for non-Fable mains. There IS therefore a documented advisor-shaped path to Fable spend; because advisor calls are model-triggered, the cost gate now explicitly covers advisor configuration (no Fable advisor on automated/unattended runs).
+
+**Edits to `model-tier-notes.md`:**
+- Header paragraph: clarified that the header date marks the latest verification pass; previous-generation sections retain inline 2026-04-17 dates (proleptic counterargument 1).
+- Fable 5 advisor note: rewritten as "Advisor pairing and the cost gate" — observed/documented attribution split (the in-session 400 proves only the Fable-main-rejects-Opus-advisor direction); doc-conflict recorded with both citations; beta-API caveat (changes without model releases, outside the header staleness tripwire) (proleptic counterargument 2 + correction).
+- Cross-model advisor bullet: scope facts added — advisor is session main-loop only (`/advisor`, `advisorModel`, `--advisor`); no advisor attachment for subagent dispatches (closed frontmatter field set, no env var); subagent quality lift = `model`/`effort` choice. Source: <https://code.claude.com/docs/en/sub-agents> (verified 2026-06-11).
+- Effort bullet: noted agent-definition `effort` frontmatter field.
+
+**Verification:** AC2.6.8 re-grep on `model-tier-notes.md` — every new claim carries a verified-date citation; no bare era-claims; cost gate and Haiku-no-judgement text unchanged.

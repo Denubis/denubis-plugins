@@ -20,6 +20,8 @@
 - Rubric-for-rubrics draft: `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (R3, R5, R7, R10 cost-gate)
 - <https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool> (added by 2026-06-10 post-GREEN addendum: advisor pairing pattern and cost-gate protection)
 - <https://platform.claude.com/docs/en/build-with-claude/effort> (added by 2026-06-10 post-GREEN addendum: effort parameter, task budgets)
+- <https://code.claude.com/docs/en/advisor> (added by 2026-06-11 correction addendum: Claude Code advisor pairing table — conflicts with the API-docs table; Fable accepted as advisor for Haiku/Sonnet mains; advisor is session main-loop only)
+- <https://code.claude.com/docs/en/sub-agents> (added by 2026-06-11 correction addendum: closed agent-frontmatter field set — no advisor attachment for subagents; per-agent `effort` field)
 
 ---
 
