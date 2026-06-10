@@ -66,7 +66,7 @@ description: Use when tests have race conditions or timing dependencies - replac
 
 ## Compliance Techniques
 
-Current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5) are highly responsive to instructions, with per-model specifics in [`model-tier-notes.md`](model-tier-notes.md). Lead with context and motivation; reserve imperatives for critical boundaries.
+Current Claude models (Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5) are highly responsive to instructions, with per-model specifics in [`model-tier-notes.md`](model-tier-notes.md). Lead with context and motivation; reserve imperatives for critical boundaries.
 
 ### Primary: Context + Motivation
 
@@ -93,7 +93,9 @@ Use structure to make compliance the path of least resistance:
 
 ### Escalation: Imperatives (Use Sparingly)
 
-Imperatives divide into two cases, and the distinction is load-bearing. **Rhetorical emphasis** — stacking `CRITICAL` / `YOU MUST` / `NEVER` onto ordinary instructions to signal importance — should be dialled back. Current Claude models (Opus 4.7, Sonnet 4.6, Haiku 4.5) overtrigger on these markers, reading urgency as content-signal rather than emphasis. **True boundaries** — irreversibility, safety-critical operations, unconditional prohibitions — retain the imperative; they earn it. The cost of misfire differs between the two cases: rhetorical overtrigger degrades instruction-following in nearby unrelated contexts, while a missed true-boundary gate destroys work, rewrites shared history, or leaks secrets. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X`; but leave `Never commit secrets to version control` alone. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+Imperatives divide into two cases, and the distinction is load-bearing. **Rhetorical emphasis** — stacking `CRITICAL` / `YOU MUST` / `NEVER` onto ordinary instructions to signal importance — should be dialled back. Current Claude models (Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5) overtrigger on these markers, reading urgency as content-signal rather than emphasis. **True boundaries** — irreversibility, safety-critical operations, unconditional prohibitions — retain the imperative; they earn it. The cost of misfire differs between the two cases: rhetorical overtrigger degrades instruction-following in nearby unrelated contexts, while a missed true-boundary gate destroys work, rewrites shared history, or leaks secrets. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X`; but leave `Never commit secrets to version control` alone. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-06-10).
+
+**Trigger explicitness fixes under-triggering — not stronger emphasis.** The dial-back above answers overtriggering; the opposite failure (a tool or skill that should fire and doesn't) has a different fix. On Opus 4.8 and Fable 5 the remedy for under-triggering is a plain, specific when-to-use condition in the description — `Use when X`, `Call this when the user asks about Y` — placed in the capability's own description, not just surrounding prose. This gives measurable should-call lift. Reaching for louder language instead is the trap: it does not raise the should-call rate and it overtriggers Sonnet 4.6 and the Opus 4.6 tier. Explicit trigger conditions, not emphasis, are the lever in both directions. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
 
 Concrete before/after:
 
@@ -127,6 +129,14 @@ Write the test first. Code written before its test tends to test the implementat
 | Discipline (TDD, verification) | Context + structural enforcement + loophole closure |
 | Technique (patterns, how-to) | Clear steps, "we want quality" framing |
 | Reference (documentation) | Clarity only, no persuasion needed |
+
+### Ask for Evidence, Not Reasoning-Echo
+
+Do not instruct the model to echo, transcribe, or explain its internal reasoning as response text. On Fable 5, show-your-thinking phrasing can trigger the `reasoning_extraction` refusal category and cause fallbacks. Ask for evidence and justification *in the output* — "cite the line you changed", "state which check you ran" — rather than asking the model to reproduce the thinking that produced it. If reasoning visibility is genuinely needed, read the structured `thinking` blocks instead of prompting for a transcript. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+
+### Name a Fallback for Harness Tools
+
+A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agent`/`Task`, MCP tools) must state the fallback when the tool is absent — "if unavailable, ask inline". Tool rosters vary per session (operator evidence: the `claudew` alias disables specific tools), so a directive that assumes a tool is present misfires wherever it is not. Reference MCP tools by the fully qualified `Server:tool` form so the model can locate them.
 
 ## Rubric Callback
 
@@ -212,7 +222,7 @@ Do not jump into implementation or change files unless clearly instructed. When 
 
 ## Overengineering Prevention
 
-Claude 4.x tends to overengineer. Include this when needed:
+Current Opus and Fable models tend to overengineer — adding files, abstractions, or unrequested tidying, especially at higher effort. Include this when needed (per-model specifics in [`model-tier-notes.md`](model-tier-notes.md)):
 
 ```markdown
 Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
