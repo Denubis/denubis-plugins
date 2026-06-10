@@ -1,6 +1,6 @@
 ---
 name: epistemic-humility
-description: Use when assessing whether a proposed skill, agent scaffold, or automated task earns its existence — provides a rubric for scope, observability, reflective process, and failure-pattern screening, sourced from AbsenceJudgement.tex, Schön 1994 p.132, Jones 2025, and Latour 1987/1999.
+description: Use when assessing whether a proposed skill, agent scaffold, or automated task earns its existence — screens scope, observability, reflective process, and failure patterns before building.
 user-invocable: false
 ---
 
