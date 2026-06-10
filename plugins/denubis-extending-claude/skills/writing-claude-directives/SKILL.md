@@ -97,15 +97,7 @@ Imperatives divide into two cases, and the distinction is load-bearing. **Rhetor
 
 **Trigger explicitness fixes under-triggering — not stronger emphasis.** The dial-back above answers overtriggering; the opposite failure (a tool or skill that should fire and doesn't) has a different fix. On Opus 4.8 and Fable 5 the remedy for under-triggering is a plain, specific when-to-use condition in the description — `Use when X`, `Call this when the user asks about Y` — placed in the capability's own description, not just surrounding prose. This gives measurable should-call lift. Reaching for louder language instead is the trap: it does not raise the should-call rate and it overtriggers Sonnet 4.6 and the Opus 4.6 tier. Explicit trigger conditions, not emphasis, are the lever in both directions. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
 
-Concrete before/after:
-
-```markdown
-# Before (overtriggers current models)
-CRITICAL: You MUST run tests before committing. NEVER skip this step.
-
-# After (current Anthropic guidance)
-Run tests before committing. Untested commits break CI for the whole team.
-```
+Concrete before/after (the dial-back transformation itself is shown under Primary: Context + Motivation above):
 
 ```markdown
 # Often sufficient for current models
