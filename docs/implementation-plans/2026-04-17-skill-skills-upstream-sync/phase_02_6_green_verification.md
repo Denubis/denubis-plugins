@@ -91,3 +91,18 @@ model-tier-notes.md: 99
 ## Full test suite
 
 `uv run pytest -q` from the working directory — result recorded at commit time (see report). Skill-lint tests over SKILL.md description/frontmatter included; any failure treated as a real failure, not suppressed.
+
+## Post-GREEN addendum — advisor-tool pairing constraint + cost levers (2026-06-10)
+
+Operator-approved follow-up after GREEN (precedent: Phase 2's post-GREEN touch-ups). Touches `model-tier-notes.md` only; SKILL.md untouched (closed at 289/300 lines). Existing GREEN content above is unchanged.
+
+**Added (all carry `verified 2026-06-10` citations; source: <https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool> and the effort page):**
+- Fable 5 section — negative result protecting the cost gate: the advisor tool (beta `advisor-tool-2026-03-01`, type `advisor_20260301`) gives no cross-tier route to Fable judgement. Per the model-compatibility table, Fable 5 executor pairs only with Fable 5 advisor; no other executor may name Fable 5 as advisor; invalid pairs `400`. Recorded with the operator-empirical dated framing, including the verbatim in-session API error `400 tools.30.model: 'claude-opus-4-8' cannot be used as an advisor when the request model is 'claude-fable-5'`.
+- Cross-model patterns — positive pattern (inside the cost gate): Haiku 4.5 / Sonnet 4.6 executor + Opus 4.8 advisor as a sanctioned automated-work quality lift (advisor reads transcript mid-generation, ~1,400–1,800 tokens, cap `max_tokens: 2048`; Claude Code `/advisor`).
+- Cross-model patterns — task budgets (`output_config.task_budget`, beta `task-budgets-2026-03-13`, min 20,000 tokens, Fable 5 / Opus 4.7 / 4.8) and the effort parameter (`output_config.effort`; `xhigh` Claude Code default). Confirmed not already covered by the earlier Phase 2.6 cross-model edits before adding (no duplication).
+
+**Verification:**
+- AC2.6.8 grep on `model-tier-notes.md`: bare-generation era-claims → CLEAN none; benchmark numbers → CLEAN none; every new advisor/budget/effort claim under a dated header or with a verified-date citation.
+- Haiku-no-judgement position and the Fable cost gate text unchanged (constraint honoured).
+- Header unchanged (2026-06-10; additions share its date). File 99 → 104 lines.
+- `uv run pytest -q` → 867 passed.
