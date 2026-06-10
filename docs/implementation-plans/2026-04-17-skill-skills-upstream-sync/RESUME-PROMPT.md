@@ -1,4 +1,4 @@
-# Resume Prompt — Skill-Skills Upstream Sync — Phase 2 Complete, 2026-06-10 Amendments Applied, Step-0 Merge Then Phase 2.5
+# Resume Prompt — Skill-Skills Upstream Sync — Step-0 Merge DONE, Phase 2.5 Next
 
 **Copy this prompt verbatim into a fresh Claude Code session after `/clear`.**
 
@@ -15,7 +15,7 @@ If the branch is `main` or anything other than `skill-skills-upstream-sync`, STO
 
 I'm resuming work on the skill-skills upstream sync plan at `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`. Execution takes place in this worktree on branch `skill-skills-upstream-sync`.
 
-**State (2026-06-10, Phase 2 complete, amendment pass applied, step-0 merge next):**
+**State (2026-06-10, Phase 2 complete, amendment pass applied, step-0 merge DONE, Phase 2.5 next):**
 
 - **Phase 1 (epistemic-humility): COMPLETE** (10 commits, C1–C4 resolved). Unchanged since the 2026-04-23 handoff; see git history and `phase-01-*` artefacts.
 - **Phase 2 (writing-claude-directives): COMPLETE.** Task commits `9ed5658` (RED static code-smell evidence), `6a29760` (SKILL.md restructure), `cc4176d` (model-tier-notes.md), `76faf34` (long-running-state-patterns anchors), `bb2f87f` (graphviz attribution); remediations `1fbd8c8` (V4), `3af9968` (V6 Gap 2); GREEN verification `089ab70`; post-GREEN touch-ups `8230047`, `0a2d607`, `acacdff`. See `phase_02_green_verification.md`.
@@ -24,26 +24,22 @@ I'm resuming work on the skill-skills upstream sync plan at `docs/implementation
 
 **Execution order:** `phase_02_5 → phase_02_6 → phase_03 → phase_04 → phase_06 → phase_05` (Phase 6 before Phase 5, per phase_05.md DoD).
 
-## Step 0 — integrate main by MERGE, not rebase
+## Step 0 — DONE (2026-06-10 afternoon session)
 
-Main is ~164 commits ahead of the 2026-04-22 merge-base `4d5c952`. **Merge `main` into this branch; do not rebase.** Reason: `phase_02_green_verification.md` and this file cite branch commit SHAs as the Phase 2 audit trail — a rebase rewrites them and orphans every citation; a merge preserves them. (The 2026-04-22 rebase predates any SHA-citing artefacts; that precedent no longer applies.)
+Merge of main (`a8d0317`) landed as `5487da7` (parents `eb83f0f` + `a8d0317`); pyproject resolved by union, uv.lock regenerated. Follow-up `6077868` conformed the epistemic-humility skill description to main's new skill-description lint (282→~190 chars, Schön namedrop moved to body-only; operator-approved). Suite green: 867 passed. `docs/audits/2026-06-10-*.md` confirmed in-tree.
 
-```bash
-git status --short            # expect: modified uv.lock, untracked .codex/
-git diff uv.lock | head       # inspect; if incidental (no pyproject change), restore: git checkout -- uv.lock
-# .codex/ is untracked tooling residue — inspect, then remove or leave (it is not part of the plan)
-git merge main
-```
+Environment notes from that session:
+- `uv sync --all-packages` is required after fresh checkout/merge — plain `uv sync` skips workspace members and pytest collection fails with `ModuleNotFoundError: workflow_statusline`.
+- uv.lock self-modifies (exclude-newer stanza) because `~/.config/uv/uv.toml` sets `exclude-newer = "1 week"` and every hook `uv run` resyncs; main's lock carries the same stanza — not drift.
+- denubis-plan-and-execute 2.33.0 removed the command wrappers that shadowed `executing-an-implementation-plan` and friends; the Skill tool now resolves the namespaced skill directly. `Skill(denubis-*:*)` allow rules are in user settings — skill loads no longer prompt.
 
-Expected conflicts: `pyproject.toml` / `uv.lock` (branch added pyyaml at `98e4cf4`; main has moved both). Resolve pyproject by union of dependencies, then regenerate the lock: `uv lock`, and verify `uv run pytest` still passes (113+ root tests). Skill-file conflicts are not expected — main has not touched `writing-claude-directives` since the branch's edits (audit-campaign rule, 2026-06-10). HALT on any conflict outside pyproject/uv.lock/CHANGELOG/marketplace.
-
-After the merge: confirm `docs/audits/2026-06-10-*.md` are present in-tree, then run the post-resume verification:
+Post-resume verification (run before any work):
 
 ```bash
 pwd                         # must end with .worktrees/skill-skills-upstream-sync
 git branch --show-current   # skill-skills-upstream-sync
-git log --oneline -3        # merge commit on top of acacdff
-uv run pytest -q | tail -2  # all green before proceeding
+git log --oneline -3        # 6077868, 5487da7 (merge), then main tip a8d0317
+uv sync --all-packages && uv run pytest -q | tail -2  # 867 passed before proceeding
 ```
 
 ## Then
