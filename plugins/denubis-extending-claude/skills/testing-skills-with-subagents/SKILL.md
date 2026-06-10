@@ -74,6 +74,8 @@ If the agent doesn't follow the skill, the skill is not clear enough. "Haiku is 
 
 This is identical to TDD's "write failing test first" - you MUST see what agents naturally do before writing the skill.
 
+### Basic Baseline Checklist
+
 **Process:**
 
 - [ ] **Create pressure scenarios** (3+ combined pressures)
@@ -81,6 +83,8 @@ This is identical to TDD's "write failing test first" - you MUST see what agents
 - [ ] **Document choices and rationalizations** word-for-word
 - [ ] **Identify patterns** - which excuses appear repeatedly?
 - [ ] **Note effective pressures** - which scenarios trigger violations?
+
+### Synthetic Pressure-Scenario Example
 
 **Example:**
 
