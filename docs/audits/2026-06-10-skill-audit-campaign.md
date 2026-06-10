@@ -42,7 +42,8 @@ Full per-skill findings: in session transcript of 2026-06-10 audit (7 subagent r
 
 - `skill-skills-upstream-sync` (branch): **owns writing-claude-directives**. RESOLVED 2026-06-10: Phase 2 was found already complete (GREEN `089ab70`); a from-the-top staleness review produced the 2026-06-10 amendment pass, committed on the branch (`f2ef6c2`..`4d101a3`): new phase_02_6 (model-tier refresh reconciling the rubric-for-rubrics draft), phase_03/04 amendment blocks (dual-upstream refetch + drift survey, up-most-upstream pinning, dated imports, true-up sweep, Discipline skill-type fix, executor-tier test matrix), phase_05/06 re-verification annotations, RESUME-PROMPT rewritten (step-0 MERGE of main, not rebase — preserves the SHA-citing Phase 2 audit trail). Operator rule recorded: Fable-tier invocations are human-triggered only (cost). Resume via the worktree's RESUME-PROMPT. Already on that branch: "4.x"/"Opus 4.5 think" staleness fixed, model notes split into dated `model-tier-notes.md`, rhetorical-emphasis vs true-boundary imperative distinction, new epistemic-humility skill + Rubric Callback section, proleptic-challenger tightening. Its model-tier-notes is pinned 2026-04-17 (Opus 4.7 era) and by its own staleness rule is now expired (Opus 4.8 + Fable 5 released since).
   - Rule for this campaign: do NOT edit writing-claude-directives or its supporting files on main while that branch lives.
-  - Open decision (Brian): land Phase 2 first then layer June-2026 intel, or amend the Phase 2 plan to absorb `2026-06-10-rubric-for-rubrics-draft.md` directly.
+  - Open decision (Brian): land Phase 2 first then layer June-2026 intel, or amend the Phase 2 plan to absorb `2026-06-10-rubric-for-rubrics-draft.md` directly. RESOLVED: amended the plan — Phase 2.6 absorbs the rubric draft directly.
+  - Phase 2.6 DONE on the branch (model-tier refresh): model-tier-notes.md refreshed to 2026-06 tier (Fable 5 + Opus 4.8, Opus 4.7 marked previous-generation, header 2026-06-10) commit `c7659d9`; writing-claude-directives SKILL.md folds R3/R5/R7 commit `47fca9d`. Reconciles rubric-draft pending items 1–2 (item 2's R8 description-alignment deferred to a successor pass). Its model-tier-notes is no longer expired by the staleness rule.
 - `approver-rtk`, `denubis-dream`, `research-proposer-verifier`: unrelated to this campaign; no fold-in.
 
 ## June 2026 guidance deltas (fetched 2026-06-10, sources live)
@@ -74,4 +75,4 @@ Goal: one canonical home for Brian's calibrated Writing style, replacing the sca
 
 ## Companion document
 
-- `2026-06-10-rubric-for-rubrics-draft.md` (same directory): meta-rubric for directive standards across Sonnet/Opus/Fable. Status: DRAFT, input to skill-skills-upstream-sync Phase 2 reconciliation. Not yet applied anywhere.
+- `2026-06-10-rubric-for-rubrics-draft.md` (same directory): meta-rubric for directive standards across Sonnet/Opus/Fable. Status: DRAFT, input to skill-skills-upstream-sync Phase 2 reconciliation. Pending items 1–2 applied via Phase 2.6 (commits `c7659d9`, `47fca9d`); items 3–4 and item 2's R8 description-alignment remain.
