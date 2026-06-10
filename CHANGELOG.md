@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.33.0
+
+Removes the four command wrappers that shared a name with their skills. Commands and skills share one namespace, and the Skill tool was resolving the namespaced name to the command wrapper — whose `$1`/`$2` substitution mangled model-passed arguments and whose "now invoke the skill" instruction was circular. The skills are user-invocable and serve the slash-command role directly.
+
+**Changed:**
+- `executing-an-implementation-plan` skill gains `argument-hint: "[absolute-plan-dir] [absolute-working-dir]"` frontmatter, preserving the autocomplete hint the command provided.
+
+**Fixed:**
+- Removed shadowing command wrappers: `executing-an-implementation-plan`, `maintain-architecture`, `starting-a-design-plan`, `starting-an-implementation-plan`. `/name` invocations now load the skill itself; model Skill-tool invocations no longer dead-end in the wrapper. `flesh-it-out` and `how-to-customize` remain (command-only, no collision).
+
+## [denubis-extending-claude] 1.8.0
+
+Plugin-authoring guidance catches up with commands-merged-into-skills, and repairs byte corruption in creating-a-plugin.
+
+**New:**
+- `creating-a-plugin`: "Commands vs Skills: One Artefact Per Name" section — new behaviour belongs in user-invocable skills; never define a command and skill with the same name (documents the observed Skill-tool wrapper-shadowing failure); Component Reference reordered to put Skills first and mark Commands legacy.
+
+**Fixed:**
+- `creating-a-plugin`: restored 48 mangled bytes in the two directory-tree code blocks (UTF-8 box-drawing characters had been reduced to their low bytes, e.g. `├──` → `1C 00 00`), which made the file register as binary to grep/file and other text tools.
+
 ## [denubis-bibliography] 0.5.0
 
 DOI in, working paper out — `fetch.py` now renders by default — plus a `dots.mocr` GPU escalation tier for scanned books the docling cascade can't handle.
