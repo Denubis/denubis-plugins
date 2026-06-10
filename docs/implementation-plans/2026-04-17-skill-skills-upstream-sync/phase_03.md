@@ -57,6 +57,19 @@ fi
 git -C /tmp/superpowers-obra log -1 --format='%H %s'  # record in first commit message
 ```
 
+## 2026-06-10 Amendment (operator-approved)
+
+Overrides matching instructions elsewhere in this file:
+
+1. **Dual-upstream refetch + drift survey (new Task 0, replaces the preflight above).** `/tmp/superpowers-obra` is gone and two months have passed — the upstream may itself have moved. Before Task 1: clone BOTH upstreams, record pinned hashes in the RED-evidence artefact, and survey drift:
+   - `git clone https://github.com/obra/superpowers /tmp/superpowers-obra` and record `git -C /tmp/superpowers-obra log -1 --format='%H %cs %s'`.
+   - Clone the ed3d upstream alongside it (URL from `git remote -v` in the main checkout, or per `denubis-extending-claude:syncing-with-upstream`); record its hash the same way.
+   - Diff both upstreams' current `testing-skills-with-subagents` (and sibling writing-skills files) against this file's April line anchors (obra file was 384 lines; 7-pressure table at 128–140; letter-vs-spirit at 169, 216; meta-testing at 240–265). Re-anchor before editing. If upstream content has materially changed, HALT and present the drift to the operator before absorbing anything.
+2. **Executor-tier test matrix (rubric R10 + Fable cost gate).** "RED at production tier, GREEN one tier down" is retained, but production tier is defined per executor, and this skill's executors now include the Fable 5 main loop. Automated RED/GREEN passes run on Haiku/Sonnet/Opus subagents only. **Fable-tier verification is a human-invoked step** (operator rule 2026-06-10: Fable burns real money) — list it in the test plan as a manual checkpoint; never auto-dispatch a Fable subagent.
+3. **Flagged contradiction — operator decision required at Task 2.** Line 49 above lists "Real-World Impact" as a denubis-specific strength to preserve verbatim, but the 2026-06-10 audit identified that section as the dated-narrative anti-pattern (`2025-10-03` session reference) that `writing-skills` itself bans. Surface this at execution: preserve verbatim, strip the date into an undated pattern statement, or drop. Do not decide unilaterally.
+
+Reference: `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (R6, R10), `docs/audits/2026-06-10-skill-audit-campaign.md`.
+
 **Current file state (Phase 3B investigator):**
 - `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md`: 421 lines pre-Phase-2.5 (slightly larger post-Phase-2.5 due to subsection headings added).
 - Haiku claim exact text at lines 59-60 (pre-Phase-2.5): *"The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough."*
