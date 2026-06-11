@@ -50,6 +50,12 @@ When a subagent prompt references a schema-level value set (a CHECK constraint's
 
 **Why**: a Critical in Phase 1 review of denubis-crash-recovery traced to passing composite section-key strings (`borderline+ambiguous_match`) as if they were the DB column values that the rest of the plan used (bare `borderline` + separate reason column). The CHECK constraint was schema-locked to the wrong shape until caught on re-review. The slip happened because the value list was generated from memory rather than read from `db.py`.
 
+### Conflicting Authoritative Sources Are Recorded, Not Resolved
+
+When two authoritative sources disagree (platform API docs vs Claude Code docs, vendor table vs in-session observation), record both claims with citations and verification dates, attribute each as **observed** (empirical, reproduced in session) or **documented** (docs-only), and gate behaviour on the conservative reading. Do not pick a winner, silently drop the weaker source, or average the two.
+
+**Why**: the Phase 2.6 advisor-pairing correction (2026-06-11) found the platform API compatibility table and the Claude Code advisor docs in direct conflict over whether Fable may advise Haiku/Sonnet mains. Recording both let the cost gate extend conservatively; resolving in either direction would have encoded a guess as doctrine. Phases 3/4 drift surveys follow this pattern when upstream sources disagree.
+
 ### Version Updates Require Marketplace and Changelog Sync
 
 When updating a plugin's version in its `.claude-plugin/plugin.json`, you must also:
