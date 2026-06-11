@@ -684,6 +684,8 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 | **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
 | **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Only when interesting.** Include for: vendor/platform lock-in, data residency, accessibility, security model, cost distribution, technology that constrains future options. Omit for routine structural decisions. Its presence signals "someone bears an invisible cost." |
 
+Full citations for the three lenses (Popper 1963, Lakatos 1978, Haraway 1988) are in the References section of the `restate-our-assumptions` skill.
+
 **Popper discipline — falsification tests must earn their format:**
 
 Every design decision gets a falsification test. But the *output* of that test depends on whether a human or a machine should verify it.
@@ -696,7 +698,7 @@ Every design decision gets a falsification test. But the *output* of that test d
 | **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry using the falsification template below | `uat-requirements.md` — the `exec-uat-gate` skill uses it during execution. **These entries MUST be persisted.** |
 | **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | `uat-requirements.md` under the future phase's section, with a back-reference to the decision (DR[N]) made here |
 
-**Quality rubric — Carnap's "Mark I eyeball" test:**
+**Quality rubric — Carnap's "Mark I eyeball" test** (after Carnap, R. 1936. "Testability and Meaning." *Philosophy of Science* 3(4): 419–471; "Mark I eyeball" is operator slang for the human-as-instrument, not Carnap's phrase)**:**
 
 The developer is the instrument. A good UAT entry requires ALL THREE:
 

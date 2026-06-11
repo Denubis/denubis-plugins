@@ -437,7 +437,7 @@ Divergence justified by: Legacy code violates FCIS pattern, difficult to test, h
 - **Superseded by [new plan/section]:** A new decision replaces this one. The old record stays immutable; the new record references what it supersedes.
 - **Deprecated:** Decision is no longer relevant (e.g., feature removed) but was never formally replaced.
 
-**Fowler's superseding rule:** Accepted decisions are never reopened or edited. To change a decision, create a new record marked as superseding the old one. This preserves the audit trail — future readers see what governed work during each period.
+**Fowler's superseding rule:** Accepted decisions are never reopened or edited. To change a decision, create a new record marked as superseding the old one. This preserves the audit trail — future readers see what governed work during each period. (Fowler, M. "Architecture Decision Record." <https://martinfowler.com/bliki/ArchitectureDecisionRecord.html>, verified 2026-06-11; the status conventions follow Nygard's ADR format.)
 
 **Confidence levels:**
 - **High:** Strong evidence, well-understood domain, clear consensus.
