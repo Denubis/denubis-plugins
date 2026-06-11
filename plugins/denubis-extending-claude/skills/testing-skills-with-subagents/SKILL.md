@@ -82,7 +82,7 @@ This is identical to TDD's "write failing test first" - you MUST see what agents
 
 **Independent-session gate — RED baseline MUST come from a session that is NOT this executor, not from invention:**
 
-1. **Prior conversation transcript** retrieved via `cc-search-chats:search-chat`. Search for sessions where this skill's problem space manifested as a real failure. Capture: session ID, date, 2-3 sentence failure summary, direct quote illustrating the failure.
+1. **Prior conversation transcript** retrieved via `cc-search-chats:search-chat`. Search for sessions where this skill's problem space manifested as a real failure. Capture: session ID, date, 2-3 sentence failure summary, direct quote illustrating the failure. If `cc-search-chats` is unavailable in this session, skip directly to path 2 — do not reconstruct transcripts from memory.
 2. **Fresh-session run, user-executed.** Executor and user jointly design a scenario likely to exercise the failure mode. Executor drafts a concrete copy-paste-ready prompt. User runs the prompt in a separate chat session — NOT this session, NOT a subagent of this session — and returns the transcript. Executor + user review the transcript together to identify where the failure manifests.
 
 **There is no third path.** If neither source produces an observed failure, the skill-testing cycle halts for human decision — either run a sharper fresh-session scenario, or re-scope the skill.

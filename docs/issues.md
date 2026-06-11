@@ -317,6 +317,8 @@ Two independent paths:
    - Current review's M2 revision must reference this issue and prescribe the workaround pattern (one-term-per-query, executor unions results, avoid apostrophes by using alternative spellings).
    - Any future plan or skill invoking cc-search-chats documents the fragility and example-safe queries.
 
+**Operator direction (2026-06-11, Phase 3 gate):** prioritise path 1. The union-in-Python workaround has now been re-implemented at least twice (the 2026-04-19 thread audit and Phase 3's `red_search.py`), and the restructured testing-skills-with-subagents protocol documents the constraints again. Improving the tool beats reinventing the workaround in each consumer. Upstream fix scope should also cover the worktree project-path round-trip lossiness recorded in `phase_03_red_evidence.md` (encode/decode of `-` in project directory names is not invertible).
+
 **Related:**
 
 - `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/critical-peer-review-2026-04-18.md` M2 finding
