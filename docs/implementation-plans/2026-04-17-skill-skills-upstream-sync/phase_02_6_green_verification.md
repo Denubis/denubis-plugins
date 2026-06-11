@@ -120,3 +120,19 @@ Operator-directed follow-up (proleptic counterarguments 1–2 disposition + advi
 - Effort bullet: noted agent-definition `effort` frontmatter field.
 
 **Verification:** AC2.6.8 re-grep on `model-tier-notes.md` — every new claim carries a verified-date citation; no bare era-claims; cost gate and Haiku-no-judgement text unchanged.
+
+## Coherence-review closeout (2026-06-11)
+
+Coherence reviewer (Opus, falsification framing, range `0f52233..eba4818`): **coheres — no revision required.** Both hard constraints verified by the reviewer: the Fable cost-gate sentence appears on no removed line in the range; GREEN artefact append-only with zero content lines removed. Operator disposition: "fix the things" — all actionable findings fixed in-session rather than deferred.
+
+**Acknowledged nuance:** the Haiku-no-judgement passage is verbatim-preserved except its routing target advanced "Opus 4.7" → "Opus 4.8" (mechanical consequence of demoting 4.7 to previous-generation). Surfaced by the reviewer, acknowledged by the operator via the fix-the-things disposition; judged within the constraint's intent.
+
+**Dispositions:**
+- **M1 (architecture doc stale):** fixed in place rather than deferred to Phase 5 — `docs/architecture/plugins/denubis-extending-claude/0-context.md` updated to ten skills (epistemic-humility row + in-scope line) and skill-adjacent files now list `model-tier-notes.md` and the epistemic-humility supporting files. Root cause noted: the librarian/freshness pass did not fire at the Phase 1/2 boundaries; Phase 5 re-verification sweeps the tree again after Phases 3/4 reshape it.
+- **M2 (doc-conflict pattern):** ratified as house style — repo `CLAUDE.md` gains "Conflicting Authoritative Sources Are Recorded, Not Resolved" (record both, attribute observed vs documented, gate conservatively), citing the advisor-pairing correction as precedent for Phases 3/4 drift surveys.
+- **Flagged (operator claims lack falsifiers):** falsifier sentences added to the Fable cost gate (both copies, preserving the deliberate verbatim symmetry) and the Haiku-no-judgement note. Both are operator-owned: only a dated operator note or operator-run trial overturns them; vendor framing, doc changes, and model releases never do on their own. The `claudew` citation in SKILL.md deliberately receives no falsifier — it is evidence for rule R7, not a standing revisable position.
+- **Suggestion (standing test):** AC2.6.8's mechanisable subset promoted to `tests/test_model_tier_freshness.py` (12 tests, TDD red-green: checker stubs failed first, negative cases prove detection). Invariants: parseable `last-verified` header; every `<URL>` citation carries a same-line `(verified YYYY-MM-DD)`; no bare `N.x` era-claims; "current models/tier" phrases anchored by a model-name enumeration. The new test immediately caught one floating "current models" (cross-model Prompting-responsiveness bullet), fixed to "these models" referring to the enumerated intro. Suite: 867 → 879 passed.
+
+**Carry-forwards (for Phase 3/4 prep):**
+- Phase 3 dispatch must read the `model-tier-notes.md` header date at execution time and halt if a model has shipped since (proleptic counterargument 3).
+- Phase 4's true-up sweep must not mechanically bless beta-surface claims (advisor, task budgets) because the header reads current — the file deliberately mixes three freshness regimes (current 2026-06-10, previous-generation 2026-04-17 inline, beta surface outside the tripwire).
