@@ -164,6 +164,8 @@ The first-run GREEN table that the favourable scenario produced (`57a3d76b-…`)
   synthetic scenario would be labelled as supplementary completeness coverage
   rather than primary GREEN evidence.
 
+Note for reviewers (added after phase-3 code review, 2026-06-11): the qualifying session tested `writing-claude-directives` while following the methodology `testing-skills-with-subagents` prescribes — the observed failure is of the prescribed methodology, locatable in this skill's RED-phase instructions, not of the skill that happened to be under test. A direct in-use failure of this specific skill would be stronger evidence; the session satisfies the gate because the deficiency it exhibits is the one this skill's RED phase encodes.
+
 ---
 
 ## Near-misses considered and rejected (gate honesty)

@@ -67,6 +67,7 @@ Overrides matching instructions elsewhere in this file:
    - Diff both upstreams' current `testing-skills-with-subagents` (and sibling writing-skills files) against this file's April line anchors (obra file was 384 lines; 7-pressure table at 128–140; letter-vs-spirit at 169, 216; meta-testing at 240–265). Re-anchor before editing. If upstream content has materially changed, HALT and present the drift to the operator before absorbing anything.
 2. **Executor-tier test matrix (rubric R10 + Fable cost gate).** "RED at production tier, GREEN one tier down" is retained, but production tier is defined per executor, and this skill's executors now include the Fable 5 main loop. Automated RED/GREEN passes run on Haiku/Sonnet/Opus subagents only. **Fable-tier verification is a human-invoked step** (operator rule 2026-06-10: Fable burns real money) — list it in the test plan as a manual checkpoint; never auto-dispatch a Fable subagent.
 3. **RESOLVED (operator decision, 2026-06-10): drop the "Real-World Impact" section.** It was flagged as a contradiction (listed at line 49 as a preserve-verbatim strength, but it is the dated-narrative anti-pattern — `2025-10-03`, an upstream obra session — that `writing-skills` itself bans, with unverifiable "100% compliance" overclaiming). Operator ruled: delete the section in Task 2; fold its one load-bearing idea (bulletproofing takes multiple iterations; baselines surface many rationalisations) as a single undated sentence into Core Principle. Remove "Real-World Impact" from the preserve list in AC2.3's grep-audit expectations.
+4. **(2026-06-11) Task 2 model anchors executed as Sonnet 4.6 / Opus 4.8 (not the 2026-04-22 text's Opus 4.7):** Opus 4.7 was demoted to previous-generation by Phase 2.6's model-tier refresh. Spec text updated in place per the phase-3 code review (Important finding); the committed SKILL.md already used 4.8.
 
 Reference: `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (R6, R10), `docs/audits/2026-06-10-skill-audit-campaign.md`.
 
@@ -180,9 +181,9 @@ At the current lines 59-60 (or wherever Phase 2.5's refactor left them), the exi
 
 Target result (edit-in-place, preserving the surrounding paragraph shape):
 
-> The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but **operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement** — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, Sonnet 4.6 and Opus 4.7 will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough. Structural principle retained: weakest-model-tier-that-follows = strongest-clarity-test.
+> The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but **operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement** — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, Sonnet 4.6 and Opus 4.8 will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough. Structural principle retained: weakest-model-tier-that-follows = strongest-clarity-test.
 
-**Specific changes from the pre-amendment text:** (a) "struggles with judgement calls" replaced by "unsuitable for any task requiring judgement" with operator-empirical anchor; (b) add the contrast to Anthropic's 2026-04 framing so a future reader can audit the provenance; (c) update model anchors (Sonnet → Sonnet 4.6, Opus → Opus 4.7) consistent with Phase 2's model-tier-notes.md; (d) explicitly keep the tier-test structural principle.
+**Specific changes from the pre-amendment text:** (a) "struggles with judgement calls" replaced by "unsuitable for any task requiring judgement" with operator-empirical anchor; (b) add the contrast to Anthropic's 2026-04 framing so a future reader can audit the provenance; (c) update model anchors (Sonnet → Sonnet 4.6, Opus → Opus 4.8) consistent with Phase 2's model-tier-notes.md; (d) explicitly keep the tier-test structural principle.
 
 **Step 3: Verify the edits**
 
@@ -236,7 +237,7 @@ git commit -m "refactor(testing-skills-with-subagents): prepend conversation-pre
   for nuanced tasks' describes mechanical instruction-following, not
   evaluative judgement. Passage reworded to name the contrast explicitly.
 - Preserve tier-test structural principle (weakest-tier = strongest
-  clarity test) with updated model anchors (Sonnet 4.6, Opus 4.7)
+  clarity test) with updated model anchors (Sonnet 4.6, Opus 4.8)
 - Denubis-specific strengths preserved byte-identical (model-tier guidance,
   No Blaming the Model, flaky-result discipline) — verification in Task 5
 
