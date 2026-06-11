@@ -1,4 +1,4 @@
-# Resume Prompt — Skill-Skills Upstream Sync — Phases 2.5 + 2.6 DONE, Phase 3 Next
+# Resume Prompt — Skill-Skills Upstream Sync — Phase 3 DONE, Phase 4 Next
 
 **Copy this prompt verbatim into a fresh Claude Code session after `/clear`.**
 
@@ -15,35 +15,36 @@ If the branch is `main` or anything other than `skill-skills-upstream-sync`, STO
 
 I'm resuming work on the skill-skills upstream sync plan at `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`. Execution takes place in this worktree on branch `skill-skills-upstream-sync`.
 
-**State (2026-06-11, Phases 1, 2, 2.5, 2.6 complete; Phase 3 next):**
+**State (2026-06-11, Phases 1, 2, 2.5, 2.6, 3 complete; Phase 4 next):**
 
-- **Phase 1 (epistemic-humility): COMPLETE** (10 commits, C1–C4 resolved). Unchanged since the 2026-04-23 handoff.
-- **Phase 2 (writing-claude-directives): COMPLETE.** See `phase_02_green_verification.md` (historical; do not re-edit).
-- **Phase 2.5 (preparatory refactor of testing-skills-with-subagents RED): COMPLETE.** Three-agent pipeline (smell-assessor → critical-peer-review → refactoring-executor) with one reviewer-required checkpoint revision. Result: two H3s inserted (`### Basic Baseline Checklist`, `### Synthetic Pressure-Scenario Example`), all verbatim blocks byte-identical. Commits `cdc9811` (split), `0f52233` (checkpoint). Phase-3 notes live in the checkpoint: line-339 edit-target note; M2 hazard (RED example near-duplicates GREEN great-scenario — Phase 3's demotion must decide merge vs cross-reference vs duplicate).
-- **Phase 2.6 (model-tier refresh): COMPLETE.** Main refresh `c7659d9` + `47fca9d`; audits closeout `052bdca`; post-GREEN advisor addendum `93d572d`; code review to zero issues (`43778b9`, `5cb75fa`); 2026-06-11 advisor correction (`a97b0f3`, `6767b4f`); SKILL.md small refactor `eba4818` (281/300 lines); coherence review CONFIRMED with all findings fixed (`3c66720`, `ec544b9`, `a33bddb`, `7e4caea`, `0e4f22e`). See the GREEN artefact's two addenda + coherence closeout for the full audit trail.
+- **Phases 1, 2, 2.5, 2.6: COMPLETE.** Unchanged since the previous handoff; see `phase_02_green_verification.md`, `phase_02_5_smell_checkpoint.md`, `phase_02_6_green_verification.md` (all historical; dated append only).
+- **Phase 3 (restructure testing-skills-with-subagents): COMPLETE** — 17 commits (`0adc63e` → `f04995f`). Drift survey clean; RED evidence sourced through the independent-session gate (`phase_03_red_evidence.md`); SKILL.md restructured with byte-identical preserved blocks; code review APPROVED zero issues (`code-review-findings-phase-3.md`); rubric self-application surfaced 8 vulnerabilities, all dispositioned and operator-acknowledged (`phase_03_rubric_self_application.md`); UAT entries DR-P3-DR7 + AM2-P3 armed; refactor pipeline ran (smell report + falsification review committed; sole surviving finding P2 fixed at `fbda343`).
 - **2026-04-22/23 and 2026-06-10 amendment passes: still in force.** Do not reverse.
 
-**New standing facts since the last handoff (2026-06-11):**
+**New standing facts since the last handoff (2026-06-11, Phase 3 gate):**
 
-- **Advisor correction:** Claude Code docs (<https://code.claude.com/docs/en/advisor>) accept Fable as advisor for Haiku 4.5 / Sonnet 4.6 mains — conflicting with the platform API table. Both recorded in `model-tier-notes.md`, not resolved. **The Fable cost gate now covers advisor configuration** (advisor calls are model-triggered Fable spend; automated runs route advisors to Opus 4.8). Advisor is session main-loop only — no subagent attachment exists.
-- **Doc-conflict house style:** repo `CLAUDE.md` → "Conflicting Authoritative Sources Are Recorded, Not Resolved". Phases 3/4 drift surveys follow it.
-- **Operator-claim falsifiers:** the Fable cost gate and Haiku-no-judgement notes now carry operator-owned falsifiers (only dated operator notes/trials overturn them). Do not delete or weaken either position.
-- **Standing test:** `tests/test_model_tier_freshness.py` enforces AC2.6.8's mechanisable subset on `model-tier-notes.md` (header date, per-URL verified markers, no bare `N.x`, anchored "current models"). Suite is now **879 passed**.
+- **Citation house style (operator-directed):** name-drops must point at readable sources — no "name-drops and walks away". Jones/Schön/AbsenceJudgement mentions point to `epistemic-humility`'s `absencejudgement-citations.md`; `exec-refactoring-rubric` gained a References section citing the **webpages actually consulted** (Mäntylä's taxonomy page, Fowler's online catalogue — NOT "Fowler (1999)", the book was never the source); Popper/Carnap/Fowler-ADR cited at first use across denubis-plan-and-execute. Brian's Zotero is the resolution path for citations (skill: `denubis-bibliography:using-bibliography`); chat-history search recovers what was actually consulted when provenance is unclear.
+- **Qualifying-criteria checklist** is now part of the Conversation-Precedent Protocol (`41138e0`): observed-not-described, recorded independence argument, in-scope, externally confirmed, not self-licensing. Phase 4's RED evidence sourcing (H2 discipline) MUST apply it and record the answers.
+- **ISSUE-10 operator direction:** improve cc-search-chats upstream (FTS5 quoting + worktree path round-trip) rather than re-documenting workarounds per consumer. Until then the constraints stand: single literal term per query, no hyphens/apostrophes, union in Python.
+- **CA3 rule (now in phase_05.md):** audits recompute line/commit counts from files and git at audit time — never from phase-summary prose. Do not transcribe counts forward.
+- **P2 template fix (`fbda343`):** phase_05's CHANGELOG template no longer claims the Haiku passage was "removed" (it was retained + reframed per the 2026-04-22 amendment). Do not reintroduce.
+- Suite is **879 passed**.
 
-**Execution order:** `phase_03 → phase_04 → phase_06 → phase_05` (Phase 6 before Phase 5, per phase_05.md DoD).
+**Execution order:** `phase_04 → phase_06 → phase_05` (Phase 6 before Phase 5, per phase_05.md DoD).
 
-## Phase 3 carry-forwards (from Phase 2.6 coherence closeout)
+## Phase 4 carry-forwards
 
-1. **Dispatch-time staleness check:** before executing Phase 3 tasks, read `model-tier-notes.md`'s `last-verified` header; if a model has shipped since, HALT and re-verify before building the executor-tier test matrix on it.
-2. **Beta-surface caution (also binds Phase 4):** the advisor/task-budget claims are beta APIs outside the header-date tripwire — Phase 4's true-up sweep must re-verify them independently, not bless them because the header reads current.
-3. The Real-World-Impact contradiction flagged in phase_03's amendment block was **resolved at `eb83f0f` (drop the section)** — do not re-litigate it.
+1. **Beta-surface caution:** the advisor/task-budget claims in `model-tier-notes.md` are beta APIs outside the header-date tripwire — Phase 4's true-up sweep must re-verify them independently, not bless them because the header reads current.
+2. **V5 deferral (from Phase 3 walk-through):** inline model anchors (Haiku 4.5 / Sonnet 4.6 / Opus 4.8) in `testing-skills-with-subagents/SKILL.md` violate rubric R6 (model claims live in dated supporting files) — reconcile at Phase 4/5 via rubric-draft pending item 4. Recorded in `phase_03_rubric_self_application.md` V5.
+3. **Rule-of-Three watch (smell C2/D1, reviewed-verified):** the rubric-callback summary sentence is byte-identical in `testing-skills-with-subagents` and `writing-claude-directives`; the qualifying-criteria idea appears in two places. If Phase 4's cornerstone adds a third instance of either, extract a shared reference instead of duplicating. See `phase_03_smell_report.md` + `phase_03_smell_review.md`.
+4. **Dispatch-time staleness check:** before executing Phase 4 tasks, read `model-tier-notes.md`'s `last-verified` header; if a model has shipped since, HALT and re-verify.
 
 ## Post-resume verification (run before any work)
 
 ```bash
 pwd                         # must end with .worktrees/skill-skills-upstream-sync
 git branch --show-current   # skill-skills-upstream-sync
-git log --oneline -3        # tip: RESUME-PROMPT rewrite, then 0e4f22e, 7e4caea
+git log --oneline -3        # tip: RESUME-PROMPT rewrite, then f04995f, f12d8b2
 uv sync --all-packages && uv run pytest -q | tail -2  # 879 passed before proceeding
 ```
 
@@ -51,24 +52,24 @@ uv sync --all-packages && uv run pytest -q | tail -2  # 879 passed before procee
 
 ## Then
 
-**Invoke** `denubis-plan-and-execute:executing-an-implementation-plan` targeting Phase 3 (`phase_03.md` — restructure testing-skills-with-subagents). Read its `## 2026-06-10 Amendment` block first; it overrides matching base instructions (dual-upstream refetch + drift survey, executor-tier test matrix with Fable cost gate).
+**Invoke** `denubis-plan-and-execute:executing-an-implementation-plan` targeting Phase 4 (`phase_04.md` — rewrite `writing-skills` as cornerstone orchestrator, ≤250 lines, sequencing epistemic-humility → writing-claude-directives → testing-skills-with-subagents, with obra supporting-file imports). Read its `## 2026-06-10 Amendment (operator-approved)` block first; it overrides matching base instructions.
 
 If any phase returns surprising results — tests failing, reviewer flagging structural issues, subagent empty response, upstream drift beyond what the amendment anticipated — HALT per the repo CLAUDE.md "HALT When Things Feel Sideways" discipline.
 
 ## Read first
 
-1. `phase_03.md` including its amendment block.
-2. `phase_02_5_smell_checkpoint.md` — Phase-3 notes section (line-339 edit target; M2 RED/GREEN near-duplicate hazard).
-3. `phase_02_6_green_verification.md` — coherence closeout carry-forwards (historical record; append-only).
-4. `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (items 1–2 closed; R8 deferred — SKILL.md headroom now 19 lines) and `docs/audits/2026-06-10-skill-audit-campaign.md`.
+1. `phase_04.md` including its amendment block.
+2. `phase_03_rubric_self_application.md` — the 8 dispositions, especially V5 (binds Phase 4/5) and V2's now-in-skill checklist.
+3. `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md` — Phase 4 invokes this skill in practice; the Conversation-Precedent Protocol (with qualifying criteria) governs Phase 4's RED sourcing.
+4. `docs/audits/2026-06-10-rubric-for-rubrics-draft.md` (pending item 4 = V5's reconciliation point) and `docs/audits/2026-06-10-skill-audit-campaign.md`.
 5. `plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md` — current tier doctrine, advisor pairing, cost-gate scope.
-6. Operator standing positions: Haiku-no-judgement — primary in-tree record is `model-tier-notes.md` (Haiku section, now with falsifier). The archived memory-file path in older docs is dead; do not "fix" it by deleting the position.
-7. `docs/issues.md` — ISSUE-06 (this plan), ISSUE-10 (cc-search-chats FTS5 constraints: single literal term, no apostrophes/hyphens/regex).
+6. `docs/issues.md` — ISSUE-06 (this plan), ISSUE-10 (cc-search-chats constraints + 2026-06-11 operator direction).
+7. `phase_03_smell_review.md` — what the falsification review rejected and why (precedent for gating smell reports against closed decisions).
 
 ## Standing rules (unchanged + carried forward)
 
 - Do not execute the plan on `main`; all execution commits belong on this branch.
-- Do not re-edit the H/M/L revision-history markers, the Phase 1 C1–C4 artefacts, `phase_02_green_verification.md`, or the Phase 2.5/2.6 GREEN/checkpoint artefacts except by dated append — audit trail.
+- Do not re-edit the H/M/L revision-history markers, the Phase 1 C1–C4 artefacts, the Phase 2/2.5/2.6 GREEN/checkpoint artefacts, or the Phase 3 records (`phase_03_red_evidence.md`, `phase_03_rubric_self_application.md`, smell report/review, code-review findings) except by dated append — audit trail.
 - Do not reverse the 2026-04-22/23 or 2026-06-10 amendment passes without explicit operator direction.
 - Do not route judgement-requiring subagent tasks to Haiku 4.5.
 - **Operator rule (2026-06-10, extended 2026-06-11): never auto-dispatch Fable-tier subagents, schedule unattended Fable runs, or set a Fable advisor on automated runs — Fable invocations are human-triggered only (real-money cost).** Automated phase work runs on Haiku/Sonnet/Opus; pin `model` explicitly on every Agent dispatch (default inheritance would dispatch Fable).
