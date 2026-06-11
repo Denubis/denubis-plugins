@@ -33,7 +33,7 @@ Don't test:
 
 ## Rubric Callback
 
-Before testing a new skill with subagents, check whether the skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement). If the skill-under-test fails any screen, the right next step is usually to revise the skill's scope, not to invest in testing it — testing a skill that fails the rubric is often a sunk-cost amplifier (the more you test it, the more attached you become to its current form, the harder the eventual re-scope becomes). If the skill passes all screens, proceed to the testing cycle below.
+Before testing a new skill with subagents, check whether the skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the skill-under-test fails any screen, the right next step is usually to revise the skill's scope, not to invest in testing it — testing a skill that fails the rubric is often a sunk-cost amplifier (the more you test it, the more attached you become to its current form, the harder the eventual re-scope becomes). If the skill passes all screens, proceed to the testing cycle below.
 
 ## TDD Mapping for Skill Testing
 
