@@ -6,13 +6,13 @@ user-invocable: false
 
 # Writing Skills
 
-**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, discovery optimization, and compliance techniques. This skill focuses on TDD methodology specific to skill creation.
+Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?), `denubis-extending-claude:testing-skills-with-subagents` (does it survive pressure?). Iron Law: no skill without a failing test first.
 
 ## Core Principle
 
 **Writing skills IS Test-Driven Development applied to process documentation.**
 
-Write test cases (pressure scenarios), watch them fail (baseline behavior), write the skill, watch tests pass, refactor (close loopholes).
+Write test cases (pressure scenarios), watch them fail (baseline behaviour), write the skill, watch tests pass, refactor (close loopholes).
 
 **Iron Law:** No skill without a failing test first. Same as TDD for code.
 
@@ -39,13 +39,17 @@ Write test cases (pressure scenarios), watch them fail (baseline behavior), writ
 - Standard practices documented elsewhere
 - Project-specific conventions (use CLAUDE.md)
 
+**Before committing to creation, apply the rubric:** run the artefact-under-consideration through `denubis-extending-claude:epistemic-humility`. If it fails Scope (Jones's three conditions), Observability (three screens), Process (Schön's four questions), or the Failure-pattern screen, the right next step is to re-scope, not to author. Directive-writing is a protective belt around a scope decision, not a substitute for it.
+
 ## Skill Types
 
-**Technique:** Concrete method with steps (condition-based-waiting, root-cause-tracing)
+**Technique:** Concrete method with steps (condition-based-waiting, root-cause-tracing).
 
-**Pattern:** Mental model for problems (flatten-with-flags, test-invariants)
+**Pattern:** Mental model for problems (flatten-with-flags, test-invariants).
 
-**Reference:** API docs, syntax guides, tool documentation
+**Reference:** API docs, syntax guides, tool documentation.
+
+**Discipline:** Enforces a rule under pressure (TDD, verification). Tested with combined-stressor pressure scenarios; success is following the rule when the agent wants to break it. This is the type that most needs `denubis-extending-claude:testing-skills-with-subagents`.
 
 ## Directory Structure
 
@@ -53,18 +57,22 @@ Write test cases (pressure scenarios), watch them fail (baseline behavior), writ
 skills/
   skill-name/
     SKILL.md              # Main reference (required)
-    supporting-file.*     # Only if needed
+    supporting-file.*     # Peer reference or tool, loaded on demand
+    examples/             # Optional: worked examples
+      worked-example.md
 ```
 
-**Separate files for:** Heavy reference (100+ lines), reusable tools/scripts
+A skill directory holds `SKILL.md` plus optional peer supporting files and an optional `examples/` subdirectory. This shape follows obra/superpowers' `writing-skills` layout, which this skill imports from (see Supporting Files).
 
-**Keep inline:** Principles, code patterns (<50 lines), everything else
+**Separate files for:** Heavy reference (100+ lines), reusable tools/scripts, worked examples.
+
+**Keep inline:** Principles, code patterns (<50 lines), everything else.
 
 ## SKILL.md Template
 
 ```markdown
 ---
-name: Skill-Name-With-Hyphens
+name: skill-name-with-hyphens
 description: Use when [triggers/symptoms] - [what it does, third person]
 ---
 
@@ -86,49 +94,21 @@ Table or bullets for scanning.
 What goes wrong + fixes.
 ```
 
-## RED-GREEN-REFACTOR Cycle
+## Workflow
 
-### RED: Baseline Test
+Authoring a skill sequences the three sub-skills in order. Each owns a phase of the work; this orchestrator only points.
 
-Run pressure scenario WITHOUT skill:
-1. Create combined pressures (time + sunk cost + exhaustion)
-2. Document exact violations and rationalizations verbatim
-3. Identify failure patterns
+1. **Scope check** — `denubis-extending-claude:epistemic-humility`. Apply the rubric before committing to a skill. A skill that fails Scope, Observability, Process, or the Failure-pattern screen wants re-scoping, not authoring.
+2. **Phrasing and compliance** — `denubis-extending-claude:writing-claude-directives`. Token efficiency, discovery optimisation, model-tier notes, aggressive-language dial-back. Covers Compelling Skill Organisation (CSO) and the per-model behavioural specifics.
+3. **RED/GREEN/REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Pressure testing, conversation-precedent sourcing for the RED baseline, and bulletproofing against rationalisations. This is where the Iron Law's "failing test first" becomes operational.
 
-### GREEN: Write Minimal Skill
+## Supporting Files
 
-1. Address specific baseline failures identified in RED
-2. Run scenarios WITH skill
-3. Verify compliance
+Three files imported from obra/superpowers ship alongside this skill. See `README.md` for dependencies and invocation.
 
-### REFACTOR: Close Loopholes
-
-1. Find NEW rationalizations from testing
-2. Add explicit counters
-3. Re-test until bulletproof
-
-**REQUIRED:** Use denubis-extending-claude:testing-skills-with-subagents for complete methodology.
-
-## Testing by Skill Type
-
-| Type | Test Approach | Success Criteria |
-|------|---------------|------------------|
-| Discipline | Pressure scenarios, combined stressors | Follows rule under maximum pressure |
-| Technique | Application scenarios, edge cases | Successfully applies to new scenario |
-| Pattern | Recognition + counter-examples | Knows when/how and when NOT to apply |
-| Reference | Retrieval + application tests | Finds and correctly uses information |
-
-## Common Rationalizations to Block
-
-| Excuse | Reality |
-|--------|---------|
-| "Obviously clear" | Clear to you ≠ clear to agents. Test. |
-| "Just a reference" | References have gaps. Test retrieval. |
-| "Testing is overkill" | Untested skills have issues. Always. |
-| "Too simple" | Simple things break. Test anyway. |
-| "No time" | Fixing broken skills wastes more time. |
-
-**All mean: Test before deploying.**
+- `anthropic-best-practices.md` (obra verbatim) — Anthropic-authored reference on skill structure, CSO, and anti-patterns. Reference material, not denubis-authored guidance.
+- `render-graphs.js` (obra verbatim) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime.
+- `examples/CLAUDE_MD_TESTING.md` (obra adapted) — worked example of pressure-testing CLAUDE.md documentation.
 
 ## Anti-Patterns
 
@@ -141,10 +121,14 @@ Run pressure scenario WITHOUT skill:
 
 **IMPORTANT:** Use TaskCreate to track each item.
 
+**Scope:**
+- [ ] Run the artefact through `denubis-extending-claude:epistemic-humility`
+- [ ] If it fails any screen, re-scope rather than author
+
 **RED Phase:**
-- [ ] Create pressure scenarios (3+ combined pressures for discipline skills)
+- [ ] Source the RED baseline from an independent session (not invented by this executor)
 - [ ] Run WITHOUT skill - document baseline failures verbatim
-- [ ] Identify rationalization patterns
+- [ ] Identify rationalisation patterns
 
 **GREEN Phase:**
 - [ ] Name uses letters, numbers, hyphens only
@@ -154,7 +138,7 @@ Run pressure scenario WITHOUT skill:
 - [ ] Run WITH skill - verify compliance
 
 **REFACTOR Phase:**
-- [ ] Identify new rationalizations
+- [ ] Identify new rationalisations
 - [ ] Add explicit counters
 - [ ] Re-test until bulletproof
 
