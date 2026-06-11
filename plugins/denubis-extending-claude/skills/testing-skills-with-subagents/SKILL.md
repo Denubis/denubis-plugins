@@ -12,7 +12,7 @@ user-invocable: false
 
 You run scenarios without the skill (RED - watch agent fail), write skill addressing those failures (GREEN - watch agent comply), then close loopholes (REFACTOR - stay compliant).
 
-**Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill prevents the right failures.
+**Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill prevents the right failures. Bulletproofing a skill takes multiple iterations: baseline testing surfaces many distinct rationalizations, and each REFACTOR pass closes the specific loopholes the previous round exposed.
 
 **REQUIRED BACKGROUND:** You MUST understand denubis-plan-and-execute:coding-tdd before using this skill. That skill defines the fundamental RED-GREEN-REFACTOR cycle. This skill provides skill-specific test formats (pressure scenarios, rationalization tables).
 
@@ -56,7 +56,7 @@ The RED phase needs realistic baseline behaviour. A stronger model might avoid p
 
 Run GREEN-phase tests one model tier below your expected production model. If you tested RED with Sonnet, test GREEN with Haiku. If you tested RED with Opus, test GREEN with Sonnet.
 
-The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough.
+The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, Sonnet 4.6 and Opus 4.8 will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough. Structural principle retained: weakest-model-tier-that-follows = strongest-clarity-test.
 
 ### No Blaming the Model
 
@@ -73,6 +73,19 @@ If the agent doesn't follow the skill, the skill is not clear enough. "Haiku is 
 **Goal:** Run test WITHOUT the skill - watch agent fail, document exact failures.
 
 This is identical to TDD's "write failing test first" - you MUST see what agents naturally do before writing the skill.
+
+### Conversation-Precedent Protocol (RED baseline sourcing)
+
+**Independent-session gate — RED baseline MUST come from a session that is NOT this executor, not from invention:**
+
+1. **Prior conversation transcript** retrieved via `cc-search-chats:search-chat`. Search for sessions where this skill's problem space manifested as a real failure. Capture: session ID, date, 2-3 sentence failure summary, direct quote illustrating the failure.
+2. **Fresh-session run, user-executed.** Executor and user jointly design a scenario likely to exercise the failure mode. Executor drafts a concrete copy-paste-ready prompt. User runs the prompt in a separate chat session — NOT this session, NOT a subagent of this session — and returns the transcript. Executor + user review the transcript together to identify where the failure manifests.
+
+**There is no third path.** If neither source produces an observed failure, the skill-testing cycle halts for human decision — either run a sharper fresh-session scenario, or re-scope the skill.
+
+**Why this gate exists:** Synthetic pressure scenarios invented by the skill-author optimise for the scenarios the author imagined the skill would face, not the scenarios the skill actually encountered. That's vibes-based operation (AbsenceJudgement §5.2). Independent-session transcripts ground the skill in observable failures, not in anticipated ones. A subagent of the author's own session does not count — it shares the author's framing.
+
+**Synthetic scenarios still have a job** — but it's REFACTOR-phase completeness coverage (see the REFACTOR phase below), not RED baseline. They check whether the skill, once green against real failures, holds up against hypothesised failure modes too.
 
 ### Basic Baseline Checklist
 
@@ -414,12 +427,3 @@ Test fails, you rerun, it passes. "Flaky" is not a diagnosis — it's a symptom.
 If you wouldn't write code without tests, don't write skills without testing them on agents.
 
 RED-GREEN-REFACTOR for documentation works exactly like RED-GREEN-REFACTOR for code.
-
-## Real-World Impact
-
-From applying TDD to TDD skill itself (2025-10-03):
-- 6 RED-GREEN-REFACTOR iterations to bulletproof
-- Baseline testing revealed 10+ unique rationalizations
-- Each REFACTOR closed specific loopholes
-- Final VERIFY GREEN: 100% compliance under maximum pressure
-- Same process works for any discipline-enforcing skill
