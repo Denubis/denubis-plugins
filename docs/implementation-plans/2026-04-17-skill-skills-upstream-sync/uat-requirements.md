@@ -110,6 +110,20 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** Skill-testers consistently discover the rubric-callback only after investing in test-scenario authoring, and find themselves either (a) defending scope choices they'd reconsider if they'd caught them earlier, or (b) ignoring the rubric because they've sunk cost into testing as-is. That would mean the placement didn't achieve the pre-testing timing — either the H2 needs to move still earlier (before "When to Use", as the skill's opening check) or the rubric-callback needs a more intrusive trigger (e.g., wired into the subagent-dispatch prompt itself so the testing subagent raises the rubric as its first output).
 
+### AM2-P3 — Fable-tier verification of the restructured skill is a human-invoked manual checkpoint (2026-06-10 amendment item 2)
+
+**Originating decision:** phase_03.md 2026-06-10 Amendment item 2 (executor-tier test matrix per rubric R10, inside the Fable cost gate). "RED at production tier, GREEN one tier down" is retained, but production tier is defined per executor, and this skill's executors now include the Fable 5 main loop. Automated RED/GREEN passes run on Haiku/Sonnet/Opus subagents only; Fable-tier verification is human-triggered (operator rule 2026-06-10: Fable burns real money — never auto-dispatched).
+
+**What's automatable:** RED/GREEN subagent runs of the restructured skill on Haiku/Sonnet/Opus with `model` pinned per dispatch; grep checks that neither the restructured SKILL.md nor the phase artefacts instruct auto-dispatching a Fable-tier subagent.
+
+**What's NOT automatable:** The Fable-tier verification itself — the cost gate forbids automating it. Specifically: whether the restructured skill reads correctly when the executor IS a Fable 5 main loop, given the documented over-prescription risk (rubric R2: skills tuned for prior models can degrade Fable output; mechanical checklists may be exactly that).
+
+**This decision assumes:** A human-triggered Fable 5 session applying the restructured skill honours the Conversation-Precedent gate and the demoted role of synthetic scenarios at least as reliably as Opus-tier runs, without the checklist density degrading its output.
+
+**To shatter it:** In a human-triggered Fable 5 session, apply the restructured skill to a real skill-under-test and observe: does the Conversation-Precedent gate fire before any scenario is invented? Does the skill's checklist density visibly flatten or degrade the Fable output relative to an Opus subagent run of the same exercise?
+
+**It's wrong if:** The Fable run rationalises around the Conversation-Precedent gate (invents a baseline scenario anyway and labels it precedent), or compliance is only achievable by adding louder emphasis (which would overtrigger Sonnet-tier executors — the R3 trade-off the skill is supposed to respect), or the skill's mechanical structure measurably degrades Fable-tier output (the R2 over-prescription failure). Any of these means the skill needs a tier-split (mechanical core + judgement latitude) rather than one register for all executors.
+
 ## Phase 4: `writing-skills` cornerstone rewrite
 
 Phase 4 itself produces no native UAT entries — all DRs routed to test-requirements. Back-referenced UAT entries from Phase 2 (DR8 rubric-callback timing in `writing-claude-directives`) and Phase 3 (DR7 rubric-callback timing in `testing-skills-with-subagents`) manifest here because Phase 4 is when orchestrator-to-rubric timing can first be exercised in practice with all three sub-skills wired together.
