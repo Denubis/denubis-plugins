@@ -85,7 +85,15 @@ This is identical to TDD's "write failing test first" - you MUST see what agents
 1. **Prior conversation transcript** retrieved via `cc-search-chats:search-chat`. Search for sessions where this skill's problem space manifested as a real failure. Capture: session ID, date, 2-3 sentence failure summary, direct quote illustrating the failure. If `cc-search-chats` is unavailable in this session, skip directly to path 2 — do not reconstruct transcripts from memory.
 2. **Fresh-session run, user-executed.** Executor and user jointly design a scenario likely to exercise the failure mode. Executor drafts a concrete copy-paste-ready prompt. User runs the prompt in a separate chat session — NOT this session, NOT a subagent of this session — and returns the transcript. Executor + user review the transcript together to identify where the failure manifests.
 
-**There is no third path.** If neither source produces an observed failure, the skill-testing cycle halts for human decision — either run a sharper fresh-session scenario, or re-scope the skill.
+**A source qualifies only if all of the following hold.** The gate screens the evidence; this checklist screens the screener — "qualifying" is a judgement call, and an unguarded judgement call erodes the gate one generous reading at a time. Record the answers alongside the captured evidence:
+
+- [ ] **Observed, not described.** The transcript shows the failure occurring, not a participant discussing the failure mode in the abstract. Frustration alone does not qualify — the failure itself must be identifiable in the transcript.
+- [ ] **Independent of this session.** Record the session ID and a one-sentence independence argument: who ran it, when, and why its framing does not derive from yours.
+- [ ] **In-scope.** What failed is what the skill-under-test claims to prevent, not a neighbouring problem that resembles it.
+- [ ] **Externally confirmed.** Something other than the failing agent's self-assessment marks it as a failure: a user correction, a reviewer, a second tool, an observably broken outcome.
+- [ ] **Not self-licensing.** The evidence does not originate from the skill's own authoring or testing process. If only process-adjacent evidence exists, state explicitly why it still counts, grade it as weaker, or prefer path 2.
+
+**There is no third path.** If neither source produces a qualifying observed failure, the skill-testing cycle halts for human decision — either run a sharper fresh-session scenario, or re-scope the skill.
 
 **Why this gate exists:** Synthetic pressure scenarios invented by the skill-author optimise for the scenarios the author imagined the skill would face, not the scenarios the skill actually encountered. That's vibes-based operation (AbsenceJudgement §5.2). Independent-session transcripts ground the skill in observable failures, not in anticipated ones. A subagent of the author's own session does not count — it shares the author's framing.
 
