@@ -742,6 +742,8 @@ Refs: AC5.8; design plan Additional Consideration 'No integration test
 - [ ] All prior phases' DoD conditions verified (Task 4 Step 3)
 - [ ] Phase 5 UAT entry appended to `uat-requirements.md` using gate-form template
 
+**Note (2026-06-11, Phase 3 proleptic carry-forward CA3):** Phase 5 audits recompute line counts and commit counts from the files and git history at audit time — never from phase-summary prose. During Phase 3, three different line counts for the same artefact circulated in prose within days, each stale by the time it was read. The commit-count expectations above are floors to verify against `git log`, not figures to transcribe forward.
+
 **Not in scope for Phase 5:**
 - Any content changes to skills (Phases 1-4, 6 handle all content)
 - Handoff to executing-an-implementation-plan (Finalization task + Re-read + Critical peer review + Execution handoff come after Phase 5)
