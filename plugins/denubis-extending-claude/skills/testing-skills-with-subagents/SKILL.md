@@ -31,6 +31,10 @@ Don't test:
 - Skills without rules to violate
 - Skills agents have no incentive to bypass
 
+## Rubric Callback
+
+Before testing a new skill with subagents, check whether the skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement). If the skill-under-test fails any screen, the right next step is usually to revise the skill's scope, not to invest in testing it — testing a skill that fails the rubric is often a sunk-cost amplifier (the more you test it, the more attached you become to its current form, the harder the eventual re-scope becomes).
+
 ## TDD Mapping for Skill Testing
 
 | TDD Phase | Skill Testing | What You Do |
@@ -160,6 +164,18 @@ Make agent believe it's real work, not a quiz.
 ## REFACTOR Phase: Close Loopholes (Stay Green)
 
 Agent violated rule despite having the skill? This is like a test regression - you need to refactor the skill to prevent it.
+
+### Letter-vs-Spirit Bulletproofing Principle
+
+**Foundational principle:** Violating the letter of a rule is violating the spirit of the rule.
+
+When an agent under test rationalizes with:
+- *"I'm following the spirit not the letter"*
+- *"The PURPOSE is X, and I'm achieving X differently"*
+- *"Being pragmatic means adapting"*
+- *"Deleting X hours is wasteful"*
+
+The skill failed to encode letter-vs-spirit as non-negotiable. Add this principle explicitly to any skill whose REFACTOR cycle surfaces these rationalization patterns. The principle is structurally prior to the rules themselves — it defends against the meta-rationalization that "the rule wasn't the *real* rule."
 
 **Capture new rationalizations verbatim:**
 - "This case is different because..."
