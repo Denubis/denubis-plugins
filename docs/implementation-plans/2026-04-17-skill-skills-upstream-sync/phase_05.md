@@ -383,11 +383,12 @@ Skill-skills upstream sync: new `epistemic-humility` reference skill, restructur
 
 **Fixed:**
 - Stale Opus 4.5 "Think Sensitivity" claim in `writing-claude-directives/SKILL.md` removed (superseded by Opus 4.7 effort-level controls).
-- Unsupported "Haiku struggles with judgement calls" claim in `testing-skills-with-subagents/SKILL.md` removed (not in current 2026-04 Anthropic docs).
 
 **Explicitly NOT imported from obra:**
 - `persuasion-principles.md` — denubis departs from obra on this point. Persuasion principles are compliance-induction levers that contradict the `epistemic-humility` rubric, Anthropic's current prompting guidance, and AbsenceJudgement's technoscholasticism critique. See design plan Additional Consideration *Persuasion principles do not belong in denubis skills*.
 ```
+
+**Template correction (2026-06-11, Phase 3 refactor pipeline P2):** the Fixed section previously claimed the Haiku-judgement passage was "removed". The 2026-04-22 plan-amendment pass reversed that decision — the passage was retained and reframed with an operator-empirical anchor, as the Changed bullet above correctly records. The stale Fixed bullet predated the amendment and contradicted the Changed bullet in the same template; it was deleted so the CHANGELOG entry written from this template stays true.
 
 **Step 4: Verify the triad is synchronised**
 
