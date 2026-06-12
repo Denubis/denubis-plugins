@@ -119,3 +119,129 @@ This seed is the starting input for step 1.
 - Empirical algorithm extracted from the 2026-05-18/19 transcript where a peer Claude session recovered the casualty list from `~/.claude/projects/` after the crash-recovery CLI failed to surface them.
 - Casualty list (for reproducibility): 5 sessions clustered at `2026-05-18 18:47:56.97…98.04` AEST, cwds spanning sillytavern-deploy/implement-tavern-laws5000, brian-ed3d-plugins/denubis-dream, session-runner, and Adela/melica (×2).
 - Current crash-recovery DB state on user's machine at time of writing: 130 sessions classified `borderline` with reason `unknown_tail_kind`; zero `hard_crash`; zero `live`. Consistent with the structural gap above.
+
+## Addendum 2026-06-12 — tmux-resurrect / byobu as a post-mortem input source
+
+A second OOM/kill on **2026-06-11 ~20:50 AEST** took out 9 sessions across 6 dirs. The
+casualty list was again recovered by hand, and again the running `triage` buried them in
+the 130-row `unknown_tail_kind` bin — the seed's algorithm works, it is just still unbuilt.
+This run added a signal the original algorithm did not use.
+
+**The signal.** byobu ships tmux-resurrect (plugin under `~/.byobu/tpm/plugins/`, **saves to
+`~/.byobu-sessions/tmux_resurrect_<YYYYMMDDTHHMMSS>.txt` — NOT `~/.tmux/resurrect/`**).
+A 2026-06-08 recovery attempt concluded "no resurrect installed" precisely because it only
+checked `~/.tmux/plugins`; this is the standard miss. Continuum snapshots every ~15 min, so
+there is almost always a save 0–15 min before any crash. Each `pane` line (tab-separated)
+carries, in field order: `pane`, session, window, pane-idx, flags, `1`, **`:<window title>`**,
+**`:<pane_current_path>`**, `1`, `<pane_current_command>`, `:<shell>`.
+
+**What it buys, mapped to the open questions:**
+- **Open Q#2 (labels / render).** Field 7 is the window title — for wrapped Claude windows
+  it is the `exec-session-naming` slug prefixed `✳` (e.g. `✳ Add open-pdf endpoint to Zotero
+  API plugin`). This is a human-meaningful "what was this session" label that mtime-clustering
+  cannot produce. Render could show it beside the resume line.
+- **Open Q#3 (input source).** A third option besides `last` / `journalctl`: the resurrect
+  snapshot independently confirms *which cwds had a live `claude` pane at kill time* (filter
+  panes to `✳` title or `pane_current_command`), turning the mtime cluster from "probable" to
+  "corroborated". It also works where `last`/`journalctl` are unreliable (the 2026-06-11 run
+  never needed `last` — pane-set ∩ mtime-cluster was sufficient).
+- **False-positive suppression (Q#5).** pane∩cluster is a stronger discriminant than cluster
+  alone: a coincidental fsync burst will not also have matching live `claude` panes.
+
+**Confirms, does not replace, the cwd-join.** `correlate.py::_project_dir_for_cwd` already
+reads the JSONL `cwd` field (the robust reverse map). The resurrect `pane_current_path` is the
+forward map and agrees with it — useful as a cross-check, and it caught a hand-decode error:
+the project dir `-home-brian-people-Brian-zendo-kdf-data` is ambiguous and naively decodes to
+`zendo-kdf-data` (which does not exist) when the real cwd is `zendo-kdf/data`. Reading `cwd`
+from the JSONL (as the plugin already does) is canonical; resurrect's path corroborates it.
+
+**Gotchas observed 2026-06-11:**
+- A pane having a Claude window does not mean a *resumable* session — `agy`, `ssh`, `fish`,
+  `oauth2-proxy` panes coexist; filter on `✳`/`pane_current_command == claude`.
+- A live Claude session may have **no** resurrect pane (here: `zendo-kdf/data`, a subdir the
+  window had `cd`'d out of). So: drive the casualty list from the JSONL mtime cluster; use
+  resurrect to *enrich and corroborate*, not as the sole source.
+- The auto-restored post-crash tmux session has `created` == restore time and does **not**
+  restart `claude`; `pgrep claude` empty + a fresh-stamped restored session is itself a
+  crash tell.
+- `/clear` mints a new session UUID in the same window, so one pane can leave several JSONLs
+  in the kill cluster; resume the newest per cwd, or present all and let the user pick.
+
+**Provenance.** Recovery artefact for this run: `~/llm-resume-postmortem-20260611.md`
+(hand-written, kept outside the DB-managed `~/llm-resume.md`). Casualties clustered
+`20:50:01.57–20:50:02.64` AEST; pre-crash snapshot `~/.byobu-sessions/tmux_resurrect_20260611T203938.txt`.
+
+### Operator feedback 2026-06-12 — recovery-output requirements (binding)
+
+The 2026-06-11 recovery first shipped a list of only the 7 crash-cluster sessions and
+described it as "everything". The operator's correction, verbatim in intent: *"When I ask
+for all sessions, I mean all sessions, not just the ones you vibe. And the starting hashes
+aren't very useful."* These are hard requirements for any recovery output, manual or coded:
+
+1. **All means all — no vibe-curation.** Enumerate **every** session in the stated window,
+   not the subset the assistant judges "live" / "relevant" / "worth resuming". The operator
+   decides relevance; the tool's job is the complete roster. Mark derived attributes
+   (`● crash`, subagent count) as *columns*, never as a filter that drops rows. The full
+   2026-06-11 set was **22** top-level sessions, not 7.
+2. **State the enumeration window explicitly** ("every top-level session with activity on
+   `<date>`") so scope is visible, not an implicit judgement call. Do not silently narrow it.
+3. **Do not claim comprehensiveness unless the artefact is exhaustive.** "Everything is in
+   the file" when the file holds a quarter of the sessions is the specific failure here.
+4. **Opening message / first line is a useless identifier** — almost always `/clear`, a
+   slash-command wrapper, a continuation prompt, or a tool stub. Key each row on, in order:
+   the **tmux-resurrect pane title** (the `✳` `exec-session-naming` slug — the best "what was
+   this"), **last substantive activity**, **last-activity timestamp**, and the **full
+   resumable UUID** (never a truncated hash — the operator needs the whole UUID to resume).
+5. **"Last substantive activity" extraction must skip more than `/clear`.** Observed leakage
+   on 2026-06-11: trailing `<usage>…</usage>` token-accounting records, `<summary>…</summary>`
+   background-command notifications, `</task-notification>` stubs, and the post-compaction
+   "If you need specific details from before compaction…" boilerplate all surfaced as the
+   "last message". The backward scan for the last real event must skip these bookkeeping kinds
+   (extends gotcha #2 above), falling back to the last human turn or last assistant text.
+
+Render implication for the coded feature: the "Probable system-crash victims" section (open
+Q#2) is a *priority highlight*, not the whole report — the full roster must still render so
+nothing is dropped.
+
+### Operator ask 2026-06-12 — "a flag in claudew that says if I exited properly"
+
+This flag **already exists**: it is the DR8 liveness file in
+`denubis-plan-and-execute/scripts/claude-wrapper.sh`. The wrapper writes
+`~/.claude/run/<PID>.live` on start (`cwd`, `started`, `argv` incl. `--resume <uuid>`,
+`boot_id`) and removes it **only on exit code 0 or 130 (Ctrl-C)**; any other code (137 SIGKILL,
+139 SIGSEGV, generic non-zero) leaves it as crash evidence. So "exited properly" = the `.live`
+is gone; a surviving `.live` = abnormal termination. The operator's instinct is right; the
+mechanism is built. The gaps below are why it does not yet *feel* built.
+
+**Empirical landscape 2026-06-12** (`~/.claude/run`, 30 files): 3 alive (today's resumes,
+incl. the already-recovered BJET `4e7fc80e` and zotero `1e32935f`), 27 dead stale markers
+spanning 06-04…06-11. The flag retained every uncleanly-exited session correctly.
+
+**The three gaps this exposes — these are the work, not a new flag:**
+
+1. **Same-boot kills defeat `boot_id` detection.** All 30 files carry the *current* boot_id —
+   the 20:50 kill was an OOM/tmux-server death, **not a reboot** (kernel never restarted). So
+   "boot_id ≠ current ⇒ crash" matches **zero**, and the seed's `last`/`journalctl`
+   reboot-window algorithm (steps 1–2 above) would miss it entirely. **The reliable
+   same-boot crash signal is `.live`-present AND its PID is dead**, not a boot change. The
+   classifier must test PID liveness of each `.live`, not (only) reboot history. boot_id stays
+   useful for the *reboot* case (where PIDs are reused en masse); it is not sufficient alone.
+
+2. **PID-liveness is PID-reuse-fragile.** A bare `kill -0 <pid>` calls a recycled PID "alive"
+   and silently drops a crash victim; on 2026-06-12 this had to be rejected by reading
+   `/proc/<pid>/cmdline`. The `.live` records no process start-time, so reuse cannot be
+   rejected from the file alone. **Fix: stamp the process start-time into the `.live`** (e.g.
+   `/proc/<pid>/stat` field 22, or `ps -o lstart=`) and require *PID alive AND start-time
+   matches* to count as still-running. This is a small, testable addition to
+   `claude-wrapper.sh` + `liveness.py`.
+
+3. **No reaping, and the tool doesn't consume it.** 27 markers accumulate back to 06-04 — the
+   flag rots into noise with no lifecycle. And `crash-recovery triage` renders from its SQLite
+   DB without cross-referencing `~/.claude/run/*.live` at all, so the signal sits on disk
+   unused. The classifier should (a) read the `.live` set, (b) classify present+PID-dead
+   (start-time-checked) as `hard_crash`, and (c) reap markers once recovered/acknowledged
+   (or let `prune` cover `~/.claude/run`).
+
+**Net:** do not add a second flag. Harden the existing one (start-time stamp), then wire the
+classifier to consume it for the same-boot case. This subsumes the seed's reboot-only
+algorithm rather than replacing it.
