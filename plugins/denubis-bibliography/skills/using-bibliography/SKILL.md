@@ -351,6 +351,97 @@ text from the page. **If no match is found, it exits non-zero and prints
 NO MATCH** — do not invent a quote. Per the zettelkasten `AGENTS.md` rule,
 unverified quotes are flagged with `> [unverified] ...` for human review.
 
+## Annotating cited passages back onto the PDF (requires zotero-api-plus)
+
+`blockquote.py` surfaces a verified quote *for* citing. `annotate.py` does the
+inverse: it writes that passage back into the Zotero PDF as a **highlight whose
+comment carries the citation**, so every passage you used is marked in the
+source. In Zotero's reader you (or a collaborator) then see, on the page, which
+of your writing each highlighted span supports.
+
+**Requires** the zotero-api-plus build with the annotation endpoints
+(`add-highlight`, `add-note`, `read-annotations`, `read-note`, `open-pdf`,
+`delete-annotation`). `annotate.py` probes `GET /api/plus/read-annotations` on
+startup (a bare GET returns `400 "No item key"` when present, `404` when the
+build is too old) and halts with instructions if they are absent.
+
+**It WRITES to your library**, and My Library annotations **sync to your other
+devices** (verified). Writing is the point of the tool, so it is not gated the
+way `fetch.py` gates `add-item`; the dedup marker (below) makes re-runs safe, and
+`--dry-run` resolves and locates a span without writing.
+
+### Why rects mode is the default (the 5-page cap)
+
+Zotero's PDF worker caps `getRecognizerData` at **5 pages**, so the endpoint's
+own text-anchored mode only reaches a quote in the first five pages. `annotate.py`
+therefore computes the geometry locally with **PyMuPDF** (already a render
+dependency): `page.search_for(quote)` for the rects, `page.rect.height` for the
+page height. It posts *position (rects) mode*, which works on **any** page.
+PyMuPDF's TOP-LEFT rects and page height feed the endpoint directly; it flips
+them to Zotero's bottom-left space, so the consumer does no coordinate maths.
+Verified live on Arksey & O'Malley 2005, physical p.8 (My Library): the
+highlight landed on the right span and synced.
+
+### Single passage
+
+```bash
+uv run annotate.py <citekey> --page <physical-page> \
+    --quote "<verbatim passage>" --note "<why you cited it>"
+```
+
+- `--page` is the **physical** PDF page (page 1 = first page of the file), the
+  same basis the render output uses — *not* the printed page number (e.g. Arksey
+  physical p.8 is printed p.5).
+- `--dry-run` resolves the item, checks for an existing annotation, and locates
+  the span (reports the rect count) without writing.
+- `--color #rrggbb` overrides Zotero's default highlight colour.
+
+The same citekey can exist in several libraries, only some with the PDF
+attached. `annotate.py` exports every copy and uses the one that has a PDF —
+when calling the endpoints by hand, select that copy yourself (see Common
+mistakes).
+
+### Batch — annotate every passage you used
+
+`annotate.py --batch passages.jsonl` loops the single-passage path over a JSONL
+file, one object per line:
+
+```json
+{"citekey": "yim...", "page": 7, "quote": "the verbatim span", "note": "the claim it supports"}
+```
+
+Generating that list — walking a draft or the literature notes for every
+`> quote` + `[@citekey, p. N]` pair — is the **caller's** job (have Claude
+produce the JSONL). `annotate.py` only applies it. The batch is idempotent, so a
+re-run after you add citations annotates only the new ones.
+
+### Idempotency and the note fallback
+
+Every annotation's comment carries a machine marker `⟦ax:<fingerprint>⟧`, the
+fingerprint being a whitespace/case-normalised hash of the quote. Before
+annotating, `annotate.py` reads existing annotations (`read-annotations` returns
+notes **and** highlights) and skips any passage whose marker is already there —
+so re-runs never duplicate, and a passage recorded either as a highlight or as a
+note-fallback counts as done.
+
+When PyMuPDF cannot locate the quote — a scanned/OCR'd page with no text layer,
+or text drift between the rendered markdown and the live PDF — `annotate.py`
+falls back to a **page-anchored sticky note** (`add-note`) carrying the same
+citation + marker, so the citation is still recorded on the right page. Those
+runs report `◐ noted` instead of `✓ highlighted`.
+
+### Inspect / clean up
+
+```bash
+uv run annotate.py --list <citekey>          # show existing annotations
+curl -sS -X POST http://localhost:23119/api/plus/delete-annotation \
+     -H 'Content-Type: application/json' -d '{"key":"<annKey>","libraryID":<id>}'
+```
+
+`open-pdf` is a plain GET, so
+`http://localhost:23119/api/plus/open-pdf?key=<itemKey>&page=<n>` is a clickable
+citation link that opens the passage in Zotero's reader.
+
 ## Adding notes to the zettelkasten
 
 Two note types, two locations, two purposes (per `~/zettelkasten/AGENTS.md`).
@@ -635,6 +726,14 @@ quirks worth knowing:
   `blockquote.py` at quote-creation time as the verification step.
 - **Does not handle SSL bypass for EZProxy.** Designed (dated stamp file in
   project) but not implemented.
+- **Does not generate the batch passage list itself.** `annotate.py --batch`
+  consumes a JSONL of `{citekey, page, quote, note}`; walking a draft or the
+  literature notes to *produce* that list is the caller's job (have Claude do
+  it). The script only applies a list it is given.
+- **Cannot span-highlight scanned/OCR'd sources.** `annotate.py` locates a quote
+  via the PDF text layer (PyMuPDF); a page with no text layer (e.g. Schraw 1994,
+  Polanyi) has nothing to anchor on, so it falls back to a page-anchored note
+  rather than a highlight on the span.
 
 When asked to do any of these, halt and say so explicitly. Do not improvise.
 
@@ -661,6 +760,9 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Running 0.2.1 or earlier on Windows and getting "no PDF attachment" for items that clearly have one | `parse_pdf_paths` in 0.2.1 and earlier collided with the Windows drive-letter colon (`C:\...`) and returned no path. Upgrade to 0.2.2+. |
 | Hand-writing a multi-line `python3 -c "…"` block in bash to dig a `collectionKey` out of `/api/plus/libraries` | That improvisation is what broke (shell mangled the multi-line quoting). Use `fetch.py --group … --collection …` — it resolves the key in one call and previews before writing. |
 | Reaching for `pdftotext`/`tesseract`/manual docling, or standing up an OCR tool by hand + a one-off converter, when a render looks bad | PDF→text is always the `renderer.py` cascade. On `NEEDS MOCR`, confirm with the user and re-run with `--allow-mocr` — the cascade drives the dots.mocr spinup/OCR/spindown and folds output into `papers/` itself. |
+| Passing the printed page number to `annotate.py --page` | Use the **physical** PDF page (page 1 = first page of the file). Printed and physical pages differ (Arksey physical p.8 = printed p.5). |
+| Calling `add-highlight`/`add-note` directly with the first `item.search` hit | The citekey may exist in several libraries, only some with the PDF attached. `annotate.py` exports every copy and uses the one with a PDF; by hand, resolve to that copy and pass its `libraryID`. |
+| Expecting `add-highlight` text mode to highlight past page 5 | `getRecognizerData` caps at 5 pages. Use rects (position) mode — `annotate.py` computes the rects with PyMuPDF, so any page works. |
 
 ## Provenance
 
@@ -798,3 +900,27 @@ discovery):
   total ~63 s. The run surfaced that dots.mocr's `_nohf.md` embeds a full-page
   PNG atop each page (~86% of the file's bytes on COSMIN); `fold_mocr_markdown`
   now strips those base64 data-images, keeping only the OCR text.
+
+**2026-06-13 addendum** (annotate cited passages back onto the PDF):
+
+- New `annotate.py`: writes a cited passage back into the Zotero PDF as a
+  highlight carrying the citation, via zotero-api-plus position (rects) mode.
+  Pure core (item-key extraction, quote fingerprint, comment/marker building,
+  payload construction, response parsing, and multi-library copy selection)
+  covered by 26 unit tests in `tests/test_bibliography_annotate.py`; the httpx +
+  PyMuPDF shell is verified live, in the FCIS shape `fetch.py` established.
+- Geometry is computed locally with PyMuPDF (`page.search_for` +
+  `page.rect.height`) and posted as TOP-LEFT rects + pageHeight; the endpoint
+  flips to Zotero's bottom-left space. This sidesteps the recogniser's 5-page cap
+  (corrected from a stale "50" in the endpoint's own comment — the PDF worker
+  caps at 5), so highlights work on any page.
+- Idempotent: every comment carries `⟦ax:<fingerprint>⟧`; a run reads existing
+  annotations (`read-annotations`, which returns highlights too) and skips
+  already-marked passages. A quote PyMuPDF cannot locate (OCR'd page / text
+  drift) falls back to a page-anchored `add-note`.
+- Verified end-to-end 2026-06-13 on `arkseyScopingStudiesMethodological2005`
+  (My Library): resolve → dedup → rects-mode highlight on physical p.8 landed on
+  the right span and synced; the re-run skipped (idempotent); `delete-annotation`
+  removed the test annotation. Endpoint contracts read from
+  `~/people/Brian/zotero-api-plus/src/{addon.ts,utils/highlight.ts,
+  utils/annotations.ts}`, not transcribed from the API thread's summary.
