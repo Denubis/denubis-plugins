@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-bibliography] 0.6.0
+
+Annotate cited passages back onto the source PDF: `annotate.py` highlights a quoted passage in the Zotero PDF with the pandoc citation as its note, via the zotero-api-plus position (rects) mode.
+
+**New:**
+- `annotate.py`: given (citekey, page, verbatim quote, note), highlights that passage in the Zotero PDF carrying `[@citekey, p. N]` as the annotation comment. Computes the geometry locally with PyMuPDF (`search_for` + page height) and posts position (rects) mode, so highlights work on any page — the recogniser's text mode caps at 5. Idempotent via a per-quote `⟦ax:<fp>⟧` marker read back through `read-annotations`; falls back to a page-anchored note when the quote has no text layer (scanned/OCR'd pages). `--batch` applies a JSONL of passages; `--dry-run` and `--list` preview and inspect.
+- 26 unit tests for the functional core (`tests/test_bibliography_annotate.py`): item-key extraction, quote fingerprint, comment/marker round-trip, payload building, response/structured-error parsing, and multi-library copy selection.
+
+**Changed:**
+- `using-bibliography` SKILL.md documents the annotate-back workflow and the zotero-api-plus annotation endpoints (`add-highlight` rects mode, `read-annotations`, `add-note`, `open-pdf`, `delete-annotation`); plugin description notes the new capability.
+
 ## [denubis-plan-and-execute] 2.33.0
 
 Removes the four command wrappers that shared a name with their skills. Commands and skills share one namespace, and the Skill tool was resolving the namespaced name to the command wrapper — whose `$1`/`$2` substitution mangled model-passed arguments and whose "now invoke the skill" instruction was circular. The skills are user-invocable and serve the slash-command role directly.
