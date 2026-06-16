@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.34.0
+
+New `writing-academic-prose` skill: a portable academic-writing discipline that fires the project's own register rules before drafting and keeps prose clean across revision passes.
+
+**New:**
+- `writing-academic-prose` skill. Before the first prose edit each session it opens the project's full `.notes/` register and writing rules, the gate that a CLAUDE.md summary alone does not enforce. It then cuts scar tissue (sentences whose subject is the manuscript rather than the study), holds a punctuation hierarchy (em-dash never, semicolon exceptionally rare, colon sparing for lists and definitions), and rebuilds crammed sentences from the idea rather than laundering the mark into a semicolon or lapsing into staccato. Carries pinpoint-citation (APA paraphrase) discipline. Built with RED-GREEN-REFACTOR subagent testing: a baseline agent under deadline pressure skipped the notes and grew scar tissue, while the skill fires the gate and produces genuine rebuilds on Haiku.
+
 ## [denubis-bibliography] 0.6.0
 
 Annotate cited passages back onto the source PDF: `annotate.py` highlights a quoted passage in the Zotero PDF with the pandoc citation as its note, via the zotero-api-plus position (rects) mode.
