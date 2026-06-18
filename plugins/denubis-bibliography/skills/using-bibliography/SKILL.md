@@ -1,8 +1,8 @@
 ---
 name: using-bibliography
-description: Use when rendering a Zotero PDF to per-page markdown, surfacing page-keyed blockquotes from a rendered paper, or fetching a missing paper into Zotero behind explicit confirmation.
+description: Use when resolving a paper in Zotero by any key, rendering a Zotero PDF to per-page markdown, surfacing page-keyed blockquotes, or fetching a missing paper behind explicit confirmation.
 user-invocable: true
-last-reviewed: 2026-06-03
+last-reviewed: 2026-06-17
 ---
 
 # Using Bibliography
@@ -58,6 +58,54 @@ yet validated.
 4. **`pymupdf4llm` is installed** in a usable venv. `docling` is also
    required for the fallback path when pymupdf4llm produces empty or
    garbage output (see "Render cascade" and Dependencies below).
+
+## Resolve a paper — the front door (`resolve.py`)
+
+**Start here to find a paper in Zotero by anything you know about it.** `resolve.py`
+is the live, citekey-first resolver: pass any of author, year, title, date,
+citekey, or DOI and it reports the truth — which libraries *and* collections the
+paper is in, whether a PDF is attached and on disk, and whether it has been
+rendered — then renders it by default so it can be "asked questions".
+
+It queries the **running Zotero DB** (BBT JSON-RPC: `item.search` /
+`item.collections` / `item.attachments` / `user.groups`), never the cached `.bib`
+export — so it cannot report a stale ghost. And because it resolves by
+citekey/author/title, it does not inherit the DOI path's failure modes (Crossref
+dependency, empty-author DOIs, DOI drift).
+
+```bash
+R=plugins/denubis-bibliography/skills/using-bibliography/resolve.py
+# Bare query is auto-classified: DOI shape (10.NNNN/…) -> --doi; citekey shape -> --citekey
+uv run $R vehtariPracticalBayesianModel2017
+uv run $R --author Vehtari --year 2017
+uv run $R --title "scoping studies"
+uv run $R --doi 10.1007/s13347-024-00760-w        # DOI: Crossref-surname fallback (the one weak key)
+uv run $R --citekey <key> --library "My Library" --no-render   # narrow + don't render
+```
+
+Per match it prints library, the paper's collections (aggregated per citekey by
+BBT, **not** per library copy), PDF path (+ exists), and `state`: `not-in-zotero`
+| `no-pdf` | `pdf-unknown` | `ready-to-render` | `rendered` | `needs-ocr-escalation`.
+Auto-render is ON by default (`--no-render` suppresses; `--force` re-renders;
+`--allow-mocr` escalates to GPU OCR).
+
+**Truthful by construction:** a wrong/constructed citekey returns an honest "No
+matches" rather than a guess; the same paper is listed once per library it lives
+in; a PDF that can't be confirmed (unresolved library name / failed lookup) is
+`pdf-unknown`, never a false `no-pdf`. `--author` matches an **exact surname as
+filed** in Zotero — so a mis-filed creator (see Common mistakes), initials, or a
+partial name won't match; fall back to `--title`.
+
+**Known behaviour:** copies of one citekey across libraries share a single render
+dir `papers/<citekey>/`. The paper renders **once** — render state is per-citekey,
+not per-copy PDF, so other copies never re-render or clobber it (`--force`
+re-renders). If two libraries genuinely hold *different* documents under one
+citekey (e.g. a preprint vs the published version), the dir holds whichever
+rendered first; that's a Zotero data-hygiene case, pinnable with `--library`.
+
+`resolve.py` is the one call to use. The inline `item.search` → `item.export`
+recipe under "The proven workflow" documents the same mechanism by hand for when
+you need to drive it directly.
 
 ## Quickstart: ingest a list of DOIs
 
@@ -608,7 +656,7 @@ curl -sS "http://localhost:23119/better-bibtex/library?/<libraryID>/library.bibl
 - `<libraryID>` is the numeric ID from `user.groups` (My Library = 1; group
   libraries get higher IDs).
 - Output is byte-identical to BBT's auto-export — verified against
-  `2026-bbs-jt-em-bjet-AI-metacognitive-1` (libraryID = 27, 42 entries,
+  `2026-example-library-1` (libraryID = 27, 42 entries,
   47 KB BibLaTeX) on 2026-05-12.
 - Alternative translator suffixes work too: `.bibtex` for classic BibTeX,
   `.csljson` for CSL-JSON, etc. — same pattern.
@@ -743,6 +791,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 |---------|-----|
 | Calling `item.export` without `library_id` | Always look up `library_id` via `user.groups`. My Library = 1; groups vary. |
 | Constructing cite keys by hand or truncating them | Copy `citation-key` verbatim from `item.search` response. BBT keys are longer than they look. |
+| Searching by a remembered/constructed citekey, getting "not found", and concluding the paper is absent | The real key can differ from what you'd guess: a paper authored "Imre Lakatos" was filed with given/family swapped, so its key is `imreFalsificationMethodologyScientific1970`, not `lakatos…1970a`. Resolve with `resolve.py --title`/`--author` (or fix the misfiled creator in Zotero) — never trust a remembered citekey. |
 | Multi-token `item.search` queries returning zero hits | Search is AND-style. Use single tokens (author surname OR title fragment), then refine. |
 | Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | DOI field is not indexed for fulltext search. Resolve DOI → surname via Crossref, then search by surname, then filter results by exact DOI match. |
 | Using the storage directory name (e.g. `2367YXMF`) as the item key | That's the attachment key. The parent item has a different key; use cite-key based lookups. |
@@ -771,7 +820,7 @@ the academic-bibliography design conversation. The render and blockquote
 scripts are the same scripts used in that demo, lightly cleaned. Anything
 beyond what the demo proved is marked explicitly above.
 
-**2026-05-12 addenda** (BJET-RR project, 42-paper rendering pass):
+**2026-05-12 addenda** (the project, 42-paper rendering pass):
 
 - "Refreshing the on-disk bib" section added — HTTP pull-export URL pattern
   discovered after the BBT JSON-RPC method-list probe confirmed no
@@ -780,7 +829,7 @@ beyond what the demo proved is marked explicitly above.
   disambiguation; Wiley chapter DOIs failing in `ingest.py`; brittle
   `blockquote.py` matching on Unicode apostrophes, HTML-rendered table cells,
   and paraphrased "quotes".
-- Confirmed `ingest.py` end-to-end on the BJET methodology corpus (35
+- Confirmed `ingest.py` end-to-end on a methodology corpus (35
   journal articles + 8 burst chapter PDFs + 7 late adds → 42 papers; 0
   render failures with the HTTP-pull-export-driven workflow).
 
@@ -823,7 +872,7 @@ discovery):
   image-only pages - they produce actual empty pages, which the existing
   heuristic catches).
 
-**2026-05-14 second pass** (Windows hardening for Jodie's BJET project):
+**2026-05-14 second pass** (Windows hardening for a collaborator's project):
 
 - `parse_pdf_paths` extracted into `bbt.py` and hardened for Windows
   drive-letter colons (`C:\Users\...`). Both unescaped and `\:`-escaped
@@ -924,3 +973,42 @@ discovery):
   removed the test annotation. Endpoint contracts read from
   `~/people/Brian/zotero-api-plus/src/{addon.ts,utils/highlight.ts,
   utils/annotations.ts}`, not transcribed from the API thread's summary.
+
+**2026-06-17 addendum** (`resolve.py` — the any-key, live, truthful front door):
+
+- New `resolve.py`: resolve a paper by author / year / title / date / citekey /
+  DOI against the **running** Zotero DB (BBT `item.search` / `item.collections` /
+  `item.attachments` / `user.groups`), never the cached `.bib`. Reports
+  libraries, collections, PDF path + existence, and pipeline `state`, and
+  auto-renders `ready-to-render` matches via a `render.py` subprocess. Pure core
+  (`select_citekey_matches`, `normalize_bbt_hit`, `matches_query`,
+  `classify_state`, `collection_names`, `_render_cmd`) covered by unit tests in
+  `tests/test_bibliography_resolve.py`; the httpx/subprocess shell verified live in
+  the FCIS shape `fetch.py` established.
+- Motivation: the DOI-only resolver reported papers that ARE in Zotero as
+  `NOT FOUND` (Crossref→surname→BBT pipeline failing on Wiley chapter DOIs, R
+  Journal DOIs, and DOI drift — vehtari/Collins/Lombardo cases across multiple
+  project sessions). Resolving by citekey/author/title removes that whole class.
+- The "Lakatos is missing" ghost that motivated this was a constructed citekey
+  (`lakatos…1970a`) for an item filed under `imre…1970` with no PDF — not a stale
+  cache. `resolve.py` reports the wrong key as honestly absent and finds the paper
+  by `--title`/`--author`.
+- Bug caught at live verification, not in tests: the render subprocess must pass
+  `--with pymupdf4llm --with docling --with easyocr` because `render.py` has no
+  PEP 723 header; `_render_cmd` now encodes that and is regression-tested. Live
+  render confirmed end-to-end (Vehtari, 28 pages via pymupdf4llm).
+- DOI remains the one weak key (BBT can't search the DOI field): `--doi` uses the
+  same Crossref-surname fallback as `ingest.py`. A clean DOI-field search + bundled
+  on-disk path is specced for a future `zotero-api-plus` `GET /api/plus/resolve`
+  endpoint, which would let `resolve.py` demote the BBT/Crossref path to a fallback.
+- Critical-peer-review pass (2026-06-17) hardened truthfulness: render state is now
+  **per-citekey** (a paper renders once; copies never re-render or clobber the
+  shared `papers/<citekey>/` dir; `--force` re-renders) — replacing a per-copy
+  sha256 check that bounced state and clobbered across library copies. An
+  unconfirmable PDF is `pdf-unknown`, not a false `no-pdf` (an unresolved library
+  name or failed attachment RPC no longer collapses to a confident "no PDF").
+  Collections are reported per-citekey (BBT aggregates them), not per-library. The
+  dead stock-API normaliser and its "identical content — harmless" claim were
+  removed: the claim was live-falsified — copies of one citekey can be
+  byte-different PDF files (the rare genuinely-different-document case is a Zotero
+  data-hygiene matter, not arbitrated here).
