@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-bibliography] 0.7.0
+
+One-call paper resolution by any key, plus a pass to genericise project-identifying strings ahead of a public deposit.
+
+**New:**
+- `resolve.py`: resolve a paper in Zotero by citekey, author, year, title, date, or DOI in a single live call (BBT JSON-RPC, no stale `.bib` cache). Reports which libraries and collections hold the paper, takes an optional `--library` constraint, and auto-renders the match. Classifies pipeline state (not-in-zotero / no-pdf / pdf-unknown / ready-to-render / rendered) and is truthful — a paper that is in Zotero is never reported as NOT FOUND. Pure functional core unit-tested in `tests/test_bibliography_resolve.py` (26 tests); the httpx/subprocess shell verified live.
+- `using-bibliography` SKILL.md documents `resolve.py` as the front door for paper lookup.
+
+**Changed:**
+- Genericised project-identifying strings (an old venue label and a collaborator name) in the skill docs and test fixtures, so the publicly-linked plugin and the registered-report deposit carry a neutral worked-example library name. No behaviour change.
+- Trimmed the `using-bibliography` skill description back under the 200-character lint.
+
 ## [denubis-plan-and-execute] 2.34.0
 
 New `writing-academic-prose` skill: a portable academic-writing discipline that fires the project's own register rules before drafting and keeps prose clean across revision passes.
