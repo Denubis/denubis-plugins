@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.35.0
+
+The academic-writing register as an always-on output style, and the prose skill renamed for discoverability.
+
+**New:**
+- `Academic Writing` output style (`output-styles/academic-writing.md`): the prose register (cut scar tissue, em-dash never, rebuild crammed sentences, pinpoint-citation discipline) as a system-prompt-level style applied to every response once selected via `/config`. Sets `keep-coding-instructions: true`, so it shapes prose without dropping Claude Code's built-in coding behaviour. Not force-applied; you opt in per session.
+
+**Changed:**
+- Renamed the `writing-academic-prose` skill to `academic-writing`, so it answers to `/academic-writing`. The skill runs the `.notes/` gate and the revision-pass workflow, the output style is the always-on floor, both carry the same register, and the project's `.notes/` overrides both.
+
 ## [denubis-bibliography] 0.7.0
 
 One-call paper resolution by any key, plus a pass to genericise project-identifying strings ahead of a public deposit.
