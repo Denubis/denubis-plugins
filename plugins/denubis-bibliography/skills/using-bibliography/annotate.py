@@ -178,8 +178,8 @@ def choose_resolution(candidates: list[dict]) -> tuple[str, int, Path]:
     """Pick the citekey copy that actually has a PDF.
 
     A paper can exist in several libraries under one citekey, and only some
-    copies have the PDF attached (e.g. ballsun-stanton...2025 lives in both a
-    workshop group with no PDF and the bjet group with the PDF). Prefer the
+    copies have the PDF attached (e.g. one citekey can live in both a
+    workshop group with no PDF and another group with the PDF). Prefer the
     first candidate in search order whose pdf_paths is non-empty. Pure, so the
     multi-library selection is unit-tested apart from the BBT export I/O that
     fills pdf_paths.

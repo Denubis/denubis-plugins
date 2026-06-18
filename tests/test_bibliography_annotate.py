@@ -249,14 +249,14 @@ def test_parse_highlight_non_json_200_raises():
 
 # --- choose_resolution (multi-library copy selection) -----------------------
 # A paper can live in several libraries under one citekey; only some copies have
-# the PDF attached. (Live case: ballsun-stanton...2025 exists in both 'GenAI
-# workshop Aarhus' (no PDF) and the bjet group (PDF present).)
+# the PDF attached. (Live case: one citekey exists in both a workshop group
+# (no PDF) and another group (PDF present).)
 
 
 def test_choose_resolution_picks_the_copy_with_a_pdf():
     candidates = [
-        {"item_key": "NOPDF", "library_id": 23, "library": "Aarhus", "pdf_paths": []},
-        {"item_key": "HASPDF", "library_id": 27, "library": "bjet", "pdf_paths": ["/x/y.pdf"]},
+        {"item_key": "NOPDF", "library_id": 23, "library": "GroupA", "pdf_paths": []},
+        {"item_key": "HASPDF", "library_id": 27, "library": "groupB", "pdf_paths": ["/x/y.pdf"]},
     ]
     key, lib, pdf = annotate.choose_resolution(candidates)
     assert key == "HASPDF"
@@ -267,7 +267,7 @@ def test_choose_resolution_picks_the_copy_with_a_pdf():
 def test_choose_resolution_prefers_first_when_multiple_have_pdf():
     candidates = [
         {"item_key": "A", "library_id": 1, "library": "My Library", "pdf_paths": ["/a.pdf"]},
-        {"item_key": "B", "library_id": 27, "library": "bjet", "pdf_paths": ["/b.pdf"]},
+        {"item_key": "B", "library_id": 27, "library": "groupB", "pdf_paths": ["/b.pdf"]},
     ]
     key, _, pdf = annotate.choose_resolution(candidates)
     assert key == "A"
@@ -276,13 +276,13 @@ def test_choose_resolution_prefers_first_when_multiple_have_pdf():
 
 def test_choose_resolution_raises_listing_libraries_when_no_pdf():
     candidates = [
-        {"item_key": "A", "library_id": 23, "library": "Aarhus", "pdf_paths": []},
+        {"item_key": "A", "library_id": 23, "library": "GroupA", "pdf_paths": []},
         {"item_key": "B", "library_id": 99, "library": "Other", "pdf_paths": []},
     ]
     with pytest.raises(annotate.ResolveError) as ei:
         annotate.choose_resolution(candidates)
     msg = str(ei.value)
-    assert "Aarhus" in msg and "Other" in msg  # libraries tried are surfaced
+    assert "GroupA" in msg and "Other" in msg  # libraries tried are surfaced
 
 
 def test_choose_resolution_raises_on_no_candidates():

@@ -4,7 +4,7 @@ via the zotero-api-plus local API.
 
 This replaces the fragile, hand-written `python3 -c "..."` JSON-parsing that the
 SKILL used to leave to improvisation. The brittle step was turning a human group
-+ collection name ("BJET group", "Bayesian / Methods") into the numeric groupID
++ collection name ("Project group", "Bayesian / Methods") into the numeric groupID
 and collectionKey that add-item-by-id requires. That lives in `resolve_target`,
 a pure function with unit tests.
 

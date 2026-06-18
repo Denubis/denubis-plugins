@@ -61,26 +61,26 @@ def test_linux_label_with_space():
 def test_windows_unescaped_drive_letter():
     """The shape Brian's parser couldn't handle in 0.2.1 and earlier."""
     bib = _wrap(
-        r"Full Text:C:\Users\jodie\Zotero\storage\XYZ\paper.pdf:application/pdf"
+        r"Full Text:C:\Users\example\Zotero\storage\XYZ\paper.pdf:application/pdf"
     )
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path(r"C:\Users\jodie\Zotero\storage\XYZ\paper.pdf")]
+    assert paths == [Path(r"C:\Users\example\Zotero\storage\XYZ\paper.pdf")]
 
 
 def test_windows_escaped_drive_letter():
     """BibLaTeX convention escapes `:` as `\\:`."""
     bib = _wrap(
-        r"Full Text:C\:\Users\jodie\Zotero\storage\XYZ\paper.pdf:application/pdf"
+        r"Full Text:C\:\Users\example\Zotero\storage\XYZ\paper.pdf:application/pdf"
     )
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path(r"C:\Users\jodie\Zotero\storage\XYZ\paper.pdf")]
+    assert paths == [Path(r"C:\Users\example\Zotero\storage\XYZ\paper.pdf")]
 
 
 def test_windows_forward_slash_drive_letter():
     """Some BBT versions normalise to forward slashes after the drive letter."""
-    bib = _wrap("Full Text:C:/Users/jodie/Zotero/storage/XYZ/paper.pdf:application/pdf")
+    bib = _wrap("Full Text:C:/Users/example/Zotero/storage/XYZ/paper.pdf:application/pdf")
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path("C:/Users/jodie/Zotero/storage/XYZ/paper.pdf")]
+    assert paths == [Path("C:/Users/example/Zotero/storage/XYZ/paper.pdf")]
 
 
 # --- Multi-entry ----------------------------------------------------------

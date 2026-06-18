@@ -54,9 +54,9 @@ LIBRARIES = [
         "type": "group",
         "libraryID": 99,
         "groupID": 6549571,
-        "name": "2026-bbs-jt-em-bjet-AI-metacognitive-1",
+        "name": "2026-example-library-1",
         "collections": [
-            {"key": "BJETKEY", "name": "Bayesian / Methods", "parentKey": None},
+            {"key": "EXKEY", "name": "Bayesian / Methods", "parentKey": None},
             {"key": "OTHER", "name": "Drafts", "parentKey": None},
         ],
     },
@@ -79,13 +79,13 @@ LIBRARIES = [
 def test_resolves_group_by_name_and_collection_by_name():
     r = fetch.resolve_target(
         LIBRARIES,
-        group="2026-bbs-jt-em-bjet-AI-metacognitive-1",
+        group="2026-example-library-1",
         collection="Bayesian / Methods",
     )
     assert r.group_id == 6549571
-    assert r.collection_key == "BJETKEY"
+    assert r.collection_key == "EXKEY"
     assert r.collection_name == "Bayesian / Methods"
-    assert r.library_name == "2026-bbs-jt-em-bjet-AI-metacognitive-1"
+    assert r.library_name == "2026-example-library-1"
 
 
 def test_resolves_my_library_when_group_none():
@@ -118,7 +118,7 @@ def test_collection_match_is_case_insensitive():
     r = fetch.resolve_target(
         LIBRARIES, group="6549571", collection="bayesian / methods"
     )
-    assert r.collection_key == "BJETKEY"
+    assert r.collection_key == "EXKEY"
 
 
 def test_group_not_found_raises_and_lists_groups():
@@ -127,7 +127,7 @@ def test_group_not_found_raises_and_lists_groups():
     msg = str(ei.value)
     assert "Nonexistent" in msg
     # the available groups should be surfaced to the operator
-    assert "2026-bbs-jt-em-bjet-AI-metacognitive-1" in msg
+    assert "2026-example-library-1" in msg
 
 
 def test_collection_not_found_lists_available():
