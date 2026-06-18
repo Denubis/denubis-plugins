@@ -1,17 +1,19 @@
 ---
-name: writing-academic-prose
+name: academic-writing
 description: Use when drafting or revising academic prose, especially revision passes and reviewer edits. Reads the project's .notes/ register rules first, then cuts scar tissue and rebuilds crammed sentences.
 ---
 
 # Writing Academic Prose
 
-**Announce at start:** "I'm using the writing-academic-prose skill, and I'll read the project's register and writing rules in `.notes/` before I touch the prose."
+**Announce at start:** "I'm using the academic-writing skill, and I'll read the project's register and writing rules in `.notes/` before I touch the prose."
 
 ## Overview
 
 Academic prose fails in two compounding ways. The session works off the project's CLAUDE.md summary and never opens the full rules, so the calibrated discipline never loads. Then, expanding or revising, the writer reaches for sentences that manage the reader instead of carrying content. These are scar tissue, and they regrow on every revision pass.
 
 This skill makes the project's own rules fire at draft time, then supplies the discipline that keeps the prose clean. The project's `.notes/` rules are authoritative and override anything here. This skill is the portable floor, and the thing that forces you to go read them.
+
+The same register floor ships as the `Academic Writing` output style. Select it via `/config` when a whole session is writing, and it holds these rules in the system prompt on every response. This skill is the on-demand path that also runs the `.notes/` gate and the revision-pass workflow.
 
 ## Gate: read the project's writing rules first (once per session)
 
