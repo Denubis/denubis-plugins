@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-external-agents] 0.1.0
+
+New plugin: dispatch review tasks to external CLI models as a heterogeneous second voice. First skill packages the codex peer-review smoke test that was validated end-to-end.
+
+**New:**
+- `codex-peer-review` skill: runs OpenAI's codex (GPT-5.5) as a critical peer reviewer of a file or directory, shaped by a bundled copy of the `critical-peer-review` rubric. The script stages rubric + target into one throwaway working dir and runs `codex exec -s read-only`, so codex sees only that root; it writes the review and prints a provenance smoke-check.
+- The SKILL.md makes the provenance gate non-negotiable: every review's quotes are `grep -F`'d against the real target before anything is presented, because codex will confabulate a fluent, correctly-formatted review (faked "Verification" section included) of a document it never read. A review is a claim until its quotes are verified.
+- Codex's voice is presented source-tagged and unmerged — a second opinion for the human to weigh, not folded into Claude's own review.
+
 ## [denubis-token-estimator] 0.1.0
 
 New plugin: measure AI token/word usage from Claude Code and Codex logs for an AI-use disclosure. Reports two real measures — output tokens and human input words — not proxies.
