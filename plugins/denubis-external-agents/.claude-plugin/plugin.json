@@ -1,0 +1,17 @@
+{
+    "name": "denubis-external-agents",
+    "description": "Dispatch review tasks to external CLI models as a heterogeneous second voice. Currently: run OpenAI's codex (GPT-5.5) as a critical peer reviewer of a file or directory, with a mandatory provenance check so a confabulated review cannot pass as real. WIP.",
+    "version": "0.1.0",
+    "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+    },
+    "license": "CC-BY-SA-4.0",
+    "keywords": [
+        "codex",
+        "peer-review",
+        "external-model",
+        "openai",
+        "critique"
+    ]
+}
