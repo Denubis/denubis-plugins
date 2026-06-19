@@ -206,6 +206,25 @@
         "sqlite",
         "resume"
       ]
+    },
+    {
+      "name": "denubis-token-estimator",
+      "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens (origin-deduplicated, main thread vs subagent fan-out) and human-authored input words (machine wrappers stripped), per project, rolled up from the directory via a .token-estimator mapper, optionally by month. WIP — methodology established and reproducible; external audit pending.",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-token-estimator",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "tokens",
+        "usage",
+        "disclosure",
+        "claude-code",
+        "codex",
+        "academic"
+      ]
     }
   ]
 }

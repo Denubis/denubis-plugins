@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-token-estimator] 0.1.0
+
+New plugin: measure AI token/word usage from Claude Code and Codex logs for an AI-use disclosure. Reports two real measures — output tokens and human input words — not proxies.
+
+**New:**
+- `/estimate` command and `using-token-estimator` skill: per-project AI usage rolled up from the directory, split into main-thread vs subagent output tokens and human-authored input words, optionally by month or as CSV leaf grain. The `.token-estimator` mapper binds moved/renamed dirs to one canonical project (pure longest-prefix match on the recorded cwd string, so defunct paths still resolve).
+- Corrected, reproducible methodology (`docs/DESIGN.md`, nodes 1–5): origin-based dedup for Claude (`message.id`, classify by where work originated, since subagent transcripts replay the parent); additive per-file accounting for Codex (subagents have independent token counters — merging them into the parent erases real work); human-word counting via a named machine-tag allow-list, not "starts with `<`/`#`" (humans paste markup and write headings).
+- `scripts/verify.py`: single source of truth for the rules and an audit harness that re-derives every headline number from the live logs, asserting structural invariants (no Codex resumes, subagents additive across all of them, person-grain reconciliation) separately from point-in-time counts that drift as logs grow.
+- `~/.token-estimator` config for people-roots; absent it, the tool scopes to the local directory.
+- `docs/AUDIT-BRIEF.md` + `docs/findings.schema.json`: adversarial brief to hand the methodology to a different engine for independent falsification (pending).
+
 ## [denubis-plan-and-execute] 2.35.0
 
 The academic-writing register as an always-on output style, and the prose skill renamed for discoverability.
