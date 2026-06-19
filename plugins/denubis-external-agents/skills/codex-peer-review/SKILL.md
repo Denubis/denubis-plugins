@@ -1,6 +1,6 @@
 ---
 name: codex-peer-review
-description: Use when you want a critical peer review of a file or directory from OpenAI's codex (GPT-5.5) as a heterogeneous second voice. Runs codex against the target using the critical-peer-review rubric, then verifies the review's quotes against the real file before presenting, so a confabulated review cannot pass as real.
+description: Use when you want an external critical peer review of a file or directory from OpenAI's codex (GPT-5.5), with its quotes verified against the source before presenting.
 user-invocable: true
 ---
 
