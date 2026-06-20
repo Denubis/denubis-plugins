@@ -23,14 +23,12 @@ from pathlib import Path
 
 import pytest
 import typer
-
 from crash_recovery import db as db_mod
 from crash_recovery import liveness as liveness_mod
 from crash_recovery import scan as scan_mod
 from crash_recovery.__main__ import scan as scan_cmd
 from crash_recovery.classify import CLASSIFIER_VERSION
 from crash_recovery.jsonl import TailKind, TailSummary
-
 from fixtures.jsonl_builder import (
     FixtureSession,
     make_full_fixture,
@@ -46,7 +44,7 @@ def test_pick_dead_pid_is_truly_dead_and_above_pid_max():
     from fixtures.jsonl_builder import _pick_dead_pid
 
     pid = _pick_dead_pid()
-    with open("/proc/sys/kernel/pid_max") as f:
+    with Path("/proc/sys/kernel/pid_max").open() as f:
         pid_max = int(f.read().strip())
     assert pid > pid_max
     with pytest.raises(ProcessLookupError):
@@ -181,8 +179,7 @@ def test_scan_is_idempotent(tmp_path: Path) -> None:
     # before/after without depending on wall-clock resolution.
     scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=1_000_000))
     first_seen_before = {
-        r[0]: r[1]
-        for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
+        r[0]: r[1] for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
     }
 
     scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=2_000_000))
@@ -192,14 +189,12 @@ def test_scan_is_idempotent(tmp_path: Path) -> None:
     assert count_rows == [(3,)]
     # first_seen preserved.
     first_seen_after = {
-        r[0]: r[1]
-        for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
+        r[0]: r[1] for r in _rows(db_path, "SELECT uuid, first_seen FROM sessions")
     }
     assert first_seen_after == first_seen_before
     # last_scanned advanced to the second scan's now.
     last_scanned_after = {
-        r[0]: r[1]
-        for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
+        r[0]: r[1] for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
     }
     assert all(v == 2_000_000 for v in last_scanned_after.values())
     # Two scan_runs rows; three history rows (one per session from scan 1;
@@ -323,7 +318,10 @@ def test_scan_reclassifies_stale_row_whose_jsonl_still_exists(tmp_path: Path) ->
 
 
 def test_scan_classifies_live_pid_as_live(tmp_path: Path) -> None:
-    """Live PID + boot_id current → ``live`` / ``live_pid_present_boot_current`` (AC6.2)."""
+    """Live PID + boot_id current → ``live`` / ``live_pid_present_boot_current``.
+
+    (AC6.2)
+    """
     uuid = "cccccccc-cccc-cccc-cccc-cccccccccccc"
     sessions = [
         FixtureSession(
@@ -614,7 +612,8 @@ def test_scan_writes_scan_runs_with_live_pids(tmp_path: Path) -> None:
 def test_run_scan_deduplicates_live_pids_across_facts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``run_scan`` deduplicates PIDs via ``sorted({...})`` when two facts share one PID.
+    """``run_scan`` deduplicates PIDs via ``sorted({...})`` when two facts
+    share one PID.
 
     Two ``SessionFact`` objects with distinct UUIDs and cwds but the same
     ``liveness.pid`` (12345) and ``pid_alive_value=True`` are injected by
@@ -679,7 +678,9 @@ def test_run_scan_deduplicates_live_pids_across_facts(
     rows = _rows(db_path, "SELECT live_pids FROM scan_runs")
     assert len(rows) == 1
     live_pids = json.loads(rows[0][0])
-    assert isinstance(live_pids, list), "live_pids must be a list (JSON array), not a set"
+    assert isinstance(live_pids, list), (
+        "live_pids must be a list (JSON array), not a set"
+    )
     assert live_pids == [12345], (
         f"expected [12345] (deduplicated); got {live_pids!r}. "
         "If this is [12345, 12345], sorted({{...}}) was changed to sorted([...])."
@@ -917,9 +918,7 @@ def test_scan_two_concurrent_invocations_do_not_corrupt_db(tmp_path: Path) -> No
     assert len(runs) == 2
     run_timestamps = {r[1] for r in runs}
 
-    rows = _rows(
-        db_path, "SELECT classifier_version, last_scanned FROM sessions"
-    )
+    rows = _rows(db_path, "SELECT classifier_version, last_scanned FROM sessions")
     for cv, ls in rows:
         assert cv == CLASSIFIER_VERSION
         assert ls in run_timestamps
@@ -1001,9 +1000,7 @@ def test_walk_emits_irrecoverable_missing_cwd_for_unreadable_jsonl(
     project_dir = projects_root / "-no-cwd-fixture"
     project_dir.mkdir(parents=True, exist_ok=True)
     jsonl_path = project_dir / f"{uuid}.jsonl"
-    jsonl_path.write_text(
-        json.dumps({"role": "assistant", "content": "hi"}) + "\n"
-    )
+    jsonl_path.write_text(json.dumps({"role": "assistant", "content": "hi"}) + "\n")
 
     scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
 
@@ -1057,22 +1054,17 @@ def test_classification_history_skips_append_when_unchanged(tmp_path: Path) -> N
     db_path = _init_db(db_dir)
 
     scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=1_000_000))
-    history_after_first = _rows(
-        db_path, "SELECT COUNT(*) FROM classification_history"
-    )
+    history_after_first = _rows(db_path, "SELECT COUNT(*) FROM classification_history")
     assert history_after_first == [(2,)]
 
     scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=2_000_000))
 
     # No new history rows because nothing changed
-    history_after_second = _rows(
-        db_path, "SELECT COUNT(*) FROM classification_history"
-    )
+    history_after_second = _rows(db_path, "SELECT COUNT(*) FROM classification_history")
     assert history_after_second == [(2,)]
     # last_scanned still advanced
     last_scanned = {
-        r[0]: r[1]
-        for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
+        r[0]: r[1] for r in _rows(db_path, "SELECT uuid, last_scanned FROM sessions")
     }
     assert all(v == 2_000_000 for v in last_scanned.values())
 
@@ -1080,7 +1072,9 @@ def test_classification_history_skips_append_when_unchanged(tmp_path: Path) -> N
 def test_classification_history_appends_when_classification_changes(
     tmp_path: Path,
 ) -> None:
-    """Seed a row with one classification; scan produces a different one → history grows.
+    """Seed a row with one classification; scan produces a different one
+    → history grows.
+
 
     M4: when a session's classification + reason genuinely change between
     scans, the append still happens. Seed a row at ``classification=live``

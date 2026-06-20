@@ -31,9 +31,12 @@ import shlex
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from crash_recovery.liveness import Liveness
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from crash_recovery.liveness import Liveness
 
 
 class CorrelationKind(StrEnum):
@@ -107,7 +110,7 @@ def _cwd_matches_any_jsonl_in(child: Path, cwd: str) -> bool:
             if not first.strip():
                 continue
             entry = json.loads(first)
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             continue
         entry_cwd = entry.get("cwd")
         if isinstance(entry_cwd, str) and entry_cwd == cwd:
@@ -160,7 +163,7 @@ def _extract_resume_uuid(argv: str) -> str | None:
     except ValueError:
         return None
     for i, token in enumerate(tokens):
-        if token == "--resume" and i + 1 < len(tokens):
+        if token == "--resume" and i + 1 < len(tokens):  # noqa: S105 (CLI arg)
             candidate = tokens[i + 1]
             if _UUID_RE.match(candidate):
                 return candidate.lower()
@@ -183,7 +186,7 @@ def _jsonl_first_entry_ts_meets_threshold(jsonl: Path, threshold: int) -> bool:
         if not first.strip():
             return False
         entry = json.loads(first)
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return False
     raw_ts = entry.get("timestamp")
     if not isinstance(raw_ts, str):

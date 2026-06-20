@@ -12,10 +12,11 @@ TailKind values produced here.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from crash_recovery.jsonl import TailKind, TailSummary, parse_tail
+
 # pytest injects tests/ onto sys.path when tests/__init__.py is absent (a
 # deliberate Phase 1 decision for workspace-wide collection), so the
 # fixtures package is addressable as top-level "fixtures", not "tests.fixtures".
@@ -32,6 +33,9 @@ from fixtures.jsonl_builder import (
     make_only_bookkeeping_no_signal,
     make_tool_use_no_result,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_parse_tail_classifies_concluded(tmp_path: Path) -> None:
@@ -57,7 +61,8 @@ def test_parse_tail_classifies_ask_question_no_reply(tmp_path: Path) -> None:
 
 
 def test_parse_tail_handles_ask_question_answered_by_answers(tmp_path: Path) -> None:
-    """AskUserQuestion satisfied by toolUseResult.answers must NOT produce ASK_QUESTION_NO_REPLY.
+    """AskUserQuestion satisfied by toolUseResult.answers must NOT produce
+    ASK_QUESTION_NO_REPLY.
 
     Exercises the ``_has_ask_question_answer`` satisfaction path in parse_tail
     which had no coverage in the initial Task 2 set (Phase 2 review Minor 1).
@@ -68,7 +73,8 @@ def test_parse_tail_handles_ask_question_answered_by_answers(tmp_path: Path) -> 
     make_ask_question_answered_by_answers(p)
     summary = parse_tail(p)
     assert summary.kind is not TailKind.ASK_QUESTION_NO_REPLY, (
-        f"answered AskUserQuestion should not produce ASK_QUESTION_NO_REPLY; got {summary.kind}"
+        f"answered AskUserQuestion should not produce"
+        f" ASK_QUESTION_NO_REPLY; got {summary.kind}"
     )
 
 
@@ -80,7 +86,8 @@ def test_parse_tail_classifies_agent_dispatch_no_result(tmp_path: Path) -> None:
 
 
 def test_parse_tail_handles_attachment_interleave(tmp_path: Path) -> None:
-    """Attachment between tool_use and tool_result must NOT trigger TOOL_USE_NO_RESULT."""
+    """Attachment between tool_use and tool_result must NOT trigger
+    TOOL_USE_NO_RESULT."""
     p = tmp_path / "interleave.jsonl"
     make_attachment_interleaved_then_concluded(p)
     summary = parse_tail(p)
@@ -136,13 +143,12 @@ def test_parse_tail_respects_n_window(tmp_path: Path) -> None:
 
 
 def test_parse_tail_extracts_last_ts(tmp_path: Path) -> None:
-    """last_ts is unix epoch seconds parsed from the final filtered entry's timestamp."""
+    """last_ts is unix epoch seconds parsed from the final filtered entry's
+    timestamp."""
     p = tmp_path / "ts.jsonl"
     make_concluded(p)
     summary = parse_tail(p)
-    expected = int(
-        datetime(2026, 5, 13, 3, 0, 12, tzinfo=timezone.utc).timestamp()
-    )
+    expected = int(datetime(2026, 5, 13, 3, 0, 12, tzinfo=UTC).timestamp())
     assert summary.last_ts == expected
 
 
@@ -185,5 +191,6 @@ def test_bookkeeping_only_tail_walks_past_to_real_signal(tmp_path: Path) -> None
     make_bookkeeping_only_tail(p)
     summary = parse_tail(p)
     assert summary.kind is TailKind.CONCLUDED, (
-        f"expected CONCLUDED after deny-list strips bookkeeping tail, got {summary.kind}"
+        f"expected CONCLUDED after deny-list strips bookkeeping tail,"
+        f" got {summary.kind}"
     )

@@ -27,14 +27,13 @@ import os
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from crash_recovery import db as db_mod
-from crash_recovery import prune as prune_mod
 from crash_recovery.classify import CLASSIFIER_VERSION
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -89,7 +88,8 @@ def _seed_scan_run(db_path: Path, ts: int) -> int:
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.execute(
-            "INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version) "
+            "INSERT INTO scan_runs"
+            " (ts, live_pids, sessions_scanned, classifier_version) "
             "VALUES (?, '[]', 0, ?)",
             (ts, CLASSIFIER_VERSION),
         )
@@ -351,8 +351,7 @@ def test_prune_confirm_does_not_delete_stale_rows(tmp_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     try:
         uuids_remaining = {
-            row[0]
-            for row in conn.execute("SELECT uuid FROM sessions").fetchall()
+            row[0] for row in conn.execute("SELECT uuid FROM sessions").fetchall()
         }
     finally:
         conn.close()

@@ -17,13 +17,16 @@ from __future__ import annotations
 import itertools
 import json
 import os
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from crash_recovery.jsonl import TailKind
 from crash_recovery.liveness import current_boot_id
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # Deterministic timestamp used across every fixture so ``last_ts`` is stable
 # in assertions.
@@ -219,7 +222,11 @@ def make_only_bookkeeping_no_signal(path: Path) -> None:
         path,
         [
             {"type": "system", "timestamp": FIXED_TS, "content": "boot"},
-            {"type": "custom-title", "timestamp": FIXED_TS, "title": "Just bookkeeping"},
+            {
+                "type": "custom-title",
+                "timestamp": FIXED_TS,
+                "title": "Just bookkeeping",
+            },
             {"type": "agent-name", "timestamp": FIXED_TS, "name": "Claude"},
             {"type": "permission-mode", "timestamp": FIXED_TS, "mode": "default"},
         ],
@@ -242,12 +249,7 @@ def make_liveness_file(
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / f"{pid}.live"
-    path.write_text(
-        f"cwd={cwd}\n"
-        f"started={started}\n"
-        f"argv={argv}\n"
-        f"boot_id={boot_id}\n"
-    )
+    path.write_text(f"cwd={cwd}\nstarted={started}\nargv={argv}\nboot_id={boot_id}\n")
     return path
 
 
@@ -321,7 +323,7 @@ class FixtureSession:
 
     ``started_offset`` is added to ``time.time()`` at fixture-construction
     time; the default ``-3600`` makes the liveness ``started`` an hour in
-    the past so correlate's mtime window (now > started − 60) admits the
+    the past so correlate's mtime window (now > started - 60) admits the
     JSONL written immediately after.
     """
 
@@ -356,9 +358,12 @@ def _pick_dead_pid() -> int:
     Fallback to ``2**22 + 1`` if ``pid_max`` isn't readable (non-Linux).
     """
     try:
-        with open("/proc/sys/kernel/pid_max") as f:
+        with Path("/proc/sys/kernel/pid_max").open() as f:
             return int(f.read().strip()) + 1
-    except (OSError, ValueError):
+    # PEP 758 (Python 3.14+): an except clause may list exception types without
+    # wrapping them in a tuple. ruff stripped the redundant parens for our py314
+    # target — `except OSError, ValueError:` is VALID here, not a Py2-style bug.
+    except OSError, ValueError:
         return 2**22 + 1
 
 
@@ -568,10 +573,7 @@ def make_full_fixture(
     for session in sessions:
         if not session.has_liveness:
             continue
-        if session.pid_alive is True:
-            pid = os.getpid()
-        else:
-            pid = next(dead_pid_counter)
+        pid = os.getpid() if session.pid_alive is True else next(dead_pid_counter)
         boot_id = real_boot_id if session.boot_id_current else _NEVER_MATCH_BOOT_ID
         started = now_epoch + session.started_offset
         # argv carries ``--resume <uuid>`` so correlate takes the DIRECT_MATCH
@@ -663,7 +665,8 @@ def make_db_with_sessions(tmp_path: Path, sessions: list[DbFixtureRow]) -> Path:
 
 
 def make_attachment_interleaved_then_concluded(path: Path) -> None:
-    """Assistant tool_use → attachment (bookkeeping) → user tool_result → assistant end_turn.
+    """Assistant tool_use → attachment (bookkeeping) → user tool_result
+    → assistant end_turn.
 
     The parser must not classify this as TOOL_USE_NO_RESULT just because an
     attachment sits between the dispatch and the result. The last meaningful

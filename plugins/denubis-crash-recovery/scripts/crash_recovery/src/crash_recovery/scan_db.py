@@ -43,7 +43,9 @@ class WriteContext:
     allocates ``scan_run_id``.
     """
 
-    conn: object  # typed as object to allow mock connections in tests; callers always pass sqlite3.Connection
+    # typed as object to allow mock connections in tests;
+    # callers always pass sqlite3.Connection
+    conn: object
     ctx: ScanContext
     scan_run_id: int
 
@@ -216,12 +218,8 @@ def _orphan_sweep(
             )
         else:
             tail_summary = parse_tail(Path(jsonl_path_str))
-            liveness_state = LivenessState(
-                present=False, boot_id_current=False
-            )
-            new_classification = classify(
-                tail_summary, liveness_state, pid_alive=None
-            )
+            liveness_state = LivenessState(present=False, boot_id_current=False)
+            new_classification = classify(tail_summary, liveness_state, pid_alive=None)
         wctx.conn.execute(
             "UPDATE sessions SET classification = ?, classification_reason = ?, "
             "classifier_version = ?, state_summary = ?, last_scanned = ? "

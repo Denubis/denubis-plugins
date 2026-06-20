@@ -30,8 +30,10 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Allow-list filter: keep only top-level ``type`` values in ``_REAL_TYPES``
 # that carry real signal; everything else is treated as bookkeeping and
@@ -112,7 +114,7 @@ def _parse_ts(value: Any) -> int | None:
         # Python 3.11+ accepts the trailing ``Z`` directly.
         ts = datetime.fromisoformat(value.replace("Z", "+00:00"))
         return int(ts.timestamp())
-    except (ValueError, OSError):
+    except ValueError, OSError:
         return None
 
 
@@ -149,7 +151,8 @@ def _has_matching_tool_result(
     start_idx: int,
     tool_use_id: str,
 ) -> bool:
-    """Scan forward through ``entries`` from ``start_idx + 1`` for a matching tool_result.
+    """Scan forward through ``entries`` from ``start_idx + 1``
+    for a matching tool_result.
 
     Per Phase 2B: attachments and other bookkeeping entries can interleave
     between an assistant tool_use dispatch and the user tool_result. We
@@ -169,9 +172,7 @@ def _has_matching_tool_result(
     return False
 
 
-def _has_ask_question_answer(
-    entries: list[dict[str, Any]], start_idx: int
-) -> bool:
+def _has_ask_question_answer(entries: list[dict[str, Any]], start_idx: int) -> bool:
     """Scan forward for a user entry carrying ``toolUseResult.answers``."""
     for j in range(start_idx + 1, len(entries)):
         nxt = entries[j]
@@ -192,9 +193,7 @@ def _is_concluded(entry: dict[str, Any]) -> bool:
     items = _content_items(entry)
     if not items:
         return False
-    return all(
-        isinstance(item, dict) and item.get("type") == "text" for item in items
-    )
+    return all(isinstance(item, dict) and item.get("type") == "text" for item in items)
 
 
 def _parse_ts_pair(value: Any) -> tuple[int | None, str | None]:
@@ -323,9 +322,7 @@ def _classify_dispatch(
                 total_entries,
             )
 
-        if isinstance(tool_id, str) and _has_matching_tool_result(
-            filtered, i, tool_id
-        ):
+        if isinstance(tool_id, str) and _has_matching_tool_result(filtered, i, tool_id):
             # This dispatch was resolved — look further back for an earlier
             # unmatched dispatch.
             continue
@@ -429,7 +426,9 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
             kind=TailKind.UNKNOWN,
             last_ts=None,
             total_entries=total_entries,
-            state_summary=_summarise(TailKind.UNKNOWN, None, "only bookkeeping entries"),
+            state_summary=_summarise(
+                TailKind.UNKNOWN, None, "only bookkeeping entries"
+            ),
         )
 
     last_entry = filtered[-1]
@@ -438,16 +437,12 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
     # --- Classify the tail ----------------------------------------------
     # CONCLUDED: last entry is assistant end_turn with text-only content.
     if _is_concluded(last_entry):
-        return _make_tail(
-            TailKind.CONCLUDED, last_ts, last_ts_str, total_entries
-        )
+        return _make_tail(TailKind.CONCLUDED, last_ts, last_ts_str, total_entries)
 
     # Tool dispatch: walk backward through ``filtered`` for the most recent
     # unmatched assistant tool_use. ``None`` means every dispatch in the
     # window was satisfied — fall through to UNKNOWN.
-    dispatch_summary = _classify_dispatch(
-        filtered, last_ts, last_ts_str, total_entries
-    )
+    dispatch_summary = _classify_dispatch(filtered, last_ts, last_ts_str, total_entries)
     if dispatch_summary is not None:
         return dispatch_summary
 

@@ -144,10 +144,8 @@ def _build_liveness_fact_direct_or_mtime(
     pid_alive_value = pid_alive(liveness.pid)
     boot_match = liveness.boot_id == current_bid
     resolved_uuid = correlation.uuid
-    assert resolved_uuid is not None  # invariant of DIRECT/MTIME kinds
-    jsonl_path_str, jsonl_mtime = _jsonl_path_and_mtime(
-        project_dir, resolved_uuid
-    )
+    assert resolved_uuid is not None  # noqa: S101 (invariant of DIRECT/MTIME kinds)
+    jsonl_path_str, jsonl_mtime = _jsonl_path_and_mtime(project_dir, resolved_uuid)
     tail_summary = (
         parse_tail(Path(jsonl_path_str))
         if jsonl_path_str is not None
@@ -192,9 +190,7 @@ def _build_ambiguous_facts(
     candidates_str = ", ".join(correlation.candidates)
     facts: list[SessionFact] = []
     for candidate_uuid in correlation.candidates:
-        jsonl_path_str, jsonl_mtime = _jsonl_path_and_mtime(
-            project_dir, candidate_uuid
-        )
+        jsonl_path_str, jsonl_mtime = _jsonl_path_and_mtime(project_dir, candidate_uuid)
         synthetic_tail = TailSummary(
             kind=TailKind.UNKNOWN,
             last_ts=None,
@@ -218,9 +214,7 @@ def _build_ambiguous_facts(
     return facts
 
 
-def _walk_jsonl_only(
-    ctx: ScanContext, seen_uuids: set[str]
-) -> list[SessionFact]:
+def _walk_jsonl_only(ctx: ScanContext, seen_uuids: set[str]) -> list[SessionFact]:
     """Enumerate JSONL files under ``ctx.projects_root`` not yet ``seen_uuids``.
 
     JSONL-only facts have ``liveness=None``, ``pid_alive_value=None``,
@@ -327,7 +321,7 @@ def _first_entry_cwd(jsonl_path: Path) -> str:
         if not first.strip():
             return ""
         entry = json.loads(first)
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return ""
     cwd_value = entry.get("cwd")
     return cwd_value if isinstance(cwd_value, str) else ""
@@ -402,30 +396,28 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
             if fact.liveness is not None and fact.pid_alive_value is True
         }
     )
-    with closing(db.open_db(ctx.db_path)) as conn:
-        with conn:
-            wctx = _write_scan_run(
-                conn,
-                ctx,
-                sessions_scanned=len(facts),
-                live_pids=live_pids,
-            )
-            for fact, classification in classifications:
-                # M4: query existing classification + reason before upsert
-                # so we can dedup the history append. The upsert below will
-                # overwrite these values; we need the pre-upsert state.
-                prior = conn.execute(
-                    "SELECT classification, classification_reason "
-                    "FROM sessions WHERE uuid = ?",
-                    (fact.uuid,),
-                ).fetchone()
-                _upsert_session(wctx, fact, classification)
-                if prior is None or (
-                    classification.value != prior[0]
-                    or classification.reason != prior[1]
-                ):
-                    _append_history(wctx, fact.uuid, classification)
-            reclassified = _orphan_sweep(wctx, seen_uuids)
+    with closing(db.open_db(ctx.db_path)) as conn, conn:
+        wctx = _write_scan_run(
+            conn,
+            ctx,
+            sessions_scanned=len(facts),
+            live_pids=live_pids,
+        )
+        for fact, classification in classifications:
+            # M4: query existing classification + reason before upsert
+            # so we can dedup the history append. The upsert below will
+            # overwrite these values; we need the pre-upsert state.
+            prior = conn.execute(
+                "SELECT classification, classification_reason "
+                "FROM sessions WHERE uuid = ?",
+                (fact.uuid,),
+            ).fetchone()
+            _upsert_session(wctx, fact, classification)
+            if prior is None or (
+                classification.value != prior[0] or classification.reason != prior[1]
+            ):
+                _append_history(wctx, fact.uuid, classification)
+        reclassified = _orphan_sweep(wctx, seen_uuids)
     return ScanRunResult(
         scan_run_id=wctx.scan_run_id,
         sessions_scanned=len(facts),

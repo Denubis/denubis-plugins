@@ -30,9 +30,12 @@ import os
 import shutil
 import subprocess
 import warnings
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @dataclass(frozen=True)
@@ -85,9 +88,7 @@ def read_liveness(path: Path) -> Liveness:
 
     for required in _REQUIRED_KEYS:
         if required not in parsed:
-            raise ValueError(
-                f"liveness file missing required key {required}: {path}"
-            )
+            raise ValueError(f"liveness file missing required key {required}: {path}")
 
     try:
         started = int(parsed["started"])
@@ -229,11 +230,11 @@ def _match_fstype_from_mounts(resolved: str, mounts: list[str]) -> str | None:
         if len(parts) < 3:
             continue
         mount_point, fstype = parts[1], parts[2]
-        if resolved == mount_point or resolved.startswith(
-            mount_point.rstrip("/") + "/"
-        ):
-            if len(mount_point) > len(best_mount):
-                best_mount, best_fstype = mount_point, fstype
+        if (
+            resolved == mount_point
+            or resolved.startswith(mount_point.rstrip("/") + "/")
+        ) and len(mount_point) > len(best_mount):
+            best_mount, best_fstype = mount_point, fstype
     return best_fstype
 
 

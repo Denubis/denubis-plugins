@@ -81,7 +81,8 @@ def survey(db_path: Path) -> PruneSurvey:
     """
     with closing(db.open_db(db_path)) as conn:
         all_concluded = conn.execute(
-            "SELECT uuid, cwd, last_scanned, jsonl_path, user_notes, classifier_version "
+            "SELECT uuid, cwd, last_scanned, jsonl_path, user_notes,"
+            " classifier_version "
             "FROM sessions WHERE classification = 'concluded'"
         ).fetchall()
     candidates: list[Candidate] = []
@@ -91,7 +92,9 @@ def survey(db_path: Path) -> PruneSurvey:
             # AC7.7: prune does not touch rows whose classification was
             # computed under an older rule table. Count rows that would
             # otherwise qualify (no note, JSONL gone) so the CLI can warn.
-            if user_notes is None and (jsonl_path is None or not Path(jsonl_path).exists()):
+            if user_notes is None and (
+                jsonl_path is None or not Path(jsonl_path).exists()
+            ):
                 stale_count += 1
             continue
         # AC7.5: skip rows with a user note.
@@ -124,11 +127,10 @@ def delete_candidates(db_path: Path, uuids: tuple[str, ...]) -> int:
     """
     if not uuids:
         return 0
-    with closing(db.open_db(db_path)) as conn:
-        with conn:
-            placeholders = ",".join("?" * len(uuids))
-            cur = conn.execute(
-                f"DELETE FROM sessions WHERE uuid IN ({placeholders})",
-                uuids,
-            )
-            return cur.rowcount
+    with closing(db.open_db(db_path)) as conn, conn:
+        placeholders = ",".join("?" * len(uuids))
+        cur = conn.execute(
+            f"DELETE FROM sessions WHERE uuid IN ({placeholders})",  # noqa: S608
+            uuids,
+        )
+        return cur.rowcount

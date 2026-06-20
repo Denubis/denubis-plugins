@@ -12,7 +12,6 @@ convention, and unique reasons.
 from __future__ import annotations
 
 import pytest
-
 from crash_recovery.classify import (
     CLASSIFIER_VERSION,
     RULES,
@@ -27,7 +26,8 @@ from crash_recovery.jsonl import TailKind, TailSummary
 
 
 def _build_tail_summary(kind: TailKind | None) -> TailSummary:
-    """Synthesise a TailSummary whose kind matches the rule (or any kind if wildcard)."""
+    """Synthesise a TailSummary whose kind matches the rule (or any kind if
+    wildcard)."""
     use_kind = kind if kind is not None else TailKind.CONCLUDED
     return TailSummary(
         kind=use_kind,
@@ -57,7 +57,8 @@ def _build_liveness_state(
 
 @pytest.mark.parametrize("rule", RULES, ids=lambda r: r.reason)
 def test_every_rule_classifies_its_fixture(rule: Rule) -> None:
-    """AC3.1 + AC3.3: every row of RULES fires for an input synthesised from its matchers."""
+    """AC3.1 + AC3.3: every row of RULES fires for an input synthesised
+    from its matchers."""
     tail = _build_tail_summary(rule.trailing_kind)
     liveness = _build_liveness_state(rule.liveness_present, rule.boot_id_current)
 
@@ -154,7 +155,7 @@ def test_unmatched_route_returns_borderline_unmatched() -> None:
 # named rule. Adding a new RULES row that subsumes a positive case here MUST
 # remove the entry from this list in the same commit.
 _UNMATCHED_PARTITION_POSITIVE: tuple[tuple[TailKind, bool, bool, bool | None], ...] = (
-    # (kind, liveness_present, boot_id_current, pid_alive)
+    # fields per tuple: kind, liveness_present, boot_id_current, pid_alive
     # Concluded JSONL but liveness file still records a dead PID on the
     # current boot — possible during scan/kill race conditions.
     (TailKind.CONCLUDED, True, True, False),
@@ -186,12 +187,8 @@ def test_rules_table_partition_documents_unmatched_cases_positive(
     pid_alive: bool | None,
 ) -> None:
     """Positive partition: each enumerated combination routes to unmatched."""
-    tail = TailSummary(
-        kind=kind, last_ts=0, total_entries=1, state_summary="partition"
-    )
-    liveness = LivenessState(
-        present=liveness_present, boot_id_current=boot_id_current
-    )
+    tail = TailSummary(kind=kind, last_ts=0, total_entries=1, state_summary="partition")
+    liveness = LivenessState(present=liveness_present, boot_id_current=boot_id_current)
 
     result = classify(tail, liveness, pid_alive=pid_alive)
 
@@ -212,12 +209,8 @@ def test_rules_table_partition_documents_unmatched_cases_negative(
     expected_reason: str,
 ) -> None:
     """Negative partition: combinations that look unmatched but are covered."""
-    tail = TailSummary(
-        kind=kind, last_ts=0, total_entries=1, state_summary="partition"
-    )
-    liveness = LivenessState(
-        present=liveness_present, boot_id_current=boot_id_current
-    )
+    tail = TailSummary(kind=kind, last_ts=0, total_entries=1, state_summary="partition")
+    liveness = LivenessState(present=liveness_present, boot_id_current=boot_id_current)
 
     result = classify(tail, liveness, pid_alive=pid_alive)
 
@@ -226,7 +219,8 @@ def test_rules_table_partition_documents_unmatched_cases_negative(
 
 
 def test_classify_returns_classification_value_strenum() -> None:
-    """classify() must return a ClassificationValue StrEnum, serialising as the documented string."""
+    """classify() must return a ClassificationValue StrEnum,
+    serialising as the documented string."""
     tail = TailSummary(
         kind=TailKind.CONCLUDED,
         last_ts=0,

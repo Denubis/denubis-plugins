@@ -10,11 +10,13 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-
 from crash_recovery import db
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Columns documented in the design's Data Model. Each tuple is
 # ``(name, type, notnull)`` where ``notnull`` is 1 if the column is NOT NULL.
@@ -102,7 +104,11 @@ class TestInitIsIdempotent:
         finally:
             conn.close()
 
-        assert first_counts == {"sessions": 0, "scan_runs": 0, "classification_history": 0}
+        assert first_counts == {
+            "sessions": 0,
+            "scan_runs": 0,
+            "classification_history": 0,
+        }
 
         # Re-run init on the same path. Should be a no-op.
         db.init(tmp_db_path)
@@ -218,7 +224,8 @@ class TestConstraints:
     def test_sessions_classification_check_rejects_invalid_value(
         self, tmp_db_path: Path
     ) -> None:
-        """CHECK on sessions.classification rejects values not in CLASSIFICATION_VALUES."""
+        """CHECK on sessions.classification rejects values not in
+        CLASSIFICATION_VALUES."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -284,7 +291,8 @@ class TestConstraints:
     def test_classification_history_scan_id_fk_is_restrict(
         self, tmp_db_path: Path
     ) -> None:
-        """ON DELETE RESTRICT on scan_id prevents deleting a scan_runs row that has history."""
+        """ON DELETE RESTRICT on scan_id prevents deleting a scan_runs row
+        that has history."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -322,7 +330,8 @@ class TestConstraints:
     def test_classification_history_cascades_on_session_delete(
         self, tmp_db_path: Path
     ) -> None:
-        """ON DELETE CASCADE on uuid removes history rows when the parent session is deleted."""
+        """ON DELETE CASCADE on uuid removes history rows when the parent
+        session is deleted."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -378,6 +387,8 @@ class TestConstraints:
                 "SELECT uuid FROM classification_history WHERE uuid = ?",
                 ("11111111-1111-1111-1111-111111111111",),
             ).fetchone()
-            assert row is None, "CASCADE on sessions.uuid must delete child history rows"
+            assert row is None, (
+                "CASCADE on sessions.uuid must delete child history rows"
+            )
         finally:
             conn.close()

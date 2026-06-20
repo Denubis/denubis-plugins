@@ -28,7 +28,6 @@ from crash_recovery.liveness import Liveness
 # importable as a top-level "fixtures").
 from fixtures.jsonl_builder import make_project_dir
 
-
 # Stable UUIDs used across tests so assertions stay readable.
 _UUID_A = "db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
 _UUID_B = "11111111-2222-3333-4444-555555555555"

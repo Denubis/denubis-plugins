@@ -93,7 +93,9 @@ def default_db_path() -> Path:
     The env var lets tests and power users redirect the DB without rewriting
     config; the default lives under ``~/.claude/`` next to other plugin state.
     """
-    return Path(os.environ.get("CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")).expanduser()
+    return Path(
+        os.environ.get("CRASH_RECOVERY_DB", "~/.claude/crash-recovery.db")
+    ).expanduser()
 
 
 def init(path: Path) -> None:
@@ -132,7 +134,8 @@ def open_db(path: Path) -> sqlite3.Connection:
     if mode != "wal":
         conn.close()
         raise RuntimeError(
-            f"crash-recovery DB at {path} is not in WAL mode; re-run `crash-recovery init`"
+            f"crash-recovery DB at {path} is not in WAL mode;"
+            " re-run `crash-recovery init`"
         )
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -149,9 +152,7 @@ def _schema_hash(conn: sqlite3.Connection) -> str:
     against a stored baseline. The leading underscore marks this as a
     module-private helper consumed only by tests.
     """
-    rows = conn.execute(
-        "SELECT name, sql FROM sqlite_master ORDER BY name"
-    ).fetchall()
+    rows = conn.execute("SELECT name, sql FROM sqlite_master ORDER BY name").fetchall()
     digest = hashlib.sha256()
     for name, sql in rows:
         digest.update((name or "").encode("utf-8"))

@@ -24,15 +24,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from crash_recovery import render
-from crash_recovery.classify import RULES, ClassificationValue
+from crash_recovery.classify import RULES
 from crash_recovery.render import (
     JSONL_ONLY_REASONS,
     LIVENESS_REASONS,
     NO_LIVENESS_REASONS,
     SectionKey,
-    _reduced_confidence_text,
     _section_for_row,
 )
 
@@ -360,10 +358,7 @@ def test_unmatched_reason_emits_review_queue_message(tmp_path: Path) -> None:
     db_path = make_db_with_sessions(tmp_path, sessions)
     actual, _ = render.render(db_path)
     assert "⚠ Reduced confidence: Something fucky — let's go look" in actual
-    assert (
-        "⚠ Reduced confidence: session data is incomplete or corrupted"
-        in actual
-    )
+    assert "⚠ Reduced confidence: session data is incomplete or corrupted" in actual
 
 
 def test_reduced_confidence_emitted_for_no_liveness_only(tmp_path: Path) -> None:
@@ -429,15 +424,24 @@ _EXPECTED_SECTIONS: dict[tuple[str, str], SectionKey] = {
     ("live", "live_pid_present_boot_current"): SectionKey.CURRENTLY_UNFINISHED,
     # --- hard_crash (liveness present, dead pid, boot current) ---
     ("hard_crash", "liveness_dead_pid_tool_use_no_result"): SectionKey.IDLE_LIVE_KILLED,
-    ("hard_crash", "liveness_dead_pid_ask_question_no_reply"): SectionKey.IDLE_LIVE_KILLED,
-    ("hard_crash", "liveness_dead_pid_agent_dispatch_no_result"): SectionKey.IDLE_LIVE_KILLED,
+    (
+        "hard_crash",
+        "liveness_dead_pid_ask_question_no_reply",
+    ): SectionKey.IDLE_LIVE_KILLED,
+    (
+        "hard_crash",
+        "liveness_dead_pid_agent_dispatch_no_result",
+    ): SectionKey.IDLE_LIVE_KILLED,
     ("hard_crash", "liveness_dead_pid_unknown_tail"): SectionKey.IDLE_LIVE_KILLED,
     # --- concluded ---
     ("concluded", "no_liveness_clean_end_turn"): SectionKey.RECENTLY_CONCLUDED,
     # --- borderline (no liveness, dangling tails) ---
     ("borderline", "no_liveness_dangling_tool_use"): SectionKey.NEEDS_INVESTIGATION,
     ("borderline", "no_liveness_dangling_ask_question"): SectionKey.NEEDS_INVESTIGATION,
-    ("borderline", "no_liveness_dangling_agent_dispatch"): SectionKey.NEEDS_INVESTIGATION,
+    (
+        "borderline",
+        "no_liveness_dangling_agent_dispatch",
+    ): SectionKey.NEEDS_INVESTIGATION,
     # --- borderline (unknown tail, catch-all) ---
     ("borderline", "unknown_tail_kind"): SectionKey.NEEDS_INVESTIGATION,
 }
@@ -445,15 +449,13 @@ _EXPECTED_SECTIONS: dict[tuple[str, str], SectionKey] = {
 
 @pytest.mark.parametrize(
     ("classification", "reason"),
-    [
-        (rule.classification.value, rule.reason)
-        for rule in RULES
-    ],
+    [(rule.classification.value, rule.reason) for rule in RULES],
 )
 def test_section_assignment_for_every_phase_2_reason(
     classification: str, reason: str
 ) -> None:
-    """Asserts that ``_section_for_row`` returns the documented SectionKey for every Phase 2 RULE.
+    """Asserts that ``_section_for_row`` returns the documented SectionKey
+    for every Phase 2 RULE.
 
     The expected mapping is hand-written in ``_EXPECTED_SECTIONS`` as an
     independent source of truth. If ``_section_for_row`` ever disagrees with

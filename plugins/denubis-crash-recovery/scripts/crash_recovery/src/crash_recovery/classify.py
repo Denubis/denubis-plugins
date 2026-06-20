@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Optional
 
 from crash_recovery.db import CLASSIFICATION_VALUES
 from crash_recovery.jsonl import TailKind, TailSummary
@@ -69,10 +68,10 @@ class Rule:
     equals the corresponding input.
     """
 
-    trailing_kind: Optional[TailKind]
-    liveness_present: Optional[bool]
-    pid_alive: Optional[bool]
-    boot_id_current: Optional[bool]
+    trailing_kind: TailKind | None
+    liveness_present: bool | None
+    pid_alive: bool | None
+    boot_id_current: bool | None
     classification: ClassificationValue
     reason: str
 
@@ -208,7 +207,7 @@ RULES: tuple[Rule, ...] = (
 def classify(
     tail_summary: TailSummary,
     liveness_state: LivenessState,
-    pid_alive: Optional[bool],
+    pid_alive: bool | None,
 ) -> Classification:
     """Return the first :class:`Classification` whose rule matches the inputs.
 
@@ -244,13 +243,22 @@ def classify(
             "got None. Phase 3 caller must run kill -0 when a liveness file exists."
         )
     for rule in RULES:
-        if rule.trailing_kind is not None and rule.trailing_kind is not tail_summary.kind:
+        if (
+            rule.trailing_kind is not None
+            and rule.trailing_kind is not tail_summary.kind
+        ):
             continue
-        if rule.liveness_present is not None and rule.liveness_present is not liveness_state.present:
+        if (
+            rule.liveness_present is not None
+            and rule.liveness_present is not liveness_state.present
+        ):
             continue
         if rule.pid_alive is not None and rule.pid_alive is not pid_alive:
             continue
-        if rule.boot_id_current is not None and rule.boot_id_current is not liveness_state.boot_id_current:
+        if (
+            rule.boot_id_current is not None
+            and rule.boot_id_current is not liveness_state.boot_id_current
+        ):
             continue
         return Classification(value=rule.classification, reason=rule.reason)
     return Classification(value=ClassificationValue.BORDERLINE, reason="unmatched")
