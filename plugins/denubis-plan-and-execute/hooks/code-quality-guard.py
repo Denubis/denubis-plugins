@@ -11,7 +11,8 @@ Input (stdin JSON):
   tool_input.new_string: (Edit) replacement text
 
 Output (stdout JSON):
-  For deny:  {"hookSpecificOutput": {"permissionDecision": "deny"}, "systemMessage": "..."}
+  For deny:  {"hookSpecificOutput": {"permissionDecision": "deny"},
+              "systemMessage": "..."}
   For warn:  {"hookSpecificOutput": {"additionalContext": "..."}}
   For pass:  (empty stdout, exit 0)
 
@@ -148,7 +149,7 @@ def check_debug_statements(file_path: str, new_text: str) -> str | None:
     if not found:
         return None
 
-    return f"""WARNING: Debug statement detected in production code: {', '.join(found)}
+    return f"""WARNING: Debug statement detected in production code: {", ".join(found)}
 
 - Convert to proper logging (logger.debug/info/warning) if output is needed
 - Remove if this is temporary debugging
@@ -170,7 +171,11 @@ def check_easy_mode(file_path: str, new_text: str) -> str | None:
         return None
 
     patterns = [
-        (r"#\s*(TODO|FIXME|HACK|XXX):?\s*(for now|later|simplif|temporary|workaround)", "TODO/FIXME deferral"),
+        (
+            r"#\s*(TODO|FIXME|HACK|XXX):?\s*"
+            r"(for now|later|simplif|temporary|workaround)",
+            "TODO/FIXME deferral",
+        ),
         (r"#\s*simplified|#\s*easy", "simplification comment"),
         (r"pass\s*#", "pass with comment (stub)"),
         (r"\braise\s+NotImplementedError\b", "NotImplementedError stub"),
@@ -181,7 +186,7 @@ def check_easy_mode(file_path: str, new_text: str) -> str | None:
     if not found:
         return None
 
-    return f"""WARNING: Shortcut/deferral pattern detected: {', '.join(found)}
+    return f"""WARNING: Shortcut/deferral pattern detected: {", ".join(found)}
 
 You may be simplifying or deferring instead of implementing properly.
 
@@ -214,7 +219,7 @@ def check_spec_weakening(file_path: str, new_text: str) -> str | None:
     if not found:
         return None
 
-    return f"""WARNING: Potential test weakening detected: {', '.join(found)}
+    return f"""WARNING: Potential test weakening detected: {", ".join(found)}
 
 You may be making a test pass by lowering expectations instead of fixing
 the underlying code.
@@ -249,7 +254,7 @@ WARNING_CHECKS = [
 def main() -> int:
     try:
         input_data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    except json.JSONDecodeError, EOFError:
         return 0
 
     file_path = get_file_path(input_data)

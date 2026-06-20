@@ -4,9 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
-import textwrap
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -138,7 +136,9 @@ class TestCheckApiPath:
         assert check_api_path("gh api repos/denubis/denubis-plugins/pulls") is None
 
     def test_api_path_quoted(self):
-        assert check_api_path('gh api "repos/upstream/other/issues"') == "upstream/other"
+        assert (
+            check_api_path('gh api "repos/upstream/other/issues"') == "upstream/other"
+        )
 
     def test_no_api_path(self):
         assert check_api_path("gh pr list") is None
@@ -156,13 +156,17 @@ class TestCheckExplicitRepoArg:
         _mod.ALLOWED_REPO = original
 
     def test_repo_clone_different(self):
-        assert check_explicit_repo_arg("gh repo clone upstream/other") == "upstream/other"
+        assert (
+            check_explicit_repo_arg("gh repo clone upstream/other") == "upstream/other"
+        )
 
     def test_repo_clone_allowed(self):
         assert check_explicit_repo_arg("gh repo clone denubis/denubis-plugins") is None
 
     def test_repo_view(self):
-        assert check_explicit_repo_arg("gh repo view upstream/other") == "upstream/other"
+        assert (
+            check_explicit_repo_arg("gh repo view upstream/other") == "upstream/other"
+        )
 
     def test_not_a_repo_subcommand(self):
         assert check_explicit_repo_arg("gh pr list") is None
@@ -193,48 +197,58 @@ class TestMainIntegration:
         assert output is None
 
     def test_non_gh_command_passes(self):
-        rc, output = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "git status"},
-        })
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git status"},
+            }
+        )
         assert rc == 0
         assert output is None
 
     def test_allowed_repo_not_denied(self):
         """Allowed repo should not be denied — may still get advisory context."""
-        rc, output = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "gh pr list --repo denubis/denubis-plugins"},
-        })
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr list --repo denubis/denubis-plugins"},
+            }
+        )
         assert rc == 0
         if output is not None:
             # Should not be a deny, at most advisory
             assert output["hookSpecificOutput"].get("permissionDecision") != "deny"
 
     def test_different_repo_denied(self):
-        rc, output = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "gh pr create --repo upstream/other"},
-        })
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr create --repo upstream/other"},
+            }
+        )
         assert rc == 0
         assert output is not None
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_api_path_denied(self):
-        rc, output = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "gh api repos/upstream/other/pulls"},
-        })
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh api repos/upstream/other/pulls"},
+            }
+        )
         assert rc == 0
         assert output is not None
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_repo_subcommand_advisory(self):
         """gh pr list without --repo gets advisory context."""
-        rc, output = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "gh pr list"},
-        })
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr list"},
+            }
+        )
         assert rc == 0
         assert output is not None
         assert "additionalContext" in output["hookSpecificOutput"]

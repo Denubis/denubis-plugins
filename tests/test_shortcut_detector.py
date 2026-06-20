@@ -56,11 +56,13 @@ class TestCheckForShortcuts:
         ],
     )
     def test_medium_signal_phrases_detected(self, text):
-        found, phrase = check_for_shortcuts(text)
+        found, _phrase = check_for_shortcuts(text)
         assert found, f"Expected to detect shortcut in: {text}"
 
     def test_normal_text_not_detected(self):
-        found, phrase = check_for_shortcuts("I've implemented the feature as requested.")
+        found, phrase = check_for_shortcuts(
+            "I've implemented the feature as requested."
+        )
         assert not found
         assert phrase is None
 
@@ -77,14 +79,22 @@ class TestGetLastAssistantContent:
         transcript = tmp_path / "transcript.jsonl"
         lines = [
             json.dumps({"type": "human", "message": {"content": "hello"}}),
-            json.dumps({
-                "type": "assistant",
-                "message": {"content": [{"type": "text", "text": "first response"}]},
-            }),
-            json.dumps({
-                "type": "assistant",
-                "message": {"content": [{"type": "text", "text": "second response"}]},
-            }),
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [{"type": "text", "text": "first response"}]
+                    },
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [{"type": "text", "text": "second response"}]
+                    },
+                }
+            ),
         ]
         transcript.write_text("\n".join(lines))
         result = get_last_assistant_content(str(transcript))
@@ -116,7 +126,9 @@ class TestGetLastAssistantContent:
 
     def test_no_assistant_entries(self, tmp_path):
         transcript = tmp_path / "transcript.jsonl"
-        transcript.write_text(json.dumps({"type": "human", "message": {"content": "hi"}}))
+        transcript.write_text(
+            json.dumps({"type": "human", "message": {"content": "hi"}})
+        )
         assert get_last_assistant_content(str(transcript)) is None
 
 
@@ -168,7 +180,9 @@ class TestMainIntegration:
         entry = {
             "type": "assistant",
             "message": {
-                "content": [{"type": "text", "text": "Let me try a different approach here."}],
+                "content": [
+                    {"type": "text", "text": "Let me try a different approach here."}
+                ],
             },
         }
         transcript.write_text(json.dumps(entry))
@@ -191,7 +205,9 @@ class TestMainIntegration:
         entry = {
             "type": "assistant",
             "message": {
-                "content": [{"type": "text", "text": "Let me try a different approach"}],
+                "content": [
+                    {"type": "text", "text": "Let me try a different approach"}
+                ],
             },
         }
         transcript.write_text(json.dumps(entry))
@@ -215,7 +231,12 @@ class TestMainIntegration:
         entry = {
             "type": "assistant",
             "message": {
-                "content": [{"type": "text", "text": "Here is the implementation you asked for."}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Here is the implementation you asked for.",
+                    }
+                ],
             },
         }
         transcript.write_text(json.dumps(entry))

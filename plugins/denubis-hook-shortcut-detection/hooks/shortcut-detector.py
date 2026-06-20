@@ -14,6 +14,7 @@ Loop prevention:
 - Once blocked in a session, stays quiet for the rest of that session.
 - New session = new transcript path = no lockfile = re-armed.
 """
+
 import hashlib
 import json
 import re
@@ -59,9 +60,9 @@ def get_last_assistant_content(transcript_path: str) -> str | None:
     last_assistant_content = None
 
     try:
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+        with Path(transcript_path).open(encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line:
                     continue
                 try:
@@ -81,7 +82,7 @@ def get_last_assistant_content(transcript_path: str) -> str | None:
                         last_assistant_content = " ".join(text_parts)
                 except json.JSONDecodeError:
                     continue
-    except (FileNotFoundError, PermissionError, OSError):
+    except FileNotFoundError, PermissionError, OSError:
         pass
 
     return last_assistant_content
@@ -125,10 +126,14 @@ def main():
         LOCKFILE_DIR.mkdir(parents=True, exist_ok=True)
         lockfile.write_text(matched_phrase)
 
-        blocking_message = f'''SHORTCUT DETECTED: phrase "{matched_phrase}" found in assistant response.
-
-This may indicate Claude is abandoning an approach without proper debugging.
-If this is a false positive, tell Claude to continue. Otherwise, ask Claude to explain what went wrong before changing approach.'''
+        blocking_message = (
+            f'SHORTCUT DETECTED: phrase "{matched_phrase}" found in '
+            "assistant response.\n\n"
+            "This may indicate Claude is abandoning an approach without "
+            "proper debugging.\n"
+            "If this is a false positive, tell Claude to continue. Otherwise, "
+            "ask Claude to explain what went wrong before changing approach."
+        )
 
         output = {
             "decision": "block",

@@ -19,7 +19,9 @@ def run_hook():
     (returncode, parsed_stdout_or_None, raw_stdout).
     """
 
-    def _run(script_path: Path, input_data: dict | None = None) -> tuple[int, dict | None, str]:
+    def _run(
+        script_path: Path, input_data: dict | None = None
+    ) -> tuple[int, dict | None, str]:
         stdin_bytes = json.dumps(input_data).encode() if input_data else b""
         result = subprocess.run(
             [sys.executable, str(script_path)],

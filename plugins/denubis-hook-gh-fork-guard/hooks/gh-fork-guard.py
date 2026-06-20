@@ -16,6 +16,7 @@ Detection covers:
 - gh api paths containing repos/OWNER/REPO where OWNER/REPO is not the fork
 - gh repo clone/fork/view with explicit non-fork targets
 """
+
 import json
 import os
 import re
@@ -32,7 +33,10 @@ def get_allowed_repo() -> str | None:
     try:
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if result.returncode == 0:
             url = result.stdout.strip()
@@ -41,7 +45,7 @@ def get_allowed_repo() -> str | None:
             url = re.sub(r"^git@github\.com:", "", url)
             if "/" in url:
                 return url
-    except Exception:
+    except Exception:  # noqa: S110 (best-effort: no remote → nothing to guard)
         pass
 
     return None
@@ -51,9 +55,19 @@ ALLOWED_REPO = get_allowed_repo()
 
 # gh subcommands that interact with a specific repo
 REPO_SUBCOMMANDS = {
-    "issue", "pr", "release", "run", "workflow",
-    "label", "milestone", "project", "variable", "secret",
-    "cache", "ruleset", "deploy-key",
+    "issue",
+    "pr",
+    "release",
+    "run",
+    "workflow",
+    "label",
+    "milestone",
+    "project",
+    "variable",
+    "secret",
+    "cache",
+    "ruleset",
+    "deploy-key",
 }
 
 
@@ -63,8 +77,8 @@ def extract_gh_commands(command: str) -> list[str]:
     # This handles: cmd1 && cmd2, cmd1 || cmd2, cmd1 ; cmd2, cmd1 | cmd2
     parts = re.split(r"\s*(?:&&|\|\||[;|])\s*", command)
     gh_commands = []
-    for part in parts:
-        part = part.strip()
+    for raw_part in parts:
+        part = raw_part.strip()
         if re.match(r"^gh\s+", part):
             gh_commands.append(part)
     return gh_commands
@@ -109,9 +123,8 @@ def check_explicit_repo_arg(command: str) -> str | None:
     match = re.search(r"gh\s+repo\s+\w+\s+(\S+)", command)
     if match:
         arg = match.group(1)
-        if "/" in arg and not arg.startswith("-"):
-            if not repo_is_allowed(arg):
-                return arg
+        if "/" in arg and not arg.startswith("-") and not repo_is_allowed(arg):
+            return arg
     return None
 
 
@@ -164,30 +177,44 @@ def main():
         # Check --repo / -R flags
         bad_repo = check_repo_flag(gh_cmd)
         if bad_repo:
-            print(json.dumps(deny(
-                f"BLOCKED: gh command targets '{bad_repo}' which is not the allowed "
-                f"fork '{ALLOWED_REPO}'. You may ONLY interact with {ALLOWED_REPO}. "
-                f"Use --repo {ALLOWED_REPO} or remove the --repo flag."
-            )))
+            print(
+                json.dumps(
+                    deny(
+                        f"BLOCKED: gh command targets '{bad_repo}' which is"
+                        f" not the allowed fork '{ALLOWED_REPO}'."
+                        f" You may ONLY interact with {ALLOWED_REPO}. "
+                        f"Use --repo {ALLOWED_REPO} or remove the --repo flag."
+                    )
+                )
+            )
             sys.exit(0)
 
         # Check gh api paths
         bad_repo = check_api_path(gh_cmd)
         if bad_repo:
-            print(json.dumps(deny(
-                f"BLOCKED: gh api targets '{bad_repo}' which is not the allowed "
-                f"fork '{ALLOWED_REPO}'. Rewrite the API path to use "
-                f"repos/{ALLOWED_REPO}/... instead."
-            )))
+            print(
+                json.dumps(
+                    deny(
+                        f"BLOCKED: gh api targets '{bad_repo}' which is not the"
+                        f" allowed fork '{ALLOWED_REPO}'. Rewrite the API path to use "
+                        f"repos/{ALLOWED_REPO}/... instead."
+                    )
+                )
+            )
             sys.exit(0)
 
         # Check explicit repo arguments to gh repo subcommands
         bad_repo = check_explicit_repo_arg(gh_cmd)
         if bad_repo:
-            print(json.dumps(deny(
-                f"BLOCKED: gh command targets '{bad_repo}' which is not the allowed "
-                f"fork '{ALLOWED_REPO}'. You may ONLY interact with {ALLOWED_REPO}."
-            )))
+            print(
+                json.dumps(
+                    deny(
+                        f"BLOCKED: gh command targets '{bad_repo}' which is not the"
+                        f" allowed fork '{ALLOWED_REPO}'. You may ONLY interact with"
+                        f" {ALLOWED_REPO}."
+                    )
+                )
+            )
             sys.exit(0)
 
     # Second pass: no violations found. Emit advisory context if any

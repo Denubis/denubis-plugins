@@ -1,4 +1,7 @@
 """Test fixtures: code that should NOT trigger ast-grep smell rules."""
+# ruff: noqa: F821 — ast-grep pattern fixtures: names like `process` are
+# intentionally undefined; these files are matched structurally, never executed.
+
 
 # === nesting-depth: <=3 levels is fine ===
 def shallow_nesting(data):

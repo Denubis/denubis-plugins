@@ -6,8 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 _HOOK_PATH = (
     Path(__file__).resolve().parent.parent
     / "plugins"
@@ -223,7 +221,9 @@ class TestSpecWeakening:
         assert result is not None
 
     def test_allows_clean_tests(self):
-        result = check_spec_weakening("tests/test_app.py", "def test_foo(): assert True")
+        result = check_spec_weakening(
+            "tests/test_app.py", "def test_foo(): assert True"
+        )
         assert result is None
 
     def test_non_test_file_ignored(self):
@@ -247,73 +247,90 @@ class TestMainIntegration:
         return result.returncode, parsed, stdout
 
     def test_write_tool_with_violation_denies(self):
-        rc, output, _ = self._run({
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "tests/e2e/test_login.py",
-                "content": 'page.evaluate("document.title")',
-            },
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "tests/e2e/test_login.py",
+                    "content": 'page.evaluate("document.title")',
+                },
+            }
+        )
         assert rc == 2
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_edit_tool_with_violation_denies(self):
-        rc, output, _ = self._run({
-            "tool_name": "Edit",
-            "tool_input": {
-                "file_path": "src/db.py",
-                "new_string": "metadata.create_all(engine)",
-            },
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": "src/db.py",
+                    "new_string": "metadata.create_all(engine)",
+                },
+            }
+        )
         assert rc == 2
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_warning_returns_additional_context(self):
-        rc, output, _ = self._run({
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "src/app.py",
-                "content": "breakpoint()",
-            },
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "src/app.py",
+                    "content": "breakpoint()",
+                },
+            }
+        )
         assert rc == 0
         assert output is not None
         assert "additionalContext" in output["hookSpecificOutput"]
 
     def test_multiple_warnings_combined(self):
         code = "breakpoint()\nraise NotImplementedError\n# TODO: for now"
-        rc, output, _ = self._run({
-            "tool_name": "Write",
-            "tool_input": {"file_path": "src/app.py", "content": code},
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/app.py", "content": code},
+            }
+        )
         assert rc == 0
         assert output is not None
         ctx = output["hookSpecificOutput"]["additionalContext"]
         assert "---" in ctx  # separator between combined warnings
 
     def test_clean_code_passes_silently(self):
-        rc, output, _ = self._run({
-            "tool_name": "Write",
-            "tool_input": {"file_path": "src/app.py", "content": "def foo(): return 42"},
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "src/app.py",
+                    "content": "def foo(): return 42",
+                },
+            }
+        )
         assert rc == 0
         assert output is None
 
     def test_non_write_edit_tool_passes(self):
-        rc, output, _ = self._run({
-            "tool_name": "Bash",
-            "tool_input": {"command": "ls"},
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "ls"},
+            }
+        )
         assert rc == 0
         assert output is None
 
     def test_blocking_check_takes_priority(self):
         """If both blocking and warning checks trigger, blocking wins."""
         code = 'page.evaluate("x")\nbreakpoint()'
-        rc, output, _ = self._run({
-            "tool_name": "Write",
-            "tool_input": {"file_path": "tests/e2e/test_app.py", "content": code},
-        })
+        rc, output, _ = self._run(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "tests/e2e/test_app.py", "content": code},
+            }
+        )
         assert rc == 2
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 

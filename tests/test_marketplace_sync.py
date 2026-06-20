@@ -99,7 +99,8 @@ def test_plugin_json_version_matches_marketplace(plugin_json_path: Path) -> None
 
     marketplace = _load_marketplace()
     assert plugin_name in marketplace, (
-        f"{plugin_name} has plugin.json at {plugin_json_path} but no marketplace.json entry"
+        f"{plugin_name} has plugin.json at {plugin_json_path}"
+        f" but no marketplace.json entry"
     )
     marketplace_version = marketplace[plugin_name]
     assert plugin_version == marketplace_version, (
@@ -117,4 +118,6 @@ def test_no_orphan_marketplace_entries() -> None:
     marketplace = _load_marketplace()
     on_disk_names = {_plugin_name(p) for p in _plugin_json_paths()}
     orphans = set(marketplace) - on_disk_names
-    assert not orphans, f"marketplace.json lists plugins with no on-disk plugin.json: {sorted(orphans)}"
+    assert not orphans, (
+        f"marketplace.json lists plugins with no on-disk plugin.json: {sorted(orphans)}"
+    )
