@@ -1,5 +1,33 @@
 # Changelog
 
+## [denubis-hook-shortcut-detection] 2.0.4
+
+Restore portability so the Stop hook runs under the user's interpreter, not only 3.14.
+
+**Fixed:**
+- `shortcut-detector.py` is invoked `uv run python …` from the user's working directory, where the resolved interpreter may be older than 3.14, so the 3.14-only syntax it had acquired killed the hook before any logic ran. A stock-3.9 machine hit a def-time `TypeError` on the `str | None` annotation; the parenthesis-less `except` would have raised `SyntaxError` on the same interpreter. Added `from __future__ import annotations` and collapsed the except to `except OSError:` (which already covers `FileNotFoundError` and `PermissionError`). The hook now imports and runs on Python 3.9 through 3.14.
+
+## [denubis-hook-branch-bg] 0.2.4
+
+Restore portability for the SessionStart hook.
+
+**Fixed:**
+- `branch-bg.py` carried three parenthesis-less excepts (3.14-only) and runtime-evaluated union annotations, so it failed on pre-3.14 interpreters. Added `from __future__ import annotations` and rewrote the excepts in portable form (collapsed `except OSError:` where a base class subsumes the others, split into single-exception clauses otherwise).
+
+## [denubis-hook-gh-fork-guard] 1.2.1
+
+Restore portability for the fork-guard hook.
+
+**Fixed:**
+- `gh-fork-guard.py` declared several `str | None` return annotations that are evaluated at definition time, raising `TypeError` on Python below 3.10. Added `from __future__ import annotations` so the annotations stay strings. The hook runs via the dispatcher's `uv run python3`, which inherits the user's interpreter.
+
+## [denubis-plan-and-execute] 2.35.2
+
+Restore portability for the code-quality PreToolUse hook.
+
+**Fixed:**
+- `code-quality-guard.py` used a parenthesis-less `except json.JSONDecodeError, EOFError:` (3.14-only) and a runtime union annotation. Added `from __future__ import annotations` and split the except into single-exception clauses so the hook parses and runs on Python 3.9 through 3.14.
+
 ## [denubis-bibliography] 0.9.0
 
 Fan-out reader protocol for investigating many corpus papers at once, and citekey made the primary handle for paper work.
