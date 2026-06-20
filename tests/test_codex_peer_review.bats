@@ -3,8 +3,8 @@
 #
 # `codex` is stubbed on PATH so nothing reaches OpenAI. The stub records its
 # argv and stdin, writes a dummy review to the -o path, and tracks the -C work
-# dir for cleanup. Tests pin the script's preflight checks, its staging of the
-# rubric + target, the codex invocation contract, and the piped prompt.
+# dir for cleanup. The script runs with cwd = TEST_DIR so the `.review/` output
+# directory lands in the sandbox, not the repo.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 SKILL_DIR="$REPO_ROOT/plugins/denubis-external-agents/skills/codex-peer-review"
@@ -17,9 +17,6 @@ setup() {
     export CODEX_STDIN_FILE="$TEST_DIR/codex-stdin"
     export CODEX_WORK_TRACK="$TEST_DIR/codex-workdirs"
 
-    # Stub codex on PATH: record argv + stdin, write a dummy review to -o,
-    # track the -C work dir so teardown can remove it without clobbering
-    # any real run.
     local stub_bin="$TEST_DIR/bin"
     mkdir -p "$stub_bin"
     cat > "$stub_bin/codex" <<'STUB'
@@ -38,10 +35,13 @@ exit 0
 STUB
     chmod +x "$stub_bin/codex"
     export PATH="$stub_bin:$PATH"
+
+    # Run the script from the sandbox so .review/ is created there.
+    cd "$TEST_DIR"
 }
 
 teardown() {
-    # Remove only the throwaway work dirs this test's stub was told about.
+    cd "$REPO_ROOT" 2>/dev/null || cd /
     if [ -f "$CODEX_WORK_TRACK" ]; then
         while read -r w; do
             [ -n "$w" ] && rm -rf "$w" "$w.REVIEW.md"
@@ -50,7 +50,7 @@ teardown() {
     rm -rf "$TEST_DIR"
 }
 
-# Pull a printed "label:  /path" value off the script's stdout.
+# Pull a printed "label:  value" off the script's stdout.
 field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
 
 # ── Preflight ──
@@ -67,48 +67,70 @@ field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
     [[ "$output" == *"target not found"* ]]
 }
 
-# ── Staging ──
+# ── Staging (throwaway bundle in /tmp) ──
 
 @test "valid file target: stages bundled rubric and target verbatim" {
-    local tgt="$TEST_DIR/sample.md"
-    printf 'load-bearing line one\nline two\n' > "$tgt"
+    printf 'load-bearing line one\nline two\n' > "$TEST_DIR/sample.md"
 
-    run bash "$SCRIPT" "$tgt"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
     [ "$status" -eq 0 ]
 
     local pkg; pkg="$(field package)"
     [ -n "$pkg" ]
     [ -f "$pkg/REVIEW-METHOD.md" ]
     [ -f "$pkg/under-review/sample.md" ]
-    # Staged rubric is the bundled rubric; staged target is byte-identical.
     diff "$pkg/REVIEW-METHOD.md" "$RUBRIC_SRC"
-    diff "$pkg/under-review/sample.md" "$tgt"
-}
-
-@test "valid target: codex writes a review and the path is reported" {
-    local tgt="$TEST_DIR/sample.md"; echo x > "$tgt"
-    run bash "$SCRIPT" "$tgt"
-    [ "$status" -eq 0 ]
-    local rev; rev="$(field review)"
-    [ -n "$rev" ]
-    [ -f "$rev" ]
+    diff "$pkg/under-review/sample.md" "$TEST_DIR/sample.md"
 }
 
 @test "directory target is staged recursively" {
-    local d="$TEST_DIR/proj"; mkdir -p "$d/sub"
-    echo a > "$d/a.md"; echo b > "$d/sub/b.md"
-    run bash "$SCRIPT" "$d"
+    mkdir -p "$TEST_DIR/proj/sub"
+    echo a > "$TEST_DIR/proj/a.md"; echo b > "$TEST_DIR/proj/sub/b.md"
+    run bash "$SCRIPT" "$TEST_DIR/proj"
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     [ -f "$pkg/under-review/proj/a.md" ]
     [ -f "$pkg/under-review/proj/sub/b.md" ]
 }
 
+# ── Review output lands in .review/ (gitignored by design) ──
+
+@test "review is written into ./.review/ in the cwd" {
+    echo x > "$TEST_DIR/sample.md"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    [ "$status" -eq 0 ]
+    local rev; rev="$(field review)"
+    [ -n "$rev" ]
+    [ -f "$rev" ]
+    [[ "$rev" == *"/.review/"* ]]
+    [[ "$rev" == *"sample.md"* ]]
+    [[ "$rev" == *".REVIEW.md" ]]
+}
+
+@test "auto-creates a self-ignoring .review/.gitignore when absent" {
+    echo x > "$TEST_DIR/sample.md"
+    [ ! -e "$TEST_DIR/.review/.gitignore" ]
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    [ "$status" -eq 0 ]
+    [ -f "$TEST_DIR/.review/.gitignore" ]
+    grep -qx -- '*'          "$TEST_DIR/.review/.gitignore"
+    grep -qx -- '!.gitignore' "$TEST_DIR/.review/.gitignore"
+}
+
+@test "does not clobber an existing .review/.gitignore" {
+    echo x > "$TEST_DIR/sample.md"
+    mkdir -p "$TEST_DIR/.review"
+    printf 'SENTINEL-DO-NOT-TOUCH\n' > "$TEST_DIR/.review/.gitignore"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    [ "$status" -eq 0 ]
+    grep -qx -- 'SENTINEL-DO-NOT-TOUCH' "$TEST_DIR/.review/.gitignore"
+}
+
 # ── Invocation contract ──
 
 @test "codex runs read-only, ignores user config, with -C, -o, and gpt-5.5" {
-    local tgt="$TEST_DIR/sample.md"; echo x > "$tgt"
-    run bash "$SCRIPT" "$tgt"
+    echo x > "$TEST_DIR/sample.md"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
     [ "$status" -eq 0 ]
     [ -f "$CODEX_ARGS_FILE" ]
     grep -qx -- "exec"                 "$CODEX_ARGS_FILE"
@@ -120,19 +142,19 @@ field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
 }
 
 @test "the grounding prompt is piped to codex on stdin" {
-    local tgt="$TEST_DIR/sample.md"; echo x > "$tgt"
-    run bash "$SCRIPT" "$tgt"
+    echo x > "$TEST_DIR/sample.md"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
     [ "$status" -eq 0 ]
     [ -f "$CODEX_STDIN_FILE" ]
-    grep -q "under-review"    "$CODEX_STDIN_FILE"   # review only the staged target
-    grep -q "NO TARGET FOUND" "$CODEX_STDIN_FILE"   # the anti-confabulation rule
+    grep -q "under-review"    "$CODEX_STDIN_FILE"
+    grep -q "NO TARGET FOUND" "$CODEX_STDIN_FILE"
 }
 
 # ── Provenance smoke-check guidance ──
 
-@test "prints a provenance grep referencing the staged target" {
-    local tgt="$TEST_DIR/sample.md"; echo x > "$tgt"
-    run bash "$SCRIPT" "$tgt"
+@test "prints a provenance grep referencing the real target" {
+    echo x > "$TEST_DIR/sample.md"
+    run bash "$SCRIPT" "$TEST_DIR/sample.md"
     [[ "$output" == *"grep -nF"* ]]
-    [[ "$output" == *"under-review/sample.md"* ]]
+    [[ "$output" == *"sample.md"* ]]
 }

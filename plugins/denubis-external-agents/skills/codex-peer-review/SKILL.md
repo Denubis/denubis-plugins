@@ -29,7 +29,7 @@ Run OpenAI's `codex` (GPT-5.5) as a single external critic over a file or direct
    ```bash
    bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>
    ```
-   It prints the package dir, the review path (`*.REVIEW.md`), and a ready-made smoke-check command.
+   It stages into a throwaway `/tmp` dir, writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review), and prints that path plus a ready-made smoke-check command.
 
 3. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
 
@@ -57,7 +57,7 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 | Step | Command / action |
 |------|------------------|
 | Run | `bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>` |
-| Find review | path printed as `review: …REVIEW.md` |
+| Find review | `./.review/<target>.<ts>.REVIEW.md` (path printed as `review: …`) |
 | Verify (mandatory) | `grep -nF '<quote>' '<target file>'` for several findings |
 | On quote mismatch | discard the review, report confabulation |
 | Present | source-tagged as codex's voice, unmerged |
