@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-      "version": "2.35.0",
+      "version": "2.35.1",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -141,7 +141,7 @@
     {
       "name": "denubis-hook-pretooluse-dispatcher",
       "description": "PreToolUse:Bash dispatcher with auto-discovery from marketplace plugins and drop directory. Runs hooks sequentially and merges outputs.",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "source": "./plugins/denubis-hook-pretooluse-dispatcher",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -174,7 +174,7 @@
     {
       "name": "denubis-bibliography",
       "description": "Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations; annotate cited passages back into the Zotero PDF as highlights. WIP — documents only the workflow proven end-to-end so far.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "source": "./plugins/denubis-bibliography",
       "author": {
         "name": "Brian Ballsun-Stanton",

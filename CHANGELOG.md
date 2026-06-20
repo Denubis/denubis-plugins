@@ -9,6 +9,34 @@ New plugin: dispatch review tasks to external CLI models as a heterogeneous seco
 - The SKILL.md makes the provenance gate non-negotiable: every review's quotes are `grep -F`'d against the real target before anything is presented, because codex will confabulate a fluent, correctly-formatted review (faked "Verification" section included) of a document it never read. A review is a claim until its quotes are verified.
 - Codex's voice is presented source-tagged and unmerged — a second opinion for the human to weigh, not folded into Claude's own review.
 
+## [denubis-bibliography] 0.8.0
+
+Diacritic-insensitive citation search, so queries match regardless of accents.
+
+**New:**
+- `resolve.py` `search_tokens` with ASCII-folding (`_ascii_fold`): both the query and the corpus text are folded to ASCII before matching, so a plain-ASCII query resolves accented author and title tokens (e.g. "Lowenthal" finds "Löwenthal").
+- `print_no_match` reports a clear miss instead of a silent empty result.
+
+**Changed:**
+- The `using-bibliography` skill scripts are ruff-clean under the repo-wide strict config.
+
+## [denubis-plan-and-execute] 2.35.1
+
+Port the SessionStart hook from bash to Python.
+
+**Changed:**
+- `hooks/session-start.py` replaces `session-start.sh`: JSON encoding is delegated to `json.dumps`, correct for every control character rather than the five the bash hand-rolled. The injected SessionStart context is byte-identical to the prior output. Invoked via `uv run python`.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.1
+
+Port the PreToolUse:Bash dispatcher from bash to Python.
+
+**Changed:**
+- `hooks/pretooluse-bash-dispatcher.py` replaces the 255-line jq-driven shell script, gated on the existing 17-test bats contract: identical discovery, priority merge, deny short-circuit, caching, and `--list` diagnostics. Kept portable (runs on interpreters older than 3.14) because it executes via `uv run python` under the user's own project. Invoked via `uv run python`.
+
+**Fixed:**
+- `additionalContext` and `systemMessage` from multiple hooks now join with real newlines instead of a literal `\n\n`.
+
 ## [denubis-token-estimator] 0.1.0
 
 New plugin: measure AI token/word usage from Claude Code and Codex logs for an AI-use disclosure. Reports two real measures — output tokens and human input words — not proxies.
