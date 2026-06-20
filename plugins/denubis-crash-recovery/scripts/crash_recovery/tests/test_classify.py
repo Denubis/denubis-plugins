@@ -26,8 +26,8 @@ from crash_recovery.jsonl import TailKind, TailSummary
 
 
 def _build_tail_summary(kind: TailKind | None) -> TailSummary:
-    """Synthesise a TailSummary whose kind matches the rule (or any kind if
-    wildcard)."""
+    """Synthesise a TailSummary whose kind matches the rule (or any kind if wildcard).
+    """
     use_kind = kind if kind is not None else TailKind.CONCLUDED
     return TailSummary(
         kind=use_kind,
@@ -83,6 +83,33 @@ def test_every_rule_classifies_its_fixture(rule: Rule) -> None:
     assert result.reason, "classification_reason must be non-empty"
 
 
+def test_concluded_tail_with_dead_pid_on_current_boot_is_calm_reason() -> None:
+    """A present marker + dead PID on the current boot + a CONCLUDED tail must map
+    to a distinct, calm BORDERLINE reason — not the generic ``unmatched`` net.
+
+    This is the "finished a turn, then the process was killed" case: an idle-kill,
+    or (before the wrapper-cleanup fix) a terminal closed at the archive prompt on a
+    cleanly-concluded session. The marker surviving proves the wrapper did not exit
+    cleanly, so it is worth surfacing — but the concluded tail means it is not a
+    resume-these crash victim. A named reason lets render describe it honestly
+    instead of crying "Something fucky — let's go look".
+    """
+    tail = TailSummary(
+        kind=TailKind.CONCLUDED,
+        last_ts=0,
+        total_entries=1,
+        state_summary="concluded - end_turn",
+    )
+    liveness = LivenessState(present=True, boot_id_current=True)
+
+    result = classify(tail, liveness, pid_alive=False)
+
+    assert result == Classification(
+        value=ClassificationValue.BORDERLINE,
+        reason="liveness_dead_pid_concluded_tail",
+    )
+
+
 def test_classify_is_idempotent() -> None:
     """Calling classify() twice with identical inputs returns equal Classifications."""
     tail = TailSummary(
@@ -133,34 +160,47 @@ def test_empty_jsonl_maps_to_borderline_empty_file() -> None:
     )
 
 
-def test_unmatched_route_returns_borderline_unmatched() -> None:
-    """Scan/kill race: concluded tail + dead pid on current boot is unmatched."""
-    tail = TailSummary(
-        kind=TailKind.CONCLUDED,
-        last_ts=0,
-        total_entries=1,
-        state_summary="concluded",
-    )
-    liveness = LivenessState(present=True, boot_id_current=True)
+def test_unmatched_is_defensive_only_every_valid_input_is_named() -> None:
+    """After the ``liveness_dead_pid_concluded_tail`` rule, NO valid input reaches
+    the ``unmatched`` fallback: every (TailKind x present x pid_alive x boot)
+    combination resolves to a named rule.
 
-    result = classify(tail, liveness, pid_alive=False)
+    ``(CONCLUDED, present=True, pid_alive=False, boot=True)`` — a concluded tail
+    whose marker still records a dead PID on the current boot — was the sole input
+    that previously routed to ``unmatched``. Now named, it leaves the rule table
+    exhaustive over today's TailKinds; ``unmatched`` stays in ``classify()`` purely
+    as a defensive net for a future, not-yet-enumerated TailKind.
+    """
+    for kind in TailKind:
+        tail = TailSummary(
+            kind=kind, last_ts=0, total_entries=1, state_summary="exhaustive"
+        )
+        # present=False → pid_alive must be None (Phase 3 caller contract).
+        for boot in (True, False):
+            result = classify(
+                tail, LivenessState(present=False, boot_id_current=boot), pid_alive=None
+            )
+            assert result.reason != "unmatched", (
+                f"{kind} present=False boot={boot} routed to unmatched"
+            )
+        # present=True → pid_alive is a concrete bool.
+        for pid in (True, False):
+            for boot in (True, False):
+                result = classify(
+                    tail,
+                    LivenessState(present=True, boot_id_current=boot),
+                    pid_alive=pid,
+                )
+                assert result.reason != "unmatched", (
+                    f"{kind} present=True pid={pid} boot={boot} routed to unmatched"
+                )
 
-    assert result.value == ClassificationValue.BORDERLINE
-    assert result.reason == "unmatched"
-    assert result.reason  # AC3.3 guard.
 
-
-# Partition documentation: which input combinations are expected to route to
-# `unmatched`, and which look like they might but are actually covered by a
-# named rule. Adding a new RULES row that subsumes a positive case here MUST
-# remove the entry from this list in the same commit.
-_UNMATCHED_PARTITION_POSITIVE: tuple[tuple[TailKind, bool, bool, bool | None], ...] = (
-    # fields per tuple: kind, liveness_present, boot_id_current, pid_alive
-    # Concluded JSONL but liveness file still records a dead PID on the
-    # current boot — possible during scan/kill race conditions.
-    (TailKind.CONCLUDED, True, True, False),
-)
-
+# Partition documentation: combinations that LOOK like they would route to
+# `unmatched` but are actually covered by a named rule. The positive list (inputs
+# that genuinely route to `unmatched`) is now empty — the exhaustiveness test
+# above owns that claim. Adding a new RULES row that newly covers a case here is
+# fine; the row's own fixture in `test_every_rule_classifies_its_fixture` pins it.
 _UNMATCHED_PARTITION_NEGATIVE: tuple[
     tuple[TailKind, bool, bool, bool | None, str], ...
 ] = (
@@ -173,28 +213,17 @@ _UNMATCHED_PARTITION_NEGATIVE: tuple[
         False,
         "liveness_dead_pid_unknown_tail",
     ),
+    # CONCLUDED + present liveness + dead pid + current boot was the sole
+    # positive `unmatched` case until `liveness_dead_pid_concluded_tail` named
+    # it — the calm "finished a turn, then the process was killed" label.
+    (
+        TailKind.CONCLUDED,
+        True,
+        True,
+        False,
+        "liveness_dead_pid_concluded_tail",
+    ),
 )
-
-
-@pytest.mark.parametrize(
-    "kind,liveness_present,boot_id_current,pid_alive",
-    _UNMATCHED_PARTITION_POSITIVE,
-)
-def test_rules_table_partition_documents_unmatched_cases_positive(
-    kind: TailKind,
-    liveness_present: bool,
-    boot_id_current: bool,
-    pid_alive: bool | None,
-) -> None:
-    """Positive partition: each enumerated combination routes to unmatched."""
-    tail = TailSummary(kind=kind, last_ts=0, total_entries=1, state_summary="partition")
-    liveness = LivenessState(present=liveness_present, boot_id_current=boot_id_current)
-
-    result = classify(tail, liveness, pid_alive=pid_alive)
-
-    assert result == Classification(
-        value=ClassificationValue.BORDERLINE, reason="unmatched"
-    )
 
 
 @pytest.mark.parametrize(
@@ -219,8 +248,8 @@ def test_rules_table_partition_documents_unmatched_cases_negative(
 
 
 def test_classify_returns_classification_value_strenum() -> None:
-    """classify() must return a ClassificationValue StrEnum,
-    serialising as the documented string."""
+    """classify() must return a ClassificationValue StrEnum, serialising as the
+    documented string."""
     tail = TailSummary(
         kind=TailKind.CONCLUDED,
         last_ts=0,
@@ -256,16 +285,22 @@ def test_rules_have_unique_reasons() -> None:
     )
 
 
-def test_classifier_version_is_one() -> None:
-    """Regression guard: CLASSIFIER_VERSION must remain 1 until a deliberate bump.
+def test_classifier_version_is_two() -> None:
+    """Regression guard: CLASSIFIER_VERSION must remain 2 until a deliberate bump.
 
     Phase 4's scan re-classifies rows whose stored classifier_version is below
     this constant. A silent bump would re-classify the entire DB on the next
     scan run, which is correct-direction but the bump should be a deliberate
     decision (rule-table shape change), not a stray edit. Fitness function per
     Phase 2 coherence review (L1, 2026-05-16).
+
+    Bumped 1 → 2 (2026-06-20) per the convention when the
+    ``liveness_dead_pid_concluded_tail`` rule was added. The bump records which
+    ruleset last classified a row; the actual re-classification of an on-disk
+    ``borderline/unmatched`` row happens via the normal walk re-derivation on the
+    next scan, not because of the version stamp.
     """
-    assert CLASSIFIER_VERSION == 1
+    assert CLASSIFIER_VERSION == 2
 
 
 # Contradictory caller inputs: liveness_state.present=True but pid_alive=None.

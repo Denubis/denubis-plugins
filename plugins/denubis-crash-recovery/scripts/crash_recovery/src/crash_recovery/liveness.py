@@ -48,6 +48,8 @@ class Liveness:
     started: int
     argv: str
     boot_id: str
+    session_id: str | None = None
+    start_time: int | None = None
 
 
 # Required keys are listed in canonical order so the "first missing key"
@@ -95,6 +97,18 @@ def read_liveness(path: Path) -> Liveness:
     except ValueError as exc:
         raise ValueError(f"liveness 'started' is not an int: {path}") from exc
 
+    # Optional Phase 2 keys. They are NOT in _REQUIRED_KEYS: a legacy
+    # four-key marker must parse cleanly (both fields None). start_time uses a
+    # tolerant parse — a non-integer value yields None rather than raising, so
+    # an odd/legacy file never breaks enumeration of the other markers.
+    session_id = parsed.get("session_id")
+    start_time: int | None = None
+    if "start_time" in parsed:
+        try:
+            start_time = int(parsed["start_time"])
+        except ValueError:
+            start_time = None
+
     return Liveness(
         path=path,
         pid=pid,
@@ -102,6 +116,8 @@ def read_liveness(path: Path) -> Liveness:
         started=started,
         argv=parsed["argv"],
         boot_id=parsed["boot_id"].lower(),
+        session_id=session_id,
+        start_time=start_time,
     )
 
 
@@ -147,6 +163,54 @@ def pid_alive(pid: int) -> bool:
         )
         return False
     return True
+
+
+def _proc_start_time(pid: int) -> int | None:
+    """Return the process start time (``starttime``, field 22) from ``/proc``.
+
+    The value is in clock ticks since boot — a per-process constant the
+    kernel never reissues for the same PID within one boot, so pairing it
+    with the PID detects PID reuse.
+
+    DR4 comm-safe parse: field 2 (``comm``) may itself contain spaces and
+    parentheses (``(sd-pam)``, ``(kworker/0:1H-kblockd)``), so a naive
+    ``split()[21]`` reads the wrong field. Split on the LAST ``)`` instead;
+    ``starttime`` (field 22) is then index 19 of the remainder (fields 3..22).
+
+    Returns ``None`` on any failure (no such pid, unreadable, malformed).
+    """
+    try:
+        data = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    try:
+        after = data.rsplit(")", 1)[1]  # comm-safe: split on the LAST ')'
+        return int(after.split()[19])  # field 22 = index 19 after the ')'
+    except IndexError, ValueError:
+        return None
+
+
+def pid_alive_checked(pid: int, expected_start_time: int | None) -> bool:
+    """Liveness probe that also rejects PID reuse via start-time matching.
+
+    * If the PID is not alive at all → ``False``.
+    * If ``expected_start_time is None`` (legacy marker without the key) →
+      fall back to bare ``kill -0`` liveness → ``True``.
+    * Otherwise the stored start_time must equal ``/proc/<pid>/stat``'s.
+
+    When ``pid_alive(pid)`` is ``True`` the current process owns the PID, so
+    ``/proc/<pid>/stat`` is readable; ``pid_alive`` already returns ``False``
+    on ``PermissionError``, so a recycled PID owned by another user is caught
+    upstream and never reaches here. The only way to reach a live PID with an
+    unreadable start_time is the exit race (the process just died) — so a live
+    PID whose start_time we cannot read is correctly treated as dead.
+    """
+    if not pid_alive(pid):
+        return False
+    if expected_start_time is None:
+        return True  # back-compat: legacy marker, bare kill -0
+    actual = _proc_start_time(pid)
+    return actual is not None and actual == expected_start_time
 
 
 def list_liveness_files(run_dir: Path) -> Iterator[Liveness]:

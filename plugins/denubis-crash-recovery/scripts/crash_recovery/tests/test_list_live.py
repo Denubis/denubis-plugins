@@ -15,15 +15,15 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 from crash_recovery.list_live import LiveEntry, survey_live
 
 # pytest injects tests/ onto sys.path when tests/__init__.py is absent (a
 # deliberate Phase 1 decision for workspace-wide collection), so the
 # fixtures package is addressable as top-level "fixtures", not "tests.fixtures".
 from fixtures.jsonl_builder import make_liveness_file
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Module-level tests
@@ -87,8 +87,8 @@ def test_list_live_marks_boot_id_mismatch(tmp_path: Path) -> None:
 
 
 def _run_cli(*args: str, run_dir: Path) -> subprocess.CompletedProcess[str]:
-    """Run ``python -m crash_recovery list-live <args>`` with the test run-dir
-    injected."""
+    """Run ``python -m crash_recovery list-live <args>`` with the test run-dir injected.
+    """
     env = {**os.environ, "CRASH_RECOVERY_RUN_DIR": str(run_dir)}
     return subprocess.run(
         [sys.executable, "-m", "crash_recovery", "list-live", *args],

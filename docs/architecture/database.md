@@ -6,7 +6,7 @@ The crash-recovery database (`~/.claude/crash-recovery.db`, override via `CRASH_
 
 ## Tables
 
-Source file: `crash_recovery/db.py`. DDL constants: `db.py::SESSIONS_DDL`, `db.py::SCAN_RUNS_DDL`, `db.py::CLASSIFICATION_HISTORY_DDL`.
+Source file: `crash_recovery/db.py`. DDL constants: `db.py::SESSIONS_DDL`, `db.py::SCAN_RUNS_DDL`, `db.py::CLASSIFICATION_HISTORY_DDL`, `db.py::UNCORRELATED_MARKERS_DDL`.
 
 ### sessions
 
@@ -25,6 +25,8 @@ Source file: `crash_recovery/db.py`. DDL constants: `db.py::SESSIONS_DDL`, `db.p
 | first_seen | INTEGER | NOT NULL | Unix epoch when this plugin first indexed the session. |
 | last_scanned | INTEGER | NOT NULL | Unix epoch of the last `scan` that touched this row. |
 | user_notes | TEXT | | User-owned annotation; preserved across regen via `crash-recovery note`. |
+| pane_title | TEXT | | tmux-resurrect window-title slug (`✳ …`) for the session's pane; render display label. Added by additive migration via `init()`, NULL on legacy rows (`docs/design-plans/2026-06-12-crash-detection.md`, DR7). |
+| last_substantive | TEXT | | Last real human/assistant text from the JSONL, skipping content-level bookkeeping; render display field (`docs/design-plans/2026-06-12-crash-detection.md`, DR7). Added by additive migration via `init()`, NULL on legacy rows. |
 
 ### scan_runs
 
@@ -46,6 +48,24 @@ Source file: `crash_recovery/db.py`. DDL constants: `db.py::SESSIONS_DDL`, `db.p
 | reason | TEXT | | Classification reason at the time of this scan. |
 | classifier_version | INTEGER | NOT NULL | Denormalised from `scan_runs.classifier_version` (see Denormalisation Rationale). |
 | (uuid, scan_id) | — | PRIMARY KEY | Composite key; one row per session per scan. |
+
+**Dedup invariant (write-side protection of this PK):** `scan` writes at most one `classification_history` row per `(uuid, scan_id)` because `_walk_sessions` deduplicates facts by UUID before the write loop. Once correlation succeeds, two `.live` markers can resolve to one UUID; without the dedup the second insert would violate this composite primary key and crash `triage`. The retained fact is chosen by precedence rank (exact > window > ambiguous-candidate), then live-over-dead, then sorted liveness path (design DR5/DR10). Source: `scan.py::_walk_sessions`. Pinned by `tests/test_scan.py::test_scan_dedup_two_markers_same_uuid_no_integrity_error` and `::test_scan_dedup_same_rank_live_beats_dead_order_independent`.
+
+### uncorrelated_markers
+
+A `.live` marker whose process has abnormally exited (dead PID, or a `boot_id` that no longer matches the current boot) that `correlate` could **not** map to any session JSONL. These are not sessions — no UUID, no transcript — so they live in their own table rather than as synthetic rows in `sessions` (which would distort prune, note, and the session count). They are crash evidence the tool must surface rather than silently drop (the never-silently-drop principle that motivated the 2026-06-12 overhaul). Source: `db.py::UNCORRELATED_MARKERS_DDL`.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| boot_id | TEXT | NOT NULL | Kernel boot_id recorded in the marker. Part of the PK. |
+| pid | INTEGER | NOT NULL | Marker filename PID. Part of the PK — one live marker per PID at a time; `boot_id` disambiguates PID reuse across boots. |
+| cwd | TEXT | NOT NULL | Working directory from the marker; the only human anchor for an uncorrelated marker. |
+| started | INTEGER | NOT NULL | Unix epoch the session started (from the marker). NOT NULL — the writer builds the marker from `liveness.started`, a required int key (a malformed marker raises and is skipped upstream by `list_liveness_files`), so a NULL `started` is unreachable. Rendered as the "Started" line. |
+| reason | TEXT | NOT NULL, CHECK | Why it is abnormal-exit evidence. Closed domain enforced by a CHECK generated from `db.py::MARKER_REASON_VALUES` (`"dead_pid"`, `"boot_mismatch"`) — the same single-source-of-truth pattern as `classification`. The scan-time writer (`scan.py::_walk_sessions`) sets it from the `db.MARKER_REASON_*` constants. |
+| last_scanned | INTEGER | NOT NULL | Unix epoch of the scan that recorded this marker. |
+| (boot_id, pid) | — | PRIMARY KEY | Composite key. |
+
+**Full-replace write model:** `run_scan` does `DELETE FROM uncorrelated_markers` then re-inserts the current abnormal NO_MATCH set inside the same transaction. Because these rows have no UUID, no `classification_history`, and no foreign keys, a full replace each scan keeps the table free of stale rows without a dedicated orphan sweep. Only NO_MATCH markers that are *abnormal* are recorded — a live-PID marker on the current boot is a running session whose transcript was simply not located yet and is left out. Source: `scan.py::run_scan`, `scan.py::_walk_sessions`. Pinned by `tests/test_scan.py::test_scan_records_uncorrelated_dead_marker` and `::test_scan_does_not_record_uncorrelated_live_marker`.
 
 ## Relationships
 
@@ -73,7 +93,11 @@ Allowed values for `sessions.classification` and `classification_history.classif
 
 Both `SESSIONS_DDL` and `CLASSIFICATION_HISTORY_DDL` reference this constant to generate their CHECK constraints. Phase 2's `classify` module re-exports this constant so the classifier and the schema share one source of truth.
 
-The rendered markdown output groups sessions into six fixed sections in document order, each backed by a `SectionKey` StrEnum value (`render.py::SectionKey`): `Currently unfinished`, `Idle-live killed`, `Ambiguous correlation`, `Needs investigation`, `Recently concluded`, `Irrecoverable`. Section assignment is a pure function of `(classification, classification_reason)` performed by `_section_for_row` at render time; the DB stores only the bare classification value and the distinguishing reason string in separate columns. See `glossary.md` for the `SectionKey`, `Section`, and `SECTIONS` entries.
+The rendered markdown output groups sessions into fixed sections in document order, each backed by a `SectionKey` StrEnum value (`render.py::SectionKey`): `Probable system-crash victims`, `Currently unfinished`, `Ambiguous correlation`, `Needs investigation`, `Recently concluded`, `Irrecoverable`. The `Probable system-crash victims` section leads the report — `hard_crash` rows route there — with the full roster preserved below, all-means-all (`docs/design-plans/2026-06-12-crash-detection.md`, DR9 / Phase 4). Section assignment is a pure function of `(classification, classification_reason)` performed by `_section_for_row` at render time; the DB stores only the bare classification value and the distinguishing reason string in separate columns. See `glossary.md` for the `SectionKey`, `Section`, and `SECTIONS` entries.
+
+One supplementary section, `Uncorrelated crash markers`, is appended after the six session sections **only when the `uncorrelated_markers` table holds rows** (it is evidence, not a roster, so an empty report omits it entirely rather than printing an empty header). It is sourced from `uncorrelated_markers`, not `sessions`, and carries no `claudew --resume` line — there is nothing to resume. Source: `render.py::render`, `render.py::_render_marker`.
+
+The `borderline/liveness_dead_pid_concluded_tail` reason (classifier v2) names the "finished a turn, then the process was killed" case — a live marker, dead PID, current boot, but a concluded tail. It routes to `Needs investigation` with a calm explanation rather than the generic `unmatched` "Something fucky" review-queue prompt, which is now a defensive-only fallback reachable by no realistic input. Source: `classify.py::RULES`, `render.py::_reduced_confidence_text`.
 
 ### Scan transaction model
 
@@ -107,6 +131,9 @@ SQLite WAL mode serialises concurrent writers at the database level. The design'
 | FK → sessions(uuid) ON DELETE CASCADE | classification_history | uuid | FK | Yes |
 | FK → scan_runs(id) ON DELETE RESTRICT | classification_history | scan_id | FK | Yes |
 | CHECK (classification) | classification_history | classification | CHECK | Yes — via `CLASSIFICATION_VALUES` |
+| PRIMARY KEY | uncorrelated_markers | (boot_id, pid) | Composite PK | Yes |
+| NOT NULL | uncorrelated_markers | boot_id, pid, cwd, started, reason, last_scanned | NOT NULL | Yes — all columns (only the PK members are implicitly required; the rest explicit) |
+| CHECK (reason) | uncorrelated_markers | reason | CHECK | Yes — via `MARKER_REASON_VALUES` |
 
 ## Schema Migration Strategy
 
@@ -117,7 +144,13 @@ Schema changes are coupled to `CLASSIFIER_VERSION` (defined in Phase 2's `crash_
 3. Bump `CLASSIFIER_VERSION`; existing rows stamped with the old version are flagged stale by Phase 4's orphan sweep and re-classified on next `scan`.
 4. `_schema_hash()` will change after the migration — that's expected. It's a test-time helper (underscore prefix marks it module-private), not a production invariant; only the idempotency test in `tests/test_init.py` consults it, and a migration test should treat `_schema_hash` as a fingerprint that changes when the schema changes (which is the desired behaviour).
 
-`init()` itself remains idempotent across re-runs of the same schema version. Migrations are a separate code path tied to version bumps and live alongside the version that introduces them.
+`init()` itself remains idempotent across re-runs of the same schema version. CHECK-changing migrations are a separate code path tied to version bumps and live alongside the version that introduces them.
+
+**Additive-column migrations (`docs/design-plans/2026-06-12-crash-detection.md`, DR7).** The above strategy governs CHECK-constraint changes (new classification values), which SQLite only supports via table-rebuild and which couple to `CLASSIFIER_VERSION`. Adding a *nullable* column is a simpler, orthogonal class: an idempotent `ALTER TABLE ADD COLUMN` guarded by `PRAGMA table_info`, fired exclusively from `init()` — the deliberate, operator-invoked upgrade command. It is **not** coupled to `CLASSIFIER_VERSION` because a display-only column does not change classification semantics or trigger stale-row reclassification. `pane_title` and `last_substantive` are the first columns added this way.
+
+`open_db()` asserts that all additive columns are present **and that the `uncorrelated_markers` table exists**, raising `RuntimeError` (directing the operator to run `crash-recovery init`) if either is absent. It does **not** run `ALTER TABLE` or `CREATE TABLE` — keeping DDL off the per-command hot path avoids the concurrency race that arises when multiple concurrent openers each attempt the same migration. The `uncorrelated_markers` table is created by `init()` via `CREATE TABLE IF NOT EXISTS` (idempotent), the same deliberate-upgrade contract as the additive columns. `render()` opens read-only via `file:{db}?mode=ro` and bypasses `open_db()` entirely; it checks `PRAGMA table_info` and selects absent columns as `NULL`, and checks `sqlite_master` before reading `uncorrelated_markers` — a render-only call on a not-yet-migrated DB must not raise `no such column` or `no such table` (AC7.3).
+
+**`CLASSIFIER_VERSION` is 2** as of 2026-06-20: bumped per the convention when the `liveness_dead_pid_concluded_tail` rule was added (a rule-table shape change, not a new CHECK value). The bump stamps the ruleset version onto rows and re-considers version-stale orphans; it is **not** the mechanism that migrates existing data. An on-disk session is re-derived from its tail + liveness on every `scan` via `_upsert_session`, so a row stored `borderline/unmatched` by v1 picks up the calm reason on the next scan through the normal walk regardless of the version stamp.
 
 **Known v0.1.0 gap (CLASSIFIER_VERSION ↔ CHECK decoupling)**: `classifier_version` is logically coupled to the CHECK list — a future version may introduce new values — but the schema does not enforce that coupling. A row with `(classifier_version=1, classification="value_only_valid_in_v2")` would pass the CHECK as long as the value is in `CLASSIFICATION_VALUES` at write time. Only the classifier code prevents this. Accepted because nothing in v0.1.0 produces rows of that shape; the orphan sweep + classifier rule table together preserve the invariant in practice.
 

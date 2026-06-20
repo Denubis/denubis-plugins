@@ -1,5 +1,26 @@
 # Changelog
 
+## [denubis-crash-recovery] 1.1.0
+
+Triage output overhaul after a UAT run found it unreadable and ~9,000 lines long with the crash sections empty.
+
+**New:**
+- Lean triage terminal view (default): crash victims, live, ambiguous, and genuine investigation rows render in full; concluded, irrecoverable, and unrecognised-ending sessions collapse to a `## Collapsed` count summary. `triage --all` and `~/llm-resume.md` keep the full all-means-all roster. On a real database this was 9,127 → 120 lines.
+- `uncorrelated_markers` table + a supplementary "Uncorrelated crash markers" render section: a dead or previous-boot `.live` marker that cannot be correlated to a session is now surfaced as crash evidence (cwd + time) instead of being silently dropped. `reason` is CHECK-enforced from `MARKER_REASON_VALUES`.
+- `triage --all` flag for the full roster.
+
+**Changed:**
+- A dead marker with a concluded tail (a turn finished, then the process was killed) classifies as `borderline/liveness_dead_pid_concluded_tail` with a calm "likely nothing to resume" note instead of the generic `unmatched` "Something fucky" route. `unmatched` is now a defensive-only fallback. `CLASSIFIER_VERSION` → 2.
+
+**Fixed:**
+- `last_substantive` is single-lined (whitespace and newlines collapsed) so a multi-line markdown assistant message no longer spills across rows and shatters the report; render also single-lines already-stored rows defensively.
+- After upgrade, run `crash-recovery init` once to add the `uncorrelated_markers` table; `open_db` asserts its presence.
+
+## [denubis-plan-and-execute] 2.35.3
+
+**Fixed:**
+- `claude-wrapper.sh` removes the crash-recovery `.live` marker immediately on a clean exit, before the transcript-archive prompt (which blocks on input). Previously, closing the terminal at that prompt stranded a marker on a cleanly-concluded session, which crash-recovery triage misread as a crash.
+
 ## [denubis-hook-shortcut-detection] 2.0.4
 
 Restore portability so the Stop hook runs under the user's interpreter, not only 3.14.

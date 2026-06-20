@@ -52,6 +52,64 @@ EOF
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 0 ]
 }
 
+@test "AC5.7 — clean exit removes the marker BEFORE the archive-prompt block" {
+  # A clean claude exit (0) in a transcripting project makes the wrapper block on
+  # "Press Enter to archive transcript". The marker cleanup MUST happen before that
+  # blocking prompt, not after it — otherwise closing the terminal at the prompt
+  # strands a dead-PID marker that triage reads as a crash (the archive-prompt-close
+  # false positive: a concluded session that looks abnormal). This pins the ordering
+  # by holding the wrapper at the prompt and asserting the marker is already gone.
+  export HOME="$CR_TEST_DIR/home"
+  mkdir -p "$HOME/.claude/projects/test-project"
+  PROJECT_DIR="$CR_TEST_DIR/project"
+  mkdir -p "$PROJECT_DIR/ai_transcripts"   # transcripting project → prompt fires
+
+  # Stub: touch the JSONL for the injected --session-id, then exit 0 (clean).
+  cat > "$CR_TEST_DIR/jsonl-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+session_id=""
+prev=""
+for arg in "$@"; do
+  [[ "$prev" == "--session-id" ]] && { session_id="$arg"; break; }
+  prev="$arg"
+done
+[[ -n "$session_id" ]] && touch "$HOME/.claude/projects/test-project/${session_id}.jsonl"
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/jsonl-claude.sh"
+
+  # FIFO as the wrapper's stdin so the archive prompt's `read -r` BLOCKS: fd 9 is
+  # held open for writing, so the reader sees no EOF and waits.
+  fifo="$CR_TEST_DIR/prompt.fifo"
+  mkfifo "$fifo"
+  exec 9<>"$fifo"
+
+  # No flags → fresh interactive (SHOULD_TRANSCRIPT=true), so the prompt path runs.
+  cd "$PROJECT_DIR"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/jsonl-claude.sh" "$WRAPPER" <"$fifo" &
+  wrapper_pid=$!
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  # The FIFO holds the wrapper blocked at the archive prompt (no input). The fixed
+  # wrapper removes the marker BEFORE that prompt; the old one only after it. Poll
+  # for the marker to be gone rather than a fixed sleep, so the test stays robust
+  # on a loaded machine. Up to ~5s.
+  removed=0
+  for _ in $(seq 1 50); do
+    if [ ! -f "$live_file" ]; then removed=1; break; fi
+    sleep 0.1
+  done
+  # The wrapper must still be alive — i.e. blocked at the prompt — which proves it
+  # actually reached the prompt path and removed the marker before it, rather than
+  # dying before writing (which would make absence a false pass).
+  kill -0 "$wrapper_pid" 2>/dev/null
+  [ "$removed" -eq 1 ]
+
+  # Unblock the prompt and reap the wrapper.
+  printf '\n' >&9
+  exec 9>&-
+  wait "$wrapper_pid" 2>/dev/null || true
+}
+
 @test "AC5.5 — Claude exit 137 (SIGKILL) preserves the liveness file" {
   FAKE_CLAUDE_EXIT_CODE=137 "$WRAPPER" --print "test" || true
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 1 ]
@@ -127,7 +185,7 @@ EOF
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.tmp 2>/dev/null | wc -l)" -eq 0 ]
 }
 
-@test "M3 — wrapper liveness format flows through scan → render to Idle-live killed" {
+@test "M3 — wrapper liveness format flows through scan → render to Probable system-crash victims" {
   # Closes Phase 8 coherence-review gap: no automated test pins the chain
   # "wrapper writes <pid>.live → crash-recovery scan reads it → render emits
   # the UUID in the right section". Each layer is tested separately; this
@@ -143,7 +201,7 @@ EOF
   #   3. Build a matching JSONL under projects_root with a TOOL_USE_NO_RESULT
   #      tail so the classifier returns hard_crash via the dead-pid rule.
   #   4. Drive `crash-recovery init`, `scan`, `render` from the same dirs.
-  #   5. Assert the rendered markdown shows the UUID under "Idle-live killed".
+  #   5. Assert the rendered markdown shows the UUID under "Probable system-crash victims".
   FAKE_CLAUDE_EXIT_CODE=0 "$WRAPPER" --print "lifecycle-warmup"
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 0 ]
 
@@ -186,13 +244,13 @@ EOF
   run $CR_CLI render --db "$DB_PATH" --output "$RESUME_PATH"
   [ "$status" -eq 0 ]
 
-  # The synthesised session must appear under "Idle-live killed".
-  grep -q "^## Idle-live killed" "$RESUME_PATH"
-  # awk extracts the body of the section: lines after the "Idle-live killed"
+  # The synthesised session must appear under "Probable system-crash victims".
+  grep -q "^## Probable system-crash victims" "$RESUME_PATH"
+  # awk extracts the body of the section: lines after the "Probable system-crash victims"
   # header and before the next "## " heading. A naive range pattern
   # /header/,/^## / would stop at the header line itself; this flag-based
   # form is the conventional awk idiom for "everything between two headings".
-  section=$(awk '/^## Idle-live killed/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  section=$(awk '/^## Probable system-crash victims/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
   echo "$section" | grep -q "${CRASHED_UUID:0:8}"
   echo "$section" | grep -q "$CRASHED_UUID"
 }
@@ -231,6 +289,99 @@ EOF
   grep -qx -- "--teammate-mode=auto" "$CAPTURE_FILE"
 }
 
+@test "AC4.6 integration — wrapper exports CR_LIVE_FILE into the child environment" {
+  # Phase 2b Task 2: the SessionStart hook (update-live-marker.sh) runs as a
+  # descendant of the wrapper via claude and must inherit CR_LIVE_FILE to know
+  # which marker to rewrite. A real /clear round-trip is not unit-testable
+  # (Phase 4 DR1/DR9 UAT); this test pins the necessary precondition — the env
+  # var is EXPORTED, not merely a local var — by having the stub child record
+  # what it sees in its environment.
+  #
+  # The ${CR_LIVE_FILE:-} guard in the stub is load-bearing for a clean RED:
+  # before the export is added the child sees it unset, so the capture is empty
+  # and the assertion fails as a value mismatch, not as a set -u abort.
+  CAPTURE_FILE="$BATS_TEST_TMPDIR/captured-cr-live-file.txt"
+  cat > "$CR_TEST_DIR/capture-env-claude.sh" <<EOF
+#!/usr/bin/env bash
+printf '%s' "\${CR_LIVE_FILE:-}" > "$CAPTURE_FILE"
+sleep 2
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/capture-env-claude.sh"
+
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/capture-env-claude.sh" "$WRAPPER" --print "test" &
+  wrapper_pid=$!
+  sleep 0.5  # let the wrapper exec the child, which records its environment
+  [ -f "$CAPTURE_FILE" ]
+  # The child inherits the wrapper's $$, so CR_LIVE_FILE is <wrapper_pid>.live.
+  [ "$(cat "$CAPTURE_FILE")" = "$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live" ]
+  wait "$wrapper_pid"
+}
+
+@test "AC4.1 — resumed session stamps session_id=<uuid> and start_time=<int>" {
+  cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 2
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/sleep-claude.sh"
+  RESUME_UUID="db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$RESUME_UUID" &
+  wrapper_pid=$!
+  sleep 0.5
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  [ -f "$live_file" ]
+  grep -q "^session_id=$RESUME_UUID\$" "$live_file"
+  grep -qE "^start_time=[0-9]+\$" "$live_file"
+  wait "$wrapper_pid"
+}
+
+@test "AC4.1 — fresh interactive session stamps a UUID-shaped session_id and start_time" {
+  cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 2
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/sleep-claude.sh"
+  # No resume/print/session-id flags → fresh interactive: wrapper-generated
+  # SESSION_ID is in EXTRA_ARGS and must be stamped. cd to a non-transcripting
+  # dir so the clean-exit transcript path stays inert.
+  cd "$CR_TEST_DIR"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" &
+  wrapper_pid=$!
+  sleep 0.5
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  [ -f "$live_file" ]
+  grep -qE "^session_id=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\$" "$live_file"
+  grep -qE "^start_time=[0-9]+\$" "$live_file"
+  wait "$wrapper_pid"
+}
+
+@test "AC4.2 — written start_time equals the wrapper's real comm-safe /proc start time" {
+  cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 2
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/sleep-claude.sh"
+  cd "$CR_TEST_DIR"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" &
+  wrapper_pid=$!
+  sleep 0.5
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  [ -f "$live_file" ]
+  # Independently compute the wrapper's start time with the SAME comm-safe
+  # rpartition logic (strip through the last ") ", starttime is the 20th token).
+  stat=$(cat "/proc/$wrapper_pid/stat")
+  rest=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $rest
+  expected_start_time="${20-}"
+  [ -n "$expected_start_time" ]
+  grep -q "^start_time=$expected_start_time\$" "$live_file"
+  wait "$wrapper_pid"
+}
+
 @test "M1 fitness — abnormal claude exit skips transcript-archive prompt" {
   # Phase 8 coherence-review M1: the `|| EXIT_CODE=$?` fix made the transcript-archive
   # block structurally reachable for non-zero exits, where pre-Phase-8 `set -e` would
@@ -263,4 +414,190 @@ EOF
 
   [ "$status" -eq 1 ]
   ! echo "$output" | grep -q "Press Enter to archive transcript"
+}
+
+# ---------------------------------------------------------------------------
+# Cross-language start_time seam (Phase 2). The wrapper (bash) writes
+# start_time from /proc/<pid>/stat field 22 via _proc_starttime; the reader
+# (python liveness.py::_proc_start_time) parses the same field and
+# pid_alive_checked() compares the stored value against a fresh /proc read for
+# a LIVE pid. If the two parsers ever disagreed on the field index, every live
+# session's stored start_time would mismatch on read-back, pid_alive_checked
+# would return False, and live sessions would mass-misclassify as crashed.
+#
+# Existing coverage does NOT exercise the MATCHING/True round-trip THROUGH the
+# wrapper: the M3 test uses a hand-synthesised DEAD pid (pid_alive_checked
+# short-circuits before comparing start_time), and Task 3's python positive
+# control (test_scan_live_pid_with_correct_start_time_is_live) generated the
+# fixture start_time with python's own _proc_start_time, not the wrapper's bash.
+#
+# These two tests pin the seam as a self-certifying pair:
+#   (a) real live wrapper + correlatable live-shaped JSONL → classifies LIVE,
+#       and the marker contains a start_time= line (so the comparison branch,
+#       not the start_time-is-None back-compat branch, is exercised).
+#   (b) identical setup, but the marker's start_time= line is mutated to a
+#       different integer while the pid stays alive → classifies CRASHED.
+# (b) passing proves start_time is consulted (load-bearing), so (a)'s "live"
+# is via the genuine comparison through the wrapper-written value — not a
+# vacuous green where start_time is ignored.
+#
+# Live-shaped tail = TOOL_USE_NO_RESULT (the same shape Task 3's
+# test_scan_live_pid_with_correct_start_time_is_live and the M3 test use). It
+# is load-bearing for the pair: the LIVE rule (classify.py RULES) takes any
+# trailing_kind when pid_alive=True+boot_current=True, but the matching
+# HARD_CRASH fallback for a DEAD pid requires a dead-pid tail kind —
+# TOOL_USE_NO_RESULT routes to liveness_dead_pid_tool_use_no_result. A
+# CONCLUDED tail would fall through to borderline/unmatched in (b), not crash.
+#
+# Authoritative live classification value: db.py CLASSIFICATION_VALUES ("live");
+# render.py _section_for_row maps "live" → "## Currently unfinished" and
+# "hard_crash" → "## Probable system-crash victims".
+
+# Helper: build a correlatable live-shaped JSONL whose first record's cwd
+# equals $1 (the wrapper's cwd, used by correlate._project_dir_for_cwd) and
+# whose tail is a dangling tool_use (TOOL_USE_NO_RESULT). $2 = lowercase uuid,
+# $3 = projects-root dir. Mirrors the M3 test's two-line hand-rolled JSONL.
+_cr_build_live_jsonl() {
+  local cwd="$1" uuid="$2" projects_root="$3"
+  # Encoded dir name is lossy and resolution is by-content, so the exact
+  # directory name is irrelevant — _project_dir_for_cwd matches on the
+  # first-record cwd. Use a fixed encoded-style name.
+  local encoded_dir="$projects_root/-cr-seam-live"
+  mkdir -p "$encoded_dir"
+  local jsonl="$encoded_dir/$uuid.jsonl"
+  local iso_ts
+  iso_ts=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
+  printf '%s\n%s\n' \
+    "{\"type\":\"user\",\"cwd\":\"$cwd\",\"timestamp\":\"$iso_ts\",\"message\":{\"content\":[]}}" \
+    "{\"type\":\"assistant\",\"timestamp\":\"$iso_ts\",\"message\":{\"stop_reason\":\"tool_use\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_seam_001\",\"name\":\"Bash\",\"input\":{}}]}}" \
+    > "$jsonl"
+}
+
+@test "seam — wrapper-written start_time round-trips so a live session classifies LIVE" {
+  # Long-lived stub: the wrapper pid must stay alive THROUGH the scan, which
+  # reads /proc/<wrapper_pid>/stat for the start_time comparison. Three cold
+  # `uv run` invocations can exceed a short sleep, so use a generous one.
+  cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 120
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/sleep-claude.sh"
+
+  SEAM_UUID="db0cc58f-dc30-4195-a64a-4f25a5c19d6b"  # lowercase: correlate lowercases session_id
+  WORK_CWD="$CR_TEST_DIR/work"
+  mkdir -p "$WORK_CWD"
+  PROJECTS_ROOT="$CR_TEST_DIR/projects"
+  DB_PATH="$CR_TEST_DIR/crash-recovery.db"
+  RESUME_PATH="$CR_TEST_DIR/llm-resume.md"
+  CR_CLI="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
+
+  # init BEFORE launching so the slow cold-start is outside the live window.
+  run $CR_CLI init --db "$DB_PATH"
+  [ "$status" -eq 0 ]
+
+  # Launch the REAL wrapper from WORK_CWD with --resume <uuid>. The wrapper
+  # stamps session_id=<uuid>, argv=--resume <uuid>, and start_time from its
+  # own /proc via bash _proc_starttime, then writes the marker via atomic mv.
+  # cd in the test body (NOT a subshell) so $! is the wrapper's own pid — the
+  # marker filename is <wrapper_pid>.live ($$ inside the wrapper). A
+  # ( cd ... && wrapper ) & subshell would make $! the subshell's pid, not the
+  # wrapper's, and the marker lookup would miss. bats runs each test in its own
+  # subshell, so this cd does not leak; the CLI calls below use absolute paths.
+  cd "$WORK_CWD"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" &
+  wrapper_pid=$!
+  sleep 0.5  # let the wrapper write the marker
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  [ -f "$live_file" ]
+  # The comparison branch (not the start_time-is-None back-compat branch) must
+  # be the one exercised: the marker must carry a start_time= line.
+  grep -qE "^start_time=[0-9]+\$" "$live_file"
+
+  # Correlatable live-shaped JSONL: first-record cwd == wrapper cwd, dangling
+  # tool_use tail. session_id DIRECT_MATCH then resolves the project dir by
+  # content and finds <uuid>.jsonl.
+  _cr_build_live_jsonl "$WORK_CWD" "$SEAM_UUID" "$PROJECTS_ROOT"
+
+  # Drive scan → render WHILE the wrapper is still alive.
+  run $CR_CLI scan --db "$DB_PATH" --run-dir "$CRASH_RECOVERY_RUN_DIR" --projects-root "$PROJECTS_ROOT"
+  [ "$status" -eq 0 ]
+  run $CR_CLI render --db "$DB_PATH" --output "$RESUME_PATH"
+  [ "$status" -eq 0 ]
+
+  # Tear the wrapper down now that the live window is no longer needed.
+  kill "$wrapper_pid" 2>/dev/null || true
+  wait "$wrapper_pid" 2>/dev/null || true
+
+  # Section-scoped assertions. render emits EVERY section header (empty ones
+  # get an empty_message), so a bare file-wide grep would pass vacuously.
+  # Extract each section body with the M3 awk idiom and assert per-section.
+  unfinished=$(awk '/^## Currently unfinished/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  killed=$(awk '/^## Probable system-crash victims/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  # LIVE → "## Currently unfinished".
+  echo "$unfinished" | grep -q "$SEAM_UUID"
+  echo "$unfinished" | grep -q "live_pid_present_boot_current"
+  # And NOT under "## Probable system-crash victims".
+  ! echo "$killed" | grep -q "$SEAM_UUID"
+}
+
+@test "seam — mutating the wrapper-written start_time flips a live session to CRASHED" {
+  # Non-vacuity proof: same live wrapper + same correlatable live-shaped JSONL
+  # as the round-trip test, but after the marker is written we mutate ONLY the
+  # start_time= line to real+1 while the pid stays alive. The wrapper writes
+  # the marker once at startup (atomic mv) and never rewrites it, so the
+  # mutation is stable. pid_alive_checked then sees a live pid whose real
+  # /proc start_time no longer matches the stored value → False → the dead-pid
+  # rule fires → hard_crash → "## Probable system-crash victims".
+  cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
+#!/usr/bin/env bash
+sleep 120
+exit 0
+EOF
+  chmod +x "$CR_TEST_DIR/sleep-claude.sh"
+
+  SEAM_UUID="db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
+  WORK_CWD="$CR_TEST_DIR/work"
+  mkdir -p "$WORK_CWD"
+  PROJECTS_ROOT="$CR_TEST_DIR/projects"
+  DB_PATH="$CR_TEST_DIR/crash-recovery.db"
+  RESUME_PATH="$CR_TEST_DIR/llm-resume.md"
+  CR_CLI="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery"
+
+  run $CR_CLI init --db "$DB_PATH"
+  [ "$status" -eq 0 ]
+
+  # cd in the test body (not a subshell) so $! is the wrapper's own pid; see
+  # the round-trip test for why a subshell would break the marker lookup.
+  cd "$WORK_CWD"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" &
+  wrapper_pid=$!
+  sleep 0.5
+  live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
+  [ -f "$live_file" ]
+
+  # Read the real wrapper-written start_time, then rewrite that line to real+1.
+  real_start_time=$(grep -oE "^start_time=[0-9]+\$" "$live_file" | cut -d= -f2)
+  [ -n "$real_start_time" ]
+  mutated_start_time=$((real_start_time + 1))
+  # Replace only the start_time= line; leave every other key untouched.
+  sed -i "s/^start_time=.*\$/start_time=$mutated_start_time/" "$live_file"
+  grep -q "^start_time=$mutated_start_time\$" "$live_file"
+
+  _cr_build_live_jsonl "$WORK_CWD" "$SEAM_UUID" "$PROJECTS_ROOT"
+
+  run $CR_CLI scan --db "$DB_PATH" --run-dir "$CRASH_RECOVERY_RUN_DIR" --projects-root "$PROJECTS_ROOT"
+  [ "$status" -eq 0 ]
+  run $CR_CLI render --db "$DB_PATH" --output "$RESUME_PATH"
+  [ "$status" -eq 0 ]
+
+  kill "$wrapper_pid" 2>/dev/null || true
+  wait "$wrapper_pid" 2>/dev/null || true
+
+  # CRASHED → hard_crash → "## Probable system-crash victims"; NOT under "Currently unfinished".
+  unfinished=$(awk '/^## Currently unfinished/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  killed=$(awk '/^## Probable system-crash victims/{flag=1; next} /^## /{flag=0} flag' "$RESUME_PATH")
+  echo "$killed" | grep -q "$SEAM_UUID"
+  echo "$killed" | grep -q "liveness_dead_pid_tool_use_no_result"
+  ! echo "$unfinished" | grep -q "$SEAM_UUID"
 }

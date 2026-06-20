@@ -46,8 +46,8 @@ class TestPluginJson:
         assert data["name"] == "denubis-crash-recovery", data["name"]
 
     def test_plugin_json_version_string_shape(self) -> None:
-        """Version is a non-empty string (semver-ish; full semver enforced
-        elsewhere)."""
+        """Version is a non-empty string (semver-ish; full semver enforced elsewhere).
+        """
         with _PLUGIN_JSON.open() as fh:
             data = json.load(fh)
         assert isinstance(data["version"], str), type(data["version"])

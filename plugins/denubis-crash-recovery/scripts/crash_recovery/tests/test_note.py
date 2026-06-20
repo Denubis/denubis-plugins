@@ -25,13 +25,13 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 import pytest
 from crash_recovery import db as db_mod
 from crash_recovery import note as note_mod
 from crash_recovery import render as render_mod
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -214,8 +214,8 @@ def _run_cli(*args: str, db_path: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_note_cli_unknown_uuid_exits_nonzero_with_error_text(tmp_path: Path) -> None:
-    """AC4.5 (CLI): unknown UUID → exit code != 0 and "no session with uuid"
-    in stderr."""
+    """AC4.5 (CLI): unknown UUID → exit code != 0 and "no session with uuid" in stderr.
+    """
     db_path = _init_db(tmp_path)
     result = _run_cli("no-such-uuid", "hello", db_path=db_path)
     assert result.returncode != 0, (result.stdout, result.stderr)

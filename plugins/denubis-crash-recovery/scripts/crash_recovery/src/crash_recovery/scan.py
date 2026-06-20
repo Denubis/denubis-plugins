@@ -16,12 +16,11 @@ readers proceed unblocked; concurrent scans serialise at the write lock.
 
 from __future__ import annotations
 
-import json
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from crash_recovery import db
+from crash_recovery import db, resurrect
 from crash_recovery.classify import (
     Classification,
     ClassificationValue,
@@ -29,12 +28,18 @@ from crash_recovery.classify import (
     classify,
 )
 from crash_recovery.correlate import CorrelationKind, _project_dir_for_cwd, correlate
-from crash_recovery.jsonl import TailKind, TailSummary, parse_tail
+from crash_recovery.jsonl import (
+    TailKind,
+    TailSummary,
+    first_record_field,
+    last_substantive_text,
+    parse_tail,
+)
 from crash_recovery.liveness import (
     Liveness,
     current_boot_id,
     list_liveness_files,
-    pid_alive,
+    pid_alive_checked,
 )
 from crash_recovery.scan_db import (
     WriteContext,
@@ -66,12 +71,19 @@ class ScanContext:
 
     ``now`` is injected (not read from ``time.time()`` inside the scan) so
     tests can pin the ``last_scanned`` and ``scan_runs.ts`` values.
+
+    ``resurrect_dir`` is the tmux-resurrect snapshot directory
+    (``~/.byobu-sessions`` by default). ``_walk_sessions`` loads its snapshots
+    once and corroborates id-less backlog markers against the pane cwds live at
+    crash time (Phase 3). A missing or empty directory makes corroboration a
+    no-op — multi-candidate markers stay ``borderline/ambiguous_match``.
     """
 
     db_path: Path
     run_dir: Path
     projects_root: Path
     now: int
+    resurrect_dir: Path
 
 
 @dataclass(frozen=True)
@@ -107,6 +119,27 @@ class SessionFact:
     pid_alive_value: bool | None
     boot_id_current: bool = False
     ambiguity_candidates: tuple[str, ...] = ()
+    pane_title: str | None = None
+    last_substantive: str | None = None
+
+
+@dataclass(frozen=True)
+class UncorrelatedMarker:
+    """An abnormal-exit ``.live`` marker that ``correlate`` could not map to a session.
+
+    Not a session (no UUID, no transcript). Produced by ``_walk_sessions`` only
+    when a NO_MATCH marker is evidence of an abnormal exit — its pid is dead, or
+    its ``boot_id`` no longer matches the current boot. A NO_MATCH marker whose
+    pid is alive on the current boot is a running session whose transcript was
+    simply not located yet, so it is left out. ``reason`` is ``"dead_pid"`` or
+    ``"boot_mismatch"``.
+    """
+
+    boot_id: str
+    pid: int
+    cwd: str
+    started: int
+    reason: str
 
 
 def _jsonl_path_and_mtime(
@@ -127,24 +160,48 @@ def _jsonl_path_and_mtime(
         return str(candidate), None
 
 
+def _pane_title_for(
+    jsonl_path_str: str | None, snapshot: resurrect.Snapshot | None
+) -> str | None:
+    """Return the resurrect pane label for the session at ``jsonl_path_str``.
+
+    CA2 (per-candidate cwd): the label is keyed on the session's OWN first-entry
+    ``cwd`` — read from THIS JSONL via :func:`_first_entry_cwd` — never on
+    ``liveness.cwd``. Under a lossy encoded-dir collision two candidates share
+    one directory but declare distinct cwds; labelling by the marker's cwd would
+    attach the wrong pane's title to the candidate whose cwd differs.
+
+    ``snapshot`` may be ``None`` (empty/old resurrect dir → ``snapshot_near`` is
+    ``None``); :func:`resurrect.label_for_cwd` tolerates it and returns ``None``.
+    A missing ``jsonl_path_str`` yields an empty cwd, and no pane sits at ``""``,
+    so the label is ``None``.
+    """
+    session_cwd = _first_entry_cwd(Path(jsonl_path_str)) if jsonl_path_str else ""
+    return resurrect.label_for_cwd(snapshot, session_cwd)
+
+
 def _build_liveness_fact_direct_or_mtime(
     liveness: Liveness,
     correlation,
     ctx: ScanContext,
     current_bid: str | None,
+    snapshot: resurrect.Snapshot | None,
 ) -> SessionFact:
     """Build one :class:`SessionFact` for a DIRECT_MATCH / MTIME_MATCH liveness.
 
     Caller (``_walk_sessions``) has already verified the correlation kind
     is DIRECT or MTIME — the ``assert`` below documents the invariant for
-    type-narrowing readers.
+    type-narrowing readers. ``snapshot`` is the resurrect snapshot nearest the
+    marker's ``started`` (already resolved by the caller) used to label
+    ``pane_title``.
     """
     project_dir = _project_dir_for_cwd(ctx.projects_root, liveness.cwd)
     project_path = liveness.cwd
-    pid_alive_value = pid_alive(liveness.pid)
+    pid_alive_value = pid_alive_checked(liveness.pid, liveness.start_time)
     boot_match = liveness.boot_id == current_bid
     resolved_uuid = correlation.uuid
-    assert resolved_uuid is not None  # noqa: S101 (invariant of DIRECT/MTIME kinds)
+    if resolved_uuid is None:
+        raise AssertionError("invariant of DIRECT/MTIME kinds")
     jsonl_path_str, jsonl_mtime = _jsonl_path_and_mtime(project_dir, resolved_uuid)
     tail_summary = (
         parse_tail(Path(jsonl_path_str))
@@ -155,6 +212,11 @@ def _build_liveness_fact_direct_or_mtime(
             total_entries=0,
             state_summary="jsonl missing on disk",
         )
+    )
+    last_substantive = (
+        last_substantive_text(Path(jsonl_path_str))
+        if jsonl_path_str is not None
+        else None
     )
     return SessionFact(
         uuid=resolved_uuid,
@@ -167,6 +229,8 @@ def _build_liveness_fact_direct_or_mtime(
         pid_alive_value=pid_alive_value,
         boot_id_current=boot_match,
         ambiguity_candidates=(),
+        pane_title=_pane_title_for(jsonl_path_str, snapshot),
+        last_substantive=last_substantive,
     )
 
 
@@ -175,6 +239,7 @@ def _build_ambiguous_facts(
     correlation,
     ctx: ScanContext,
     current_bid: str | None,
+    snapshot: resurrect.Snapshot | None,
 ) -> list[SessionFact]:
     """Build one :class:`SessionFact` per AMBIGUOUS candidate UUID.
 
@@ -182,10 +247,17 @@ def _build_ambiguous_facts(
     short-circuit to ``BORDERLINE/ambiguous_match`` per AC6.3 without
     consulting Phase 2's RULES. The synthetic :class:`TailSummary` records
     the candidate list in ``state_summary`` for downstream triage.
+
+    ``pane_title`` is labelled PER CANDIDATE from each candidate's OWN
+    first-entry cwd (CA2): under a lossy encoded-dir collision the candidates
+    share ``liveness.cwd`` but declare distinct cwds, so labelling by
+    ``liveness.cwd`` would attach the wrong pane's title to the candidate whose
+    cwd differs. ``snapshot`` is the resurrect snapshot nearest the marker's
+    ``started`` (already resolved by the caller).
     """
     project_dir = _project_dir_for_cwd(ctx.projects_root, liveness.cwd)
     project_path = liveness.cwd
-    pid_alive_value = pid_alive(liveness.pid)
+    pid_alive_value = pid_alive_checked(liveness.pid, liveness.start_time)
     boot_match = liveness.boot_id == current_bid
     candidates_str = ", ".join(correlation.candidates)
     facts: list[SessionFact] = []
@@ -196,6 +268,11 @@ def _build_ambiguous_facts(
             last_ts=None,
             total_entries=0,
             state_summary=f"{AMBIGUOUS_STATE_SUMMARY_PREFIX}{candidates_str}",
+        )
+        last_substantive = (
+            last_substantive_text(Path(jsonl_path_str))
+            if jsonl_path_str is not None
+            else None
         )
         facts.append(
             SessionFact(
@@ -209,6 +286,8 @@ def _build_ambiguous_facts(
                 pid_alive_value=pid_alive_value,
                 boot_id_current=boot_match,
                 ambiguity_candidates=correlation.candidates,
+                pane_title=_pane_title_for(jsonl_path_str, snapshot),
+                last_substantive=last_substantive,
             )
         )
     return facts
@@ -247,13 +326,32 @@ def _walk_jsonl_only(ctx: ScanContext, seen_uuids: set[str]) -> list[SessionFact
                 pid_alive_value=None,
                 boot_id_current=False,
                 ambiguity_candidates=(),
+                # No liveness marker → no ``started`` anchor for ``snapshot_near``
+                # → ``pane_title`` is unconditionally NULL. ``last_substantive``
+                # still comes from the JSONL.
+                pane_title=None,
+                last_substantive=last_substantive_text(jsonl_path),
             )
         )
         seen_uuids.add(uuid)
     return facts
 
 
-def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
+def _is_live_fact(fact: SessionFact) -> bool:
+    """True when ``fact`` represents a session running *now* — its pid is alive on
+    the current boot.
+
+    Used by ``_walk_sessions`` dedup: on a same-rank, same-UUID collision a live
+    fact must displace a dead one, so a running session (e.g. a crashed session
+    that has since been resumed and is alive again) is never persisted as a crash
+    victim merely because a stale dead marker's path sorts first.
+    """
+    return fact.pid_alive_value is True and fact.boot_id_current
+
+
+def _walk_sessions(
+    ctx: ScanContext,
+) -> tuple[list[SessionFact], list[UncorrelatedMarker]]:
     """Read-only filesystem walk producing one :class:`SessionFact` per UUID.
 
     Strategy:
@@ -265,9 +363,26 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
        * ``AMBIGUOUS`` → one fact per candidate UUID, each carrying the full
          candidate list. ``_classify_fact`` short-circuits these to
          ``BORDERLINE/ambiguous_match`` per AC6.3.
-       * ``NO_MATCH`` → skip; no DB row to write.
+       * ``NO_MATCH`` → no session fact. If the marker is abnormal-exit evidence
+         (dead pid, or boot_id mismatch) it is collected as an
+         :class:`UncorrelatedMarker` so it is surfaced rather than silently
+         dropped (Gap A). A live marker on the current boot is left out.
 
-    2. Iterate ``ctx.projects_root.glob("*/*.jsonl")`` and collect any UUIDs
+    Returns ``(session_facts, uncorrelated_markers)``.
+
+    2. Deduplicate facts by UUID before the write loop. Two ``.live`` files
+       can resolve to the same UUID (e.g. a DIRECT_MATCH from marker A and
+       an AMBIGUOUS candidate from marker B), which would crash ``run_scan``
+       with a ``sqlite3.IntegrityError`` on the ``(uuid, scan_id)`` UNIQUE
+       constraint in ``classification_history``. Dedup selects the winner by
+       precedence rank: ``DIRECT_MATCH/session_id → 0``, ``MTIME_MATCH → 1``,
+       ``AMBIGUOUS candidate → 2`` — lower rank wins. Within a rank, a live fact
+       (pid alive on the current boot) beats a dead one, so a running session is
+       never displaced by a crashed sibling for the same UUID. Remaining ties are
+       broken by the lexicographically smaller liveness path string, making the
+       selection order-independent regardless of ``list_liveness_files`` order.
+
+    3. Iterate ``ctx.projects_root.glob("*/*.jsonl")`` and collect any UUIDs
        not already produced by the liveness walk. JSONL-only facts have
        ``liveness=None``, ``pid_alive_value=None``, ``boot_id_current=False``.
 
@@ -278,53 +393,120 @@ def _walk_sessions(ctx: ScanContext) -> list[SessionFact]:
     Does NOT touch the DB.
     """
     current_bid = current_boot_id()
-    facts: list[SessionFact] = []
-    seen: set[str] = set()
+
+    # Phase 3: load tmux-resurrect snapshots once. Per liveness we pick the
+    # snapshot nearest its ``started`` and pass that snapshot's pane cwds into
+    # ``correlate`` so a multi-candidate backlog marker can be narrowed to the
+    # single pane that was live at crash time. Empty/missing dir → [] → every
+    # ``snapshot_near`` is None → empty frozenset → corroboration is a no-op.
+    snapshots = resurrect.load_snapshots(ctx.resurrect_dir)
+
+    # Precedence rank per correlation kind (lower wins).
+    _RANK = {
+        CorrelationKind.DIRECT_MATCH: 0,
+        CorrelationKind.MTIME_MATCH: 1,
+        CorrelationKind.AMBIGUOUS: 2,
+    }
+
+    # keyed by UUID → (rank, live_rank, liveness_path_str, fact)
+    deduped: dict[str, tuple[int, int, str, SessionFact]] = {}
+    # Abnormal-exit markers that correlate could not map to any session (Gap A).
+    uncorrelated: list[UncorrelatedMarker] = []
+
+    def _consider(rank: int, liveness_path_str: str, fact: SessionFact) -> None:
+        """Insert or replace the entry for ``fact.uuid`` if this one wins.
+
+        Tie-break key (lower wins): correlation ``rank``, then ``live_rank`` — a
+        live fact (0) beats a dead one (1) so a running session is never displaced
+        by a crashed sibling — then the lexicographically smaller liveness path
+        for full order-independence.
+        """
+        live_rank = 0 if _is_live_fact(fact) else 1
+        key = (rank, live_rank, liveness_path_str)
+        existing = deduped.get(fact.uuid)
+        if existing is None or key < existing[:3]:
+            deduped[fact.uuid] = (rank, live_rank, liveness_path_str, fact)
 
     for liveness in list_liveness_files(ctx.run_dir):
-        correlation = correlate(liveness, ctx.projects_root)
+        # Pane cwds from the snapshot nearest this marker's ``started`` (empty
+        # frozenset when no snapshot qualifies). Passed unconditionally: the
+        # session_id / --resume direct paths in ``correlate`` return before
+        # they ever consult ``corroborated_cwds``, so direct matches are
+        # unaffected; only the >1-candidate mtime branch uses it.
+        near = resurrect.snapshot_near(snapshots, liveness.started)
+        corroborated = (
+            frozenset(resurrect.corroborating_cwds(near))
+            if near is not None
+            else frozenset()
+        )
+        correlation = correlate(
+            liveness, ctx.projects_root, corroborated_cwds=corroborated
+        )
         if correlation.kind is CorrelationKind.NO_MATCH:
+            # Surface abnormal-exit evidence rather than dropping it (Gap A). A
+            # boot_id mismatch means the pid belongs to a previous boot (the
+            # process is gone); a dead pid on the current boot is an abnormal
+            # exit this boot. A live pid on the current boot is a running session
+            # whose transcript we have not located yet — not a crash — so it is
+            # left for a later scan.
+            if liveness.boot_id != current_bid:
+                uncorrelated.append(
+                    UncorrelatedMarker(
+                        boot_id=liveness.boot_id,
+                        pid=liveness.pid,
+                        cwd=liveness.cwd,
+                        started=liveness.started,
+                        reason=db.MARKER_REASON_BOOT_MISMATCH,
+                    )
+                )
+            elif pid_alive_checked(liveness.pid, liveness.start_time) is False:
+                uncorrelated.append(
+                    UncorrelatedMarker(
+                        boot_id=liveness.boot_id,
+                        pid=liveness.pid,
+                        cwd=liveness.cwd,
+                        started=liveness.started,
+                        reason=db.MARKER_REASON_DEAD_PID,
+                    )
+                )
             continue
+        liveness_path_str = str(liveness.path)
         if correlation.kind in (
             CorrelationKind.DIRECT_MATCH,
             CorrelationKind.MTIME_MATCH,
         ):
             fact = _build_liveness_fact_direct_or_mtime(
-                liveness, correlation, ctx, current_bid
+                liveness, correlation, ctx, current_bid, near
             )
-            facts.append(fact)
-            seen.add(fact.uuid)
+            _consider(_RANK[correlation.kind], liveness_path_str, fact)
             continue
         # AMBIGUOUS — one fact per candidate UUID.
         ambiguous_facts = _build_ambiguous_facts(
-            liveness, correlation, ctx, current_bid
+            liveness, correlation, ctx, current_bid, near
         )
-        facts.extend(ambiguous_facts)
         for fact in ambiguous_facts:
-            seen.add(fact.uuid)
+            _consider(_RANK[CorrelationKind.AMBIGUOUS], liveness_path_str, fact)
+
+    facts: list[SessionFact] = [entry[3] for entry in deduped.values()]
+    seen: set[str] = set(deduped)
 
     facts.extend(_walk_jsonl_only(ctx, seen))
-    return facts
+    return facts, uncorrelated
 
 
 def _first_entry_cwd(jsonl_path: Path) -> str:
-    """Return ``cwd`` from the first JSON line of ``jsonl_path``, or ``""``.
+    """Return ``cwd`` from the first JSONL record that carries it, or ``""``.
 
-    Best-effort: empty string on any parse error. The encoded directory
-    name is lossy so this is the canonical cwd source; an empty string
-    just means "we couldn't read it" — the DB column is NOT NULL but
-    accepts ``""``.
+    Uses :func:`crash_recovery.jsonl.first_record_field` to scan forward past
+    snapshot/bookkeeping records (which carry no ``cwd``) so that modern
+    transcripts — where ``cwd`` sits on line 2 or later — are read correctly.
+
+    Best-effort: empty string on any parse error or when no record carries
+    ``cwd`` within the scan window. The DB column is NOT NULL but accepts
+    ``""``, and ``_classify_fact`` maps an empty cwd to
+    ``irrecoverable/missing_cwd``.
     """
-    try:
-        with jsonl_path.open("r", encoding="utf-8") as handle:
-            first = handle.readline()
-        if not first.strip():
-            return ""
-        entry = json.loads(first)
-    except OSError, json.JSONDecodeError:
-        return ""
-    cwd_value = entry.get("cwd")
-    return cwd_value if isinstance(cwd_value, str) else ""
+    return first_record_field(jsonl_path, "cwd") or ""
 
 
 def _classify_fact(fact: SessionFact) -> Classification:
@@ -385,7 +567,7 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
         Containing the new ``scan_runs`` rowid, the count of facts emitted
         by the walk, and the count of orphan-sweep rows updated.
     """
-    facts = _walk_sessions(ctx)
+    facts, uncorrelated = _walk_sessions(ctx)
     classifications = [(fact, _classify_fact(fact)) for fact in facts]
     seen_uuids = {fact.uuid for fact in facts}
     # Sorted for determinism so identical inputs produce identical DB content.
@@ -418,6 +600,25 @@ def run_scan(ctx: ScanContext) -> ScanRunResult:
             ):
                 _append_history(wctx, fact.uuid, classification)
         reclassified = _orphan_sweep(wctx, seen_uuids)
+        # Replace the uncorrelated-markers set with this scan's. They are not
+        # sessions (no UUID, no transcript, no classification_history), so a
+        # full replace each scan keeps the table free of stale rows without
+        # needing an orphan sweep of its own.
+        conn.execute("DELETE FROM uncorrelated_markers")
+        for marker in uncorrelated:
+            conn.execute(
+                "INSERT INTO uncorrelated_markers "
+                "(boot_id, pid, cwd, started, reason, last_scanned) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    marker.boot_id,
+                    marker.pid,
+                    marker.cwd,
+                    marker.started,
+                    marker.reason,
+                    ctx.now,
+                ),
+            )
     return ScanRunResult(
         scan_run_id=wctx.scan_run_id,
         sessions_scanned=len(facts),

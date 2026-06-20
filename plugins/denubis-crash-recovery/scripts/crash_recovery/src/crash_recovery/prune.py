@@ -130,7 +130,7 @@ def delete_candidates(db_path: Path, uuids: tuple[str, ...]) -> int:
     with closing(db.open_db(db_path)) as conn, conn:
         placeholders = ",".join("?" * len(uuids))
         cur = conn.execute(
-            f"DELETE FROM sessions WHERE uuid IN ({placeholders})",  # noqa: S608
+            f"DELETE FROM sessions WHERE uuid IN ({placeholders})",  # noqa: S608  # bound ? placeholders, no untrusted input
             uuids,
         )
         return cur.rowcount

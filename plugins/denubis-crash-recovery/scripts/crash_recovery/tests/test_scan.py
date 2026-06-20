@@ -59,13 +59,23 @@ def _init_db(db_dir: Path) -> Path:
 
 
 def _make_ctx(
-    db_path: Path, run_dir: Path, projects_root: Path, now: int | None = None
+    db_path: Path,
+    run_dir: Path,
+    projects_root: Path,
+    now: int | None = None,
+    resurrect_dir: Path | None = None,
 ) -> scan_mod.ScanContext:
     return scan_mod.ScanContext(
         db_path=db_path,
         run_dir=run_dir,
         projects_root=projects_root,
         now=now if now is not None else int(time.time()),
+        # Default to a non-existent dir so resurrect corroboration is a no-op
+        # for every existing test (load_snapshots returns []). ``run_dir.parent``
+        # is the per-test ``tmp_path`` (make_full_fixture sets run_dir = tmp/run).
+        resurrect_dir=resurrect_dir
+        if resurrect_dir is not None
+        else run_dir.parent / "no-resurrect",
     )
 
 
@@ -318,10 +328,8 @@ def test_scan_reclassifies_stale_row_whose_jsonl_still_exists(tmp_path: Path) ->
 
 
 def test_scan_classifies_live_pid_as_live(tmp_path: Path) -> None:
-    """Live PID + boot_id current → ``live`` / ``live_pid_present_boot_current``.
-
-    (AC6.2)
-    """
+    """Live PID + boot_id current → ``live`` / ``live_pid_present_boot_current``
+    (AC6.2)."""
     uuid = "cccccccc-cccc-cccc-cccc-cccccccccccc"
     sessions = [
         FixtureSession(
@@ -384,6 +392,105 @@ def test_scan_classifies_boot_mismatch_as_hard_crash_even_if_pid_alive(
     finally:
         conn.close()
     assert row == ("hard_crash", "liveness_boot_id_mismatch")
+
+
+# ---------------------------------------------------------------------------
+# AC4.2 (scan integration) — recycled PID rejected via start-time-checked probe
+# ---------------------------------------------------------------------------
+
+
+def test_scan_recycled_pid_with_wrong_start_time_is_not_live(tmp_path: Path) -> None:
+    """AC4.2: a live PID whose stored ``start_time`` is wrong must NOT classify
+    ``live``.
+
+    Recycled-PID scenario. The marker's PID is alive (``os.getpid()``) and the
+    boot_id is current, so the *bare* ``kill -0`` liveness check that scan used
+    before this task would classify the session ``live`` — the exact bug. The
+    tail is the live-shaped ``TOOL_USE_NO_RESULT`` (same shape
+    ``test_scan_classifies_live_pid_as_live`` relies on), so the session is
+    genuinely live-by-old-logic; only the start-time mismatch can flip it.
+
+    With the start-time-checked probe in scan's fact builders,
+    ``pid_alive_checked(pid, wrong_start_time)`` returns ``False`` → the dead-pid
+    rule fires on the TOOL_USE_NO_RESULT tail → ``hard_crash`` /
+    ``liveness_dead_pid_tool_use_no_result``.
+
+    RED (before the scan fix) prints ``("live", "live_pid_present_boot_current")``
+    — proving the fixture would be live without the fix, so the fix is
+    demonstrably what flips it.
+    """
+    base = liveness_mod._proc_start_time(os.getpid())
+    assert base is not None, "could not read own /proc start_time — test precondition"
+    wrong_start_time = base + 1
+
+    uuid = "44440002-0000-0000-0000-000000000001"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd="/tmp/recycled-pid",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,  # os.getpid() — genuinely alive
+            boot_id_current=True,  # boot matches → live-by-old-logic
+            start_time=wrong_start_time,  # but start_time mismatches → recycled
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("hard_crash", "liveness_dead_pid_tool_use_no_result")
+
+
+def test_scan_live_pid_with_correct_start_time_is_live(tmp_path: Path) -> None:
+    """AC4.2 over-rejection guard: correct ``start_time`` + live PID still ``live``.
+
+    Positive control for ``test_scan_recycled_pid_with_wrong_start_time_is_not_live``.
+    Same live-shaped fixture, but the stored ``start_time`` is the real
+    ``/proc/<pid>/stat`` value, so ``pid_alive_checked`` matches and the session
+    classifies ``live`` / ``live_pid_present_boot_current``. Proves the fix
+    rejects only genuine mismatches, not every start-time-bearing marker.
+    """
+    correct_start_time = liveness_mod._proc_start_time(os.getpid())
+    assert correct_start_time is not None, (
+        "could not read own /proc start_time — test precondition"
+    )
+
+    uuid = "44440002-0000-0000-0000-000000000002"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd="/tmp/correct-start-time",
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=True,
+            boot_id_current=True,
+            start_time=correct_start_time,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("live", "live_pid_present_boot_current")
 
 
 def test_scan_marks_vanished_jsonl_as_irrecoverable(tmp_path: Path) -> None:
@@ -663,7 +770,7 @@ def test_run_scan_deduplicates_live_pids_across_facts(
         ),
     ]
 
-    monkeypatch.setattr(scan_mod, "_walk_sessions", lambda _ctx: list(_facts))
+    monkeypatch.setattr(scan_mod, "_walk_sessions", lambda _ctx: (list(_facts), []))
 
     db_dir = tmp_path / "db"
     db_dir.mkdir()
@@ -818,25 +925,27 @@ def test_scan_classifies_ambiguous_correlation_as_borderline_ambiguous_match(
     now_epoch = int(time.time())
     uuid_a = "aaaaaaaa-1111-1111-1111-111111111111"
     uuid_b = "bbbbbbbb-2222-2222-2222-222222222222"
-    # Both JSONLs have first_entry_ts comfortably in the mtime window:
-    # started = now - 3600, so any ts >= now - 3660 is admitted.
+    # Both JSONLs have first_entry_ts inside the Phase 3 tight window:
+    # started = now - 3600, so the window is [started - 60, started + 120].
+    # +10s / +20s past started land both candidates in-window → AMBIGUOUS.
+    started = now_epoch - 3600
     _write_session_jsonl(
         project_dir / f"{uuid_a}.jsonl",
         cwd=cwd,
-        first_entry_epoch=now_epoch - 100,
+        first_entry_epoch=started + 10,
         tail_kind=TailKind.CONCLUDED,
     )
     _write_session_jsonl(
         project_dir / f"{uuid_b}.jsonl",
         cwd=cwd,
-        first_entry_epoch=now_epoch - 50,
+        first_entry_epoch=started + 20,
         tail_kind=TailKind.CONCLUDED,
     )
     make_liveness_file(
         run_dir=run_dir,
         pid=os.getpid(),
         cwd=cwd,
-        started=now_epoch - 3600,
+        started=started,
         argv="",  # no --resume → mtime-window path
         boot_id=liveness_mod.current_boot_id(),
     )
@@ -1075,7 +1184,6 @@ def test_classification_history_appends_when_classification_changes(
     """Seed a row with one classification; scan produces a different one
     → history grows.
 
-
     M4: when a session's classification + reason genuinely change between
     scans, the append still happens. Seed a row at ``classification=live``
     for a UUID that the fixture actually classifies as ``hard_crash``
@@ -1154,6 +1262,105 @@ def test_classification_history_appends_when_classification_changes(
 
 
 # ---------------------------------------------------------------------------
+# AC2.1 / AC2.3 — forward-scan cwd repair in scan._first_entry_cwd
+# ---------------------------------------------------------------------------
+
+
+def test_scan_classifies_snapshot_prefixed_jsonl_not_missing_cwd(
+    tmp_path: Path,
+) -> None:
+    """AC2.1: snapshot-prefixed JSONL (cwd on line 2) is NOT irrecoverable/missing_cwd.
+
+    Before the fix, ``_first_entry_cwd`` read only line 1 and saw the snapshot
+    record which carries no ``cwd``, so the session was classified as
+    ``irrecoverable/missing_cwd``. After the fix, the forward scan finds the
+    cwd on line 2 and classifies correctly.
+    """
+    uuid = "ac210001-0000-0000-0000-000000000001"
+    cwd = "/tmp/ac21-snapshot-session"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd=cwd,
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+            cwd_on_first_line=False,  # snapshot-prefixed: cwd on line 2
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason, cwd"
+            " FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    classification, reason, cwd_val = row
+    # Must NOT be irrecoverable/missing_cwd.
+    assert classification != "irrecoverable" or reason != "missing_cwd", (
+        f"Expected forward scan to read cwd from line 2,"
+        f" but got {classification}/{reason}. "
+        "Snapshot-prefixed JSONL should not be classified as missing_cwd."
+    )
+    assert cwd_val == cwd, f"Expected cwd column to equal '{cwd}', got '{cwd_val}'"
+
+
+def test_scan_genuine_no_cwd_jsonl_still_classifies_missing_cwd(
+    tmp_path: Path,
+) -> None:
+    """AC2.3: JSONL with no ``cwd`` anywhere still yields irrecoverable/missing_cwd.
+
+    The forward scan must not change behaviour for genuine no-cwd sessions
+    — when no record in the scan window carries a ``cwd`` field, the session
+    is still irrecoverable (genuine case preserved).
+    """
+    uuid = "ac230001-0000-0000-0000-000000000001"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    # Write a JSONL with only snapshot records — no cwd field anywhere.
+    project_dir = projects_root / "-no-cwd-genuine"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    jsonl_path = project_dir / f"{uuid}.jsonl"
+    entries = [
+        {
+            "type": "snapshot",
+            "messageId": f"msg_{i:03d}",
+            "snapshot": {},
+            "isSnapshotUpdate": False,
+        }
+        for i in range(3)
+    ]
+    jsonl_path.write_text("".join(json.dumps(e) + "\n" for e in entries))
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    classification, reason = row
+    assert classification == "irrecoverable"
+    assert reason == "missing_cwd"
+
+
+# ---------------------------------------------------------------------------
 # M5 — ambiguous state_summary uses pinned AMBIGUOUS_STATE_SUMMARY_PREFIX
 # ---------------------------------------------------------------------------
 
@@ -1181,23 +1388,26 @@ def test_ambiguous_state_summary_uses_pinned_format(tmp_path: Path) -> None:
     now_epoch = int(time.time())
     uuid_a = "aaaaaaaa-3333-3333-3333-333333333333"
     uuid_b = "bbbbbbbb-4444-4444-4444-444444444444"
+    # Both first_entry_ts inside the Phase 3 tight window [started-60, started+120]
+    # so the pair stays AMBIGUOUS (the pinned format under test).
+    started = now_epoch - 3600
     _write_session_jsonl(
         project_dir / f"{uuid_a}.jsonl",
         cwd=cwd,
-        first_entry_epoch=now_epoch - 100,
+        first_entry_epoch=started + 10,
         tail_kind=TailKind.CONCLUDED,
     )
     _write_session_jsonl(
         project_dir / f"{uuid_b}.jsonl",
         cwd=cwd,
-        first_entry_epoch=now_epoch - 50,
+        first_entry_epoch=started + 20,
         tail_kind=TailKind.CONCLUDED,
     )
     make_liveness_file(
         run_dir=run_dir,
         pid=os.getpid(),
         cwd=cwd,
-        started=now_epoch - 3600,
+        started=started,
         argv="",
         boot_id=liveness_mod.current_boot_id(),
     )
@@ -1212,3 +1422,1293 @@ def test_ambiguous_state_summary_uses_pinned_format(tmp_path: Path) -> None:
     expected = f"{scan_mod.AMBIGUOUS_STATE_SUMMARY_PREFIX}{uuid_a}, {uuid_b}"
     for _uuid, summary in rows:
         assert summary == expected
+
+
+# ---------------------------------------------------------------------------
+# AC3.1 / AC3.2 — dedup-safe scan (two markers resolving to one UUID)
+# ---------------------------------------------------------------------------
+
+
+def test_scan_dedup_two_markers_same_uuid_no_integrity_error(
+    tmp_path: Path,
+) -> None:
+    """AC3.1: two .live files resolving to the same UUID → no IntegrityError, one row.
+
+    Fixture design (following advisor guidance):
+    - marker A: ``--resume X`` (DIRECT_MATCH for UUID X, dead pid, boot-current,
+      TOOL_USE_NO_RESULT tail → hard_crash)
+    - marker B: no ``--resume`` (AMBIGUOUS with candidates (X, Y), different pid)
+
+    UUID X gets DIRECT_MATCH → hard_crash from marker A, and is also an
+    AMBIGUOUS candidate from marker B → borderline/ambiguous_match. Before the
+    dedup fix, the second ``_append_history(X, scan_id)`` hits the
+    ``(uuid, scan_id)`` UNIQUE constraint and raises ``sqlite3.IntegrityError``.
+    After the fix, exactly one fact per UUID is emitted, so no IntegrityError
+    and exactly one ``sessions`` row + one ``classification_history`` row for X.
+    """
+    cwd = "/tmp/dedup-ac31"
+    now_epoch = int(time.time())
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from crash_recovery import liveness as liveness_mod
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Valid hex UUIDs (required by _extract_resume_uuid's _UUID_RE).
+    uuid_x = "dd310001-0000-0000-0000-000000000001"
+    uuid_y = "dd310001-0000-0000-0000-000000000002"
+
+    # Both JSONLs have timestamps in the mtime window.
+    first_entry_epoch = now_epoch - 3599  # within the started window
+    _write_session_jsonl(
+        project_dir / f"{uuid_x}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=first_entry_epoch,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_y}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=first_entry_epoch,
+        tail_kind=TailKind.CONCLUDED,
+    )
+
+    real_boot_id = liveness_mod.current_boot_id()
+    dead_pid = _pick_dead_pid()
+
+    # Marker A: --resume uuid_x (DIRECT_MATCH), dead pid, boot current → hard_crash
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=dead_pid,
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv=f"--resume {uuid_x}",
+        boot_id=real_boot_id,
+    )
+
+    # Marker B: no --resume (mtime window → AMBIGUOUS with both uuid_x and uuid_y)
+    # Use a different (also dead) pid so the .live filenames differ.
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=dead_pid + 1,
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv="",
+        boot_id=real_boot_id,
+    )
+
+    # Before dedup fix this raises sqlite3.IntegrityError.
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    # Exactly one sessions row for uuid_x.
+    count_x = _rows(
+        db_path,
+        f"SELECT COUNT(*) FROM sessions WHERE uuid = '{uuid_x}'",
+    )
+    assert count_x == [(1,)], f"expected 1 sessions row for uuid_x, got {count_x}"
+
+    # Exactly one history row for uuid_x in this scan.
+    count_hist = _rows(
+        db_path,
+        f"SELECT COUNT(*) FROM classification_history WHERE uuid = '{uuid_x}'",
+    )
+    assert count_hist == [(1,)], f"expected 1 history row for uuid_x, got {count_hist}"
+
+
+def test_scan_dedup_direct_match_wins_over_ambiguous(
+    tmp_path: Path,
+) -> None:
+    """AC3.2: when UUID X is a DIRECT_MATCH from marker A and an AMBIGUOUS
+    candidate from marker B, the persisted row reflects the direct-match fact.
+
+    The direct-match classification (hard_crash from dead-pid +
+    TOOL_USE_NO_RESULT) must win over the ambiguous-match classification
+    (borderline/ambiguous_match). Precedence rank: DIRECT=0, MTIME=1,
+    AMBIGUOUS=2 — lower rank wins on collision.
+    """
+    cwd = "/tmp/dedup-ac32"
+    now_epoch = int(time.time())
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from crash_recovery import liveness as liveness_mod
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    # Valid hex UUIDs (required by _extract_resume_uuid's _UUID_RE).
+    uuid_x = "dd320002-0000-0000-0000-000000000001"
+    uuid_y = "dd320002-0000-0000-0000-000000000002"
+
+    first_entry_epoch = now_epoch - 3599
+    _write_session_jsonl(
+        project_dir / f"{uuid_x}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=first_entry_epoch,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_y}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=first_entry_epoch,
+        tail_kind=TailKind.CONCLUDED,
+    )
+
+    real_boot_id = liveness_mod.current_boot_id()
+    dead_pid = _pick_dead_pid()
+
+    # Marker A: DIRECT_MATCH for uuid_x (dead pid, boot current)
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=dead_pid,
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv=f"--resume {uuid_x}",
+        boot_id=real_boot_id,
+    )
+
+    # Marker B: AMBIGUOUS (uuid_x and uuid_y are both in the mtime window)
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=dead_pid + 1,
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv="",
+        boot_id=real_boot_id,
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    row = _rows(
+        db_path,
+        f"SELECT classification, classification_reason FROM sessions "
+        f"WHERE uuid = '{uuid_x}'",
+    )
+    assert len(row) == 1, f"expected 1 row for uuid_x, got {row}"
+    classification, reason = row[0]
+    # Direct-match (hard_crash) must win over ambiguous-match (borderline).
+    assert classification == "hard_crash", (
+        f"Expected direct-match hard_crash to win; got {classification}/{reason}. "
+        "AMBIGUOUS precedence must not override DIRECT_MATCH."
+    )
+    assert reason == "liveness_dead_pid_tool_use_no_result"
+
+
+def test_scan_dedup_same_rank_live_beats_dead_order_independent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F1 (coherence review): on a same-rank, same-UUID dedup collision, a LIVE
+    fact (pid alive on the current boot) must win over a dead one — a running
+    session must never be persisted as ``hard_crash`` because a crashed sibling's
+    path sorts first — and the winner must not depend on ``list_liveness_files``
+    iteration order (load-bearing for Phase 4's byte-identical render).
+
+    The AC3.1/AC3.2 tests only collide DIRECT_MATCH (rank 0) against AMBIGUOUS
+    (rank 2), so the same-rank tie-break never executes. Here both markers are
+    ``--resume uuid_x`` → both DIRECT_MATCH (genuine rank-0 vs rank-0). The DEAD
+    marker is deliberately given the lexicographically SMALLER path, so a
+    path-only tie-break would (wrongly) pick it → ``hard_crash``. The fix must
+    instead pick the LIVE marker → ``live``. Liveness objects are built directly
+    and the iterator is monkeypatched so path order is decoupled from pid and
+    fully controlled.
+    """
+    cwd = "/tmp/dedup-live-beats-dead"
+    now_epoch = int(time.time())
+    _db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    uuid_x = "dd440004-0000-0000-0000-000000000001"
+    _write_session_jsonl(
+        project_dir / f"{uuid_x}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=now_epoch - 3599,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+
+    real_boot_id = liveness_mod.current_boot_id()
+
+    # Both DIRECT_MATCH uuid_x (rank 0). The DEAD marker gets the smaller path so
+    # a path-only tie-break picks it (→ hard_crash); the LIVE marker must win.
+    dead_lv = liveness_mod.Liveness(
+        path=run_dir / "00000001.live",  # sorts first
+        pid=_pick_dead_pid(),
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv=f"--resume {uuid_x}",
+        boot_id=real_boot_id,
+    )
+    live_lv = liveness_mod.Liveness(
+        path=run_dir / "99999999.live",  # sorts last
+        pid=os.getpid(),  # alive on the current boot
+        cwd=cwd,
+        started=now_epoch - 3600,
+        argv=f"--resume {uuid_x}",
+        boot_id=real_boot_id,
+    )
+
+    results: list[tuple] = []
+    for i, order in enumerate(([dead_lv, live_lv], [live_lv, dead_lv])):
+        db_dir = tmp_path / f"db_run_{i}"
+        db_dir.mkdir()
+        db_path = _init_db(db_dir)
+        monkeypatch.setattr(
+            scan_mod, "list_liveness_files", lambda _rd, _o=order: iter(_o)
+        )
+        scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+        rows = _rows(
+            db_path,
+            "SELECT classification, classification_reason FROM sessions "
+            f"WHERE uuid = '{uuid_x}'",
+        )
+        assert len(rows) == 1, f"run {i}: expected 1 row for uuid_x, got {rows}"
+        results.append(rows[0])
+
+    # Order-independence: same winner regardless of iteration order.
+    assert results[0] == results[1], (
+        f"order-dependent dedup: forward {results[0]!r} vs reversed {results[1]!r}"
+    )
+    classification, reason = results[0]
+    # F1: the LIVE marker must win even though the dead marker's path sorts first.
+    assert classification != "hard_crash", (
+        "a live session was persisted as a crash victim — the dead sibling won "
+        "the same-rank tie-break"
+    )
+    assert reason == "live_pid_present_boot_current", (
+        "expected the live marker to win the same-rank tie; "
+        f"got {classification}/{reason}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC1.1 — end-to-end: snapshot-prefixed crash victim surfaces as hard_crash
+# ---------------------------------------------------------------------------
+
+
+def test_snapshot_prefixed_crash_victim_surfaces_as_hard_crash(
+    tmp_path: Path,
+) -> None:
+    """AC1.1: snapshot-prefixed JSONL + dead-PID/boot-current + --resume marker
+    → run_scan → hard_crash (reason liveness_dead_pid_tool_use_no_result).
+
+    This is the Phase 1 capstone integration test. It exercises the full chain:
+
+    1. Task 1 fixture builder: JSONL written with snapshot record on line 1,
+       cwd+timestamp on line 2 (``cwd_on_first_line=False``).
+    2. Task 3 fix: ``_first_entry_cwd`` forward-scans past the snapshot to
+       find cwd on line 2, so the session is NOT classified
+       ``irrecoverable/missing_cwd``.
+    3. Task 4 fix: ``correlate`` forward-scans the cwd from the JSONL so
+       ``_project_dir_for_cwd`` finds the project directory → DIRECT_MATCH
+       via ``--resume <uuid>``.
+    4. Phase 2 classify: dead PID + boot current + TOOL_USE_NO_RESULT tail
+       → ``hard_crash`` / ``liveness_dead_pid_tool_use_no_result``.
+
+    Pre-fix behaviour (Tasks 1-4 not applied): the snapshot record on line 1
+    carries no ``cwd``, so ``_first_entry_cwd`` returned ``""`` and the session
+    was classified ``irrecoverable/missing_cwd``. With the fix the victim
+    surfaces correctly.
+
+    This test passes immediately (no RED phase) because it exercises completed
+    functionality from Tasks 1-4 — it is an acceptance test, not a
+    regression-guard for new code.
+    """
+    uuid = "ac110001-0000-0000-0000-000000000001"
+    cwd = "/tmp/ac11-crash-victim"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd=cwd,
+            tail_kind=TailKind.TOOL_USE_NO_RESULT,
+            has_liveness=True,
+            pid_alive=False,  # dead PID → not live
+            boot_id_current=True,  # boot matches → crash, not stale-boot
+            cwd_on_first_line=False,  # snapshot-prefixed: cwd on line 2
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT classification, classification_reason, cwd "
+            "FROM sessions WHERE uuid = ?",
+            (uuid,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None, "Expected a sessions row for the crash victim"
+    classification, reason, cwd_val = row
+
+    # The victim must NOT be buried as missing_cwd (pre-fix behaviour).
+    assert classification != "irrecoverable" or reason != "missing_cwd", (
+        f"Snapshot-prefixed crash victim was classified as {classification}/{reason}. "
+        "The forward-scan fix should have found cwd on line 2."
+    )
+
+    # The victim must surface as hard_crash with the dead-pid tail reason.
+    assert classification == "hard_crash", (
+        f"Expected hard_crash for dead-pid crash victim; got {classification}/{reason}"
+    )
+    assert reason == "liveness_dead_pid_tool_use_no_result", (
+        f"Expected liveness_dead_pid_tool_use_no_result; got {reason}"
+    )
+
+    # The cwd column must hold the real cwd, not empty string.
+    assert cwd_val == cwd, f"Expected cwd column '{cwd}', got '{cwd_val}'"
+
+
+# ---------------------------------------------------------------------------
+# AC6.2 — scan integration: tmux-resurrect corroboration resolves a
+# multi-cwd backlog candidate set to the single corroborated survivor.
+# ---------------------------------------------------------------------------
+
+
+def _write_resurrect_snapshot(
+    resurrect_dir: Path, stamp_epoch: int, pane_cwds: list[str]
+) -> Path:
+    """Write a temp ``tmux_resurrect_<stamp>.txt`` with one ``pane`` line per cwd.
+
+    The stamp is built from ``stamp_epoch`` as **naive local time** so it round-
+    trips through ``resurrect._ts_from_filename`` (which interprets the filename
+    stamp in the system local zone). Each pane line mirrors the real TAB layout
+    (11 fields, path at index 7 with a leading ``:``); the first pane carries the
+    ``✳`` idle-claude title prefix to match real snapshots, though corroboration
+    is path-based and never gates on the glyph.
+    """
+    from datetime import datetime as _dt
+
+    resurrect_dir.mkdir(parents=True, exist_ok=True)
+    stamp = _dt.fromtimestamp(stamp_epoch).strftime("%Y%m%dT%H%M%S")
+    lines = []
+    for i, cwd in enumerate(pane_cwds):
+        title = f"✳ session {i}"
+        # [0]pane [1]session [2]window [3]idx [4]flags [5]1 [6]title
+        # [7]:cwd [8]1 [9]command [10]:shell
+        lines.append(
+            "\t".join(
+                [
+                    "pane",
+                    "1",
+                    str(i),
+                    "1",
+                    ":*",
+                    "1",
+                    title,
+                    f":{cwd}",
+                    "1",
+                    "bash",
+                    ":/usr/bin/fish -l",
+                ]
+            )
+        )
+    path = resurrect_dir / f"tmux_resurrect_{stamp}.txt"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_scan_corroborates_multi_cwd_candidates_via_resurrect(
+    tmp_path: Path,
+) -> None:
+    """AC6.2: two in-window candidates with distinct cwds share one lossy encoded
+    dir; a resurrect snapshot whose only star-pane path matches cwd A resolves the
+    backlog marker to candidate A (``hard_crash`` via MTIME_MATCH), not borderline.
+
+    The corroboration filter keeps the candidate whose own first-entry cwd is in
+    the snapshot's pane cwds. Only cwd A is present, so exactly one candidate
+    survives → the marker resolves to A as a concrete crash (``hard_crash`` /
+    ``liveness_dead_pid_tool_use_no_result``), NOT ``borderline/ambiguous_match``.
+
+    Candidate B does not disappear: its JSONL is on disk, so the always-on
+    JSONL-only sweep still emits a row for it — but classified on its OWN tail
+    shape (no liveness marker), so its reason is NOT ``ambiguous_match``. That is
+    the whole point of corroboration: the marker no longer drags B into its
+    ambiguity set; B is judged independently.
+    """
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    cwd_a = "/tmp/corrob/a-b"
+    cwd_b = "/tmp/corrob-a/b"  # distinct cwd, same lossy encoded dir as cwd_a
+    assert _encoded_dir_name_for(cwd_a) == _encoded_dir_name_for(cwd_b), (
+        "fixture invariant: both cwds must collapse to one encoded dir"
+    )
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd_a)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid_a = "aaaaaaaa-3333-3333-3333-333333333333"
+    uuid_b = "bbbbbbbb-4444-4444-4444-444444444444"
+    # Both first-entry-ts land inside the tight window [started-60, started+120].
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd_a,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd_b,
+        first_entry_epoch=started + 20,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+    # Liveness marker: dead PID, boot current, no --resume (mtime-window path).
+    from fixtures.jsonl_builder import _pick_dead_pid
+
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd_a,
+        started=started,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    # Resurrect snapshot at/just before started, whose only pane sits at cwd A.
+    resurrect_dir = tmp_path / "byobu-sessions"
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [cwd_a])
+
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path, run_dir, projects_root, now=now_epoch, resurrect_dir=resurrect_dir
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason FROM sessions",
+    )
+    by_uuid = {r[0]: (r[1], r[2]) for r in rows}
+    # The marker resolved to A as a concrete crash via corroboration.
+    assert uuid_a in by_uuid, "candidate A must have a sessions row"
+    a_classification, a_reason = by_uuid[uuid_a]
+    assert a_classification == "hard_crash", (
+        f"Expected hard_crash via corroborated MTIME_MATCH for A; "
+        f"got {a_classification}/{a_reason}"
+    )
+    assert a_reason == "liveness_dead_pid_tool_use_no_result", (
+        f"Expected dead-pid crash reason for A; got {a_reason}"
+    )
+    # Neither row is the ambiguous-match verdict: corroboration narrowed the
+    # marker to one survivor, so the marker is no longer ambiguous, and B is
+    # judged on its own tail shape rather than dragged into A's candidate set.
+    for u, (_, reason) in by_uuid.items():
+        assert reason != "ambiguous_match", (
+            f"{u} was classified ambiguous_match; corroboration should have "
+            f"resolved the marker to a single survivor"
+        )
+
+
+def test_scan_no_resurrect_snapshot_stays_ambiguous_all_candidates(
+    tmp_path: Path,
+) -> None:
+    """AC6.3 path under scan: with an empty (non-existent) resurrect dir and two
+    in-window candidates, corroboration is a no-op → both stay
+    ``borderline/ambiguous_match`` with every candidate listed in state_summary.
+
+    This is the back-compat guarantee: no snapshots → identical behaviour to
+    pre-Phase-3 (single → MTIME_MATCH, multiple → ambiguous-all).
+    """
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    cwd = "/tmp/corrob-none"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid_a = "aaaaaaaa-5555-5555-5555-555555555555"
+    uuid_b = "bbbbbbbb-6666-6666-6666-666666666666"
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=started + 20,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd,
+        started=started,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    # resurrect_dir points at a path that does not exist → load_snapshots == [].
+    missing_resurrect = tmp_path / "no-such-byobu-dir"
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path,
+            run_dir,
+            projects_root,
+            now=now_epoch,
+            resurrect_dir=missing_resurrect,
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason, state_summary "
+        "FROM sessions",
+    )
+    by_uuid = {r[0]: (r[1], r[2], r[3]) for r in rows}
+    assert set(by_uuid.keys()) == {uuid_a, uuid_b}
+    for u in (uuid_a, uuid_b):
+        classification, reason, summary = by_uuid[u]
+        assert classification == "borderline"
+        assert reason == "ambiguous_match"
+        other = uuid_b if u == uuid_a else uuid_a
+        assert other in summary, "all candidates must be listed (all-means-all)"
+
+
+# ---------------------------------------------------------------------------
+# CRASH_RECOVERY_RESURRECT_DIR env-var / --resurrect-dir CLI resolution
+# ---------------------------------------------------------------------------
+
+
+def test_resurrect_dir_env_var_is_consumed_end_to_end(tmp_path: Path) -> None:
+    """CRASH_RECOVERY_RESURRECT_DIR reaches _walk_sessions via the CLI.
+
+    Drives ``crash-recovery scan`` through ``subprocess`` (the real ``_resolve``
+    path) rather than constructing a ``ScanContext`` directly, so the env-var →
+    ``_resolve`` → ``ScanContext.resurrect_dir`` → ``_walk_sessions`` chain is
+    exercised.
+
+    Fixture: two in-window candidates sharing one lossy-encoded project dir
+    (``/tmp/rdir-env/a-b`` and ``/tmp/rdir-env-a/b``), a backlog liveness marker
+    with a dead PID (no ``--resume``, so the mtime-window path runs), and a
+    resurrect snapshot dir containing one pane at cwd A.
+
+    With ``CRASH_RECOVERY_RESURRECT_DIR`` pointing at the snapshot dir,
+    corroboration narrows the marker to candidate A → ``hard_crash``.
+    With an empty snapshot dir, corroboration is a no-op → both candidates stay
+    ``borderline/ambiguous_match``.
+    """
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    cwd_a = "/tmp/rdir-env/a-b"
+    cwd_b = "/tmp/rdir-env-a/b"  # distinct cwd, same lossy encoded dir as cwd_a
+    assert _encoded_dir_name_for(cwd_a) == _encoded_dir_name_for(cwd_b), (
+        "fixture invariant: both cwds must collapse to one encoded dir"
+    )
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd_a)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid_a = "aaaaaaaa-7777-7777-7777-777777777777"
+    uuid_b = "bbbbbbbb-8888-8888-8888-888888888888"
+
+    # Both first-entry-ts land inside the tight window [started-60, started+120].
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd_a,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd_b,
+        first_entry_epoch=started + 20,
+        tail_kind=TailKind.TOOL_USE_NO_RESULT,
+    )
+
+    # Liveness marker: dead PID, boot current, no --resume (mtime-window path).
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd_a,
+        started=started,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    # Corroborating snapshot dir: one pane at cwd A only.
+    resurrect_dir = tmp_path / "byobu-sessions-env"
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [cwd_a])
+
+    # Empty dir used for discrimination evidence (no snapshots → ambiguous).
+    empty_resurrect_dir = tmp_path / "byobu-sessions-empty"
+    empty_resurrect_dir.mkdir(parents=True, exist_ok=True)
+
+    base_env = {
+        **os.environ,
+        "CRASH_RECOVERY_DB": str(db_path),
+        "CRASH_RECOVERY_RUN_DIR": str(run_dir),
+        "CRASH_RECOVERY_PROJECTS_ROOT": str(projects_root),
+    }
+
+    # --- Discrimination check: empty dir → both stay AMBIGUOUS ---------------
+    proc_empty = subprocess.run(
+        [sys.executable, "-m", "crash_recovery", "scan"],
+        env={**base_env, "CRASH_RECOVERY_RESURRECT_DIR": str(empty_resurrect_dir)},
+        capture_output=True,
+        timeout=30,
+    )
+    assert proc_empty.returncode == 0, (proc_empty.stdout, proc_empty.stderr)
+    rows_empty = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason FROM sessions",
+    )
+    by_uuid_empty = {r[0]: (r[1], r[2]) for r in rows_empty}
+    assert by_uuid_empty.get(uuid_a, (None,))[0] == "borderline", (
+        "empty resurrect dir: expected borderline for A;"
+        f" got {by_uuid_empty.get(uuid_a)}"
+    )
+    assert by_uuid_empty.get(uuid_b, (None,))[0] == "borderline", (
+        "empty resurrect dir: expected borderline for B;"
+        f" got {by_uuid_empty.get(uuid_b)}"
+    )
+
+    # --- Main assertion: corroborating dir → A resolves to hard_crash --------
+    proc_corrob = subprocess.run(
+        [sys.executable, "-m", "crash_recovery", "scan"],
+        env={**base_env, "CRASH_RECOVERY_RESURRECT_DIR": str(resurrect_dir)},
+        capture_output=True,
+        timeout=30,
+    )
+    assert proc_corrob.returncode == 0, (proc_corrob.stdout, proc_corrob.stderr)
+    rows_corrob = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason FROM sessions",
+    )
+    by_uuid_corrob = {r[0]: (r[1], r[2]) for r in rows_corrob}
+    assert uuid_a in by_uuid_corrob, "candidate A must have a sessions row"
+    a_cls, a_reason = by_uuid_corrob[uuid_a]
+    assert a_cls == "hard_crash", (
+        f"expected hard_crash for A after corroboration via env var; "
+        f"got {a_cls}/{a_reason}"
+    )
+    assert a_reason == "liveness_dead_pid_tool_use_no_result", (
+        f"expected dead-pid crash reason; got {a_reason}"
+    )
+    for u, (_, reason) in by_uuid_corrob.items():
+        assert reason != "ambiguous_match", (
+            f"{u} still ambiguous_match after env-var-provided corroborating snapshot"
+        )
+
+
+# ---------------------------------------------------------------------------
+# AC5.2 (population half) — scan populates pane_title + last_substantive
+# (Phase 4 Task 3 / Subcomponent B)
+# ---------------------------------------------------------------------------
+
+
+def test_scan_populates_pane_title_and_last_substantive(tmp_path: Path) -> None:
+    """AC5.2: a liveness-matched session with a corroborating snapshot at its cwd
+    stores the snapshot's pane label in ``pane_title`` and the JSONL's last real
+    text in ``last_substantive``.
+
+    Fixture: one ``--resume <uuid>`` marker (DIRECT_MATCH), a CONCLUDED tail (so
+    ``last_substantive_text`` returns the assistant text ``"done"``), and a
+    resurrect snapshot whose single pane sits at the session's cwd with the
+    ``✳ session 0`` title. After scan, ``pane_title == "✳ session 0"`` and
+    ``last_substantive == "done"``.
+    """
+    cwd = "/tmp/pane-title-match"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid = "aaaaaaaa-9999-9999-9999-999999999999"
+    _write_session_jsonl(
+        project_dir / f"{uuid}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd,
+        started=started,
+        argv=f"--resume {uuid}",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    resurrect_dir = tmp_path / "byobu-sessions"
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [cwd])
+
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path, run_dir, projects_root, now=now_epoch, resurrect_dir=resurrect_dir
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT pane_title, last_substantive FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1
+    pane_title, last_substantive = rows[0]
+    assert pane_title == "✳ session 0", (
+        f"expected the snapshot pane label; got {pane_title!r}"
+    )
+    assert last_substantive == "done", (
+        f"expected the JSONL's last real text; got {last_substantive!r}"
+    )
+
+
+def test_rescan_refreshes_pane_title_and_last_substantive(tmp_path: Path) -> None:
+    """ON CONFLICT(uuid) DO UPDATE refreshes ``pane_title`` + ``last_substantive``.
+
+    Every other scan test does a single scan, so only the INSERT branch of
+    ``_upsert_session`` is exercised — the DO UPDATE SET clause for the two
+    Phase-4 columns is unproven. This test scans the SAME session twice with
+    the inputs changed between scans so a faithful UPDATE must overwrite both
+    stored values:
+
+    * Scan 1 derives ``pane_title == "✳ session 0"`` (A) from a resurrect
+      snapshot whose single pane sits at the session's cwd, and
+      ``last_substantive == "done"`` (X) from the CONCLUDED tail — same shape
+      as ``test_scan_populates_pane_title_and_last_substantive``.
+    * Between scans the snapshot is rewritten (same stamp, so ``snapshot_near``
+      still selects it) with the session's cwd at pane index 1, so
+      ``label_for_cwd`` returns ``"✳ session 1"`` (B); and a fresh substantive
+      ``end_turn`` turn (text ``"redone"``, Y) is appended to the JSONL so
+      ``last_substantive_text`` returns it. The tail stays CONCLUDED and the
+      ``--resume`` marker keeps the correlation a DIRECT_MATCH, so the second
+      scan upserts the same uuid row → the DO UPDATE SET branch.
+    * Scan 2 must leave the row holding B / Y, not the stale A / X.
+
+    If ``pane_title`` / ``last_substantive`` are dropped from the DO UPDATE SET
+    clause, the row keeps its first-INSERT A / X and both assertions fail — the
+    mutation check that gives this test its teeth.
+    """
+    cwd = "/tmp/rescan-refresh-match"
+    other_cwd = "/tmp/rescan-refresh-other"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid = "aaaaaaaa-7777-7777-7777-777777777777"
+    jsonl_path = project_dir / f"{uuid}.jsonl"
+    _write_session_jsonl(
+        jsonl_path,
+        cwd=cwd,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd,
+        started=started,
+        argv=f"--resume {uuid}",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    resurrect_dir = tmp_path / "byobu-sessions"
+    # Scan-1 snapshot: cwd at pane index 0 → label "✳ session 0" (A).
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [cwd])
+
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path, run_dir, projects_root, now=now_epoch, resurrect_dir=resurrect_dir
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT pane_title, last_substantive FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1
+    pane_title_a, last_substantive_x = rows[0]
+    assert pane_title_a == "✳ session 0", (
+        f"scan 1 should store the snapshot pane label; got {pane_title_a!r}"
+    )
+    assert last_substantive_x == "done", (
+        f"scan 1 should store the JSONL's last real text; got {last_substantive_x!r}"
+    )
+
+    # Change both inputs so a faithful re-scan derives DIFFERENT values.
+    # pane_title B: rewrite the snapshot (same stamp → snapshot_near still
+    # picks it) with the cwd at pane index 1 so label_for_cwd skips the
+    # non-matching other_cwd at index 0 and returns "✳ session 1".
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [other_cwd, cwd])
+    # last_substantive Y: append a fresh substantive end_turn turn. "redone"
+    # is non-empty and not a bookkeeping marker, so last_substantive_text
+    # returns it; the end_turn shape keeps the tail CONCLUDED.
+    with jsonl_path.open("a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "timestamp": "2026-01-01T00:00:00.000Z",
+                    "message": {
+                        "stop_reason": "end_turn",
+                        "content": [{"type": "text", "text": "redone"}],
+                    },
+                }
+            )
+            + "\n"
+        )
+
+    # Second scan of the SAME session → ON CONFLICT(uuid) DO UPDATE branch.
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path, run_dir, projects_root, now=now_epoch, resurrect_dir=resurrect_dir
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT pane_title, last_substantive FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1, "rescan must update the existing row, not insert a new one"
+    pane_title_b, last_substantive_y = rows[0]
+    assert pane_title_b == "✳ session 1", (
+        f"rescan should refresh pane_title to the new snapshot label (B); "
+        f"got {pane_title_b!r} (stale A was {pane_title_a!r})"
+    )
+    assert last_substantive_y == "redone", (
+        f"rescan should refresh last_substantive to the appended turn (Y); "
+        f"got {last_substantive_y!r} (stale X was {last_substantive_x!r})"
+    )
+
+
+def test_scan_jsonl_only_session_populates_last_substantive_not_pane_title(
+    tmp_path: Path,
+) -> None:
+    """A JSONL-only session (no liveness marker) gets ``last_substantive`` from the
+    JSONL but a NULL ``pane_title`` (no ``started`` anchor → no snapshot).
+
+    The JSONL-only walk has no liveness marker and thus no ``started`` to anchor
+    ``snapshot_near``; ``_walk_jsonl_only`` hardcodes ``pane_title=None``.
+    ``last_substantive`` is still extracted from the JSONL's CONCLUDED tail.
+    """
+    uuid = "bbbbbbbb-9999-9999-9999-999999999999"
+    cwd = "/tmp/jsonl-only-substantive"
+    sessions = [
+        FixtureSession(
+            uuid=uuid,
+            cwd=cwd,
+            tail_kind=TailKind.CONCLUDED,
+            has_liveness=False,
+            pid_alive=None,
+            boot_id_current=False,
+        )
+    ]
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, sessions)
+    db_path = _init_db(db_dir)
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root))
+
+    rows = _rows(
+        db_path,
+        "SELECT pane_title, last_substantive FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1
+    pane_title, last_substantive = rows[0]
+    assert pane_title is None, (
+        "jsonl-only session has no snapshot anchor → NULL pane_title;"
+        f" got {pane_title!r}"
+    )
+    assert last_substantive == "done", (
+        f"expected the JSONL's last real text; got {last_substantive!r}"
+    )
+
+
+def test_scan_pane_title_is_per_candidate_cwd_not_liveness_cwd(
+    tmp_path: Path,
+) -> None:
+    """AC5.2 (per-candidate cwd, CA2): each AMBIGUOUS candidate's ``pane_title`` is
+    labelled by ITS OWN first-entry cwd, never by ``liveness.cwd``.
+
+    Two candidates share one lossy-collided encoded dir but declare distinct cwds
+    (``cwd_a``, ``cwd_b``). A resurrect snapshot carries a pane at BOTH cwds, so
+    corroboration keeps both survivors → the marker stays AMBIGUOUS (verdict for
+    a >1-survivor set, per ``_apply_corroboration``). The snapshot labels each cwd
+    differently (``✳ session 0`` for ``cwd_a``, ``✳ session 1`` for ``cwd_b``).
+
+    The regression this guards: labelling by ``liveness.cwd`` (== ``cwd_a``) would
+    attach ``✳ session 0`` to BOTH candidate rows. The contract is that candidate
+    B's row carries ``✳ session 1`` — its own cwd's label — proving the lookup
+    reads each candidate's OWN first-entry cwd.
+    """
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    cwd_a = "/tmp/cand-cwd/a-b"
+    cwd_b = "/tmp/cand-cwd-a/b"  # distinct cwd, same lossy encoded dir as cwd_a
+    assert _encoded_dir_name_for(cwd_a) == _encoded_dir_name_for(cwd_b), (
+        "fixture invariant: both cwds must collapse to one encoded dir"
+    )
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd_a)
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid_a = "aaaaaaaa-1212-1212-1212-121212121212"
+    uuid_b = "bbbbbbbb-3434-3434-3434-343434343434"
+    _write_session_jsonl(
+        project_dir / f"{uuid_a}.jsonl",
+        cwd=cwd_a,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    _write_session_jsonl(
+        project_dir / f"{uuid_b}.jsonl",
+        cwd=cwd_b,
+        first_entry_epoch=started + 20,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    # Backlog marker (no --resume) whose cwd is cwd_a → liveness.cwd == cwd_a.
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd_a,
+        started=started,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    # Snapshot carries a pane at BOTH cwds, so BOTH candidates survive
+    # corroboration → marker stays AMBIGUOUS. Pane index drives the label:
+    # cwd_a → "✳ session 0", cwd_b → "✳ session 1".
+    resurrect_dir = tmp_path / "byobu-sessions"
+    _write_resurrect_snapshot(resurrect_dir, started - 60, [cwd_a, cwd_b])
+
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path, run_dir, projects_root, now=now_epoch, resurrect_dir=resurrect_dir
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT uuid, classification, classification_reason, pane_title FROM sessions",
+    )
+    by_uuid = {r[0]: (r[1], r[2], r[3]) for r in rows}
+    assert set(by_uuid.keys()) == {uuid_a, uuid_b}, (
+        f"both candidates must stay AMBIGUOUS (two rows); got {set(by_uuid)}"
+    )
+    # Both candidates are borderline/ambiguous_match (corroboration kept both).
+    for u in (uuid_a, uuid_b):
+        classification, reason, _ = by_uuid[u]
+        assert classification == "borderline" and reason == "ambiguous_match", (
+            f"{u}: expected borderline/ambiguous_match; got {classification}/{reason}. "
+            "If this is hard_crash or one row only, the CA2 ambiguity setup is broken."
+        )
+    # CA2 contract: each candidate's pane_title matches ITS OWN cwd's pane label.
+    assert by_uuid[uuid_a][2] == "✳ session 0", (
+        "candidate A's pane_title should be its own cwd's label;"
+        f" got {by_uuid[uuid_a][2]!r}"
+    )
+    assert by_uuid[uuid_b][2] == "✳ session 1", (
+        f"candidate B's pane_title should be its OWN cwd's label (✳ session 1), "
+        f"not liveness.cwd's (✳ session 0); got {by_uuid[uuid_b][2]!r}. "
+        "A regression to liveness.cwd would label both rows ✳ session 0."
+    )
+
+
+def test_scan_no_snapshot_leaves_pane_title_null_without_crashing(
+    tmp_path: Path,
+) -> None:
+    """No-snapshot safety: a marker with an empty/non-existent resurrect dir →
+    ``snapshot_near`` is None → ``label_for_cwd(None, ...)`` → NULL ``pane_title``,
+    and scan does not crash.
+
+    Exercises the Phase-3-hardened ``label_for_cwd(None, ...)`` path end-to-end:
+    with no resurrect snapshots, the per-candidate label lookup degrades to NULL
+    rather than raising. ``last_substantive`` is still populated from the JSONL.
+    """
+    cwd = "/tmp/no-snapshot-safety"
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+
+    from fixtures.jsonl_builder import (
+        _encoded_dir_name_for,
+        _pick_dead_pid,
+        _write_session_jsonl,
+        make_liveness_file,
+    )
+
+    project_dir = projects_root / _encoded_dir_name_for(cwd)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    uuid = "cccccccc-9999-9999-9999-999999999999"
+    _write_session_jsonl(
+        project_dir / f"{uuid}.jsonl",
+        cwd=cwd,
+        first_entry_epoch=started + 10,
+        tail_kind=TailKind.CONCLUDED,
+    )
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=_pick_dead_pid(),
+        cwd=cwd,
+        started=started,
+        argv=f"--resume {uuid}",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    # resurrect_dir points at a path that does not exist → load_snapshots == []
+    # → snapshot_near is None → label_for_cwd(None, ...) is None.
+    missing_resurrect = tmp_path / "no-such-byobu-dir"
+    scan_mod.run_scan(
+        _make_ctx(
+            db_path,
+            run_dir,
+            projects_root,
+            now=now_epoch,
+            resurrect_dir=missing_resurrect,
+        )
+    )
+
+    rows = _rows(
+        db_path,
+        "SELECT pane_title, last_substantive FROM sessions WHERE uuid = '" + uuid + "'",
+    )
+    assert len(rows) == 1
+    pane_title, last_substantive = rows[0]
+    assert pane_title is None, (
+        f"no snapshot → NULL pane_title (no crash); got {pane_title!r}"
+    )
+    assert last_substantive == "done", (
+        f"expected the JSONL's last real text; got {last_substantive!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Schema-current assertion: scan refuses un-migrated DB cleanly
+# ---------------------------------------------------------------------------
+
+# Old-shape sessions DDL: the column set before pane_title/last_substantive.
+# Duplicated from test_init.py deliberately — this test must be self-contained
+# and must not import from another test module.
+_OLD_SHAPE_SESSIONS_DDL_SCAN = """
+CREATE TABLE sessions (
+    uuid                  TEXT PRIMARY KEY NOT NULL,
+    project_path          TEXT NOT NULL,
+    cwd                   TEXT NOT NULL,
+    jsonl_path            TEXT,
+    jsonl_mtime           INTEGER,
+    jsonl_last_ts         INTEGER,
+    classification        TEXT NOT NULL,
+    classification_reason TEXT,
+    classifier_version    INTEGER NOT NULL,
+    state_summary         TEXT,
+    first_seen            INTEGER NOT NULL,
+    last_scanned          INTEGER NOT NULL,
+    user_notes            TEXT
+)
+"""
+
+
+def _build_old_shape_db_for_scan(path: Path) -> None:
+    """Create a WAL-mode DB whose ``sessions`` table lacks the new columns."""
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute(_OLD_SHAPE_SESSIONS_DDL_SCAN)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_scan_refuses_unmigrated_db_with_clean_error(tmp_path: Path) -> None:
+    """scan against an un-migrated DB raises a clean RuntimeError, not a raw
+    sqlite3.OperationalError, and leaves no partial write.
+
+    The assertion lives in open_db() — scan calls open_db before any write, so
+    the RuntimeError fires before any session or scan_runs row is written.
+    After the error the schema must be unchanged (open_db did not add columns).
+    """
+    db_path = tmp_path / "old-shape.db"
+    _build_old_shape_db_for_scan(db_path)
+
+    # Empty projects root — scan walk finds nothing, but open_db fires first.
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    projects_root = tmp_path / "projects"
+    projects_root.mkdir()
+
+    ctx = scan_mod.ScanContext(
+        db_path=db_path,
+        run_dir=run_dir,
+        projects_root=projects_root,
+        now=1_000_000,
+        resurrect_dir=tmp_path / "no-resurrect",
+    )
+
+    with pytest.raises(RuntimeError, match="crash-recovery init"):
+        scan_mod.run_scan(ctx)
+
+    # open_db must not have added the columns — schema on disk untouched.
+    raw = sqlite3.connect(db_path)
+    try:
+        cols = {row[1] for row in raw.execute("PRAGMA table_info(sessions)")}
+        # No scan_runs table should exist (was never created in old-shape DB).
+        tables = {
+            row[0]
+            for row in raw.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+    finally:
+        raw.close()
+
+    assert "pane_title" not in cols, "open_db must not have migrated pane_title"
+    assert "last_substantive" not in cols, (
+        "open_db must not have migrated last_substantive"
+    )
+    assert "scan_runs" not in tables, "no scan_runs row must have been written"
+
+
+# ---------------------------------------------------------------------------
+# Part 3 (Gap A): uncorrelated abnormal-exit markers are surfaced, not dropped.
+# ---------------------------------------------------------------------------
+
+
+def test_scan_records_uncorrelated_dead_marker(tmp_path: Path) -> None:
+    """A dead-PID marker that correlate cannot map to any session is recorded in
+    ``uncorrelated_markers`` as crash evidence — never silently dropped (Gap A).
+
+    The cwd has no project directory on disk, so ``correlate`` returns NO_MATCH.
+    Before this fix the marker was skipped with no DB row at all; now its abnormal
+    exit (dead pid) is preserved without fabricating a phantom session row.
+    """
+    from fixtures.jsonl_builder import _pick_dead_pid, make_liveness_file
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+    now_epoch = int(time.time())
+    started = now_epoch - 3600
+    dead_pid = _pick_dead_pid()
+    cwd = "/tmp/uncorrelated-no-transcripts"
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=dead_pid,
+        cwd=cwd,
+        started=started,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    markers = _rows(
+        db_path,
+        "SELECT boot_id, pid, cwd, started, reason FROM uncorrelated_markers",
+    )
+    assert len(markers) == 1
+    _boot_id, pid, marker_cwd, marker_started, reason = markers[0]
+    assert pid == dead_pid
+    assert marker_cwd == cwd
+    assert marker_started == started
+    assert reason == "dead_pid"
+    # It must NOT fabricate a phantom sessions row for an uncorrelated marker.
+    assert _rows(db_path, "SELECT uuid FROM sessions") == []
+
+
+def test_scan_does_not_record_uncorrelated_live_marker(tmp_path: Path) -> None:
+    """A live-PID marker on the current boot that correlate cannot map is a running
+    session whose transcript was not located yet — not crash evidence. It must not
+    be recorded as an uncorrelated marker.
+    """
+    from fixtures.jsonl_builder import make_liveness_file
+
+    db_dir, run_dir, projects_root = make_full_fixture(tmp_path, [])
+    db_path = _init_db(db_dir)
+    now_epoch = int(time.time())
+    make_liveness_file(
+        run_dir=run_dir,
+        pid=os.getpid(),  # this test process is alive; no start_time → bare kill -0
+        cwd="/tmp/uncorrelated-live-no-transcripts",
+        started=now_epoch - 60,
+        argv="",
+        boot_id=liveness_mod.current_boot_id(),
+    )
+
+    scan_mod.run_scan(_make_ctx(db_path, run_dir, projects_root, now=now_epoch))
+
+    assert _rows(db_path, "SELECT pid FROM uncorrelated_markers") == []

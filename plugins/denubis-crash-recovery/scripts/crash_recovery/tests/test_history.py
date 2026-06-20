@@ -22,11 +22,11 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from crash_recovery import db as db_mod
-from crash_recovery import history as history_mod
-
 if TYPE_CHECKING:
     from pathlib import Path
+
+from crash_recovery import db as db_mod
+from crash_recovery import history as history_mod
 
 # ---------------------------------------------------------------------------
 # Helpers

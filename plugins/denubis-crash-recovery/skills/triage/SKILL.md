@@ -25,7 +25,11 @@ Invoke the CLI and surface its output to the user verbatim. Do not summarise or 
 uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery triage
 ```
 
-The report has six sections in fixed order: **Currently unfinished**, **Idle-live killed**, **Ambiguous correlation**, **Needs investigation**, **Recently concluded**, **Irrecoverable**. Each row carries the session uuid, cwd, last-activity timestamp, classification, and reason.
+**The terminal view is lean by default.** It answers "what crashed / needs attention" at a glance: crash victims, currently-unfinished, ambiguous, and the genuine investigation rows (dangling tails, concluded-then-killed) render in full, plus any uncorrelated crash markers. The non-actionable bulk — concluded, irrecoverable, and unrecognised-ending sessions — collapses to a `## Collapsed` count summary. Pass `--all` for the complete all-means-all roster; `~/llm-resume.md` (written by `regenerate`) is always the full roster and stays searchable.
+
+**First run after a plugin upgrade:** if triage exits with an error naming missing migrated columns or the missing `uncorrelated_markers` table (`... run \`crash-recovery init\``), the local database predates a schema change. Run `crash-recovery init` once to apply the migration (additive columns and the uncorrelated-markers table), then re-run triage. `init` is the deliberate, idempotent migration step (safe to re-run); triage never migrates on its own — that is what keeps two concurrent triage runs from colliding on the schema change.
+
+The full roster (`--all`, and `~/llm-resume.md`) has six session sections in fixed order: **Probable system-crash victims**, **Currently unfinished**, **Ambiguous correlation**, **Needs investigation**, **Recently concluded**, **Irrecoverable**. Each row carries the session uuid, cwd, last-activity timestamp, classification, and reason. (The lean default renders the first four in full and collapses **Recently concluded** + **Irrecoverable** into the `## Collapsed` summary.) A seventh supplementary section, **Uncorrelated crash markers**, is appended **only when present**: abnormal-exit `.live` markers (dead PID, or a previous-boot PID) that could not be correlated to any session JSONL — crash evidence with no resumable session (likely an early crash with no transcript, or a marker left by a pre-fix archive-prompt close). They carry no resume command.
 
 ## Step 2: Annotate borderline entries (optional)
 
@@ -33,8 +37,8 @@ Annotations are user-supplied context that survives prune. They are the only sig
 
 Walk the report's actionable sections in this order:
 
-1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use AskUserQuestion with a `[manual review]` prefix in the prompt.
-2. **Ambiguous correlation**, then **Needs investigation**, then **Idle-live killed** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
+1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use AskUserQuestion with a `[manual review]` prefix in the prompt. (As of classifier v2 `unmatched` is a defensive-only fallback reached by no realistic input — the former sole case, a dead-marker concluded tail, now classifies as `liveness_dead_pid_concluded_tail` in **Needs investigation** with a calm "concluded, then killed — likely nothing to resume" note, and usually needs no annotation.)
+2. **Ambiguous correlation**, then **Needs investigation**, then **Probable system-crash victims** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
 
 For each row, ask:
 

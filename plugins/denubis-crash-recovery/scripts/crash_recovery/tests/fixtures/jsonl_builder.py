@@ -22,15 +22,33 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from crash_recovery.jsonl import TailKind
-from crash_recovery.liveness import current_boot_id
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+from crash_recovery.jsonl import TailKind
+from crash_recovery.liveness import current_boot_id
 
 # Deterministic timestamp used across every fixture so ``last_ts`` is stable
 # in assertions.
 FIXED_TS = "2026-05-13T03:00:12.000Z"
+
+
+def _snapshot_record() -> dict:
+    """Return a snapshot/bookkeeping record carrying NO ``cwd`` and NO ``timestamp``.
+
+    Mirrors the real shape modern Claude Code transcripts open with: top-level
+    keys ``type, messageId, snapshot, isSnapshotUpdate`` with ``type`` value
+    ``snapshot``. Because ``snapshot`` is not in ``_REAL_TYPES`` it is filtered
+    out by :func:`crash_recovery.jsonl.parse_tail`, and because it carries no
+    ``cwd``/``timestamp`` the line-1-only readers this phase replaces see an
+    empty value here — the regression :func:`first_record_field` repairs.
+    """
+    return {
+        "type": "snapshot",
+        "messageId": "msg_snapshot_0001",
+        "snapshot": {"messageIds": []},
+        "isSnapshotUpdate": False,
+    }
 
 
 def _write(path: Path, entries: list[dict]) -> None:
@@ -240,16 +258,32 @@ def make_liveness_file(
     started: int = 1715151234,
     argv: str = "",
     boot_id: str = "8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d",
+    session_id: str | None = None,
+    start_time: int | None = None,
 ) -> Path:
-    """Write a four-key ``<pid>.live`` file under ``run_dir``; return the path.
+    """Write a ``<pid>.live`` file under ``run_dir``; return the path.
 
-    Mirrors the format Phase 8's wrapper patch will write: one ``key=value``
-    line per required field, UTF-8, newline-terminated. ``argv`` may be empty
-    (no resume flag in the parent invocation) and may contain ``=`` signs.
+    Mirrors the format the wrapper patch writes: one ``key=value`` line per
+    field, UTF-8, newline-terminated. ``argv`` may be empty (no resume flag in
+    the parent invocation) and may contain ``=`` signs.
+
+    ``session_id`` and ``start_time`` are the optional Phase 2 additive keys.
+    Each line is written ONLY when its value is provided, so callers that omit
+    them get a four-key legacy file (keeping pre-Phase-2 fixtures unchanged).
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / f"{pid}.live"
-    path.write_text(f"cwd={cwd}\nstarted={started}\nargv={argv}\nboot_id={boot_id}\n")
+    lines = [
+        f"cwd={cwd}\n",
+        f"started={started}\n",
+        f"argv={argv}\n",
+        f"boot_id={boot_id}\n",
+    ]
+    if session_id is not None:
+        lines.append(f"session_id={session_id}\n")
+    if start_time is not None:
+        lines.append(f"start_time={start_time}\n")
+    path.write_text("".join(lines))
     return path
 
 
@@ -325,6 +359,12 @@ class FixtureSession:
     time; the default ``-3600`` makes the liveness ``started`` an hour in
     the past so correlate's mtime window (now > started - 60) admits the
     JSONL written immediately after.
+
+    ``start_time`` is the optional Phase 2 ``start_time=`` marker key. Left
+    ``None`` (the default) the marker stays four-key legacy and
+    ``pid_alive_checked`` falls back to bare ``kill -0``. Set it to a
+    deliberately wrong value to drive the PID-reuse-rejection path (a marker
+    whose stored start_time no longer matches ``/proc/<pid>/stat``).
     """
 
     uuid: str
@@ -334,6 +374,8 @@ class FixtureSession:
     pid_alive: bool | None
     boot_id_current: bool
     started_offset: int = -3600
+    cwd_on_first_line: bool = True
+    start_time: int | None = None
 
 
 # Sentinel boot_id that will never match the kernel's value — used to
@@ -360,9 +402,6 @@ def _pick_dead_pid() -> int:
     try:
         with Path("/proc/sys/kernel/pid_max").open() as f:
             return int(f.read().strip()) + 1
-    # PEP 758 (Python 3.14+): an except clause may list exception types without
-    # wrapping them in a tuple. ruff stripped the redundant parens for our py314
-    # target — `except OSError, ValueError:` is VALID here, not a Py2-style bug.
     except OSError, ValueError:
         return 2**22 + 1
 
@@ -455,13 +494,20 @@ def _write_session_jsonl(
     cwd: str,
     first_entry_epoch: int,
     tail_kind: TailKind,
+    cwd_on_first_line: bool = True,
 ) -> None:
     """Write a session JSONL with a cwd+timestamp header plus tail-shape entries.
 
     The header satisfies correlate's first-entry-cwd lookup
     (:func:`_project_dir_for_cwd`) and mtime-window filter
-    (:func:`_jsonl_first_entry_ts_meets_threshold`). The tail entries
+    (:func:`_jsonl_first_entry_ts_in_tight_window`). The tail entries
     drive :func:`parse_tail`'s ``TailKind`` discrimination.
+
+    When ``cwd_on_first_line`` is ``False`` a snapshot/bookkeeping record (no
+    ``cwd``, no ``timestamp``) is prepended so the authoritative cwd+timestamp
+    header lands on line 2 — the modern-transcript shape that the line-1-only
+    readers mis-read and :func:`crash_recovery.jsonl.first_record_field`
+    repairs.
     """
     iso = _iso_ts(first_entry_epoch)
     header = {
@@ -470,8 +516,39 @@ def _write_session_jsonl(
         "timestamp": iso,
         "message": {"content": []},
     }
-    entries = [header, *_tail_entries_for(tail_kind)]
+    prefix = [] if cwd_on_first_line else [_snapshot_record()]
+    entries = [*prefix, header, *_tail_entries_for(tail_kind)]
     _write(jsonl_path, entries)
+
+
+def make_snapshot_prefixed_jsonl(
+    path: Path,
+    cwd: str,
+    first_ts: int,
+    *,
+    tail_kind: TailKind,
+) -> None:
+    """Write a snapshot-prefixed session JSONL (cwd+timestamp on line 2).
+
+    Line order:
+
+    1. a ``snapshot`` bookkeeping record with NO ``cwd`` and NO ``timestamp``
+       (see :func:`_snapshot_record`);
+    2. the first real record carrying ``cwd`` and ``timestamp``;
+    3. the tail entries for ``tail_kind`` (see :func:`_tail_entries_for`).
+
+    This is the fixture for the forward-scan ACs (AC2.1 / AC2.2): the line-1
+    readers being replaced see the snapshot record and read no cwd/timestamp,
+    while :func:`crash_recovery.jsonl.first_record_field` scans forward to the
+    line-2 header.
+    """
+    _write_session_jsonl(
+        path,
+        cwd=cwd,
+        first_entry_epoch=first_ts,
+        tail_kind=tail_kind,
+        cwd_on_first_line=False,
+    )
 
 
 def _encoded_dir_name_for(cwd: str) -> str:
@@ -566,6 +643,7 @@ def make_full_fixture(
                 cwd=cwd,
                 first_entry_epoch=first_entry_epoch,
                 tail_kind=session.tail_kind,
+                cwd_on_first_line=session.cwd_on_first_line,
             )
 
     # Now write liveness files (after JSONLs exist on disk, so the
@@ -586,6 +664,7 @@ def make_full_fixture(
             started=started,
             argv=f"--resume {session.uuid}",
             boot_id=boot_id,
+            start_time=session.start_time,
         )
 
     return db_dir, run_dir, projects_root
@@ -614,7 +693,9 @@ class DbFixtureRow:
     project_path: str = "/decoded/project/path"
     jsonl_path: str = "/jsonl/path.jsonl"
     jsonl_mtime: int = 1_700_000_000
-    jsonl_last_ts: int = 1_700_000_000
+    jsonl_last_ts: int | None = 1_700_000_000
+    pane_title: str | None = None
+    last_substantive: str | None = None
 
 
 def make_db_with_sessions(tmp_path: Path, sessions: list[DbFixtureRow]) -> Path:
@@ -639,8 +720,9 @@ def make_db_with_sessions(tmp_path: Path, sessions: list[DbFixtureRow]) -> Path:
                 INSERT INTO sessions (
                     uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
                     classification, classification_reason, classifier_version,
-                    state_summary, first_seen, last_scanned, user_notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    state_summary, first_seen, last_scanned, user_notes,
+                    pane_title, last_substantive
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.uuid,
@@ -656,12 +738,111 @@ def make_db_with_sessions(tmp_path: Path, sessions: list[DbFixtureRow]) -> Path:
                     session.first_seen,
                     session.last_scanned,
                     session.user_notes,
+                    session.pane_title,
+                    session.last_substantive,
                 ),
             )
         conn.commit()
     finally:
         conn.close()
     return db_path
+
+
+def make_substantive_then_bookkeeping_tail(path: Path) -> None:
+    """Real assistant text, then operator-leaked bookkeeping content turns.
+
+    The last two *real* (assistant/user) turns carry content-level bookkeeping
+    text — a ``<usage>`` block and a ``</task-notification>`` close — that the
+    type-level ``_REAL_TYPES`` filter does NOT drop (they are genuine
+    assistant/user turns whose *text* is operator noise). ``last_substantive_text``
+    must walk past them to the prior real assistant turn and return its text.
+    """
+    _write(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "Here is the real answer."}],
+                },
+            },
+            {
+                "type": "user",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "content": "<usage>tokens: 1234</usage>",
+                },
+            },
+            {
+                "type": "user",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "content": "</task-notification>",
+                },
+            },
+        ],
+    )
+
+
+def make_post_compaction_boilerplate_tail(path: Path) -> None:
+    """Real assistant turn, then a post-compaction boilerplate user turn.
+
+    The final real turn is the standard post-compaction notice whose text
+    starts with ``If you need specific details from before compaction``.
+    ``last_substantive_text`` must skip it and return the prior assistant text.
+    """
+    _write(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "Prior substantive turn."}],
+                },
+            },
+            {
+                "type": "user",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "content": (
+                        "If you need specific details from before compaction, "
+                        "ask me to recover them."
+                    ),
+                },
+            },
+        ],
+    )
+
+
+def make_only_bookkeeping_content_tail(path: Path) -> None:
+    """Every real turn carries only bookkeeping content → no substantive text.
+
+    Both turns are genuine assistant/user entries (so ``_REAL_TYPES`` keeps
+    them) but their text is operator noise. ``last_substantive_text`` must
+    return ``None`` because nothing in the window is substantive.
+    """
+    _write(
+        path,
+        [
+            {
+                "type": "assistant",
+                "timestamp": FIXED_TS,
+                "message": {
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "<summary>recap</summary>"}],
+                },
+            },
+            {
+                "type": "user",
+                "timestamp": FIXED_TS,
+                "message": {"content": "<task-notification>queued</task-notification>"},
+            },
+        ],
+    )
 
 
 def make_attachment_interleaved_then_concluded(path: Path) -> None:

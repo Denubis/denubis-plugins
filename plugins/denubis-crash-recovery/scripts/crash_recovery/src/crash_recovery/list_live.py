@@ -22,11 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from crash_recovery.liveness import (
-    current_boot_id,
-    list_liveness_files,
-    pid_alive,
-)
+from crash_recovery.liveness import current_boot_id, list_liveness_files, pid_alive
 
 if TYPE_CHECKING:
     from pathlib import Path

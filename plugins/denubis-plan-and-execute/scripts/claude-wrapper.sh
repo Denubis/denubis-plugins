@@ -89,19 +89,71 @@ has_transcripts_dir() {
 # --- crash-recovery liveness file write (atomic) ---
 CR_RUN_DIR="${CRASH_RECOVERY_RUN_DIR:-$HOME/.claude/run}"
 mkdir -p "$CR_RUN_DIR"
-CR_LIVE_FILE="$CR_RUN_DIR/$$.live"
+# Exported so the SessionStart marker-update hook (update-live-marker.py), a
+# descendant of this wrapper via claude, inherits it and knows which marker to
+# rewrite. The child inherits $$ → value is <wrapper_pid>.live.
+export CR_LIVE_FILE="$CR_RUN_DIR/$$.live"
 CR_LIVE_TMP="$CR_RUN_DIR/$$.live.tmp"
+
+# Comm-safe /proc/<pid>/stat starttime (field 22). field 2 (comm) may contain
+# spaces/parens, so strip through the last ") " before tokenising; starttime is
+# then the 20th token of the remainder (fields 3..22). See DR4.
+_proc_starttime() {  # $1 = pid; echoes field-22 starttime or nothing
+    local stat rest
+    stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 0
+    rest=${stat##*) }          # strip through the last ") " — defeats comm-with-spaces
+    # shellcheck disable=SC2086
+    set -- $rest               # $1=state(field3) ... $20=starttime(field22)
+    printf '%s' "${20-}"
+}
+
+# Effective session id for the marker: a --resume/-r uuid, else a --session-id
+# uuid, else (fresh interactive — we generated SESSION_ID into EXTRA_ARGS) the
+# generated uuid, else empty (line omitted). Loose validation; reader revalidates.
+CR_SESSION_ID=""
+_cr_prev=""
+for _cr_arg in "$@"; do
+    case "$_cr_prev" in --resume|-r) CR_SESSION_ID="$_cr_arg"; break ;; esac
+    _cr_prev="$_cr_arg"
+done
+if [ -z "$CR_SESSION_ID" ]; then
+    _cr_prev=""
+    for _cr_arg in "$@"; do
+        case "$_cr_prev" in --session-id) CR_SESSION_ID="$_cr_arg"; break ;; esac
+        _cr_prev="$_cr_arg"
+    done
+fi
+if [ -z "$CR_SESSION_ID" ] && [ "${#EXTRA_ARGS[@]}" -gt 0 ]; then
+    CR_SESSION_ID="$SESSION_ID"
+fi
+
 {
     printf 'cwd=%s\n' "$PWD"
     printf 'started=%s\n' "$(date +%s)"
     printf 'argv=%s\n' "$*"
     printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)"
+    [ -n "$CR_SESSION_ID" ] && printf 'session_id=%s\n' "$CR_SESSION_ID"
+    CR_START_TIME="$(_proc_starttime $$)"
+    [ -n "$CR_START_TIME" ] && printf 'start_time=%s\n' "$CR_START_TIME"
 } > "$CR_LIVE_TMP"
 mv "$CR_LIVE_TMP" "$CR_LIVE_FILE"  # atomic via rename(2) on the same filesystem
 # --- end crash-recovery liveness file write ---
 
 "$REAL_CLAUDE" --disallowedTools "$DISALLOWED_TOOLS" --teammate-mode=auto "${EXTRA_ARGS[@]}" "$@" || EXIT_CODE=$?
 EXIT_CODE=${EXIT_CODE:-0}
+
+# --- crash-recovery liveness file cleanup (DR8) ---
+# Remove the marker on clean (0) or Ctrl-C (130) exit; any other code (137
+# SIGKILL, 139 SIGSEGV, generic non-zero) leaves it in place as evidence of an
+# abnormal termination. This MUST run BEFORE the transcript-archive prompt
+# below: that prompt blocks on `read`, and a terminal closed at the prompt would
+# otherwise strand the marker on a cleanly-concluded session — which triage then
+# misreads as a crash (the archive-prompt-close false positive). Archiving keys
+# off SESSION_ID/TRANSCRIPT_PATH, not the marker, so removing it here is safe.
+if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ]; then
+    rm -f "$CR_LIVE_FILE"
+fi
+# --- end crash-recovery liveness file cleanup ---
 
 # The transcript-archive prompt only makes sense for clean exits. Before the
 # || EXIT_CODE=$? fix at line 103, set -e made these blocks unreachable on
@@ -136,14 +188,5 @@ if [[ "$EXIT_CODE" -eq 0 ]]; then
         echo "Reminder: resumed sessions aren't auto-archived. Run /transcript before exiting next time."
     fi
 fi
-
-# --- crash-recovery liveness file cleanup ---
-# DR8: remove the liveness file only on clean (0) or Ctrl-C (130) exit.
-# Any other code (137 SIGKILL, 139 SIGSEGV, generic non-zero) leaves the file
-# in place as evidence of an abnormal termination.
-if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ]; then
-    rm -f "$CR_LIVE_FILE"
-fi
-# --- end crash-recovery liveness file cleanup ---
 
 exit $EXIT_CODE

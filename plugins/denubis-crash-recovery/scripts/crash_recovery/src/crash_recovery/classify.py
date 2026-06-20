@@ -20,9 +20,17 @@ from enum import StrEnum
 from crash_recovery.db import CLASSIFICATION_VALUES
 from crash_recovery.jsonl import TailKind, TailSummary
 
-CLASSIFIER_VERSION: int = 1
-"""Bump when RULES changes shape. Scan re-classifies any row whose stored
-classifier_version is below this constant. See design plan DR9."""
+CLASSIFIER_VERSION: int = 2
+"""Bump when RULES changes shape; the scan stamps this value onto every row it
+touches and re-considers version-stale orphans. See design plan DR9.
+
+v2 (2026-06-20): added the ``liveness_dead_pid_concluded_tail`` rule, which
+renames the sole real ``unmatched`` case to a calm, specific reason. The bump
+follows the convention (RULES shape changed) and records which ruleset last
+classified each row. It is not what migrates existing data: an on-disk session
+is re-derived from its tail + liveness on every scan via ``_upsert_session``, so
+a row stored ``borderline/unmatched`` by v1 picks up the new reason on the next
+scan through the normal walk, independent of the version stamp."""
 
 
 # Derived at module load from db.CLASSIFICATION_VALUES — single authoritative
@@ -160,6 +168,23 @@ RULES: tuple[Rule, ...] = (
         boot_id_current=True,
         classification=ClassificationValue.HARD_CRASH,
         reason="liveness_dead_pid_unknown_tail",
+    ),
+    # A present marker + dead PID on the current boot + a CONCLUDED tail: the
+    # session finished a turn, then its process was killed (idle-kill; or, before
+    # the wrapper-cleanup-ordering fix, a terminal closed at the archive prompt on
+    # a cleanly-concluded session). The marker surviving proves the wrapper did
+    # not exit cleanly — worth surfacing — but the concluded tail means it is not
+    # a resume-these crash victim, so it is BORDERLINE with its own reason rather
+    # than HARD_CRASH. This was previously the sole input that reached the
+    # ``unmatched`` review-queue net; naming it here retires ``unmatched`` to a
+    # defensive-only fallback (see test_classify partition lists).
+    Rule(
+        trailing_kind=TailKind.CONCLUDED,
+        liveness_present=True,
+        pid_alive=False,
+        boot_id_current=True,
+        classification=ClassificationValue.BORDERLINE,
+        reason="liveness_dead_pid_concluded_tail",
     ),
     Rule(
         trailing_kind=TailKind.CONCLUDED,

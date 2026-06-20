@@ -29,11 +29,11 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from crash_recovery import db as db_mod
-from crash_recovery.classify import CLASSIFIER_VERSION
-
 if TYPE_CHECKING:
     from pathlib import Path
+
+from crash_recovery import db as db_mod
+from crash_recovery.classify import CLASSIFIER_VERSION
 
 # ---------------------------------------------------------------------------
 # Helpers
