@@ -1,5 +1,27 @@
 # Changelog
 
+## [denubis-bibliography] 0.9.0
+
+Fan-out reader protocol for investigating many corpus papers at once, and citekey made the primary handle for paper work.
+
+**New:**
+- "Fanning out readers over a rendered corpus" section in `using-bibliography`: the orchestrator resolves and renders each paper once, then dispatches one reader subagent per paper given only the rendered `full.md` path. A reader that never receives a PDF cannot reach for `pdftotext`, so the extraction-improvisation failure dissolves by construction rather than being policed.
+- A reader-prompt template and a dispatch gate that stats the rendered file on disk before dispatch, never trusting a "rendered" report unverified.
+
+**Changed:**
+- "Work by citekey": the citekey is the stable handle for the render dir, citation, note, and dispatch. Resolve by citekey wherever you have one, and use first-author plus a title word only to find the citekey before switching to it.
+
+## [denubis-research-agents] 1.2.0
+
+Academic Research Protocol rewritten to route through the Zotero corpus instead of a parallel `docs/papers/` PDF pile.
+
+**Changed:**
+- The protocol is now identify, load, read. Discovery returns locators (DOI preferred, then a stable id, then an unstable locator flagged unverified), papers are loaded into Zotero via `fetch.py` behind confirmation (or the connector for paywalled work with no open-access copy), and reading uses the `using-bibliography` fan-out.
+- Removed the "Use the Read tool on the PDF" step and the `docs/papers/{slug}.md` discussion-file model, which forked a second corpus outside Zotero and invited hand-rolled PDF extraction.
+
+**Note:**
+- A project still relying on the old `docs/papers/` discussion files is a migration, not covered by this change.
+
 ## [denubis-external-agents] 0.1.0
 
 New plugin: dispatch review tasks to external CLI models as a heterogeneous second voice. First skill packages the codex peer-review smoke test that was validated end-to-end.

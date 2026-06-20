@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -174,7 +174,7 @@
     {
       "name": "denubis-bibliography",
       "description": "Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations; annotate cited passages back into the Zotero PDF as highlights. WIP — documents only the workflow proven end-to-end so far.",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "source": "./plugins/denubis-bibliography",
       "author": {
         "name": "Brian Ballsun-Stanton",
