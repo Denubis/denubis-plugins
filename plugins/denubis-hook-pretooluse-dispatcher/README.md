@@ -61,7 +61,7 @@ Discovered hooks are cached at `~/.claude/hooks/.pretooluse-bash-cache`. The cac
 Run with `--list` to see discovered hooks and cache state:
 
 ```bash
-/path/to/pretooluse-bash-dispatcher.sh --list
+uv run python /path/to/pretooluse-bash-dispatcher.py --list
 ```
 
 ## Setup

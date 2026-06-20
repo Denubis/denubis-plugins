@@ -93,7 +93,7 @@ Check `~/.claude/settings.json` for any `PreToolUse` hooks with matcher `Bash` o
 
 Run the dispatcher's `--list` flag to verify all hooks are discovered correctly:
 ```bash
-<dispatcher-path>/pretooluse-bash-dispatcher.sh --list
+uv run python <dispatcher-path>/pretooluse-bash-dispatcher.py --list
 ```
 
 ### 6. Check line endings (Windows only)

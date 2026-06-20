@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.sh",
+            "command": "uv run python \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.py\"",
             "timeout": 15
           }
         ]
