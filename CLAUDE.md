@@ -50,6 +50,16 @@ When a subagent prompt references a schema-level value set (a CHECK constraint's
 
 **Why**: a Critical in Phase 1 review of denubis-crash-recovery traced to passing composite section-key strings (`borderline+ambiguous_match`) as if they were the DB column values that the rest of the plan used (bare `borderline` + separate reason column). The CHECK constraint was schema-locked to the wrong shape until caught on re-review. The slip happened because the value list was generated from memory rather than read from `db.py`.
 
+### Python Targets 3.14+ — Modern Syntax Is Intentional
+
+This codebase targets Python 3.14+ (ruff `target-version = py314`). Modern syntax that does not parse on older interpreters is **deliberate, not a bug**. Do not "fix" it back, and do not flag it in review as a Python 2 relic.
+
+Most-tripped-over case: **PEP 758 parenthesis-less `except`**. `except TypeError, ValueError, IndexError:` (no parentheses around the tuple) is valid from 3.14 and catches all three, exactly like the parenthesised form. It is used intentionally across ~13 sites (`resolve.py`, `crash_recovery/*`, several hooks, `workflow_statusline`, `token-estimator`). It is **not** the Python 2 `except E, name:` bind form. Leave it.
+
+**Corollary — PEP 723 floors must match.** A script using 3.14-only syntax must declare `# requires-python = ">=3.14"`, not `>=3.11`. With a `>=3.11` floor, `uv run` may provision a 3.11–3.13 interpreter and the file dies with a `SyntaxError` before any logic runs. When you add 3.14-only syntax to a PEP 723 script, bump its `requires-python` in the same edit.
+
+**Why:** repeated sessions have "discovered" the parenthesis-less `except` as a syntax error, burnt time confirming it parses, and nearly reverted valid code. It parses. It is intended. Stop re-litigating it.
+
 ### Version Updates Require Marketplace and Changelog Sync
 
 When updating a plugin's version in its `.claude-plugin/plugin.json`, you must also:
