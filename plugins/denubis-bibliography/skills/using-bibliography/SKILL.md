@@ -2,7 +2,7 @@
 name: using-bibliography
 description: Use when resolving a paper in Zotero by any key, rendering a Zotero PDF to per-page markdown, surfacing page-keyed blockquotes, or fetching a missing paper behind explicit confirmation.
 user-invocable: true
-last-reviewed: 2026-06-17
+last-reviewed: 2026-06-20
 ---
 
 # Using Bibliography
@@ -114,6 +114,120 @@ rendered first; that's a Zotero data-hygiene case, pinnable with `--library`.
 `resolve.py` is the one call to use. The inline `item.search` → `item.export`
 recipe under "The proven workflow" documents the same mechanism by hand for when
 you need to drive it directly.
+
+## Fanning out readers over a rendered corpus
+
+When the user hands you a reading list of papers already in their Zotero corpus
+and asks you to investigate them, render each paper once on the orchestrator
+side, then dispatch one reader subagent per paper given only the rendered
+markdown path. The corpus is curated, so every paper on the list is present by
+construction, and the job is to read them rather than to litigate whether they
+exist.
+
+**Work by citekey.** The citekey is the stable handle for everything downstream:
+the render directory `papers/<citekey>/`, the `[@citekey, p. N]` citation, the
+`notes/literature/<citekey>.md` note, and the reader dispatch all key on it.
+Resolve each paper by its citekey wherever you have one. When you do not yet have
+the citekey, find it with the first-author surname plus a distinctive title word,
+then switch to the citekey `resolve.py` returns. A bare co-author surname
+surfaces nothing because `item.search` indexes only the first author, so
+`resolve.py` reports an honest "no matches" while the paper sits in the library.
+On a reading-list paper, treat that as a wrong key to retry, never as proof of
+absence.
+
+**Readers get a path, not a PDF and not inline text.** The point of fanning out
+is to keep many papers' worth of text out of your own context, so each reader
+reads its own paper in its own context. A reader handed only the rendered
+markdown cannot reach for `pdftotext` or stand up its own extractor, because the
+authoritative, quality-checked text is already on disk. The orchestrator owns the
+one render, and the readers own the reading.
+
+### Dispatch gate (per paper, before dispatching its reader)
+
+```text
+1. resolve.py <citekey>          # auto-renders. No citekey yet? Find it with
+                                 #   --author <first-author> --title <word>, then use the citekey.
+2. read `state` from the output:
+     rendered                                    -> continue
+     no-pdf | needs-ocr-escalation |
+     pdf-unknown | render failed                 -> add to "could not prepare"
+3. PROVE the file: stat <zk>/papers/<citekey>/full.md and confirm non-empty
+4. render note := meta.json.ocr ? "OCR'd, flag garbled quotes" : "clean text layer"
+5. dispatch one reader with the prompt below, interpolating {citekey, path, note, brief}
+```
+
+Step 3 is not optional: stat the file rather than trusting `resolve.py`'s word
+that it rendered, which is the "claimed success without checking" mistake the
+Common-mistakes table already names. After the fan-out, surface the "could not
+prepare" list to the user, because a paper that needs `--allow-mocr` or a PDF
+attached via the connector needs a human decision, and a reader must never be
+pointed at a file that is not there.
+
+### Reader prompt
+
+Interpolate `{{CITEKEY}}`, the deterministic path `{{FULLMD_PATH}}` =
+`<zk>/papers/<citekey>/full.md`, `{{RENDER_NOTE}}` from `meta.json`'s `ocr`
+field, and the `{{BRIEF}}` for this paper.
+
+```text
+<role>
+You are reading one paper from the user's curated Zotero corpus to answer a
+specific brief. The PDF has already been rendered to per-page markdown by a
+quality-checked cascade (pymupdf4llm, then docling, then OCR). That markdown is
+the authoritative text of the paper, and it is the only source you read from.
+</role>
+
+<inputs>
+- citekey: {{CITEKEY}}
+- paper text: {{FULLMD_PATH}}
+  (combined markdown; each page begins with a `<!-- page:N -->` marker)
+- render note: {{RENDER_NOTE}}
+  (either "clean text layer" or "OCR'd, so flag any quote that looks garbled")
+</inputs>
+
+<brief>
+{{BRIEF}}
+</brief>
+
+<how_to_work>
+Read the markdown file at the path above. Everything you need is in that file,
+which is the already-extracted, quality-checked text of the paper and is better
+than anything you could re-derive. To attribute a page, find the nearest
+`<!-- page:N -->` marker preceding the passage. Copy every quote verbatim from
+the markdown. To double-check a quote, re-read the markdown (and the matching
+`pages/NNN.md`); that rendered text, not the PDF, is the source of truth here.
+</how_to_work>
+
+<constraints>
+Read only the file you were given and its sibling `pages/NNN.md`. The extraction
+is finished, so do not open, fetch, or convert a PDF, and do not run pdftotext,
+tesseract, pymupdf4llm, docling, or any other extractor: re-running extraction
+produces worse text than you already hold and wastes the render done for you.
+
+The dispatcher already resolved and placed this file, so do not search Zotero,
+run resolve.py, or render anything. If the file is not at the path, stop and
+report exactly that. Do not go looking for the paper.
+
+Quote only what is literally in the markdown. If the brief asks for something the
+paper does not contain, say so plainly rather than inventing it.
+</constraints>
+
+<output_format>
+## {{CITEKEY}} (<one line on what this paper is and does>)
+
+### Findings (answering the brief)
+- <finding stated in your own words> [p. N]
+
+### Quotes (verbatim, for citation)
+> <exact quote copied from the markdown>
+
+[@{{CITEKEY}}, p. N]
+
+### Gaps and caveats
+- <anything the brief asked that the paper does not cover>
+- <any passage that looks garbled, when the render note flagged OCR>
+</output_format>
+```
 
 ## Quickstart: ingest a list of DOIs
 
