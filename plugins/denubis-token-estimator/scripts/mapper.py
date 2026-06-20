@@ -15,6 +15,7 @@ the matched path.
 """
 
 from __future__ import annotations
+
 import tomllib
 from pathlib import Path
 
@@ -34,7 +35,10 @@ def discover(roots, extra_files=None):
 
 
 def load(roots, extra_files=None):
-    """Return aliases [(path, person, project)] longest-prefix first. Raises on conflict."""
+    """Return aliases [(path, person, project)] longest-prefix first.
+
+    Raises on conflict.
+    """
     aliases = []
     claimed = {}
     for f in discover(roots, extra_files):
@@ -49,11 +53,12 @@ def load(roots, extra_files=None):
             ):  # a ~/.token-estimator global config, not a project mapper
                 continue
             raise ValueError(f"{f}: both 'person' and 'project' are required")
-        for p in data.get("paths") or []:
-            p = p.rstrip("/")
+        for raw_p in data.get("paths") or []:
+            p = raw_p.rstrip("/")
             if p in claimed and claimed[p] != (person, project):
                 raise ValueError(
-                    f"mapper conflict: {p} claimed by {claimed[p]} and {(person, project)} (in {f})"
+                    f"mapper conflict: {p} claimed by {claimed[p]} "
+                    f"and {(person, project)} (in {f})"
                 )
             claimed[p] = (person, project)
             aliases.append((p, person, project))

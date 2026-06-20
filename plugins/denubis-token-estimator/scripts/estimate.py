@@ -8,7 +8,7 @@ mapper.py for directory rollup. People-roots come from ~/.token-estimator (else 
 target/local directory) — see verify.load_roots.
 
 Usage:
-  python3 estimate.py --dir .                 # estimate the project of a directory (cwd)
+  python3 estimate.py --dir .                 # project of a directory (cwd)
   python3 estimate.py --dir <path> --month    # ... broken down by month
   python3 estimate.py --person Jodie          # every project for a person
   python3 estimate.py --person Jodie --month  # ... with month rows
@@ -17,17 +17,18 @@ Usage:
 """
 
 from __future__ import annotations
-import sys
-import json
-import csv
+
 import argparse
 import collections
+import csv
+import json
 import re
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import verify as V
 import mapper as M
+import verify as V
 
 
 def make_attr(roots):
@@ -173,10 +174,10 @@ def collect_codex(leaves, attr):
             )
 
 
-def rollup(leaves, keep_source=False, keep_month=False):
+def rollup(leaves, keep_month=False):
     """Collapse leaves to (person, project[, month]) totals."""
     agg = collections.defaultdict(_blank)
-    for (src, person, project, month), v in leaves.items():
+    for (_src, person, project, month), v in leaves.items():
         k = (person, project) + ((month,) if keep_month else ())
         for i in range(3):
             agg[k][i] += v[i]
@@ -196,7 +197,8 @@ def print_project(leaves, person, project, by_month):
     months = sorted(m for (pe, pr, m) in rows if pe == person and pr == project)
     tot = _blank()
     print(
-        f"\n{'=' * 72}\n{person} / {project}{'  (by month)' if by_month else ''}\n{'=' * 72}"
+        f"\n{'=' * 72}\n{person} / {project}"
+        f"{'  (by month)' if by_month else ''}\n{'=' * 72}"
     )
     print(f"{'month':<12}{'main_tok':>14}{'sub_tok':>12}{'sub%':>6}{'words':>12}")
     print("-" * 72)
@@ -206,14 +208,17 @@ def print_project(leaves, person, project, by_month):
             tot[i] += v[i]
         if by_month:
             print(
-                f"{m:<12}{fmt(v[0]):>14}{fmt(v[1]):>12}{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>12}"
+                f"{m:<12}{fmt(v[0]):>14}{fmt(v[1]):>12}"
+                f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>12}"
             )
     print("-" * 72)
     print(
-        f"{'TOTAL':<12}{fmt(tot[0]):>14}{fmt(tot[1]):>12}{share(tot[0], tot[1]):>5.0f}%{fmt(tot[2]):>12}"
+        f"{'TOTAL':<12}{fmt(tot[0]):>14}{fmt(tot[1]):>12}"
+        f"{share(tot[0], tot[1]):>5.0f}%{fmt(tot[2]):>12}"
     )
     print(
-        f"\n  output tokens: {fmt(tot[0] + tot[1])} ({share(tot[0], tot[1]):.0f}% subagent)   human words: {fmt(tot[2])}"
+        f"\n  output tokens: {fmt(tot[0] + tot[1])} "
+        f"({share(tot[0], tot[1]):.0f}% subagent)   human words: {fmt(tot[2])}"
     )
 
 
@@ -230,24 +235,27 @@ def print_person(leaves, person, by_month):
             for i in range(3):
                 pt[i] += v[i]
         print(
-            f"\n{project:<40}{fmt(pt[0]):>13}{fmt(pt[1]):>11}{share(pt[0], pt[1]):>5.0f}%{fmt(pt[2]):>11}"
+            f"\n{project:<40}{fmt(pt[0]):>13}{fmt(pt[1]):>11}"
+            f"{share(pt[0], pt[1]):>5.0f}%{fmt(pt[2]):>11}"
         )
         if by_month:
             for m in months:
                 v = rows[(person, project, m)]
                 print(
-                    f"   {m:<37}{fmt(v[0]):>13}{fmt(v[1]):>11}{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>11}"
+                    f"   {m:<37}{fmt(v[0]):>13}{fmt(v[1]):>11}"
+                    f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>11}"
                 )
         for i in range(3):
             gt[i] += pt[i]
     print(f"\n{'=' * 72}")
     print(
-        f"{person} TOTAL: {fmt(gt[0] + gt[1])} output tokens ({share(gt[0], gt[1]):.0f}% subagent), {fmt(gt[2])} human words"
+        f"{person} TOTAL: {fmt(gt[0] + gt[1])} output tokens "
+        f"({share(gt[0], gt[1]):.0f}% subagent), {fmt(gt[2])} human words"
     )
 
 
 def write_csv(leaves, path):
-    with open(path, "w", newline="") as f:
+    with Path(path).open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [

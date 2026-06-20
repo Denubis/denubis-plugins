@@ -20,10 +20,11 @@ Read-only. Stdlib only. Reads ~/.claude/projects and ~/.codex/sessions.
 """
 
 from __future__ import annotations
+
+import collections
 import json
 import re
 import sys
-import collections
 import tomllib
 from pathlib import Path
 
@@ -31,10 +32,10 @@ CLAUDE_ROOT = Path.home() / ".claude" / "projects"
 CODEX_ROOT = Path.home() / ".codex" / "sessions"
 
 
-# People-roots are NOT hardcoded. They come from ~/.token-estimator (TOML):
-#     roots = ["/home/you/people", "/mnt/store/people"]
-# Absent that file, the tool scopes to one local directory (target_dir or cwd) — so it
-# works out of the box on "the project I'm in" without any global config.
+# People-roots are NOT hardcoded. They come from ~/.token-estimator (TOML) as a
+# top-level `roots = [...]` array of absolute people-dir paths. Absent that file,
+# the tool scopes to one local directory (target_dir or cwd) — so it works out of
+# the box on "the project I'm in" without any global config.
 def load_roots(target_dir=None):
     cfg = Path.home() / ".token-estimator"
     if cfg.exists():
@@ -42,7 +43,7 @@ def load_roots(target_dir=None):
             roots = (tomllib.loads(cfg.read_text(encoding="utf-8")) or {}).get("roots")
             if roots:
                 return [str(Path(r).expanduser().resolve()) for r in roots]
-        except (OSError, tomllib.TOMLDecodeError):
+        except OSError, tomllib.TOMLDecodeError:
             pass
     return [str(Path(target_dir).resolve() if target_dir else Path.cwd())]
 
@@ -72,8 +73,8 @@ _LEAD_TAG = re.compile(r"^\s*<([a-zA-Z][\w-]*)")
 
 # Codex root-thread user-input machine markers (node 4), derived by signature-inspecting
 # the live stream. Same allow-list discipline as node 3: machine is a NAMED set, not
-# "starts with <" or "starts with #" — human prompts use markdown headings (# Claude ...)
-# and humans paste markup, both of which are kept.
+# "starts with <" or "starts with #" — human prompts use markdown headings
+# such as "# Claude ...", and pasted markup — both are kept.
 CODEX_MACHINE_TAGS = {
     "turn_aborted",  # "<turn_aborted> The user interrupted ..." boilerplate
     "skill",  # injected SKILL.md contents
@@ -104,7 +105,8 @@ INVARIANT = {
 # BASELINES are point-in-time snapshots; absolute counts drift UP as logs accrue.
 # Only the ratios (share %) should stay roughly constant. Recorded for reference.
 BASELINE = {
-    "node1_share_pct": 20.2,  # 2026-06-18 snapshot; method, not the absolute, is audited
+    # 2026-06-18 snapshot; method, not the absolute, is audited
+    "node1_share_pct": 20.2,
     "node2_main_tok": 6_284_838,
     "node2_sub_tok": 1_641_596,
     "node2_share_pct": 20.7,
@@ -138,9 +140,10 @@ def attribute(cwd, roots=None):
         return ("(no-cwd)", "(no-cwd)", "")
     best = None
     for r in roots if roots is not None else ROOTS:
-        if cwd == r or cwd.startswith(r + "/"):
-            if best is None or len(r) > len(best):
-                best = r
+        if (cwd == r or cwd.startswith(r + "/")) and (
+            best is None or len(r) > len(best)
+        ):
+            best = r
     if best is None:
         return ("(unrooted)", cwd, "")
     rem = cwd[len(best) :].lstrip("/")
@@ -198,15 +201,16 @@ def claude_pass():
                         cwds_all[mid].add(cwd)
                         out = (m.get("usage") or {}).get("output_tokens") or 0
                         # bind cwd to the MAX-token occurrence (node 5 rule)
-                        if out > out_max[mid] or (
-                            out == out_max[mid]
-                            and cwd_atmax.get(mid)
-                            and str(cwd) < str(cwd_atmax[mid])
-                        ):
-                            if out >= out_max[mid]:
-                                cwd_atmax[mid] = cwd
-                        if out > out_max[mid]:
-                            out_max[mid] = out
+                        if (
+                            out > out_max[mid]
+                            or (
+                                out == out_max[mid]
+                                and cwd_atmax.get(mid)
+                                and str(cwd) < str(cwd_atmax[mid])
+                            )
+                        ) and out >= out_max[mid]:
+                            cwd_atmax[mid] = cwd
+                        out_max[mid] = max(out_max[mid], out)
                     elif t == "user" and not is_subfile:
                         if r.get("isSidechain") is True:
                             continue
@@ -253,18 +257,18 @@ def claude_pass():
             cross_person += 1
         if len(pps) > 1:
             cross_pp += 1
-    return dict(
-        distinct_ids=len(ids),
-        main_tok=main_tok,
-        sub_tok=sub_tok,
-        share=pct(sub_tok, main_tok + sub_tok),
-        cross_partition=cross_part,
-        node3_blocks=blocks,
-        node3_words=words,
-        wrap_hist=dict(wrap_hist),
-        cross_person=cross_person,
-        cross_person_project=cross_pp,
-    )
+    return {
+        "distinct_ids": len(ids),
+        "main_tok": main_tok,
+        "sub_tok": sub_tok,
+        "share": pct(sub_tok, main_tok + sub_tok),
+        "cross_partition": cross_part,
+        "node3_blocks": blocks,
+        "node3_words": words,
+        "wrap_hist": dict(wrap_hist),
+        "cross_person": cross_person,
+        "cross_person_project": cross_pp,
+    }
 
 
 # ----------------------------------------------------------------- Codex pass
@@ -310,8 +314,7 @@ def codex_pass():
                         o = int(o)
                         if first_out is None:
                             first_out = o
-                        if o > mx:
-                            mx = o
+                        mx = max(mx, o)
                 elif (
                     t == "response_item"
                     and p.get("type") == "message"
@@ -326,7 +329,9 @@ def codex_pass():
                         user_texts.append("\n".join(parts))
         if not own_id:
             continue
-        recs.append(dict(id=own_id, ff=ff, kind=kind, mx=mx, first=first_out))
+        recs.append(
+            {"id": own_id, "ff": ff, "kind": kind, "mx": mx, "first": first_out}
+        )
         by_id[own_id] = recs[-1]
         if kind == "sub":
             sub_tok += mx
@@ -336,9 +341,10 @@ def codex_pass():
             n_main += 1
         # node 4: human words from ROOT threads only, per-thread text-set dedup
         if kind == "main":
-            # No dedup: zero resumes in the corpus and response_item carries no id, so each
-            # kept user message is a distinct human send. Repeated "yes"/"continue"/"ok" are
-            # real human turns — text-set dedup would silently delete them.
+            # No dedup: zero resumes in the corpus and response_item carries no
+            # id, so each kept user message is a distinct human send. Repeated
+            # "yes"/"continue"/"ok" are real human turns — text-set dedup would
+            # silently delete them.
             for tx in user_texts:
                 mk = codex_machine_marker(tx)
                 if mk:
@@ -348,8 +354,9 @@ def codex_pass():
                 n_words += len(tx.split())
 
     # subagent independence — checked for ALL subagents, not a sample.
-    # parented sub: first_out must be << parent total. parentless sub (ff absent): first_out
-    # must be a fresh small start (the invariant is "counter does not begin at a parent total").
+    # parented sub: first_out must be << parent total. parentless sub (ff absent):
+    # first_out must be a fresh small start (the invariant is "counter does not
+    # begin at a parent total").
     sub_all = []  # (first_out, own_max, parent_max_or_None)
     for rec in recs:
         if rec["kind"] == "sub":
@@ -358,20 +365,20 @@ def codex_pass():
             if pm is not None:
                 sub_independence.append((rec["first"], rec["mx"], pm))
 
-    return dict(
-        files=len(files),
-        n_main=n_main,
-        n_sub=n_sub,
-        main_tok=main_tok,
-        sub_tok=sub_tok,
-        share=pct(sub_tok, main_tok + sub_tok),
-        distinct_ids=len({r["id"] for r in recs}),
-        sub_independence=sub_independence[:15],
-        sub_all=sub_all,
-        node4_turns=n_turns,
-        node4_words=n_words,
-        node4_excl=dict(excl_hist),
-    )
+    return {
+        "files": len(files),
+        "n_main": n_main,
+        "n_sub": n_sub,
+        "main_tok": main_tok,
+        "sub_tok": sub_tok,
+        "share": pct(sub_tok, main_tok + sub_tok),
+        "distinct_ids": len({r["id"] for r in recs}),
+        "sub_independence": sub_independence[:15],
+        "sub_all": sub_all,
+        "node4_turns": n_turns,
+        "node4_words": n_words,
+        "node4_excl": dict(excl_hist),
+    }
 
 
 # --------------------------------------------------------------------- report
@@ -409,12 +416,12 @@ def main():
         )
         return
 
-    # additive check over ALL subagents (not a sample): parented -> first << parent total;
-    # parentless -> fresh small start. A "large start" means the counter may continue a
-    # parent total (replay) -> additive model would over-count.
+    # additive check over ALL subagents (not a sample): parented -> first << parent
+    # total; parentless -> fresh small start. A "large start" means the counter may
+    # continue a parent total (replay) -> additive model would over-count.
     FRESH = 2000
 
-    def is_fresh(fo, own, pm):
+    def is_fresh(fo, _own, pm):
         if fo is None:
             return True  # no output events
         if pm is not None:
@@ -428,14 +435,16 @@ def main():
     print("=" * 78)
     print("AUDIT VERIFY — headline numbers re-derived from the live logs")
     print(
-        "[PASS/FAIL] = structural invariant (must hold).  [base] = point-in-time (drifts up)."
+        "[PASS/FAIL] = structural invariant (must hold).  "
+        "[base] = point-in-time (drifts up)."
     )
     print("=" * 78)
 
     print("\nNODE 1 — Claude output tokens (origin-based dedup)")
     print(base("subagent share %", round(c["share"], 1), BASELINE["node1_share_pct"]))
     print(
-        f"        main={c['main_tok']:,}  sub={c['sub_tok']:,}  ids={c['distinct_ids']:,}  cross-partition={c['cross_partition']}"
+        f"        main={c['main_tok']:,}  sub={c['sub_tok']:,}  "
+        f"ids={c['distinct_ids']:,}  cross-partition={c['cross_partition']}"
     )
 
     print("\nNODE 2 — Codex output tokens (per-file, subagents additive)")
@@ -450,7 +459,8 @@ def main():
         inv(
             "node2 subagents additive",
             add_ok,
-            f"all {n_sub_checked}/{x['n_sub']} subs start fresh; {len(bad)} start large; max first_out={max_first}",
+            f"all {n_sub_checked}/{x['n_sub']} subs start fresh; "
+            f"{len(bad)} start large; max first_out={max_first}",
         )
     )
     print(base("subagent share %", round(x["share"], 1), BASELINE["node2_share_pct"]))
@@ -467,7 +477,8 @@ def main():
     )
 
     print(
-        "\nNODE 4 — Codex human words (re-derived; exclusion set from signature inspection)"
+        "\nNODE 4 — Codex human words "
+        "(re-derived; exclusion set from signature inspection)"
     )
     print(base("human turns", x["node4_turns"], BASELINE["node4_turns"]))
     print(base("human words", x["node4_words"], BASELINE["node4_words"]))
@@ -476,7 +487,8 @@ def main():
         "        KEPT as human (audit these): markdown-heading prompts (# Claude ...),"
     )
     print(
-        "        pasted agent output (●…) and terminal pastes — owner's explicit choice."
+        "        pasted agent output (●…) and terminal pastes "
+        "— owner's explicit choice."
     )
     print("        (prior session's unreproduced 1,294/103,413 now superseded.)")
 

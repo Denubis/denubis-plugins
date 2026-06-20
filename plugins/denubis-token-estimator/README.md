@@ -14,7 +14,7 @@ Reported per project, rolled up from the directory, optionally by month.
 > number re-derives from the live logs via `scripts/verify.py`), but the external audit
 > (`docs/AUDIT-BRIEF.md`) has not yet been run. Treat numbers as corrected-pending-audit.
 
-**Requirements:** Python ≥3.11 (stdlib only — uses `tomllib`). All log access is read-only.
+**Requirements:** Python ≥3.14 (stdlib only — uses `tomllib`). All log access is read-only.
 
 ## Quick start
 
