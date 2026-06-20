@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
+import contextlib
+from pathlib import Path
 from unittest import mock
 
 import pytest
-
 from workflow_statusline import tmux
 
 
@@ -22,10 +22,8 @@ def tmux_env(monkeypatch, tmp_path):
     yield pane_id, cache_file, lock_file
     # Cleanup any files created during test
     for f in (cache_file, lock_file):
-        try:
-            os.unlink(f)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(f).unlink()
 
 
 class TestMaybeRename:
@@ -42,7 +40,7 @@ class TestMaybeRename:
     def test_skips_rename_when_cache_matches(self, tmux_env):
         """AC4.2: Cached name matches -> subprocess NOT called."""
         _pane_id, cache_file, _lock_file = tmux_env
-        with open(cache_file, "w") as f:
+        with Path(cache_file).open("w") as f:
             f.write("testrepo")
 
         with mock.patch("workflow_statusline.tmux.subprocess") as mock_sub:
@@ -52,7 +50,7 @@ class TestMaybeRename:
     def test_skips_rename_when_lock_file_exists(self, tmux_env):
         """AC4.3: Lock file exists -> subprocess NOT called."""
         _pane_id, _cache_file, lock_file = tmux_env
-        with open(lock_file, "w") as f:
+        with Path(lock_file).open("w") as f:
             f.write("")
 
         with mock.patch("workflow_statusline.tmux.subprocess") as mock_sub:

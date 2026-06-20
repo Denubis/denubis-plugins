@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import os
 import time
+from pathlib import Path
 
 
 def rate_cache_path(window_key: str) -> str:
@@ -14,11 +16,8 @@ def rate_cache_path(window_key: str) -> str:
     so samples persist across restarts.
     """
     xdg = os.environ.get("XDG_CACHE_HOME")
-    if xdg:
-        base = xdg
-    else:
-        base = os.path.join(os.environ.get("HOME", "/tmp"), ".cache")
-    return os.path.join(base, "claude-statusline", f"rate-{window_key}")
+    base = xdg or str(Path(os.environ.get("HOME", "/tmp")) / ".cache")
+    return str(Path(base) / "claude-statusline" / f"rate-{window_key}")
 
 
 def read_if_fresh(cache_file: str, max_age: float) -> str | None:
@@ -27,8 +26,8 @@ def read_if_fresh(cache_file: str, max_age: float) -> str | None:
     Returns None if the file is missing or stale.
     """
     try:
-        if (time.time() - os.path.getmtime(cache_file)) <= max_age:
-            with open(cache_file) as f:
+        if (time.time() - Path(cache_file).stat().st_mtime) <= max_age:
+            with Path(cache_file).open() as f:
                 return f.read().strip()
     except OSError:
         pass
@@ -37,8 +36,8 @@ def read_if_fresh(cache_file: str, max_age: float) -> str | None:
 
 def write(cache_file: str, data: str) -> None:
     """Write data to cache file, creating parent dirs if needed."""
-    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-    with open(cache_file, "w") as f:
+    Path(cache_file).parent.mkdir(parents=True, exist_ok=True)
+    with Path(cache_file).open("w") as f:
         f.write(data)
 
 
@@ -51,7 +50,7 @@ def read_rate_samples(cache_file: str) -> list[tuple[float, float]]:
     lines silently.
     """
     try:
-        with open(cache_file) as f:
+        with Path(cache_file).open() as f:
             content = f.read()
     except OSError:
         return []
@@ -76,7 +75,7 @@ def read_rate_samples_full(
     Legacy 2-field lines parse with ``pid=0`` and ``session_id=""``.
     """
     try:
-        with open(cache_file) as f:
+        with Path(cache_file).open() as f:
             content = f.read()
     except OSError:
         return []
@@ -131,21 +130,23 @@ def append_rate_sample(
     Trims to the most recent ``max_entries`` and, if ``max_age_seconds`` is
     given, drops entries older than that horizon.
     """
-    os.makedirs(os.path.dirname(cache_file) or ".", exist_ok=True)
+    Path(cache_file).parent.mkdir(parents=True, exist_ok=True)
 
     if pid is None:
         pid = os.getpid()
 
     lock_file = cache_file + ".lock"
     try:
-        lf = open(lock_file, "w")
+        # The lock fd is closed in the finally below; a with-block here would
+        # tangle the two-stage open-then-flock-or-skip control flow.
+        lf = Path(lock_file).open("w")  # noqa: SIM115
     except OSError:
         return
 
     try:
         try:
             fcntl.flock(lf.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (BlockingIOError, OSError):
+        except BlockingIOError, OSError:
             return  # Another writer holds the lock — skip this sample
 
         entries = read_rate_samples_full(cache_file)
@@ -163,19 +164,19 @@ def append_rate_sample(
             entries = entries[-max_entries:]
 
         tmp = cache_file + ".tmp"
-        with open(tmp, "w") as f:
+        with Path(tmp).open("w") as f:
             for ts, pct, p, sid in entries:
                 f.write(f"{ts}|{pct}|{p}|{sid}\n")
-        os.replace(tmp, cache_file)
+        Path(tmp).replace(cache_file)
     finally:
-        try:
+        with contextlib.suppress(OSError):
             fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
-        except OSError:
-            pass
         lf.close()
 
 
-def discard_before_reset(samples: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def discard_before_reset(
+    samples: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
     """Drop samples preceding the most recent window reset.
 
     A reset is detected by a monotonic decrease in used_pct between adjacent

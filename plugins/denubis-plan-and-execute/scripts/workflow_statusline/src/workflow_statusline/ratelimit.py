@@ -75,9 +75,7 @@ def next_active_end(now: float, active_end_hour: int = 22) -> float:
     return (today_end + datetime.timedelta(days=1)).timestamp()
 
 
-def theil_sen_slope(
-    samples: list[tuple[float, float]], cap: int = 500
-) -> float | None:
+def theil_sen_slope(samples: list[tuple[float, float]], cap: int = 500) -> float | None:
     """Theil-Sen robust slope estimator: median of pairwise slopes.
 
     Returns slope in ``pct/second`` (units determined by the input).
@@ -253,9 +251,7 @@ def eta_to_pct(
     return now + (target_pct - used_pct) / rate
 
 
-def elapsed_fraction(
-    now: float, resets_at: float, window_length: float
-) -> float:
+def elapsed_fraction(now: float, resets_at: float, window_length: float) -> float:
     """Return fraction of the rate-limit window elapsed (0.0..1.0).
 
     Clamped to [0.0, 1.0]. This is the "pace line" — at steady even
@@ -278,8 +274,8 @@ def day_stop_target(
     """Return (day_in_window, target_pct) for self-paced daily stop.
 
     ``day_in_window`` is 1-indexed, increments at each 24h boundary from the
-    window start (``resets_at − window_length``), and caps at the number of
-    whole days in the window. ``target_pct`` is ``day_in_window / days × 100``
+    window start (``resets_at - window_length``), and caps at the number of
+    whole days in the window. ``target_pct`` is ``day_in_window / days * 100``
     — the pace line you should be at by the end of that day.
     """
     window_start = resets_at - window_length
@@ -349,11 +345,12 @@ def format_clock_time(ts: float | None, now: float) -> str:
     disp_hour = hour % 12
     if disp_hour == 0:
         disp_hour = 12
-    time_str = f"{disp_hour}{suffix}" if minute == 0 else f"{disp_hour}:{minute:02d}{suffix}"
+    time_str = (
+        f"{disp_hour}{suffix}" if minute == 0 else f"{disp_hour}:{minute:02d}{suffix}"
+    )
 
     same_day = (
-        local_ts.tm_year == local_now.tm_year
-        and local_ts.tm_yday == local_now.tm_yday
+        local_ts.tm_year == local_now.tm_year and local_ts.tm_yday == local_now.tm_yday
     )
     if same_day:
         return time_str

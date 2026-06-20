@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from workflow_statusline import bar
 from workflow_statusline.colours import CYAN, DIM, GREEN, MAGENTA, RED, RST, YELLOW
 
@@ -63,7 +62,8 @@ class TestLargeContextSegmentColours:
         first_rst = result.index(_RST_ESC)
         filled_portion = result[:first_rst]
         assert expected_colour in filled_portion, (
-            f"pct={pct}: expected {expected_colour!r} in filled portion {filled_portion!r}"
+            f"pct={pct}: expected {expected_colour!r} in filled portion"
+            f" {filled_portion!r}"
         )
 
 
@@ -112,7 +112,8 @@ class TestSmallContextColours:
 # ---------------------------------------------------------------------------
 class TestMainEntryPointBarIntegration:
     def test_line2_starts_with_20_char_bar(self) -> None:
-        """Pipe JSON with 1M context through main; line 2 should start with 20-char bar."""
+        """Pipe JSON with 1M context through main; line 2 should start with
+        20-char bar."""
         import io
         import json
         import sys
@@ -135,10 +136,16 @@ class TestMainEntryPointBarIntegration:
         buf = io.StringIO()
         from workflow_statusline.git import LocationInfo
 
-        with mock.patch.object(sys, "stdin", fake_stdin), mock.patch.object(
-            sys, "stdout", buf
-        ), mock.patch("workflow_statusline.__main__.git_location", return_value=LocationInfo(display="/tmp/fake", is_on_main=False, is_worktree=False)), mock.patch(
-            "workflow_statusline.__main__.git_changes", return_value=(0, 0)
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch(
+                "workflow_statusline.__main__.git_location",
+                return_value=LocationInfo(
+                    display="/tmp/fake", is_on_main=False, is_worktree=False
+                ),
+            ),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
         ):
             main()
 
@@ -149,6 +156,6 @@ class TestMainEntryPointBarIntegration:
         bar_chars = {"\u2588", "\u2592"}  # █ and ▒
         first_20 = visible[:20]
         assert len(first_20) == 20, f"line2 visible too short: {visible!r}"
-        assert all(
-            c in bar_chars for c in first_20
-        ), f"First 20 visible chars should be bar chars, got: {first_20!r}"
+        assert all(c in bar_chars for c in first_20), (
+            f"First 20 visible chars should be bar chars, got: {first_20!r}"
+        )

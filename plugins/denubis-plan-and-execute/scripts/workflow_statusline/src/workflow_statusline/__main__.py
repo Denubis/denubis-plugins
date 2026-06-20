@@ -27,16 +27,15 @@ from workflow_statusline.ratelimit import (
 )
 from workflow_statusline.tmux import maybe_rename
 
-
 _FIVE_HOUR_WINDOW = 5 * 3600.0
 _SEVEN_DAY_WINDOW = 7 * 86400.0
-_SAMPLE_MAX_AGE = 48 * 3600.0          # 48h storage retention
-_ACTIVE_START_HOUR = 7                 # 07:00 local — pace starts advancing
-_ACTIVE_END_HOUR = 22                  # 22:00 local — pace stops advancing
-_FORECAST_LOOKBACK = 24 * 3600.0       # Theil-Sen lookback (24h of samples)
-_FORECAST_MIN_SAMPLES = 30             # minimum sample count gate
-_FORECAST_MIN_SPAN = 2 * 3600.0        # minimum real-time span — 2h of history
-                                       # before extrapolating a 7d forecast
+_SAMPLE_MAX_AGE = 48 * 3600.0  # 48h storage retention
+_ACTIVE_START_HOUR = 7  # 07:00 local — pace starts advancing
+_ACTIVE_END_HOUR = 22  # 22:00 local — pace stops advancing
+_FORECAST_LOOKBACK = 24 * 3600.0  # Theil-Sen lookback (24h of samples)
+_FORECAST_MIN_SAMPLES = 30  # minimum sample count gate
+_FORECAST_MIN_SPAN = 2 * 3600.0  # minimum real-time span — 2h of history
+# before extrapolating a 7d forecast
 
 
 def _window_cell(
@@ -50,11 +49,16 @@ def _window_cell(
     through the *active hours* of this window. Red when used > pace (ahead
     of pace, borrowing against future budget); green otherwise.
     """
-    pace_pct = elapsed_active_fraction(
-        now, resets_at, window_length,
-        active_start_hour=_ACTIVE_START_HOUR,
-        active_end_hour=_ACTIVE_END_HOUR,
-    ) * 100.0
+    pace_pct = (
+        elapsed_active_fraction(
+            now,
+            resets_at,
+            window_length,
+            active_start_hour=_ACTIVE_START_HOUR,
+            active_end_hour=_ACTIVE_END_HOUR,
+        )
+        * 100.0
+    )
     used_int = round(used_pct)
     pace_int = round(pace_pct)
     if used_pct < pace_pct:
@@ -93,11 +97,16 @@ def _forecast_cells(
 
     # DayStop: target = active-fraction at next 22:00 local.
     day_end_ts = next_active_end(now, _ACTIVE_END_HOUR)
-    day_target_pct = elapsed_active_fraction(
-        day_end_ts, resets_at, _SEVEN_DAY_WINDOW,
-        active_start_hour=_ACTIVE_START_HOUR,
-        active_end_hour=_ACTIVE_END_HOUR,
-    ) * 100.0
+    day_target_pct = (
+        elapsed_active_fraction(
+            day_end_ts,
+            resets_at,
+            _SEVEN_DAY_WINDOW,
+            active_start_hour=_ACTIVE_START_HOUR,
+            active_end_hour=_ACTIVE_END_HOUR,
+        )
+        * 100.0
+    )
 
     if used_pct >= day_target_pct:
         cells.append(f"{RED}DayStop:go to sleep!{RST}")
@@ -111,7 +120,7 @@ def _forecast_cells(
     eta_week = now + (100.0 - used_pct) / slope
     if eta_week < resets_at:
         cells.append(f"{RED}WeekStop:{format_clock_time(eta_week, now)}{RST}")
-    # else: 7d window will reset before exhaustion
+    # (no else branch: the 7d window resets before exhaustion)
 
     return cells
 
@@ -171,7 +180,9 @@ def main() -> None:
             resets = five_hour.get("resets_at", 0)
             cache_file = cache.rate_cache_path("five_hour")
             cache.append_rate_sample(
-                cache_file, now, used,
+                cache_file,
+                now,
+                used,
                 max_age_seconds=_SAMPLE_MAX_AGE,
                 session_id=session_id,
             )
@@ -182,7 +193,9 @@ def main() -> None:
             resets = seven_day.get("resets_at", 0)
             cache_file = cache.rate_cache_path("seven_day")
             cache.append_rate_sample(
-                cache_file, now, used,
+                cache_file,
+                now,
+                used,
                 max_age_seconds=_SAMPLE_MAX_AGE,
                 session_id=session_id,
             )

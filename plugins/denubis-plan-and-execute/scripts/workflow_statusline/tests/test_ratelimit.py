@@ -41,7 +41,14 @@ class TestTheilSenSlope:
 
     def test_robust_to_single_outlier(self) -> None:
         # Steady y = x, with one big spike
-        samples = [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 99.0), (4.0, 4.0), (5.0, 5.0)]
+        samples = [
+            (0.0, 0.0),
+            (1.0, 1.0),
+            (2.0, 2.0),
+            (3.0, 99.0),
+            (4.0, 4.0),
+            (5.0, 5.0),
+        ]
         slope = theil_sen_slope(samples)
         assert slope is not None
         # True slope is 1.0; median should reject the spike
@@ -96,6 +103,7 @@ class TestTheilSenSlope:
 
 def _ts(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> float:
     import datetime as _dt
+
     return _dt.datetime(year, month, day, hour, minute).timestamp()
 
 
@@ -156,7 +164,7 @@ class TestActiveSecondsInRange:
         assert active_seconds_in_range(start, end) == 9 * 3600
 
     def test_seven_days_exact(self) -> None:
-        # 7 × 15h = 105h
+        # 7 * 15h = 105h
         start = _ts(2026, 4, 11, 7, 0)
         end = _ts(2026, 4, 18, 7, 0)
         assert active_seconds_in_range(start, end) == 7 * 15 * 3600
@@ -165,9 +173,10 @@ class TestActiveSecondsInRange:
         # 9am-5pm = 8h per day
         start = _ts(2026, 4, 18, 0, 0)
         end = _ts(2026, 4, 19, 0, 0)
-        assert active_seconds_in_range(
-            start, end, active_start_hour=9, active_end_hour=17
-        ) == 8 * 3600
+        assert (
+            active_seconds_in_range(start, end, active_start_hour=9, active_end_hour=17)
+            == 8 * 3600
+        )
 
 
 class TestElapsedActiveFraction:
@@ -175,13 +184,23 @@ class TestElapsedActiveFraction:
         start = _ts(2026, 4, 11, 14, 0)
         window_length = 7 * 86400.0
         resets_at = start + window_length
-        assert elapsed_active_fraction(now=start, resets_at=resets_at, window_length=window_length) == 0.0
+        assert (
+            elapsed_active_fraction(
+                now=start, resets_at=resets_at, window_length=window_length
+            )
+            == 0.0
+        )
 
     def test_one_at_window_end(self) -> None:
         start = _ts(2026, 4, 11, 14, 0)
         window_length = 7 * 86400.0
         resets_at = start + window_length
-        assert elapsed_active_fraction(now=resets_at, resets_at=resets_at, window_length=window_length) == 1.0
+        assert (
+            elapsed_active_fraction(
+                now=resets_at, resets_at=resets_at, window_length=window_length
+            )
+            == 1.0
+        )
 
     def test_midnight_does_not_advance_pace(self) -> None:
         """From 10pm to 7am next day, pace stays flat (no active seconds elapse)."""
@@ -191,10 +210,14 @@ class TestElapsedActiveFraction:
 
         # Compare pace at 10pm day 0 vs 7am day 1 — both should equal the same fraction.
         frac_at_22 = elapsed_active_fraction(
-            now=_ts(2026, 4, 11, 22, 0), resets_at=resets_at, window_length=window_length,
+            now=_ts(2026, 4, 11, 22, 0),
+            resets_at=resets_at,
+            window_length=window_length,
         )
         frac_at_7_next = elapsed_active_fraction(
-            now=_ts(2026, 4, 12, 7, 0), resets_at=resets_at, window_length=window_length,
+            now=_ts(2026, 4, 12, 7, 0),
+            resets_at=resets_at,
+            window_length=window_length,
         )
         assert frac_at_22 == frac_at_7_next
 
@@ -205,9 +228,11 @@ class TestElapsedActiveFraction:
         resets_at = start + window_length
 
         frac_at_8am = elapsed_active_fraction(
-            now=_ts(2026, 4, 11, 8, 0), resets_at=resets_at, window_length=window_length,
+            now=_ts(2026, 4, 11, 8, 0),
+            resets_at=resets_at,
+            window_length=window_length,
         )
-        # 1 hour of active time out of 7 × 15 = 105
+        # 1 hour of active time out of 7 * 15 = 105
         assert abs(frac_at_8am - 1.0 / 105.0) < 1e-9
 
 
@@ -216,18 +241,26 @@ class TestElapsedFraction:
         assert elapsed_fraction(now=0.0, resets_at=3600.0, window_length=3600.0) == 0.0
 
     def test_halfway_through_window(self) -> None:
-        assert elapsed_fraction(now=1800.0, resets_at=3600.0, window_length=3600.0) == 0.5
+        assert (
+            elapsed_fraction(now=1800.0, resets_at=3600.0, window_length=3600.0) == 0.5
+        )
 
     def test_end_of_window(self) -> None:
-        assert elapsed_fraction(now=3600.0, resets_at=3600.0, window_length=3600.0) == 1.0
+        assert (
+            elapsed_fraction(now=3600.0, resets_at=3600.0, window_length=3600.0) == 1.0
+        )
 
     def test_clamped_below_zero(self) -> None:
         # now is before window_start — clamp to 0
-        assert elapsed_fraction(now=-100.0, resets_at=3600.0, window_length=3600.0) == 0.0
+        assert (
+            elapsed_fraction(now=-100.0, resets_at=3600.0, window_length=3600.0) == 0.0
+        )
 
     def test_clamped_above_one(self) -> None:
         # now is past resets_at — clamp to 1
-        assert elapsed_fraction(now=7200.0, resets_at=3600.0, window_length=3600.0) == 1.0
+        assert (
+            elapsed_fraction(now=7200.0, resets_at=3600.0, window_length=3600.0) == 1.0
+        )
 
     def test_seven_day_window_quarter(self) -> None:
         # 7d window, 1.75 days elapsed out of 7 → 0.25
@@ -292,7 +325,8 @@ class TestActiveTimeRate:
         assert abs(rate - (10.0 / 60.0)) < 1e-9
 
     def test_idle_interval_excluded(self) -> None:
-        # 10→20 over 60s (active), then 20→20 over 3600s (idle), then 20→30 over 60s (active)
+        # 10→20 over 60s (active), then 20→20 over 3600s (idle),
+        # then 20→30 over 60s (active)
         # Expected rate = (10 + 10) / (60 + 60) = 20/120 = 1/6 %/s
         # Without idle trimming it would be 20/3720 ≈ 0.0054 %/s
         samples = [
@@ -315,7 +349,10 @@ class TestActiveTimeRate:
 # ---------------------------------------------------------------------------
 class TestBlendedRate:
     def test_returns_none_when_insufficient_data(self) -> None:
-        assert blended_rate([], now=100.0, short_lookback=60.0, long_lookback=3600.0) is None
+        assert (
+            blended_rate([], now=100.0, short_lookback=60.0, long_lookback=3600.0)
+            is None
+        )
 
     def test_blends_short_and_long(self) -> None:
         # Samples spanning enough time for both windows.
@@ -324,21 +361,26 @@ class TestBlendedRate:
         samples = [
             (0.0, 0.0),
             (600.0, 10.0),
-            (1140.0, 10.0),    # idle interval inside long window
-            (1200.0, 20.0),    # inside short window (last 60s)
+            (1140.0, 10.0),  # idle interval inside long window
+            (1200.0, 20.0),  # inside short window (last 60s)
         ]
-        rate = blended_rate(samples, now=1200.0, short_lookback=60.0, long_lookback=1200.0)
+        rate = blended_rate(
+            samples, now=1200.0, short_lookback=60.0, long_lookback=1200.0
+        )
         assert rate is not None
         # Short rate: only the last interval (1140→1200, 10→20) = 1/6 %/s
         # Long rate (idle-trimmed): burn 20 / active 660 = 1/33 %/s
-        # Blend: 0.3 × 1/6 + 0.7 × 1/33
+        # Blend: 0.3 of the short rate plus 0.7 of the long rate (see expected)
         expected = 0.3 * (1.0 / 6.0) + 0.7 * (10.0 / 330.0)
         assert abs(rate - expected) < 1e-9
 
     def test_falls_back_to_long_when_short_empty(self) -> None:
         samples = [(0.0, 0.0), (600.0, 10.0), (1200.0, 20.0)]
-        # Short lookback 30s — no samples inside (last sample at 1200, two within 30s required).
-        rate = blended_rate(samples, now=1260.0, short_lookback=30.0, long_lookback=1300.0)
+        # Short lookback 30s — no samples inside
+        # (last sample at 1200, two within 30s required).
+        rate = blended_rate(
+            samples, now=1260.0, short_lookback=30.0, long_lookback=1300.0
+        )
         assert rate is not None
         # Only long rate available: 20 / 1200 = 1/60 %/s
         assert abs(rate - (20.0 / 1200.0)) < 1e-9
@@ -349,18 +391,26 @@ class TestBlendedRate:
 # ---------------------------------------------------------------------------
 class TestEtaToPct:
     def test_returns_now_when_already_past_target(self) -> None:
-        assert eta_to_pct(used_pct=60.0, target_pct=50.0, rate=0.1, now=1000.0) == 1000.0
+        assert (
+            eta_to_pct(used_pct=60.0, target_pct=50.0, rate=0.1, now=1000.0) == 1000.0
+        )
 
     def test_none_when_rate_is_none(self) -> None:
-        assert eta_to_pct(used_pct=10.0, target_pct=100.0, rate=None, now=1000.0) is None
+        assert (
+            eta_to_pct(used_pct=10.0, target_pct=100.0, rate=None, now=1000.0) is None
+        )
 
     def test_none_when_rate_zero_or_negative(self) -> None:
         assert eta_to_pct(used_pct=10.0, target_pct=100.0, rate=0.0, now=1000.0) is None
-        assert eta_to_pct(used_pct=10.0, target_pct=100.0, rate=-0.5, now=1000.0) is None
+        assert (
+            eta_to_pct(used_pct=10.0, target_pct=100.0, rate=-0.5, now=1000.0) is None
+        )
 
     def test_projects_clock_time(self) -> None:
         # 50% to go, rate 0.1 %/s → 500s from now
-        assert eta_to_pct(used_pct=50.0, target_pct=100.0, rate=0.1, now=1000.0) == 1500.0
+        assert (
+            eta_to_pct(used_pct=50.0, target_pct=100.0, rate=0.1, now=1000.0) == 1500.0
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -371,17 +421,21 @@ class TestDayStopTarget:
 
     def test_middle_of_day_3(self) -> None:
         # Window resets at t=7d. Now = 2.5 days in → we're inside day 3 (1-indexed).
-        # Target for end of day 3 = 3/7 × 100 ≈ 42.857%.
+        # Target for end of day 3 = 3/7 * 100 ≈ 42.857%.
         resets_at = 7 * 86400.0
         now = 2.5 * 86400.0
-        day_num, target = day_stop_target(now=now, resets_at=resets_at, window_length=self.WINDOW_7D)
+        day_num, target = day_stop_target(
+            now=now, resets_at=resets_at, window_length=self.WINDOW_7D
+        )
         assert day_num == 3
         assert abs(target - (3.0 / 7.0 * 100.0)) < 1e-9
 
     def test_start_of_day_1(self) -> None:
         resets_at = 7 * 86400.0
         now = 0.0
-        day_num, target = day_stop_target(now=now, resets_at=resets_at, window_length=self.WINDOW_7D)
+        day_num, target = day_stop_target(
+            now=now, resets_at=resets_at, window_length=self.WINDOW_7D
+        )
         assert day_num == 1
         assert abs(target - (1.0 / 7.0 * 100.0)) < 1e-9
 
@@ -389,7 +443,9 @@ class TestDayStopTarget:
         resets_at = 7 * 86400.0
         # 6.5 days in → inside day 7.
         now = 6.5 * 86400.0
-        day_num, target = day_stop_target(now=now, resets_at=resets_at, window_length=self.WINDOW_7D)
+        day_num, target = day_stop_target(
+            now=now, resets_at=resets_at, window_length=self.WINDOW_7D
+        )
         assert day_num == 7
         assert abs(target - 100.0) < 1e-9
 
@@ -454,7 +510,9 @@ class TestFormatClockTime:
         later = now + 60 * 60  # 1h from now
         result = format_clock_time(later, now=now)
         # Either the hour or ":00" should appear, and no weekday prefix
-        assert not any(day in result for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+        assert not any(
+            day in result for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        )
         assert result  # non-empty
 
     def test_other_day_includes_weekday(self) -> None:
@@ -463,4 +521,6 @@ class TestFormatClockTime:
         now = _time.time()
         three_days = now + 3 * 86400
         result = format_clock_time(three_days, now=now)
-        assert any(day in result for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+        assert any(
+            day in result for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        )
