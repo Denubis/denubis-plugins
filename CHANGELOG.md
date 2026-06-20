@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-external-agents] 0.2.0
+
+The codex-peer-review skill now runs with repository context and persists reviews in a gitignored `.review/`, replacing the single-file `/tmp` smoke test.
+
+**Changed:**
+- The runner stages the target's git repo — minus gitignored files and binaries — as `./context/` and points codex at it, so the review can follow the target's cross-references (cited code, run logs) instead of flagging "I wasn't given that." Context stops at the repo; references outside it (papers, external datasets) are flagged `[unverified]`, not chased. Gitignored files (raw data, secrets) are absent from codex's tree; a target that is itself gitignored is still staged as an explicit override.
+- Review output moved from `/tmp` to `./.review/<target>.<timestamp>.REVIEW.md` in the working directory (gitignored, persistent); the script auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review.
+- Honest bound: `-s read-only` does not confine reads, so staging bounds the repo's own files (codex runs in `/tmp`, never told the real repo path) but does not stop codex reading its own `~/.codex`/`~/.ssh` — an external sandbox (bwrap) remains the follow-up.
+
 ## [denubis-crash-recovery] 1.1.0
 
 Triage output overhaul after a UAT run found it unreadable and ~9,000 lines long with the crash sections empty.
