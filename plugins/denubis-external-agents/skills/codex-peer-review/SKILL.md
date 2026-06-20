@@ -8,7 +8,7 @@ user-invocable: true
 
 ## Overview
 
-Run OpenAI's `codex` (GPT-5.5) as a single external critic over a file or directory, shaped by the `critical-peer-review` rubric. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
+Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, shaped by the `critical-peer-review` rubric. The script stages the target's git repo **minus gitignored files**, so codex can check the target's cross-references (cited code, bibliography, run logs) without raw data or secrets in its working tree. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
 
 **Provenance is the spine of this skill.** Codex will sometimes produce a fluent, correctly-formatted review — GRADE matrix, severity tiers, even a faked "Verification" section — of a document it never actually read. A codex review is a *claim*, not a result, until its quotes are checked against the real target. The skill is built to catch that.
 
@@ -19,17 +19,17 @@ Run OpenAI's `codex` (GPT-5.5) as a single external critic over a file or direct
 
 **When NOT to use:**
 - For Claude's own review, dispatch `denubis-plan-and-execute:critical-peer-review` directly — this skill is specifically the *external* voice.
-- On anything you cannot disclose to OpenAI. Codex runs `-s read-only` (writes and network for its shell commands are blocked) but its reads are **not** confined, and whatever it reads is sent to OpenAI. Treat the run as "this content goes to OpenAI." Only run it on your own machine, on work you are willing to disclose, and watch the run.
+- On anything you cannot disclose to OpenAI. The disclosure surface is the target's repo **minus gitignored files** — whatever codex reads from that staging goes to OpenAI. `.gitignore` is the boundary, and it only holds if sensitive data is gitignored: if raw/participant data is *committed* (tracked), it gets staged and sent — glance at what's tracked first. Separately, `-s read-only` does not confine reads, so codex can still read its own well-known paths (`~/.codex`, `~/.ssh`); only an external sandbox (bwrap) closes that. Run on your own machine, on disclosable work, watched.
 
 ## How to run
 
 1. **Identify the target** — the file or directory the user named. Require one; do not invent a target.
 
-2. **Run the script.** It bundles the rubric + the target into a throwaway working dir and runs codex against only that root:
+2. **Run the script.** It stages the target's git repo (minus gitignored files) plus the rubric into a throwaway `/tmp` dir, runs codex with that as its only root, and writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review). If the target is not in a git repo, it reviews the file alone with no context.
    ```bash
    bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>
    ```
-   It stages into a throwaway `/tmp` dir, writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review), and prints that path plus a ready-made smoke-check command.
+   It prints the package dir, the staged target path, the review path, and a ready-made smoke-check command.
 
 3. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
 
@@ -37,13 +37,13 @@ Run OpenAI's `codex` (GPT-5.5) as a single external critic over a file or direct
 
 ## The provenance gate (non-negotiable)
 
-A codex review enters the conversation only after its quotes are confirmed to exist in the real target.
+A codex review enters the conversation only after its quotes are confirmed to exist in the real files it cites.
 
-- Take 2–3 verbatim quoted phrases from codex's findings (especially the High-severity ones) and `grep -F` each against the actual target file:
+- Take 2–3 verbatim quoted phrases from codex's findings (especially the High-severity ones) and `grep -F` each against the file codex attributes it to — the target, or a context file it cites:
   ```bash
-  grep -nF '<quoted phrase from the review>' '<the real target file>'
+  grep -nF '<quoted phrase from the review>' '<the file codex cites>'
   ```
-- **Decision rule:** a quote that is not in the target voids that finding. If the review's quotes broadly fail to match — or it cites a file or line range that does not exist — the whole review is a confabulation. **Discard it and report the confabulation. Never present fabricated findings as real.**
+- **Decision rule:** a quote that is not in the file it's attributed to voids that finding. If the review's quotes broadly fail to match — or it cites a file or line range that does not exist — the whole review is a confabulation. **Discard it and report the confabulation. Never present fabricated findings as real.**
 - Trust codex's live `exec … succeeded:` traces while they scroll past (they are harness-emitted and real), but the `-o` output file does not save them, so the durable check is the quote-grep — it needs nothing but the review and the file.
 - Codex has no internet. Findings it marks `[unverified — needs external check: …]` are honest gaps, not failures; relay them as such.
 
@@ -58,7 +58,7 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 |------|------------------|
 | Run | `bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>` |
 | Find review | `./.review/<target>.<ts>.REVIEW.md` (path printed as `review: …`) |
-| Verify (mandatory) | `grep -nF '<quote>' '<target file>'` for several findings |
+| Verify (mandatory) | `grep -nF '<quote>' '<cited file>'` (target or context) for several findings |
 | On quote mismatch | discard the review, report confabulation |
 | Present | source-tagged as codex's voice, unmerged |
 
@@ -69,5 +69,5 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 | Presenting the review without the quote-grep | Always run the provenance gate first. A polished review is not evidence it read the file. |
 | Trusting the faked "Verification" section | That section is codex's prose, not proof. Only your own grep counts. |
 | Merging codex's findings into your own review | Keep voices separate; present codex's as codex's. |
-| Running on sensitive content | Reads go to OpenAI. Only run on disclosable work, on your machine, watched. |
+| Running on sensitive content | The repo minus gitignored goes to OpenAI. Ensure raw/sensitive data is gitignored (not committed) before running. |
 | Inventing a target when none was given | Require an explicit file/dir; codex confabulates when under-specified. |

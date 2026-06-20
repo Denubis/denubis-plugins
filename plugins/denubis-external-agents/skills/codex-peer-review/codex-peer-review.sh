@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
-# Self-contained codex critical-peer-review smoke test.
+# Self-contained codex critical-peer-review runner.
+#
+# Stages the target's git repository MINUS gitignored files into a throwaway
+# working dir and points codex (-C) at it, so the review can follow the target's
+# cross-references (the code it cites, the bibliography, run logs) while
+# gitignored files (raw data, secrets) are absent from codex's working tree.
+#
+# Because `-s read-only` does not confine reads, staging is what bounds what
+# codex reaches for the repo's own files: it runs in /tmp and is never told the
+# real repo path, so it has no route to the excluded files. This is strong, not
+# cryptographic — a future bwrap wrapper that bind-mounts only this staged dir
+# would make it a hard bound (and also block codex reading its own ~/.codex etc).
 #
 # The rubric (review-method.md, a copy of the critical-peer-review agent) lives
-# next to this script, so the skill is self-contained. Each run stages the rubric
-# + the target into one throwaway working dir and points codex (-C) at that root,
-# so there are no out-of-root file references. That keeps the prompt working if
-# reads are ever confined (bwrap/container); it does not itself enforce confinement.
-# The review output is written to ./.review/ (gitignored) in the working directory.
+# next to this script, so the skill is self-contained. The review output is
+# written to ./.review/ (gitignored) in the working directory.
 #
 # Usage: codex-peer-review.sh <file-or-dir-to-review>
 
@@ -22,17 +30,41 @@ target="${1:?usage: codex-peer-review.sh <file-or-dir-to-review>}"
 [ -f "$RUBRIC" ]      || { echo "rubric not found: $RUBRIC"      >&2; exit 1; }
 [ -f "$PROMPT_FILE" ] || { echo "prompt not found: $PROMPT_FILE" >&2; exit 1; }
 
+target_abs="$(cd "$(dirname "$target")" && pwd)/$(basename "$target")"
+
 # Throwaway staging codex reads from (-C points here); not persisted.
 work="$(mktemp -d /tmp/codex-review.XXXXXX)"
-mkdir -p "$work/under-review"
+ctx="$work/context"
+mkdir -p "$ctx"
 cp "$RUBRIC" "$work/REVIEW-METHOD.md"
-cp -r "$target" "$work/under-review/"
+
+# Stage the surrounding repo, minus gitignored files, so the review has
+# cross-reference context without raw data / secrets. Not in a git repo: fall
+# back to the file alone (no repo means no .gitignore boundary to trust).
+repo="$(git -C "$(dirname "$target_abs")" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$repo" ]; then
+  rel="$(realpath --relative-to="$repo" "$target_abs")"
+  # tracked + untracked-but-not-ignored, copied preserving structure
+  git -C "$repo" ls-files --cached --others --exclude-standard -z \
+    | tar --null -C "$repo" -T - -cf - \
+    | tar -C "$ctx" -xf -
+  # Ensure the chosen target is present even if it is itself gitignored —
+  # reviewing it is an explicit choice that overrides the ignore filter.
+  mkdir -p "$ctx/$(dirname "$rel")"
+  cp "$target_abs" "$ctx/$rel"
+  n="$(git -C "$repo" ls-files --cached --others --exclude-standard | wc -l | tr -d ' ')"
+  echo "context:  $n non-ignored files staged from $repo"
+else
+  rel="$(basename "$target")"
+  cp -r "$target_abs" "$ctx/$rel"
+  echo "context:  (not a git repo — reviewing the file alone, no surrounding context)"
+fi
+target_in_ctx="context/$rel"
 
 # The review lands in ./.review/ (gitignored by design) in the working dir, so
 # runs persist and coexist. Drop a self-ignoring guard if the dir has none, so
 # writing into any repo — including the one under review — never leaks review
-# output into version control. Absolute path so codex's -o is unambiguous
-# regardless of its -C working root.
+# output into version control. Absolute path so codex's -o is unambiguous.
 review_dir="$PWD/.review"
 mkdir -p "$review_dir"
 [ -e "$review_dir/.gitignore" ] || printf '# codex-peer-review output — disposable, may carry content sent to an external model\n*\n!.gitignore\n' > "$review_dir/.gitignore"
@@ -40,20 +72,20 @@ out="$review_dir/$(basename "$target").$(date +%Y%m%d-%H%M%S).REVIEW.md"
 
 echo "package:  $work"
 echo "rubric:   REVIEW-METHOD.md"
-echo "target:   under-review/$(basename "$target")"
+echo "target:   $target_in_ctx"
 echo "running codex ($MODEL, read-only)…"
 echo
 
-# Prompt is read from stdin (codex exec reads instructions from a piped stdin).
-codex exec \
-  -s read-only \
-  --ignore-user-config \
-  -m "$MODEL" \
-  --ephemeral \
-  --skip-git-repo-check \
-  -C "$work" \
-  -o "$out" \
-  < "$PROMPT_FILE"
+# Prompt = grounding template + the explicit target path, piped on stdin.
+{ cat "$PROMPT_FILE"; echo; echo "REVIEW TARGET: $target_in_ctx"; } \
+  | codex exec \
+      -s read-only \
+      --ignore-user-config \
+      -m "$MODEL" \
+      --ephemeral \
+      --skip-git-repo-check \
+      -C "$work" \
+      -o "$out"
 
 echo
 echo "review:   $out"

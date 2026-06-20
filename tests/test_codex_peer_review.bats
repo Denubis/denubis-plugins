@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Tests for the codex-peer-review skill's runner script.
+# Tests for the codex-peer-review runner.
 #
-# `codex` is stubbed on PATH so nothing reaches OpenAI. The stub records its
-# argv and stdin, writes a dummy review to the -o path, and tracks the -C work
-# dir for cleanup. The script runs with cwd = TEST_DIR so the `.review/` output
-# directory lands in the sandbox, not the repo.
+# codex is stubbed on PATH (nothing reaches OpenAI). The script stages the
+# target's git repo MINUS gitignored files into a throwaway dir and points codex
+# at it, so the review has cross-reference context while gitignored files (raw
+# data, secrets) are absent from codex's working tree.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 SKILL_DIR="$REPO_ROOT/plugins/denubis-external-agents/skills/codex-peer-review"
@@ -16,7 +16,6 @@ setup() {
     export CODEX_ARGS_FILE="$TEST_DIR/codex-args"
     export CODEX_STDIN_FILE="$TEST_DIR/codex-stdin"
     export CODEX_WORK_TRACK="$TEST_DIR/codex-workdirs"
-
     local stub_bin="$TEST_DIR/bin"
     mkdir -p "$stub_bin"
     cat > "$stub_bin/codex" <<'STUB'
@@ -35,23 +34,28 @@ exit 0
 STUB
     chmod +x "$stub_bin/codex"
     export PATH="$stub_bin:$PATH"
-
-    # Run the script from the sandbox so .review/ is created there.
-    cd "$TEST_DIR"
 }
 
 teardown() {
     cd "$REPO_ROOT" 2>/dev/null || cd /
     if [ -f "$CODEX_WORK_TRACK" ]; then
-        while read -r w; do
-            [ -n "$w" ] && rm -rf "$w" "$w.REVIEW.md"
-        done < "$CODEX_WORK_TRACK"
+        while read -r w; do [ -n "$w" ] && rm -rf "$w" "$w.REVIEW.md"; done < "$CODEX_WORK_TRACK"
     fi
     rm -rf "$TEST_DIR"
 }
 
-# Pull a printed "label:  value" off the script's stdout.
 field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
+
+# A git repo with a target, a non-ignored ref, and a gitignored secret.
+make_repo() {
+    local repo="$1"
+    mkdir -p "$repo/docs" "$repo/data"
+    ( cd "$repo" && git init -q && git config user.email t@t && git config user.name t )
+    printf 'review me; analysis lives in code.py\n' > "$repo/docs/target.md"
+    printf 'def analyze(): return 1\n'              > "$repo/code.py"
+    printf 'PARTICIPANT,SECRET\n1,sensitive\n'       > "$repo/data/raw.csv"
+    printf 'data/\n'                                 > "$repo/.gitignore"
+}
 
 # ── Preflight ──
 
@@ -67,72 +71,95 @@ field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
     [[ "$output" == *"target not found"* ]]
 }
 
-# ── Staging (throwaway bundle in /tmp) ──
+# ── Staging: repo minus gitignored (the core safety behaviour) ──
 
-@test "valid file target: stages bundled rubric and target verbatim" {
-    printf 'load-bearing line one\nline two\n' > "$TEST_DIR/sample.md"
-
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+@test "git repo: non-ignored context staged, gitignored files ABSENT" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
-
     local pkg; pkg="$(field package)"
-    [ -n "$pkg" ]
     [ -f "$pkg/REVIEW-METHOD.md" ]
-    [ -f "$pkg/under-review/sample.md" ]
-    diff "$pkg/REVIEW-METHOD.md" "$RUBRIC_SRC"
-    diff "$pkg/under-review/sample.md" "$TEST_DIR/sample.md"
+    [ -f "$pkg/context/docs/target.md" ]
+    [ -f "$pkg/context/code.py" ]
+    # the safety guarantee — gitignored data is not in codex's tree:
+    [ ! -e "$pkg/context/data/raw.csv" ]
+    [ ! -e "$pkg/context/data" ]
 }
 
-@test "directory target is staged recursively" {
-    mkdir -p "$TEST_DIR/proj/sub"
-    echo a > "$TEST_DIR/proj/a.md"; echo b > "$TEST_DIR/proj/sub/b.md"
-    run bash "$SCRIPT" "$TEST_DIR/proj"
+@test "git repo: staged target and rubric are byte-identical to source" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
-    [ -f "$pkg/under-review/proj/a.md" ]
-    [ -f "$pkg/under-review/proj/sub/b.md" ]
+    diff "$pkg/context/docs/target.md" "$TEST_DIR/repo/docs/target.md"
+    diff "$pkg/REVIEW-METHOD.md" "$RUBRIC_SRC"
 }
 
-# ── Review output lands in .review/ (gitignored by design) ──
+@test "git repo: a gitignored TARGET is still staged (explicit choice overrides ignore)" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'secret/\n' >> .gitignore
+    mkdir -p secret; printf 'review this ignored file\n' > secret/note.md
+    run bash "$SCRIPT" secret/note.md
+    [ "$status" -eq 0 ]
+    local pkg; pkg="$(field package)"
+    [ -f "$pkg/context/secret/note.md" ]
+}
+
+@test "git repo: prompt names the target and scopes the rest as context" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
+    [ "$status" -eq 0 ]
+    grep -q 'docs/target.md'  "$CODEX_STDIN_FILE"
+    grep -qi 'context'        "$CODEX_STDIN_FILE"
+    grep -q 'NO TARGET FOUND' "$CODEX_STDIN_FILE"
+}
+
+# ── Non-git fallback ──
+
+@test "non-git target: reviews the file alone with a warning" {
+    echo x > "$TEST_DIR/loose.md"; cd "$TEST_DIR"
+    run bash "$SCRIPT" loose.md
+    [ "$status" -eq 0 ]
+    local pkg; pkg="$(field package)"
+    [ -f "$pkg/context/loose.md" ]
+    [[ "$output" == *"not a git repo"* ]]
+}
+
+# ── Review output → .review/ (gitignored) ──
 
 @test "review is written into ./.review/ in the cwd" {
-    echo x > "$TEST_DIR/sample.md"
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
     local rev; rev="$(field review)"
-    [ -n "$rev" ]
     [ -f "$rev" ]
     [[ "$rev" == *"/.review/"* ]]
-    [[ "$rev" == *"sample.md"* ]]
     [[ "$rev" == *".REVIEW.md" ]]
 }
 
 @test "auto-creates a self-ignoring .review/.gitignore when absent" {
-    echo x > "$TEST_DIR/sample.md"
+    echo x > "$TEST_DIR/loose.md"; cd "$TEST_DIR"
     [ ! -e "$TEST_DIR/.review/.gitignore" ]
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    run bash "$SCRIPT" loose.md
     [ "$status" -eq 0 ]
-    [ -f "$TEST_DIR/.review/.gitignore" ]
     grep -qx -- '*'          "$TEST_DIR/.review/.gitignore"
     grep -qx -- '!.gitignore' "$TEST_DIR/.review/.gitignore"
 }
 
 @test "does not clobber an existing .review/.gitignore" {
-    echo x > "$TEST_DIR/sample.md"
-    mkdir -p "$TEST_DIR/.review"
-    printf 'SENTINEL-DO-NOT-TOUCH\n' > "$TEST_DIR/.review/.gitignore"
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    echo x > "$TEST_DIR/loose.md"; cd "$TEST_DIR"
+    mkdir -p .review; printf 'SENTINEL\n' > .review/.gitignore
+    run bash "$SCRIPT" loose.md
     [ "$status" -eq 0 ]
-    grep -qx -- 'SENTINEL-DO-NOT-TOUCH' "$TEST_DIR/.review/.gitignore"
+    grep -qx -- 'SENTINEL' .review/.gitignore
 }
 
 # ── Invocation contract ──
 
-@test "codex runs read-only, ignores user config, with -C, -o, and gpt-5.5" {
-    echo x > "$TEST_DIR/sample.md"
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+@test "codex runs read-only, ignores user config, with -C, -o, gpt-5.5" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
-    [ -f "$CODEX_ARGS_FILE" ]
     grep -qx -- "exec"                 "$CODEX_ARGS_FILE"
     grep -qx -- "read-only"            "$CODEX_ARGS_FILE"
     grep -qx -- "--ignore-user-config" "$CODEX_ARGS_FILE"
@@ -141,20 +168,11 @@ field() { echo "$output" | sed -n "s/^$1:[[:space:]]*//p"; }
     grep -qx -- "gpt-5.5"              "$CODEX_ARGS_FILE"
 }
 
-@test "the grounding prompt is piped to codex on stdin" {
-    echo x > "$TEST_DIR/sample.md"
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
-    [ "$status" -eq 0 ]
-    [ -f "$CODEX_STDIN_FILE" ]
-    grep -q "under-review"    "$CODEX_STDIN_FILE"
-    grep -q "NO TARGET FOUND" "$CODEX_STDIN_FILE"
-}
-
-# ── Provenance smoke-check guidance ──
+# ── Provenance smoke-check ──
 
 @test "prints a provenance grep referencing the real target" {
-    echo x > "$TEST_DIR/sample.md"
-    run bash "$SCRIPT" "$TEST_DIR/sample.md"
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md
     [[ "$output" == *"grep -nF"* ]]
-    [[ "$output" == *"sample.md"* ]]
+    [[ "$output" == *"target.md"* ]]
 }
