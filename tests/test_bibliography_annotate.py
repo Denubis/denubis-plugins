@@ -143,7 +143,10 @@ def test_marker_present_false_when_passage_absent():
         {"type": "highlight", "comment": "[@other2020, p. 1] some unrelated marker"},
         {"type": "note", "comment": "a plain sticky note"},
     ]
-    assert annotate.marker_present(annotations, annotate.quote_fingerprint("missing")) is False
+    assert (
+        annotate.marker_present(annotations, annotate.quote_fingerprint("missing"))
+        is False
+    )
 
 
 def test_marker_present_scans_all_annotation_types():
@@ -215,9 +218,7 @@ def test_highlight_payload_includes_optional_fields_when_set():
 
 
 def test_parse_highlight_success_returns_body():
-    body = json.dumps(
-        {"ok": True, "key": "H1", "page": 8, "rects": [[1, 2, 3, 4]]}
-    )
+    body = json.dumps({"ok": True, "key": "H1", "page": 8, "rects": [[1, 2, 3, 4]]})
     r = annotate.parse_highlight_response(200, body, "application/json")
     assert r["key"] == "H1"
     assert r["page"] == 8
@@ -225,7 +226,11 @@ def test_parse_highlight_success_returns_body():
 
 def test_parse_highlight_structured_error_carries_code():
     body = json.dumps(
-        {"ok": False, "code": "span_not_found", "message": "Error: end of span not found"}
+        {
+            "ok": False,
+            "code": "span_not_found",
+            "message": "Error: end of span not found",
+        }
     )
     with pytest.raises(annotate.HighlightError) as ei:
         annotate.parse_highlight_response(422, body, "application/json")
@@ -256,7 +261,12 @@ def test_parse_highlight_non_json_200_raises():
 def test_choose_resolution_picks_the_copy_with_a_pdf():
     candidates = [
         {"item_key": "NOPDF", "library_id": 23, "library": "GroupA", "pdf_paths": []},
-        {"item_key": "HASPDF", "library_id": 27, "library": "groupB", "pdf_paths": ["/x/y.pdf"]},
+        {
+            "item_key": "HASPDF",
+            "library_id": 27,
+            "library": "groupB",
+            "pdf_paths": ["/x/y.pdf"],
+        },
     ]
     key, lib, pdf = annotate.choose_resolution(candidates)
     assert key == "HASPDF"
@@ -266,8 +276,18 @@ def test_choose_resolution_picks_the_copy_with_a_pdf():
 
 def test_choose_resolution_prefers_first_when_multiple_have_pdf():
     candidates = [
-        {"item_key": "A", "library_id": 1, "library": "My Library", "pdf_paths": ["/a.pdf"]},
-        {"item_key": "B", "library_id": 27, "library": "groupB", "pdf_paths": ["/b.pdf"]},
+        {
+            "item_key": "A",
+            "library_id": 1,
+            "library": "My Library",
+            "pdf_paths": ["/a.pdf"],
+        },
+        {
+            "item_key": "B",
+            "library_id": 27,
+            "library": "groupB",
+            "pdf_paths": ["/b.pdf"],
+        },
     ]
     key, _, pdf = annotate.choose_resolution(candidates)
     assert key == "A"

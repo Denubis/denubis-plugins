@@ -19,7 +19,7 @@ Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 """
 
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.14"  # uses PEP 758 parenthesis-less `except` (3.14+)
 # dependencies = ["httpx"]
 # ///
 
@@ -31,6 +31,7 @@ import re
 import subprocess
 import sys
 import tomllib
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,6 +53,21 @@ _DOI_RE = re.compile(r"^10\.\d+/")
 # --- Functional core (pure, unit-tested) ------------------------------------
 
 
+def _ascii_fold(s: str) -> str:
+    """Strip diacritics via NFKD, dropping combining marks. Case preserved.
+
+    BBT item.search matches against an ASCII-folded index, so the correctly
+    spelled "Frühwirth" misses the folded "fruhwirth" record while the paper is
+    present. Folding both the search token and the matches_query comparison makes
+    the accented name and its ASCII form resolve to the same paper. NFKD handles
+    the Latin diacritics this corpus carries (ü, é, ñ, ä); the rarer non-composing
+    letters (ø, ß) pass through unchanged, which is acceptable here.
+    """
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)
+    )
+
+
 def select_citekey_matches(hits: list[dict], citekey: str) -> list[dict]:
     """From BBT item.search hits, return only those whose citekey matches exactly.
 
@@ -60,6 +76,45 @@ def select_citekey_matches(hits: list[dict], citekey: str) -> list[dict]:
     (My Library + a group), so this returns every exact-match hit, not just one.
     """
     return [h for h in hits if h.get("citation-key") == citekey]
+
+
+def search_tokens(
+    *,
+    citekey: str | None = None,
+    author: str | None = None,
+    freeterm: str | None = None,
+    title: str | None = None,
+) -> list[str]:
+    """Every token worth driving a BBT item.search on, in priority order, deduped.
+
+    BBT item.search indexes only the FIRST author surname and is AND-fuzzy, so
+    choosing ONE key to search (the old elif chain) silently returned zero
+    whenever that key was a co-author (Ghahramani in "Wade, Ghahramani") or a
+    title that had drifted — reporting present papers as absent. We instead
+    search EVERY supplied key and union the hits in the shell; matches_query then
+    applies the strict AND filter. Recall comes from the union, precision from
+    the filter. A multi-word title is searched as the whole string: BBT
+    AND-matches the words within the single title field, and any title that
+    survives matches_query's substring check is, by construction, found by that
+    search — so no per-word fallback is needed.
+    """
+    tokens: list[str] = []
+
+    def add(raw: str | None) -> None:
+        tok = (raw or "").strip()
+        if not tok:
+            return
+        if tok not in tokens:
+            tokens.append(tok)
+        # BBT's index is ASCII-folded, so search the folded form too — otherwise
+        # a query carrying diacritics ("Frühwirth") never surfaces the paper.
+        folded = _ascii_fold(tok)
+        if folded != tok and folded not in tokens:
+            tokens.append(folded)
+
+    for raw in (citekey, author, freeterm, title):
+        add(raw)
+    return tokens
 
 
 @dataclass(frozen=True)
@@ -106,19 +161,32 @@ def matches_query(
         return False
     if doi is not None and paper.doi.lower() != doi.lower():
         return False
-    if author is not None and author.lower() not in {a.lower() for a in paper.authors}:
-        return False
+    if author is not None:
+        # Fold diacritics on both sides so "Frühwirth" and "Fruhwirth" both match.
+        wanted = _ascii_fold(author).lower()
+        surnames = {_ascii_fold(a).lower() for a in paper.authors}
+        # A hyphen-component also matches, so "Malsiner" finds "Malsiner-Walli"
+        # and "Frühwirth" finds "Frühwirth-Schnatter" — the partial surname BBT
+        # surfaces but the old exact-equality filter dropped. Hyphen only:
+        # space-splitting would make "van" match every "van X", and we never do
+        # arbitrary substring, so "Veh" never matches "Vehtari".
+        components = {part for s in surnames for part in s.split("-")}
+        if wanted not in surnames and wanted not in components:
+            return False
     if year is not None and paper.year != int(year):
         return False
-    if title is not None and title.lower() not in paper.title.lower():
-        return False
-    return True
+    if title is None:
+        return True
+    return _ascii_fold(title).lower() in _ascii_fold(paper.title).lower()
 
 
 def classify_state(
     *, found: bool, has_pdf: bool, pdf_exists: bool, rendered: bool
 ) -> str:
-    """The paper's place in the pipeline: not-in-zotero | no-pdf | ready-to-render | rendered."""
+    """The paper's place in the pipeline.
+
+    One of: not-in-zotero | no-pdf | ready-to-render | rendered.
+    """
     if not found:
         return "not-in-zotero"
     if not (has_pdf and pdf_exists):
@@ -150,7 +218,7 @@ def _year_from_issued(issued: dict | None) -> int | None:
         return None
     try:
         return int(first[0])
-    except (TypeError, ValueError, IndexError):
+    except TypeError, ValueError, IndexError:
         return None
 
 
@@ -165,11 +233,7 @@ def normalize_bbt_hit(hit: dict) -> Paper:
     it later via user.groups. collection_keys is always () — search hits carry
     no collection membership.
     """
-    authors = tuple(
-        a["family"]
-        for a in (hit.get("author") or [])
-        if a.get("family")
-    )
+    authors = tuple(a["family"] for a in (hit.get("author") or []) if a.get("family"))
     return Paper(
         citekey=hit.get("citation-key", "") or "",
         doi=hit.get("DOI", "") or "",
@@ -238,7 +302,7 @@ def render_is_present(out_dir: Path) -> bool:
 
 def rpc(method: str, params: list, timeout: float = 30.0):
     """POST to the BBT JSON-RPC endpoint (mirrors ingest.py)."""
-    import httpx
+    import httpx  # noqa: PLC0415
 
     r = httpx.post(
         BBT_ENDPOINT,
@@ -253,8 +317,11 @@ def rpc(method: str, params: list, timeout: float = 30.0):
 
 
 def probe_zotero() -> None:
-    """Confirm Zotero is reachable; exit with a clear message if not (mirrors ingest.py)."""
-    import httpx
+    """Confirm Zotero is reachable; exit with a clear message if not.
+
+    Mirrors ingest.py.
+    """
+    import httpx  # noqa: PLC0415
 
     try:
         r = httpx.get(PING_ENDPOINT, timeout=3)
@@ -274,13 +341,15 @@ def crossref_first_author_family(doi: str) -> str | None:
     nothing. Crossref gives a name token; we search Zotero with that, then
     filter hits by exact DOI match.
     """
-    import httpx
+    import httpx  # noqa: PLC0415
 
     try:
         r = httpx.get(
             f"https://api.crossref.org/works/{doi}",
             headers={
-                "User-Agent": "denubis-bibliography/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
+                "User-Agent": (
+                    "denubis-bibliography/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
+                )
             },
             timeout=10,
         )
@@ -295,10 +364,10 @@ def crossref_first_author_family(doi: str) -> str | None:
 
 
 def search_by_doi(doi: str) -> list[Paper]:
-    """Locate Zotero items by DOI via the Crossref fallback (mirrors ingest.py's find_by_doi).
+    """Locate Zotero items by DOI via the Crossref fallback.
 
-    Returns all hits whose DOI matches exactly (case-insensitive). A DOI can
-    appear in more than one library.
+    Mirrors ingest.py's find_by_doi. Returns all hits whose DOI matches exactly
+    (case-insensitive). A DOI can appear in more than one library.
     """
     candidates_seen: set[str] = set()
     papers: list[Paper] = []
@@ -308,14 +377,15 @@ def search_by_doi(doi: str) -> list[Paper]:
     if surname:
         queries.append(surname)
     queries.append(doi)
-    last_segment = doi.split("/")[-1]
+    last_segment = doi.rsplit("/", maxsplit=1)[-1]
     if last_segment not in queries:
         queries.append(last_segment)
 
     for q in queries:
         try:
             hits = rpc("item.search", [q]) or []
-        except Exception:
+        except Exception:  # noqa: S112
+            # Best-effort: a failed query variant must not abort the others.
             continue
         for h in hits:
             key = h.get("citation-key") or ""
@@ -382,7 +452,7 @@ def enrich_paper(paper: Paper, library_map: dict[str, int]) -> dict:
         "pdf_path": pdf_path,
         "pdf_exists": pdf_exists,
         "pdf_status": pdf_status,
-        "rendered": False,   # filled in by check_rendered once we know out_dir
+        "rendered": False,  # filled in by check_rendered once we know out_dir
         "out_dir": None,
     }
 
@@ -406,11 +476,18 @@ def _render_cmd(pdf: Path, out_dir: Path, *, allow_mocr: bool = False) -> list[s
     ModuleNotFoundError, so the --with flags are not optional.
     """
     cmd = [
-        "uv", "run",
-        "--with", "pymupdf4llm",
-        "--with", "docling",
-        "--with", "easyocr",
-        "python", str(RENDER_SCRIPT), str(pdf), str(out_dir),
+        "uv",
+        "run",
+        "--with",
+        "pymupdf4llm",
+        "--with",
+        "docling",
+        "--with",
+        "easyocr",
+        "python",
+        str(RENDER_SCRIPT),
+        str(pdf),
+        str(out_dir),
     ]
     if allow_mocr:
         cmd.append("--allow-mocr")
@@ -427,12 +504,56 @@ def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False)
     Exit codes from render.py: 0 = success, 3 = NeedsMocr, 1 = hard failure.
     """
     cmd = _render_cmd(pdf, out_dir, allow_mocr=allow_mocr)
-    proc = subprocess.run(cmd)
+    proc = subprocess.run(cmd, check=False)  # returncode inspected below
     if proc.returncode == 0:
         return "rendered"
     if proc.returncode == 3:
         return "needs-mocr"
     return "failed"
+
+
+def print_no_match(
+    tokens: list[str], *, doi: str | None, search_errors: list[str]
+) -> None:
+    """Report a no-match honestly: a no-match here is NOT proof of absence.
+
+    item.search is AND-fuzzy and (live-verified) indexes only the first author
+    surname, so a query keyed on a co-author, or on a title that has drifted from
+    how it is filed, returns zero while the paper is present. State that, show what
+    was searched, and point at the move that works — rather than asserting the
+    paper is absent, which is the overclaim this resolver exists to avoid.
+    """
+    print("No matches surfaced in Zotero for this query.", flush=True)
+    searched = ", ".join(repr(t) for t in tokens) or "(nothing searchable)"
+    print(f"  searched: {searched}", flush=True)
+    if search_errors:
+        print(
+            f"  WARNING: {len(search_errors)} search call(s) errored "
+            f"({'; '.join(search_errors)}).",
+            flush=True,
+        )
+        print(
+            "  Zotero/BBT may be unreachable, so this result is inconclusive, "
+            "not a confirmed absence.",
+            flush=True,
+        )
+    if doi:
+        print(
+            "  DOI path: BBT cannot search the DOI field, so this used a Crossref\n"
+            "  surname lookup; some journal and chapter DOIs return no author there,\n"
+            "  leaving the search nothing to query. This is NOT proof of absence —\n"
+            "  retry with --author or a distinctive --title word.",
+            flush=True,
+        )
+    else:
+        print(
+            "  A no-match is NOT proof of absence: item.search is AND-fuzzy and\n"
+            "  indexes only the FIRST author surname, so a query keyed on a\n"
+            "  co-author, or on a title filed differently than typed, returns zero\n"
+            "  while the paper is present. Retry with the first author's surname,\n"
+            "  or a distinctive single word from the title (e.g. --title BayesLCA).",
+            flush=True,
+        )
 
 
 def print_match(info: dict, state: str) -> None:
@@ -449,10 +570,17 @@ def print_match(info: dict, state: str) -> None:
     pdf = info["pdf_path"]
     status = info.get("pdf_status", "none")
     if status == "unknown":
-        print("  pdf:        (could not check — library name unresolved or attachment lookup failed)", flush=True)
+        print(
+            "  pdf:        (could not check — library name unresolved "
+            "or attachment lookup failed)",
+            flush=True,
+        )
     elif pdf is not None:
         exists = info["pdf_exists"]
-        print(f"  pdf:        {pdf}  [{'EXISTS' if exists else 'MISSING ON DISK'}]", flush=True)
+        print(
+            f"  pdf:        {pdf}  [{'EXISTS' if exists else 'MISSING ON DISK'}]",
+            flush=True,
+        )
     else:
         print("  pdf:        (no PDF attachment)", flush=True)
     print(f"  state:      {state}", flush=True)
@@ -461,7 +589,9 @@ def print_match(info: dict, state: str) -> None:
         print(f"  render dir: {info['out_dir']}", flush=True)
 
 
-def main() -> int:
+# main() is the CLI orchestrator (parse → search → filter → enrich → render); the
+# shell has no unit tests, so it is not split here — that is a separate refactor.
+def main() -> int:  # noqa: PLR0912, PLR0915
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -475,13 +605,21 @@ def main() -> int:
         ),
     )
     parser.add_argument("--citekey", help="Exact citekey to resolve.")
-    parser.add_argument("--author", help="Author surname (case-insensitive, exact).")
+    parser.add_argument(
+        "--author",
+        help="Author surname: case-insensitive, matches a hyphen-component "
+        "(Malsiner finds Malsiner-Walli) and folds diacritics (Frühwirth = Fruhwirth).",
+    )
     parser.add_argument("--year", type=int, help="Publication year (exact).")
     parser.add_argument(
         "--date",
-        help="Date string to extract a year from (e.g. '2017-09'). --year wins if both given.",
+        help="Date string to extract a year from (e.g. '2017-09'). "
+        "--year wins if both given.",
     )
-    parser.add_argument("--title", help="Title substring (case-insensitive).")
+    parser.add_argument(
+        "--title",
+        help="Title substring (case-insensitive, diacritic-insensitive).",
+    )
     parser.add_argument("--doi", help="DOI (exact, case-insensitive).")
     parser.add_argument(
         "--library",
@@ -502,7 +640,8 @@ def main() -> int:
         action="store_true",
         help=(
             "Escalate to dots.mocr (GPU) if the render cascade cannot produce a "
-            "usable render. Passed through to render.py. Requires [mocr] in config.toml."
+            "usable render. Passed through to render.py. Requires [mocr] in "
+            "config.toml."
         ),
     )
     args = parser.parse_args()
@@ -516,7 +655,7 @@ def main() -> int:
         elif field == "citekey" and not args.citekey:
             args.citekey = value
         else:
-            freeterm = value   # used as BBT search token, not a strict filter
+            freeterm = value  # used as BBT search token, not a strict filter
 
     # --- Resolve year from --date when --year not supplied -------------------
     effective_year: int | None = args.year
@@ -542,28 +681,45 @@ def main() -> int:
     library_map = build_library_map()
 
     # --- Search --------------------------------------------------------------
+    # Recall comes from searching EVERY supplied key and unioning the hits;
+    # precision comes from matches_query below. The old code searched a single
+    # key chosen by priority (citekey > author > freeterm > title), which
+    # silently returned zero whenever that key was a co-author (BBT item.search
+    # indexes only the first author surname) or a title that had drifted — the
+    # bug that reported present papers as absent.
     papers: list[Paper]
+    tokens: list[str]
+    search_errors: list[str] = []
     if args.doi:
-        # BBT can't search by DOI — use the Crossref fallback.
+        # BBT can't search the DOI field — use the Crossref-surname fallback.
+        tokens = [args.doi]
         papers = search_by_doi(args.doi)
     else:
-        # Build the BBT search token from the strongest available key.
-        if args.citekey:
-            search_token = args.citekey
-        elif args.author:
-            search_token = args.author
-        elif freeterm:
-            search_token = freeterm
-        else:
-            # title only: use as-is (BBT AND-fuzzy, multi-word works)
-            search_token = args.title or ""  # already validated non-empty above
+        tokens = search_tokens(
+            citekey=args.citekey,
+            author=args.author,
+            freeterm=freeterm,
+            title=args.title,
+        )
+        seen: set[tuple[str, str]] = set()
+        raw_hits: list[dict] = []
+        for tok in tokens:
+            try:
+                hits = rpc("item.search", [tok]) or []
+            except Exception as e:
+                # One token's RPC failing must not sink the whole resolve — the
+                # other tokens may still find the paper. Record it so the
+                # no-match message can flag an inconclusive (vs absent) result.
+                search_errors.append(f"{tok!r}: {e}")
+                continue
+            for h in hits:
+                dedup = (h.get("citation-key") or "", h.get("library") or "")
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
+                raw_hits.append(h)
 
-        try:
-            raw_hits = rpc("item.search", [search_token]) or []
-        except Exception as e:
-            sys.exit(f"BBT item.search failed: {e}")
-
-        # For a citekey query, keep only exact matches (fuzzy search returns near-misses).
+        # A citekey query keeps only exact matches (search is fuzzy near-miss).
         if args.citekey:
             raw_hits = select_citekey_matches(raw_hits, args.citekey)
 
@@ -571,7 +727,8 @@ def main() -> int:
 
     # --- Filter by matches_query (AND of all supplied strict keys) -----------
     papers = [
-        p for p in papers
+        p
+        for p in papers
         if matches_query(
             p,
             citekey=args.citekey,
@@ -588,7 +745,7 @@ def main() -> int:
         papers = [p for p in papers if p.library.lower() == lib_lower]
 
     if not papers:
-        print("No matches found in Zotero for the given query.", flush=True)
+        print_no_match(tokens, doi=args.doi, search_errors=search_errors)
         return 1
 
     # --- Enrich, classify, optionally render ---------------------------------
@@ -612,7 +769,7 @@ def main() -> int:
         if state == "ready-to-render" and not args.no_render:
             pdf = info["pdf_path"]
             out_dir = info["out_dir"]
-            assert pdf is not None and out_dir is not None
+            assert pdf is not None and out_dir is not None  # noqa: S101
             print(f"\n  [rendering {paper.citekey} via render.py ...]", flush=True)
             render_result = render_via_subprocess(
                 pdf, out_dir, allow_mocr=args.allow_mocr

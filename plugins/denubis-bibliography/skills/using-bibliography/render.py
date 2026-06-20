@@ -75,7 +75,9 @@ def main() -> int:
         )
     ctx = (
         mocr_server(
-            mocr_cfg["repo"], port=mocr_cfg["port"], startup_timeout=mocr_cfg["startup_timeout"]
+            mocr_cfg["repo"],
+            port=mocr_cfg["port"],
+            startup_timeout=mocr_cfg["startup_timeout"],
         )
         if (args.allow_mocr and mocr_cfg)
         else nullcontext(None)

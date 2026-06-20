@@ -82,7 +82,12 @@ def test_returns_every_library_copy_of_a_citekey():
 
 
 def test_no_match_returns_empty():
-    assert resolve.select_citekey_matches(HITS, "lakatosFalsificationMethodologyScientific1970a") == []
+    assert (
+        resolve.select_citekey_matches(
+            HITS, "lakatosFalsificationMethodologyScientific1970a"
+        )
+        == []
+    )
 
 
 # --- matches_query / classify_state / collection_names ----------------------
@@ -92,7 +97,10 @@ def _vehtari():
     return resolve.Paper(
         citekey="vehtariPracticalBayesianModel2017",
         doi="10.1007/s11222-016-9696-4",
-        title="Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC",
+        title=(
+            "Practical Bayesian model evaluation using "
+            "leave-one-out cross-validation and WAIC"
+        ),
         authors=("Vehtari", "Gelman"),
         year=2017,
         library="My Library",
@@ -102,7 +110,9 @@ def _vehtari():
 
 
 def test_matches_query_by_citekey_exact():
-    assert resolve.matches_query(_vehtari(), citekey="vehtariPracticalBayesianModel2017")
+    assert resolve.matches_query(
+        _vehtari(), citekey="vehtariPracticalBayesianModel2017"
+    )
     assert not resolve.matches_query(_vehtari(), citekey="somethingElse2020")
 
 
@@ -135,11 +145,34 @@ def test_matches_query_ands_all_constraints():
 
 
 def test_classify_state_progression():
-    assert resolve.classify_state(found=False, has_pdf=False, pdf_exists=False, rendered=False) == "not-in-zotero"
-    assert resolve.classify_state(found=True, has_pdf=False, pdf_exists=False, rendered=False) == "no-pdf"
-    assert resolve.classify_state(found=True, has_pdf=True, pdf_exists=False, rendered=False) == "no-pdf"
-    assert resolve.classify_state(found=True, has_pdf=True, pdf_exists=True, rendered=False) == "ready-to-render"
-    assert resolve.classify_state(found=True, has_pdf=True, pdf_exists=True, rendered=True) == "rendered"
+    assert (
+        resolve.classify_state(
+            found=False, has_pdf=False, pdf_exists=False, rendered=False
+        )
+        == "not-in-zotero"
+    )
+    assert (
+        resolve.classify_state(
+            found=True, has_pdf=False, pdf_exists=False, rendered=False
+        )
+        == "no-pdf"
+    )
+    assert (
+        resolve.classify_state(
+            found=True, has_pdf=True, pdf_exists=False, rendered=False
+        )
+        == "no-pdf"
+    )
+    assert (
+        resolve.classify_state(
+            found=True, has_pdf=True, pdf_exists=True, rendered=False
+        )
+        == "ready-to-render"
+    )
+    assert (
+        resolve.classify_state(found=True, has_pdf=True, pdf_exists=True, rendered=True)
+        == "rendered"
+    )
 
 
 def test_collection_names_maps_known_and_passes_through_unknown():
@@ -236,7 +269,10 @@ def test_normalize_bbt_hit_missing_author_list():
 
 
 def test_normalize_bbt_hit_author_without_family_skipped():
-    hit = {**BBT_HIT, "author": [{"given": "Anonymous"}, {"family": "Gelman", "given": "Andrew"}]}
+    hit = {
+        **BBT_HIT,
+        "author": [{"given": "Anonymous"}, {"family": "Gelman", "given": "Andrew"}],
+    }
     p = resolve.normalize_bbt_hit(hit)
     assert p.authors == ("Gelman",)
 
@@ -269,3 +305,142 @@ def test_normalize_bbt_hit_collection_keys_always_empty_tuple():
     # BBT item.search hits carry no collection info — always empty.
     p = resolve.normalize_bbt_hit(BBT_HIT)
     assert p.collection_keys == ()
+
+
+# --- search_tokens (union of every supplied key; Bug B) ----------------------
+#
+# BBT item.search indexes only the FIRST author surname and is AND-fuzzy, so the
+# old "pick ONE key by priority" elif chain silently failed whenever that key was
+# a co-author or a drifted title. search_tokens returns every supplied key so the
+# shell can union the hits and let matches_query filter; recall from the union,
+# precision from the filter.
+
+
+def test_search_tokens_unions_author_and_title():
+    # The exact query that returned "No matches" while the paper was present:
+    # author is the SECOND author (Wade, Ghahramani), so an author-only search
+    # finds nothing — but the title token does, and the union carries it.
+    assert resolve.search_tokens(
+        author="Ghahramani", title="Bayesian Cluster Analysis"
+    ) == ["Ghahramani", "Bayesian Cluster Analysis"]
+
+
+def test_search_tokens_order_is_citekey_author_freeterm_title():
+    assert resolve.search_tokens(
+        citekey="k2020", author="Smith", freeterm="ft", title="A Title"
+    ) == ["k2020", "Smith", "ft", "A Title"]
+
+
+def test_search_tokens_dedupes_repeated_values():
+    assert resolve.search_tokens(author="dup", freeterm="dup") == ["dup"]
+
+
+def test_search_tokens_ignores_none_and_blank():
+    assert resolve.search_tokens(author=None, title="   ", freeterm="") == []
+
+
+def test_search_tokens_empty_when_nothing_supplied():
+    assert resolve.search_tokens() == []
+
+
+# --- matches_query author: hyphen-component matching (Bug A) ------------------
+#
+# BBT item.search substring-matches a partial surname ("Malsiner" surfaces the
+# "Malsiner-Walli" item), but the old exact-equality filter then DROPPED it. A
+# hyphen-split component matches; a space-split component does NOT (else "van"
+# would match every "van X"); no arbitrary substring (so "Veh" never matches
+# "Vehtari").
+
+
+def _malsiner():
+    return resolve.Paper(
+        citekey="malsiner-walliModelbasedClusteringBased2016",
+        doi="10.1007/s11222-014-9500-2",
+        title="Model-based clustering based on sparse finite Gaussian mixtures",
+        authors=("Malsiner-Walli", "Frühwirth-Schnatter", "Grün"),
+        year=2016,
+        library="2026-mq-amanda-annotation-survey",
+        library_id=26,
+        collection_keys=(),
+    )
+
+
+def _van_onna():
+    return resolve.Paper(
+        citekey="vanonnaBayesianEstimation2002",
+        doi="",
+        title="Bayesian estimation of conditional independence",
+        authors=("van Onna",),
+        year=2002,
+        library="My Library",
+        library_id=1,
+        collection_keys=(),
+    )
+
+
+def test_matches_query_author_matches_hyphen_component():
+    assert resolve.matches_query(_malsiner(), author="Malsiner")
+    assert resolve.matches_query(_malsiner(), author="Walli")
+    assert resolve.matches_query(_malsiner(), author="Frühwirth")
+    assert resolve.matches_query(_malsiner(), author="malsiner-walli")  # exact still
+
+
+def test_matches_query_author_does_not_space_split():
+    assert resolve.matches_query(_van_onna(), author="van Onna")
+    assert not resolve.matches_query(_van_onna(), author="van")
+
+
+def test_matches_query_author_no_arbitrary_substring():
+    assert not resolve.matches_query(_vehtari(), author="Veh")
+    assert not resolve.matches_query(_vehtari(), author="elman")
+
+
+# --- diacritic folding (Bug C) -----------------------------------------------
+#
+# BBT item.search matches against an ASCII-folded index, so a query carrying
+# diacritics ("Frühwirth", "Grün") returns zero while the paper — filed with the
+# ASCII citekey "fruhwirth-schnatter…" — is present. The fix folds on the search
+# side (search the folded variant too) and on the filter side (matches_query
+# compares folded on both sides), so the correctly-spelled name and its ASCII
+# form both resolve.
+
+
+def test_ascii_fold_strips_diacritics_preserving_case():
+    assert resolve._ascii_fold("Frühwirth") == "Fruhwirth"
+    assert resolve._ascii_fold("Grün") == "Grun"
+    assert resolve._ascii_fold("Méthodes") == "Methodes"
+    assert resolve._ascii_fold("Ghahramani") == "Ghahramani"  # ASCII: unchanged
+
+
+def test_search_tokens_adds_ascii_folded_variant():
+    # The exact From-here-to-infinity failure: "Frühwirth" must also be searched
+    # as "Fruhwirth" or BBT's folded index never surfaces the paper.
+    assert resolve.search_tokens(author="Frühwirth") == ["Frühwirth", "Fruhwirth"]
+
+
+def test_search_tokens_no_fold_variant_for_pure_ascii():
+    assert resolve.search_tokens(author="Ghahramani") == ["Ghahramani"]
+
+
+def test_matches_query_author_diacritic_insensitive():
+    p = _malsiner()  # authors: Malsiner-Walli, Frühwirth-Schnatter, Grün
+    assert resolve.matches_query(p, author="Frühwirth")  # umlaut as filed
+    assert resolve.matches_query(p, author="Fruhwirth")  # ASCII as typed
+    assert resolve.matches_query(p, author="Grün")
+    assert resolve.matches_query(p, author="Grun")
+
+
+def test_matches_query_title_diacritic_insensitive():
+    p = resolve.Paper(
+        citekey="mueller2020",
+        doi="",
+        title="Méthodes de clustering bayésien",
+        authors=("Müller",),
+        year=2020,
+        library="My Library",
+        library_id=1,
+        collection_keys=(),
+    )
+    assert resolve.matches_query(p, title="methodes")  # ASCII query, accented title
+    assert resolve.matches_query(p, title="Méthodes")
+    assert resolve.matches_query(p, author="Muller")

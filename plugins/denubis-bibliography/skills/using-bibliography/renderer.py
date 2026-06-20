@@ -105,7 +105,8 @@ def quality_assessment(pages: list[str]) -> dict:
     # marker-only page (image-only PDF page) correctly registers as empty.
     # FFFD count uses raw page text - the marker doesn't contain U+FFFD.
     empty_count = sum(
-        1 for p in pages
+        1
+        for p in pages
         if len(_strip_structural_markers(p).strip()) < EMPTY_PAGE_CHAR_THRESHOLD
     )
     empty_fraction = empty_count / len(pages)
@@ -119,9 +120,7 @@ def quality_assessment(pages: list[str]) -> dict:
             f"{empty_count}/{len(pages)} pages have <{EMPTY_PAGE_CHAR_THRESHOLD} chars"
         )
     if fffd_ratio > REPLACEMENT_CHAR_RATIO_THRESHOLD:
-        reasons.append(
-            f"{fffd_count} U+FFFD chars ({fffd_ratio:.2%} of {total_chars})"
-        )
+        reasons.append(f"{fffd_count} U+FFFD chars ({fffd_ratio:.2%} of {total_chars})")
 
     return {
         "verdict": "fail" if reasons else "pass",
@@ -135,9 +134,7 @@ def quality_assessment(pages: list[str]) -> dict:
 
 # dots.mocr's combined `_nohf.md` marks page boundaries with
 # `<!-- ===== page N ===== -->`. We split on these to recover per-page text.
-_MOCR_PAGE_MARKER_RE = re.compile(
-    r"<!--\s*=+\s*page\s+\d+\s*=+\s*-->", re.IGNORECASE
-)
+_MOCR_PAGE_MARKER_RE = re.compile(r"<!--\s*=+\s*page\s+\d+\s*=+\s*-->", re.IGNORECASE)
 # dots.mocr embeds a full-page PNG atop each page as a markdown data-image
 # (~86% of the file's bytes on COSMIN). Strip these so papers/ keeps only the
 # OCR text — base64 bloat swamps the files and wrecks blockquote matching.
@@ -221,7 +218,11 @@ class NeedsMocr(Exception):
             if a.get("total_pages")
         ]
         frac = min(fracs) if fracs else None
-        detail = f" ({frac:.0%} of pages near-empty on the best attempt)" if frac is not None else ""
+        detail = (
+            f" ({frac:.0%} of pages near-empty on the best attempt)"
+            if frac is not None
+            else ""
+        )
         super().__init__(
             f"{pdf.name}: cascade could not produce a usable render{detail}. "
             "Re-run with --allow-mocr to escalate to dots.mocr (GPU OCR)."
@@ -236,7 +237,7 @@ class NeedsMocr(Exception):
 # server is started once per run and stopped on exit.
 
 
-def _free_gpu(progress: Progress) -> None:
+def _free_gpu(_progress: Progress) -> None:
     """Release VRAM held by easyocr/docling before vLLM claims the GPU."""
     import gc
 
@@ -246,7 +247,7 @@ def _free_gpu(progress: Progress) -> None:
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-    except Exception:
+    except Exception:  # noqa: S110 (best-effort VRAM release before vLLM)
         pass
 
 
@@ -256,7 +257,9 @@ class _MocrSession:
     already-running server; the owning context manager stops it on exit only
     if this session started it."""
 
-    def __init__(self, repo: Path, port: int, startup_timeout: float, progress: Progress):
+    def __init__(
+        self, repo: Path, port: int, startup_timeout: float, progress: Progress
+    ):
         self.repo = Path(repo).expanduser()
         self.port = port
         self.startup_timeout = startup_timeout
@@ -267,10 +270,15 @@ class _MocrSession:
     def _server_up(self) -> bool:
         import subprocess
 
-        return subprocess.run(
-            ["curl", "-sf", f"http://localhost:{self.port}/v1/models"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        ).returncode == 0
+        return (
+            subprocess.run(
+                ["curl", "-sf", f"http://localhost:{self.port}/v1/models"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            ).returncode
+            == 0
+        )
 
     def _ensure_server(self) -> None:
         import subprocess
@@ -287,8 +295,10 @@ class _MocrSession:
         _free_gpu(self.progress)
         self.progress("  starting vLLM (dots.mocr); model load takes minutes...")
         self._proc = subprocess.Popen(
-            ["fish", str(serve)], cwd=str(self.repo),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            ["fish", str(serve)],
+            cwd=str(self.repo),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         self._started_by_us = True
         start = time.monotonic()
@@ -313,14 +323,20 @@ class _MocrSession:
         self.progress(f"  OCR via dots.mocr: {pdf.name}")
         subprocess.run(
             ["fish", str(self.repo / "dots-ocr.fish"), str(pdf), str(outdir)],
-            cwd=str(self.repo), check=True,
+            cwd=str(self.repo),
+            check=True,
         )
         jsonls = list(outdir.glob("*.jsonl"))
         if not jsonls:
             raise RuntimeError(f"mocr: dots-ocr produced no .jsonl in {outdir}")
         subprocess.run(
-            ["python3", str(self.repo / "tools" / "combine_markdown.py"), str(jsonls[0])],
-            cwd=str(self.repo), check=True,
+            [
+                "python3",
+                str(self.repo / "tools" / "combine_markdown.py"),
+                str(jsonls[0]),
+            ],
+            cwd=str(self.repo),
+            check=True,
         )
         # combine writes <stem>_nohf.md at the outdir root; per-page _nohf files
         # live under the <stem>/ subdir, so a non-recursive glob picks the combined one.
@@ -338,7 +354,7 @@ class _MocrSession:
         stopper = self.repo / "dots-stop.fish"
         if stopper.is_file():
             self.progress("  stopping vLLM (freeing VRAM)...")
-            subprocess.run(["fish", str(stopper)], cwd=str(self.repo))
+            subprocess.run(["fish", str(stopper)], cwd=str(self.repo), check=False)
 
 
 @contextmanager
@@ -391,18 +407,30 @@ def render_pdf_with_fallback(
         except ImportError as e:
             progress(f"    {label} not installed: {e}")
             attempts.append(
-                {"renderer": renderer, "ocr": ocr, "verdict": "import-error", "error": str(e)}
+                {
+                    "renderer": renderer,
+                    "ocr": ocr,
+                    "verdict": "import-error",
+                    "error": str(e),
+                }
             )
             continue
         except Exception as e:
             progress(f"    {label} crashed: {e}")
             attempts.append(
-                {"renderer": renderer, "ocr": ocr, "verdict": "crashed", "error": str(e)}
+                {
+                    "renderer": renderer,
+                    "ocr": ocr,
+                    "verdict": "crashed",
+                    "error": str(e),
+                }
             )
             continue
 
         qa = quality_assessment(pages)
-        attempts.append({"renderer": renderer, "ocr": ocr, "verdict": qa["verdict"], **qa})
+        attempts.append(
+            {"renderer": renderer, "ocr": ocr, "verdict": qa["verdict"], **qa}
+        )
         if qa["verdict"] == "pass":
             progress(
                 f"    {label} OK: {qa['total_pages']} pages, "
@@ -415,13 +443,18 @@ def render_pdf_with_fallback(
         progress("  escalating to mocr (dots.mocr GPU OCR)...")
         pages, source_md = mocr_session.render(pdf)
         qa = quality_assessment(pages)
-        attempts.append({"renderer": "mocr", "ocr": True, "verdict": qa["verdict"], **qa})
+        attempts.append(
+            {"renderer": "mocr", "ocr": True, "verdict": qa["verdict"], **qa}
+        )
         if qa["verdict"] == "pass":
             progress(
-                f"    mocr OK: {qa['total_pages']} pages, {qa['empty_pages']} near-empty"
+                f"    mocr OK: {qa['total_pages']} pages,"
+                f" {qa['empty_pages']} near-empty"
             )
             extra = {"source_md": source_md} if source_md else None
-            return _write_outputs(pages, pdf, out_dir, "mocr", True, attempts, extra_meta=extra)
+            return _write_outputs(
+                pages, pdf, out_dir, "mocr", True, attempts, extra_meta=extra
+            )
         raise RuntimeError(
             f"mocr also failed for {pdf.name}: {'; '.join(qa['reasons'])}"
         )

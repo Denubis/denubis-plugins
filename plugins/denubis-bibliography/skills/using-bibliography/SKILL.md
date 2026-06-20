@@ -92,9 +92,17 @@ Auto-render is ON by default (`--no-render` suppresses; `--force` re-renders;
 **Truthful by construction:** a wrong/constructed citekey returns an honest "No
 matches" rather than a guess; the same paper is listed once per library it lives
 in; a PDF that can't be confirmed (unresolved library name / failed lookup) is
-`pdf-unknown`, never a false `no-pdf`. `--author` matches an **exact surname as
-filed** in Zotero — so a mis-filed creator (see Common mistakes), initials, or a
-partial name won't match; fall back to `--title`.
+`pdf-unknown`, never a false `no-pdf`. `resolve.py` searches **every** supplied
+key and unions the hits, so a query keyed on a co-author still resolves when
+another key matches — BBT `item.search` indexes only the *first* author surname,
+which is why the old single-key search reported present papers as absent.
+`--author` matches a full surname or a **hyphen-component** of one (`Malsiner`
+finds `Malsiner-Walli`, `Frühwirth` finds `Frühwirth-Schnatter`), and is
+**diacritic-insensitive** (`Frühwirth` and `Fruhwirth` both resolve, because BBT's
+index is ASCII-folded); initials and arbitrary substrings still do not match. A
+genuine no-match prints what was searched and states plainly that, `item.search`
+being AND-fuzzy and first-author-only, **a no-match is not proof of absence** —
+retry with the first author's surname or a distinctive `--title` word.
 
 **Known behaviour:** copies of one citekey across libraries share a single render
 dir `papers/<citekey>/`. The paper renders **once** — render state is per-citekey,
@@ -269,7 +277,17 @@ bib = requests.post(
   field — and no field combines author surname with title-word, so multi-token
   searches across these silently return zero hits even when the item exists.
   **Use single-token searches** (just an author surname OR just a title
-  fragment) and refine programmatically.
+  fragment) and refine programmatically. (`resolve.py` does this for you: it
+  searches every supplied key separately and unions the hits, then filters.)
+- **`item.search` indexes only the FIRST author surname.** A search for a
+  co-author (`Ghahramani` in "Wade, Ghahramani"; `Kruschke` in "Liddell,
+  Kruschke") returns zero — the paper is present, the search just can't see the
+  second author. Search the first author, or a title word.
+- **`item.search` matches an ASCII-folded index.** A query carrying diacritics
+  (`Frühwirth`, `Grün`) returns zero against the folded record (`fruhwirth`,
+  `grun`); the ASCII form finds it. `resolve.py` searches both the typed and the
+  ASCII-folded form and compares folded on both sides, so either spelling
+  resolves; by hand, fold the diacritics out of the query token.
 - **`item.search` does NOT index the DOI field.** Searching `"10.1111/jels.12413"`
   returns zero hits even for the exact item with that DOI. To resolve a DOI to
   a Zotero item, look up the DOI's first-author surname via Crossref
@@ -793,6 +811,9 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Constructing cite keys by hand or truncating them | Copy `citation-key` verbatim from `item.search` response. BBT keys are longer than they look. |
 | Searching by a remembered/constructed citekey, getting "not found", and concluding the paper is absent | The real key can differ from what you'd guess: a paper authored "Imre Lakatos" was filed with given/family swapped, so its key is `imreFalsificationMethodologyScientific1970`, not `lakatos…1970a`. Resolve with `resolve.py --title`/`--author` (or fix the misfiled creator in Zotero) — never trust a remembered citekey. |
 | Multi-token `item.search` queries returning zero hits | Search is AND-style. Use single tokens (author surname OR title fragment), then refine. |
+| Treating a `resolve.py` / `item.search` "no match" as proof a paper is absent | It is not. `item.search` is AND-fuzzy, **first-author-only**, and **ASCII-folded** — three independent ways a present paper returns zero. `resolve.py` now compensates (unions every supplied key, folds diacritics, matches hyphen-components), but if it still says no-match, query the API directly for a distinctive title word before concluding absence. The honest no-match message says exactly this. |
+| Searching `--author` for a co-author (`Ghahramani` in "Wade, Ghahramani"; `Kruschke` in "Liddell, Kruschke") and getting zero | `item.search` indexes only the FIRST author surname. Pass the first author, or add a `--title` word — `resolve.py` unions all supplied keys, so `--author <coauthor> --title <word>` resolves. |
+| Searching `--author Frühwirth` (diacritics) and getting zero | BBT's index is ASCII-folded, so `Frühwirth` misses `fruhwirth`. `resolve.py` searches the folded form too and compares folded on both sides; by hand, strip diacritics from the query token. |
 | Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | DOI field is not indexed for fulltext search. Resolve DOI → surname via Crossref, then search by surname, then filter results by exact DOI match. |
 | Using the storage directory name (e.g. `2367YXMF`) as the item key | That's the attachment key. The parent item has a different key; use cite-key based lookups. |
 | Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
@@ -1012,3 +1033,36 @@ discovery):
   removed: the claim was live-falsified — copies of one citekey can be
   byte-different PDF files (the rare genuinely-different-document case is a Zotero
   data-hygiene matter, not arbitrated here).
+
+**2026-06-19 addendum** (`resolve.py` false-negative fixes — three live-caught bugs):
+
+- Motivation: six papers genuinely present in a group library
+  (`2026-mq-amanda-annotation-survey`) resolved as "No matches", and the negatives
+  were treated as proof of absence. Querying BBT directly proved the papers were
+  there and exposed three independent false-negative bugs, each fixed with a
+  failing test first.
+- **Bug B — single-key search.** The old token-picker searched ONE key by priority
+  (citekey > author > freeterm > title); a query keyed on a co-author returned zero
+  because `item.search` indexes only the first author surname, and the title that
+  would have found it was used only as a post-filter. New pure `search_tokens`
+  returns every supplied key; the shell unions the hits and `matches_query` filters.
+  Recall from the union, precision from the filter.
+- **Bug A — exact author filter.** `matches_query` demanded an exact surname, so
+  `--author Malsiner` found then dropped `Malsiner-Walli`. Now a hyphen-component
+  matches (hyphen only — space-splitting would make "van" match every "van X"; no
+  arbitrary substring, so "Veh" never matches "Vehtari").
+- **Bug C — diacritics.** BBT's `item.search` index is ASCII-folded, so the
+  correctly-spelled `Frühwirth` returned zero against `fruhwirth` while the paper
+  was present. New `_ascii_fold` (stdlib NFKD, drop combining marks) is applied to
+  the search token (the folded variant is searched too) and on both sides of the
+  `matches_query` author/title comparison, so `Frühwirth` and `Fruhwirth` resolve
+  to the same paper.
+- The bare "No matches found" was replaced with an honest message: it lists the
+  tokens searched and states that `item.search` being AND-fuzzy and first-author-only
+  means a no-match is not proof of absence, pointing at the retry that works. This is
+  the keystone fix — the bug was a session treating a flaky negative as fact.
+- 15 new unit tests in `tests/test_bibliography_resolve.py` cover `search_tokens`
+  (union, order, dedup, blanks, ASCII-fold variant), the author hyphen-component and
+  space/substring guards, and diacritic folding on author and title. All six papers
+  verified resolving live via natural queries (co-author and accented-surname
+  included).

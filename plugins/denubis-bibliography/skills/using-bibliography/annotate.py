@@ -91,7 +91,7 @@ def quote_fingerprint(quote: str) -> str:
     PDF text layer — the two differ in spacing and line breaks.
     """
     norm = _normalise_quote(quote).encode("utf-8")
-    return hashlib.sha1(norm).hexdigest()[:8]
+    return hashlib.sha1(norm, usedforsecurity=False).hexdigest()[:8]
 
 
 def build_annotation_comment(*, note: str, citekey: str, page: int, quote: str) -> str:
@@ -170,7 +170,9 @@ def parse_highlight_response(status_code: int, body: str, content_type: str) -> 
     try:
         data = json.loads(body)
     except json.JSONDecodeError:
-        raise HighlightError(body.strip() or f"add-highlight failed ({status_code})")
+        raise HighlightError(
+            body.strip() or f"add-highlight failed ({status_code})"
+        ) from None
     raise HighlightError(data.get("message", body.strip()), code=data.get("code"))
 
 
@@ -226,7 +228,7 @@ def probe_plus() -> None:
 
     try:
         banner = httpx.get(PLUS_PROBE, timeout=3).text
-    except Exception as e:  # noqa: BLE001 - any transport failure is fatal here
+    except Exception as e:
         sys.exit(
             f"zotero-api-plus not reachable on {PLUS_PROBE} ({e}).\n"
             "Annotating requires Zotero running with the zotero-api-plus plugin "
@@ -409,11 +411,16 @@ def _print_result(res: dict) -> None:
     if status == "highlighted":
         print(f"  ✓ highlighted {where} (annotation {res['key']})", flush=True)
     elif status == "noted":
-        print(f"  ◐ noted {where} (annotation {res['key']}) — {res['reason']}", flush=True)
+        print(
+            f"  ◐ noted {where} (annotation {res['key']}) — {res['reason']}", flush=True
+        )
     elif status == "skipped":
         print(f"  · skipped {where} (already annotated)", flush=True)
     elif status == "dry-run":
-        print(f"  ? {where}: would {res['would']} ({len(res['rects'])} rect(s))", flush=True)
+        print(
+            f"  ? {where}: would {res['would']} ({len(res['rects'])} rect(s))",
+            flush=True,
+        )
 
 
 def main() -> int:
@@ -423,7 +430,9 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("citekey", nargs="?", help="Zotero citekey of the cited paper.")
-    parser.add_argument("--page", type=int, help="1-based physical PDF page of the quote.")
+    parser.add_argument(
+        "--page", type=int, help="1-based physical PDF page of the quote."
+    )
     parser.add_argument("--quote", help="The verbatim quoted passage to highlight.")
     parser.add_argument("--note", default="", help="Note to attach to the highlight.")
     parser.add_argument("--color", help="Highlight colour #rrggbb (default: Zotero's).")
@@ -432,7 +441,9 @@ def main() -> int:
         help="JSONL file; each line {citekey, page, quote, note?}. Loops annotate_one.",
     )
     parser.add_argument(
-        "--list", metavar="CITEKEY", help="List existing annotations on a paper and exit."
+        "--list",
+        metavar="CITEKEY",
+        help="List existing annotations on a paper and exit.",
     )
     parser.add_argument(
         "--dry-run",
@@ -454,8 +465,8 @@ def main() -> int:
 
     if args.batch:
         results: list[dict] = []
-        for line in Path(args.batch).read_text(encoding="utf-8").splitlines():
-            line = line.strip()
+        for raw_line in Path(args.batch).read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
             if not line:
                 continue
             item = json.loads(line)
