@@ -8,7 +8,7 @@ user-invocable: true
 
 ## Overview
 
-Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, shaped by the `critical-peer-review` rubric. The script stages the target's git repo **minus gitignored files**, so codex can check the target's cross-references (cited code, bibliography, run logs) without raw data or secrets in its working tree. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
+Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, shaped by the `critical-peer-review` rubric. The script stages the target's git repo **minus gitignored files and binaries**, so codex can check the target's cross-references (cited code, run logs) within the repo without raw data, secrets, or PDFs in its working tree. **Context stops at the repo**: references that point outside it — cited papers, external datasets — are flagged `[unverified]`, not chased across repos. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
 
 **Provenance is the spine of this skill.** Codex will sometimes produce a fluent, correctly-formatted review — GRADE matrix, severity tiers, even a faked "Verification" section — of a document it never actually read. A codex review is a *claim*, not a result, until its quotes are checked against the real target. The skill is built to catch that.
 

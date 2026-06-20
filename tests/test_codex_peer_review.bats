@@ -105,6 +105,16 @@ make_repo() {
     [ -f "$pkg/context/secret/note.md" ]
 }
 
+@test "git repo: binary files (e.g. PDFs) are skipped from context" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'PDF\000\001\002binary\000content\n' > "$TEST_DIR/repo/docs/paper.pdf"
+    run bash "$SCRIPT" docs/target.md
+    [ "$status" -eq 0 ]
+    local pkg; pkg="$(field package)"
+    [ -f "$pkg/context/docs/target.md" ]    # text kept
+    [ ! -e "$pkg/context/docs/paper.pdf" ]  # binary skipped
+}
+
 @test "git repo: prompt names the target and scopes the rest as context" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
     run bash "$SCRIPT" docs/target.md

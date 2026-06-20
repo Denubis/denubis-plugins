@@ -44,16 +44,21 @@ cp "$RUBRIC" "$work/REVIEW-METHOD.md"
 repo="$(git -C "$(dirname "$target_abs")" rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -n "$repo" ]; then
   rel="$(realpath --relative-to="$repo" "$target_abs")"
-  # tracked + untracked-but-not-ignored, copied preserving structure
+  # tracked + untracked-but-not-ignored, TEXT ONLY (skip binaries like PDFs —
+  # they are never useful review context and only bloat the disclosed tree),
+  # copied preserving structure.
   git -C "$repo" ls-files --cached --others --exclude-standard -z \
+    | { while IFS= read -r -d '' f; do
+          if grep -Iq . -- "$repo/$f" 2>/dev/null; then printf '%s\0' "$f"; fi
+        done; } \
     | tar --null -C "$repo" -T - -cf - \
     | tar -C "$ctx" -xf -
   # Ensure the chosen target is present even if it is itself gitignored —
   # reviewing it is an explicit choice that overrides the ignore filter.
   mkdir -p "$ctx/$(dirname "$rel")"
   cp "$target_abs" "$ctx/$rel"
-  n="$(git -C "$repo" ls-files --cached --others --exclude-standard | wc -l | tr -d ' ')"
-  echo "context:  $n non-ignored files staged from $repo"
+  n="$(find "$ctx" -type f | wc -l | tr -d ' ')"
+  echo "context:  $n text files staged from $repo (gitignored + binaries skipped)"
 else
   rel="$(basename "$target")"
   cp -r "$target_abs" "$ctx/$rel"
