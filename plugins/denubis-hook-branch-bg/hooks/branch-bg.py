@@ -6,6 +6,8 @@ Branch hash offsets hue (±40°), lightness (±0.03), and saturation (±0.10)
 to create visually related but distinct colours per worktree.
 """
 
+from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
+
 import colorsys
 import hashlib
 import json
@@ -39,7 +41,9 @@ def get_git_info() -> tuple[str | None, str | None]:
             # Resolve to absolute so the hash is stable regardless of cwd
             common_dir = os.path.realpath(common.stdout.strip())
             return common_dir, branch.stdout.strip()
-    except subprocess.TimeoutExpired, FileNotFoundError:
+    except subprocess.TimeoutExpired:
+        pass
+    except FileNotFoundError:
         pass
     return None, None
 
@@ -82,13 +86,15 @@ def find_terminal() -> str | None:
             fd0 = str(Path(f"/proc/{pid}/fd/0").readlink())
             if fd0.startswith("/dev/pts/") or fd0.startswith("/dev/tty"):
                 return fd0
-        except OSError, PermissionError:
+        except OSError:  # PermissionError is an OSError subclass
             pass
         try:
             with Path(f"/proc/{pid}/stat").open() as f:
                 parts = f.read().split()
                 pid = int(parts[3])  # ppid
-        except OSError, ValueError:
+        except OSError:
+            break
+        except ValueError:
             break
     return None
 

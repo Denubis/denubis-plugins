@@ -17,6 +17,8 @@ Detection covers:
 - gh repo clone/fork/view with explicit non-fork targets
 """
 
+from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
+
 import json
 import os
 import re

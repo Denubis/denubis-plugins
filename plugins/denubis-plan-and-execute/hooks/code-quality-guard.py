@@ -21,6 +21,8 @@ Exit codes:
   2 = deny (block the tool call)
 """
 
+from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
+
 import json
 import re
 import sys
@@ -254,7 +256,9 @@ WARNING_CHECKS = [
 def main() -> int:
     try:
         input_data = json.load(sys.stdin)
-    except json.JSONDecodeError, EOFError:
+    except json.JSONDecodeError:
+        return 0
+    except EOFError:
         return 0
 
     file_path = get_file_path(input_data)

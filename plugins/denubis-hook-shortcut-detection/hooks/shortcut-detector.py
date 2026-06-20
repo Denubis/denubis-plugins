@@ -15,6 +15,8 @@ Loop prevention:
 - New session = new transcript path = no lockfile = re-armed.
 """
 
+from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
+
 import hashlib
 import json
 import re
@@ -82,7 +84,7 @@ def get_last_assistant_content(transcript_path: str) -> str | None:
                         last_assistant_content = " ".join(text_parts)
                 except json.JSONDecodeError:
                     continue
-    except FileNotFoundError, PermissionError, OSError:
+    except OSError:  # FileNotFoundError/PermissionError are OSError subclasses
         pass
 
     return last_assistant_content
