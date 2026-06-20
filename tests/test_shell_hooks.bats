@@ -46,32 +46,5 @@ REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
     [[ "$result" == *"skill"* ]]
 }
 
-# ---------------------------------------------------------------------------
-# denubis-plan-and-execute session-start.sh
-# ---------------------------------------------------------------------------
-@test "plan-and-execute session-start outputs valid JSON" {
-    run bash "$REPO_ROOT/plugins/denubis-plan-and-execute/hooks/session-start.sh"
-    [ "$status" -eq 0 ]
-    echo "$output" | jq . > /dev/null
-}
-
-@test "plan-and-execute session-start has hookEventName SessionStart" {
-    run bash "$REPO_ROOT/plugins/denubis-plan-and-execute/hooks/session-start.sh"
-    result=$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')
-    [ "$result" = "SessionStart" ]
-}
-
-@test "plan-and-execute session-start includes skill content" {
-    run bash "$REPO_ROOT/plugins/denubis-plan-and-execute/hooks/session-start.sh"
-    result=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
-    # Should contain content from the using-plan-and-execute skill
-    [[ "$result" == *"EXTREMELY_IMPORTANT"* ]]
-    [[ "$result" == *"skill"* ]]
-}
-
-@test "plan-and-execute session-start JSON-escapes special characters" {
-    # The skill file contains quotes and newlines — verify they survive JSON encoding
-    run bash "$REPO_ROOT/plugins/denubis-plan-and-execute/hooks/session-start.sh"
-    # If jq can parse it, the escaping worked
-    echo "$output" | jq -r '.hookSpecificOutput.additionalContext' > /dev/null
-}
+# denubis-plan-and-execute session-start was rewritten in Python; its tests
+# moved to tests/test_session_start_hook.py.
