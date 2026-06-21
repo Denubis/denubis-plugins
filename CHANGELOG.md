@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-external-agents] 0.3.0
+
+The codex-peer-review skill now takes a one-line focus note and tells Claude to lean on the runner's staging instead of hand-building context for the reviewer.
+
+**New:**
+- Optional second argument: a one-line focus note (e.g. `"check the RQ2 fixes hold and that RQ1 calibration matches the prereg"`) injected into codex's prompt as a priority hint. It sits after the anti-fabrication grounding rules and never narrows the target's scope or relaxes the verbatim-quote requirement. A specific ask is what makes a run worth it; with none, codex roams the repo and returns a sprawling, low-signal review. The note is echoed in the run banner.
+
+**Changed:**
+- The skill instructs Claude to pass a focus note and NOT to assemble a hand-picked `context/` directory or write the reviewer an orientation README — the runner already stages the surrounding repo, so that scaffolding was a `0.1.0`-era workaround for the old single-file staging. Quick-reference and common-mistakes updated to match.
+
 ## [denubis-external-agents] 0.2.0
 
 The codex-peer-review skill now runs with repository context and persists reviews in a gitignored `.review/`, replacing the single-file `/tmp` smoke test.
