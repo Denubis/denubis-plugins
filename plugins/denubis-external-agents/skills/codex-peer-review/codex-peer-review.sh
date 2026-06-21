@@ -16,7 +16,13 @@
 # next to this script, so the skill is self-contained. The review output is
 # written to ./.review/ (gitignored) in the working directory.
 #
-# Usage: codex-peer-review.sh <file-or-dir-to-review>
+# An optional one-line focus note (second arg) tells codex what to prioritise —
+# a specific ask ("check the RQ2 fixes hold and that RQ1 calibration matches the
+# prereg") yields a sharper review than letting it roam. The note is a priority
+# hint only: it is injected AFTER the anti-fabrication grounding rules and never
+# narrows the target's scope or relaxes the verbatim-quote requirement.
+#
+# Usage: codex-peer-review.sh <file-or-dir-to-review> ["one-line focus note"]
 
 set -euo pipefail
 
@@ -25,7 +31,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUBRIC="$SCRIPT_DIR/review-method.md"       # bundled copy of critical-peer-review.md
 PROMPT_FILE="$SCRIPT_DIR/peer-review-smoke-prompt.md"
 
-target="${1:?usage: codex-peer-review.sh <file-or-dir-to-review>}"
+target="${1:?usage: codex-peer-review.sh <file-or-dir-to-review> [\"one-line focus note\"]}"
+focus="${2:-}"
 [ -e "$target" ]      || { echo "target not found: $target"      >&2; exit 1; }
 [ -f "$RUBRIC" ]      || { echo "rubric not found: $RUBRIC"      >&2; exit 1; }
 [ -f "$PROMPT_FILE" ] || { echo "prompt not found: $PROMPT_FILE" >&2; exit 1; }
@@ -78,11 +85,22 @@ out="$review_dir/$(basename "$target").$(date +%Y%m%d-%H%M%S).REVIEW.md"
 echo "package:  $work"
 echo "rubric:   REVIEW-METHOD.md"
 echo "target:   $target_in_ctx"
+[ -n "$focus" ] && echo "focus:    $focus"
 echo "running codex ($MODEL, read-only)…"
 echo
 
-# Prompt = grounding template + the explicit target path, piped on stdin.
-{ cat "$PROMPT_FILE"; echo; echo "REVIEW TARGET: $target_in_ctx"; } \
+# Prompt = grounding template + optional focus hint + the explicit target path,
+# piped on stdin. The focus note comes AFTER the template's grounding rules so it
+# reads as a priority, never an override of the anti-fabrication rules.
+{ cat "$PROMPT_FILE"
+  echo
+  if [ -n "$focus" ]; then
+    echo "REVIEW FOCUS (the requester's priorities — give these extra attention," \
+         "but still review the whole target and obey the grounding rules above;" \
+         "focus does not narrow scope or relax the verbatim-quote requirement): $focus"
+    echo
+  fi
+  echo "REVIEW TARGET: $target_in_ctx"; } \
   | codex exec \
       -s read-only \
       --ignore-user-config \

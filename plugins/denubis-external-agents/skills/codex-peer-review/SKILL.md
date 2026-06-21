@@ -25,15 +25,19 @@ Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, s
 
 1. **Identify the target** — the file or directory the user named. Require one; do not invent a target.
 
-2. **Run the script.** It stages the target's git repo (minus gitignored files) plus the rubric into a throwaway `/tmp` dir, runs codex with that as its only root, and writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review). If the target is not in a git repo, it reviews the file alone with no context.
+2. **Write a one-line focus note.** A specific ask is what makes the review worth running: the value lands when codex is told what to check, not when it roams the repo. Name the load-bearing claims to test, in one line — for a revised document, what the revision was meant to fix; for a fresh one, the decisions you most want a second pair of eyes on. Example: `"check the RQ2 fixes hold and that RQ1 calibration matches the prereg"`. If the user already named what worries them, use that.
+
+   **Do not hand-build context for codex.** The script stages the surrounding repo itself (next step). Do not assemble a `context/` directory of hand-picked files, and do not write the reviewer an orientation README — that is wasted effort the staging already covers. The focus note carries everything an orientation file would, in one line.
+
+3. **Run the script**, passing the target and the focus note. It stages the target's git repo (minus gitignored files and binaries) plus the rubric into a throwaway `/tmp` dir, runs codex with that as its only root, and writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review). If the target is not in a git repo, it reviews the file alone with no context.
    ```bash
-   bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>
+   bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target> "<one-line focus note>"
    ```
-   It prints the package dir, the staged target path, the review path, and a ready-made smoke-check command.
+   The focus note is optional and is injected as a priority hint, subordinate to the anti-fabrication grounding rules — it sharpens the review without narrowing the target's scope or relaxing the verbatim-quote requirement. The script prints the package dir, the staged target path, the focus note, the review path, and a ready-made smoke-check command.
 
-3. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
+4. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
 
-4. **Present** the verified review as codex's voice (below).
+5. **Present** the verified review as codex's voice (below).
 
 ## The provenance gate (non-negotiable)
 
@@ -56,7 +60,7 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 
 | Step | Command / action |
 |------|------------------|
-| Run | `bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target>` |
+| Run | `bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target> "<one-line focus note>"` |
 | Find review | `./.review/<target>.<ts>.REVIEW.md` (path printed as `review: …`) |
 | Verify (mandatory) | `grep -nF '<quote>' '<cited file>'` (target or context) for several findings |
 | On quote mismatch | discard the review, report confabulation |
@@ -71,3 +75,5 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 | Merging codex's findings into your own review | Keep voices separate; present codex's as codex's. |
 | Running on sensitive content | The repo minus gitignored goes to OpenAI. Ensure raw/sensitive data is gitignored (not committed) before running. |
 | Inventing a target when none was given | Require an explicit file/dir; codex confabulates when under-specified. |
+| Hand-building a `context/` dir or reviewer README | The script stages the repo for you. Pass a one-line focus note as the second argument instead; it carries the orientation in one line. |
+| Running with no focus note | Codex roams the repo unfocused and returns a sprawling, low-signal review. A one-line focus note on the load-bearing claims is what makes the run worth it. |
