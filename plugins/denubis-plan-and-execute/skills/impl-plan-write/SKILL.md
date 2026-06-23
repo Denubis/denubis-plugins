@@ -812,10 +812,16 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
    - Include the "Acceptance Criteria Coverage" section with literal AC copies
    - Write tasks that implement and test each listed AC case
 
-5. **Identify design decisions** from the implementation tasks you just wrote:
-   - A design decision is a choice where alternatives existed. If there was only one reasonable approach, it's not a decision worth reviewing.
-   - Look for: pattern choices, library selections, structural decisions, error handling strategies, trade-offs between approaches, architecture choices that affect downstream phases.
-   - Ignore: routine boilerplate, obvious implementations, choices dictated by the design plan's hard core commitments.
+5. **Find the genuine decisions — and only those.** Most phases surface none. Zero is the normal, good outcome; a phase that lists four "decisions" is almost always manufacturing them.
+
+   A genuine decision is a fork the design leaves open that you cannot settle on plain technical grounds. If the design plan, an acceptance criterion, or an obvious best practice already settles the choice, it is an implementation detail: write it to the plan and move on. It is not something to present.
+
+   Apply all three filters before presenting any candidate. Each one, on its own, disqualifies it:
+   - **Restatement.** If it restates what the design or an AC already says in other words, it is not a decision.
+   - **Invented alternative.** If you had to invent an alternative so you would have something to "consider", the alternative is not real and neither is the decision.
+   - **Obvious default.** If two competent engineers would pick the same option without discussion, that is a default. Write the default; do not present it.
+
+   A real decision survives all three: the design is silent, the alternatives are real, and a competent engineer could reasonably go either way. These live in structural choices later phases depend on, library selections with real trade-offs, and error-handling strategies the design left open. The lens analysis is for these survivors — it is not a form to fill in for every task.
 
 6. **Present to user** - Output the design decisions with lens analysis:
 
@@ -835,59 +841,34 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Design decisions in this phase:**
 
-### DR1: [Recommended decision statement] (recommended)
+*Most phases surface none. If step 5's filters leave nothing, write "No open decisions — the design settles this phase" and list what the phase delivers. Do not manufacture decisions to fill the section.*
 
-**Options considered:**
-- [Option A — the recommended choice]
-- [Option B]
-- [Option C, if applicable]
+*Each decision is plain language. The three lens lines below carry the substance — they are kept, not performed: the Popper line always routes a falsification to a test or a UAT check; the Lakatos and Haraway lines appear only when they genuinely fire.*
 
-**Counterarguments:**
-- [Option A]: [strongest argument against it]
-- [Option B]: [strongest argument against it]
+### DR1: [the decision, one plain sentence a non-specialist follows]
 
-**Recommendation:** [Option A] — [why, in one sentence].
+**What it implies:** [what each direction commits you to downstream — which later phases, data, or interfaces depend on this choice. This is the part the human is actually judging.]
 
-**This decision assumes:** [the assumption baked into the implementation]
-**To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
-**It's wrong if:** [the specific experience that shows the assumption failed your intent]
+**Where I lean:** [one plain sentence, and why. The human can overrule.]
 
-**Haraway:** [only if someone bears an invisible cost — vendor lock-in, accessibility, data residency, etc.]
-**Lakatos:** [only if DEGENERATING — cite specific evidence of workaround/scope-leak]
+**How we'd know it's wrong (Popper):** [the falsification, routed to where it gets checked:
+- A test can catch it → name it, `test_[name]`, added to test-requirements.md.
+- Only a human can judge it, and the experience exists now → write **This decision assumes / To shatter it / It's wrong if**, persisted to uat-requirements.md.
+- Only a human can judge it, but the experience doesn't exist yet → note the future phase and persist to uat-requirements.md under it, back-referencing DR[N].]
 
-### DR2: [Choice with automatable verification]
+**Works around / leaks into (Lakatos):** [only if the decision genuinely degenerates — cite the specific workaround, scope-leak, or conflict with a later phase. Omit otherwise.]
 
-**Options considered:**
-- [...]
+**Who bears the cost (Haraway):** [only if someone genuinely does — vendor lock-in, accessibility, data residency, security model. Omit otherwise.]
 
-**Recommendation:** [...]
-
-**Popper:** -> **test-requirement** — write [test type] test: `test_[name]` that [specific automated verification]. Added to test-requirements.md.
-**Lakatos: DEGENERATING** — [only if applicable, with specific evidence]
-
-### DR3: [Foundational choice — no user experience in this phase]
-
-**Options considered:**
-- [...]
-
-**Recommendation:** [...]
-
-**This decision assumes:** [assumption]
-**To shatter it:** Deferred to Phase [M] — the user-facing experience doesn't exist yet.
-**It's wrong if:** [what you'd see in Phase M that proves this foundation was wrong]
-*(Persisted to uat-requirements.md under Phase [M], back-reference DR3 from Phase [N])*
-
-### DR4: [Routine choice — no alternatives worth reviewing]
-**Popper:** -> **test-requirement** — `test_[name]`. Added to test-requirements.md.
-
-[Continue for all non-trivial decisions in this phase...]
+[Repeat only for decisions that survived step 5's filters. There is no target count; stop when the real ones run out.]
 ```
 
 7. **Use AskUserQuestion:**
 
-**The question MUST summarise what's being approved.** State the number of decisions reviewed, any Lakatos/Haraway flags raised, and the phase's key deliverables.
+**The question MUST summarise what's being approved.** State what the phase delivers, how many genuine decisions it surfaced (often zero), and any degeneration or cost flag raised.
 
-Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — retry wrapper). Creates auth middleware and token service, covers AC2.1-AC2.3."
+Example (no open decisions): "Phase 2: creates auth middleware and token service, covers AC2.1-AC2.3. No open decisions — the design settles this phase."
+Example (one decision): "Phase 3: comment store and import (AC1.6-AC1.7). One open decision — where comment ratings live (JSONB column vs separate table)."
 
 **Options:**
 - "Approved - proceed to write phase and continue"
