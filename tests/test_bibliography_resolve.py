@@ -578,7 +578,9 @@ def test_explain_autoexport_failure_endpoint_absent_tells_user_to_install():
     low = msg.lower()
     assert "0.4.0" in msg
     assert "install" in low or "upgrade" in low
-    assert "library pull" not in low or "would clobber" in low  # never recommends it
+    # If the message mentions the library pull at all, it must be to warn against
+    # it (the wrong-scope clobber), never to recommend it.
+    assert "would clobber" in low
 
 
 def test_explain_autoexport_failure_no_autoexport_lists_registered_paths():
@@ -604,3 +606,43 @@ def test_explain_autoexport_failure_bbt_states():
             resolve.AutoexportOutcome(kind="bbt-starting"), Path("/p.bib")
         ).lower()
     )
+
+
+# _trigger_autoexport is shell, but its retry-while-starting control flow is worth
+# pinning. Stub the HTTP boundary (post_run_autoexport) and use retry_delay=0 so
+# the tests neither touch the network nor sleep.
+def test_trigger_autoexport_retries_while_starting_then_succeeds(monkeypatch):
+    responses = iter(
+        [
+            (503, '{"status": "bbt-starting"}'),
+            (503, '{"status": "bbt-starting"}'),
+            (200, '{"status": "triggered", "path": "/p.bib"}'),
+        ]
+    )
+    monkeypatch.setattr(
+        resolve, "post_run_autoexport", lambda _p, **_k: next(responses)
+    )
+    out = resolve._trigger_autoexport(
+        Path("/p.bib"), starting_retries=3, retry_delay=0
+    )
+    assert out is not None
+    assert out.kind == "triggered"
+
+
+def test_trigger_autoexport_gives_up_after_starting_retries(monkeypatch):
+    monkeypatch.setattr(
+        resolve,
+        "post_run_autoexport",
+        lambda _p, **_k: (503, '{"status": "bbt-starting"}'),
+    )
+    out = resolve._trigger_autoexport(
+        Path("/p.bib"), starting_retries=2, retry_delay=0
+    )
+    assert out is not None
+    assert out.kind == "bbt-starting"
+
+
+def test_trigger_autoexport_unreachable_returns_none(monkeypatch):
+    # post_run_autoexport returns None on an httpx transport error (Zotero down).
+    monkeypatch.setattr(resolve, "post_run_autoexport", lambda _p, **_k: None)
+    assert resolve._trigger_autoexport(Path("/p.bib"), retry_delay=0) is None

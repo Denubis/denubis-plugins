@@ -49,6 +49,12 @@ RUN_AUTOEXPORT_ENDPOINT = "http://localhost:23119/api/plus/run-autoexport"
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 RENDER_SCRIPT = Path(__file__).resolve().parent / "render.py"
 
+# bibtexparser logs each malformed/truncated block to its own logger. During
+# polling we deliberately read mid-write (briefly truncated) files, so silence
+# that expected noise process-wide, once. getLogger works whether or not
+# bibtexparser is importable, so this stays safe without the PEP 723 deps.
+logging.getLogger("bibtexparser").setLevel(logging.CRITICAL)
+
 # Regex for auto-classifying a bare positional QUERY argument.
 _CITEKEY_RE = re.compile(r"^[a-z]+[A-Z]\w+\d{4}")
 _DOI_RE = re.compile(r"^10\.\d+/")
@@ -283,12 +289,11 @@ def check_bib(bib_text: str, citekey: str) -> BibCheck:
     citekey string yet be broken BibLaTeX. So we require the file to parse with no
     failed blocks AND the citekey to resolve to a real entry. bibtexparser is
     imported lazily so the module stays importable without the PEP 723 deps (the
-    httpx idiom); its per-failed-block logging is silenced because a briefly
-    truncated mid-write file during polling is expected, not news.
+    httpx idiom); its per-failed-block logging is silenced at module load (a
+    briefly truncated mid-write file during polling is expected, not news).
     """
     import bibtexparser  # noqa: PLC0415
 
-    logging.getLogger("bibtexparser").setLevel(logging.CRITICAL)
     library = bibtexparser.parse_string(bib_text)
     entry_keys = {e.key for e in library.entries}
     return BibCheck(
@@ -397,7 +402,13 @@ def explain_autoexport_failure(outcome: AutoexportOutcome, bib_path: Path) -> st
 def _timeout_message(
     last: BibCheck | None, bib_path: Path, citekey: str, poll_timeout: float
 ) -> str:
-    """Explain a verification timeout from the last bib check seen."""
+    """Explain a verification timeout from the last bib check seen.
+
+    poll_timeout is quoted only in the citekey-absent branch: there the elapsed
+    wait is the salient fact ("it didn't show up in time"). For "never appeared"
+    and "malformed" the file/parse problem is what matters, not the duration, so
+    it is deliberately omitted.
+    """
     if last is None:
         return f"  timed out: bib never appeared at {bib_path}."
     if not last.well_formed:
@@ -678,16 +689,24 @@ def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False)
     return "failed"
 
 
-def post_run_autoexport(bib_path: str, timeout: float = 30.0) -> tuple[int, str]:
+def post_run_autoexport(bib_path: str, timeout: float = 30.0) -> tuple[int, str] | None:
     """POST the bib path to the run-autoexport endpoint; return (status, body).
 
-    The endpoint forces BBT's own registered auto-export for this path to run. It
-    is trigger-only: a 200 means it fired, NOT that the export succeeded — the
-    caller proves success against the written file (check_bib).
+    Returns None when the endpoint is unreachable (an httpx transport error —
+    connect failure or timeout); any OTHER error propagates rather than being
+    mislabelled as unreachable, so a real bug surfaces. The endpoint forces BBT's
+    own registered auto-export for this path to run. Trigger-only: a 200 means it
+    fired, NOT that the export succeeded — the caller proves success against the
+    written file (check_bib).
     """
     import httpx  # noqa: PLC0415
 
-    r = httpx.post(RUN_AUTOEXPORT_ENDPOINT, json={"path": bib_path}, timeout=timeout)
+    try:
+        r = httpx.post(
+            RUN_AUTOEXPORT_ENDPOINT, json={"path": bib_path}, timeout=timeout
+        )
+    except httpx.TransportError:
+        return None
     return r.status_code, r.text
 
 
@@ -697,6 +716,33 @@ def _read_bib_text(bib_path: Path) -> str | None:
         return bib_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return None
+
+
+def _trigger_autoexport(
+    bib_path: Path, *, starting_retries: int = 3, retry_delay: float = 2.0
+) -> AutoexportOutcome | None:
+    """POST the trigger, retrying briefly while BBT reports it is still starting.
+
+    Returns the classified outcome, or None when the endpoint is unreachable
+    (post_run_autoexport returns None on an httpx transport error). `bbt-starting`
+    is the one outcome BBT expects the caller to retry (the spec), so we re-POST a
+    few times — handles the common cold-start-after-launch case.
+    """
+    attempt = 0
+    while True:
+        result = post_run_autoexport(str(bib_path))
+        if result is None:
+            return None
+        outcome = classify_autoexport_response(*result)
+        if outcome.kind != "bbt-starting" or attempt >= starting_retries:
+            return outcome
+        attempt += 1
+        print(
+            f"  Better BibTeX is still starting; retry {attempt}/{starting_retries} "
+            f"in {retry_delay:.0f}s ...",
+            flush=True,
+        )
+        time.sleep(retry_delay)
 
 
 def _poll_until_citeable(
@@ -756,18 +802,15 @@ def ensure_citeable(
                 flush=True,
             )
 
-    # Trigger the registered auto-export.
-    try:
-        status_code, body = post_run_autoexport(str(bib_path))
-    except Exception as e:
+    # Trigger the registered auto-export (retrying briefly while BBT is starting).
+    outcome = _trigger_autoexport(bib_path)
+    if outcome is None:
         print(
-            f"  could not reach the run-autoexport endpoint ({e}).\n"
+            "  could not reach the run-autoexport endpoint (connection failed).\n"
             "  Is Zotero running with zotero-api-plus >= 0.4.0?",
             flush=True,
         )
         return 1
-
-    outcome = classify_autoexport_response(status_code, body)
     if outcome.kind != "triggered":
         print(explain_autoexport_failure(outcome, bib_path), flush=True)
         return 1
