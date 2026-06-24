@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-bibliography] 0.10.0
+
+On-demand project-bib refresh: `resolve.py --bib` triggers a paper's registered BBT auto-export and verifies the citekey lands in a well-formed bib, retiring the hand-rolled `item.export` + diff splice and the wrong-scope library pull.
+
+**New:**
+- `resolve.py --bib <abs path> --citekey <key>` makes a resolved paper citeable in a project bib. It forces the registered "Keep updated" export via `POST /api/plus/run-autoexport` (zotero-api-plus >= 0.4.0), then verifies the citekey is present in a WELL-FORMED bib using a real BibLaTeX parse (bibtexparser v2 `failed_blocks`, not a grep a truncated write could fool), with the wait/timeout caller-side. On `no-autoexport` it surfaces the setup gap and lists the registered paths; when the endpoint is absent it directs the user to install/upgrade rather than doing a wrong-scope library pull. Trigger-only by design — success is proven against the written file, never the endpoint response.
+- Adds a `bibtexparser>=2.0.0b9` dependency (the v2 `failed_blocks` API; v2 is the only line that detects malformed/truncated blocks). 16 unit tests cover the new pure core (`check_bib`, `classify_autoexport_response`, `bib_arg_error`, `explain_autoexport_failure`); the `--bib` shell flow was verified live against BBT 9.0.31.
+
+**Changed:**
+- SKILL.md "Refreshing the on-disk bib" now documents the trigger-plus-verify endpoint; the prior guidance (force a refresh with the library pull-export, or that no force-run exists) is retired as wrong-scope/incorrect. Common-mistakes gains rows naming the hand-rolled `item.export` + diff splice and the wrong-scope library pull, both pointing at `resolve.py --bib`.
+
 ## [denubis-external-agents] 0.3.0
 
 The codex-peer-review skill now takes a one-line focus note and tells Claude to lean on the runner's staging instead of hand-building context for the reviewer.
