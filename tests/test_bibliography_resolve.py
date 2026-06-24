@@ -444,3 +444,163 @@ def test_matches_query_title_diacritic_insensitive():
     assert resolve.matches_query(p, title="methodes")  # ASCII query, accented title
     assert resolve.matches_query(p, title="Méthodes")
     assert resolve.matches_query(p, author="Muller")
+
+
+# --- make-citeable consumer: pure core -------------------------------------
+# `resolve.py --bib <path> --citekey <key>` triggers the run-autoexport endpoint
+# then verifies the citekey is present in a WELL-FORMED bib. The verification must
+# not be fooled by a partial/truncated write that contains the citekey string yet
+# is broken BibLaTeX — hence a real parser (bibtexparser v2 failed_blocks), not a
+# grep. These cover the three pure pieces: the parser check, the HTTP-response
+# classifier, and the --bib/--citekey argument validation.
+
+_GOOD_BIB = (
+    "@article{smithFoo2020,\n"
+    "  author = {Smith, Alice},\n"
+    "  title = {Foo and Bar},\n"
+    "  year = {2020},\n"
+    "}\n"
+)
+
+
+def test_check_bib_well_formed_with_citekey_is_citeable():
+    c = resolve.check_bib(_GOOD_BIB, "smithFoo2020")
+    assert c.well_formed is True
+    assert c.citekey_present is True
+    assert c.citeable is True
+    assert c.failed_count == 0
+    assert c.entry_count == 1
+
+
+def test_check_bib_well_formed_without_citekey_is_not_citeable():
+    c = resolve.check_bib(_GOOD_BIB, "absentKey2099")
+    assert c.well_formed is True
+    assert c.citekey_present is False
+    assert c.citeable is False
+
+
+def test_check_bib_truncated_entry_is_not_well_formed():
+    # The citekey's own entry is cut off mid-write: contains the citekey string
+    # but is broken BibLaTeX. A grep would pass; the parser must not.
+    truncated = "@article{smithFoo2020,\n  author = {Smith, Alice},\n  title = {Foo"
+    c = resolve.check_bib(truncated, "smithFoo2020")
+    assert c.well_formed is False
+    assert c.failed_count >= 1
+    assert c.citeable is False
+
+
+def test_check_bib_citekey_only_as_substring_is_not_present():
+    # The citekey appears inside a field value, not as an entry key.
+    other = (
+        "@article{otherKey2019,\n"
+        "  title = {A note mentioning smithFoo2020 in passing},\n"
+        "  year = {2019},\n"
+        "}\n"
+    )
+    c = resolve.check_bib(other, "smithFoo2020")
+    assert c.well_formed is True
+    assert c.citekey_present is False
+
+
+def test_check_bib_empty_is_well_formed_but_absent():
+    c = resolve.check_bib("", "smithFoo2020")
+    assert c.well_formed is True
+    assert c.entry_count == 0
+    assert c.citeable is False
+
+
+def test_classify_autoexport_triggered():
+    body = '{"status": "triggered", "path": "/p.bib", "type": "collection"}'
+    o = resolve.classify_autoexport_response(200, body)
+    assert o.kind == "triggered"
+
+
+def test_classify_autoexport_no_autoexport_lists_registered_paths():
+    body = (
+        '{"status": "no-autoexport", "path": "/p.bib", '
+        '"registeredPaths": ["/x.bib", "/y.bib"]}'
+    )
+    o = resolve.classify_autoexport_response(404, body)
+    assert o.kind == "no-autoexport"
+    assert o.registered_paths == ("/x.bib", "/y.bib")
+
+
+def test_classify_autoexport_endpoint_absent_on_generic_404():
+    # The endpoint isn't registered (old/absent plugin): Zotero's generic 404 with
+    # a plain-text body, distinct from the JSON no-autoexport 404.
+    o = resolve.classify_autoexport_response(404, "No endpoint found")
+    assert o.kind == "endpoint-absent"
+
+
+def test_classify_autoexport_bbt_unavailable_and_starting():
+    assert (
+        resolve.classify_autoexport_response(503, '{"status": "bbt-unavailable"}').kind
+        == "bbt-unavailable"
+    )
+    assert (
+        resolve.classify_autoexport_response(503, '{"status": "bbt-starting"}').kind
+        == "bbt-starting"
+    )
+
+
+def test_classify_autoexport_other_status_is_error():
+    assert resolve.classify_autoexport_response(400, "Error: no path").kind == "error"
+    assert (
+        resolve.classify_autoexport_response(500, "Internal Server Error: x").kind
+        == "error"
+    )
+
+
+def test_bib_arg_error_accepts_absolute_path_and_citekey():
+    assert resolve.bib_arg_error("/abs/project/references.bib", "smithFoo2020") is None
+
+
+def test_bib_arg_error_rejects_relative_path():
+    err = resolve.bib_arg_error("project/references.bib", "smithFoo2020")
+    assert err is not None
+    assert "absolute" in err.lower()
+
+
+def test_bib_arg_error_requires_citekey():
+    err = resolve.bib_arg_error("/abs/references.bib", None)
+    assert err is not None
+    assert "citekey" in err.lower()
+    err2 = resolve.bib_arg_error("/abs/references.bib", "   ")
+    assert err2 is not None
+
+
+def test_explain_autoexport_failure_endpoint_absent_tells_user_to_install():
+    # Decision 2: when the endpoint is absent, direct the user to install/upgrade
+    # the plugin — never a wrong-scope library pull.
+    msg = resolve.explain_autoexport_failure(
+        resolve.AutoexportOutcome(kind="endpoint-absent"), Path("/p/refs.bib")
+    )
+    low = msg.lower()
+    assert "0.4.0" in msg
+    assert "install" in low or "upgrade" in low
+    assert "library pull" not in low or "would clobber" in low  # never recommends it
+
+
+def test_explain_autoexport_failure_no_autoexport_lists_registered_paths():
+    out = resolve.AutoexportOutcome(
+        kind="no-autoexport", registered_paths=("/a/x.bib", "/b/y.bib")
+    )
+    msg = resolve.explain_autoexport_failure(out, Path("/p/refs.bib"))
+    assert "/a/x.bib" in msg
+    assert "/b/y.bib" in msg
+    assert "keep updated" in msg.lower()
+
+
+def test_explain_autoexport_failure_bbt_states():
+    assert (
+        "not installed"
+        in resolve.explain_autoexport_failure(
+            resolve.AutoexportOutcome(kind="bbt-unavailable"), Path("/p.bib")
+        ).lower()
+    )
+    assert (
+        "starting"
+        in resolve.explain_autoexport_failure(
+            resolve.AutoexportOutcome(kind="bbt-starting"), Path("/p.bib")
+        ).lower()
+    )

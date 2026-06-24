@@ -20,16 +20,18 @@ Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 
 # /// script
 # requires-python = ">=3.14"  # uses PEP 758 parenthesis-less `except` (3.14+)
-# dependencies = ["httpx"]
+# dependencies = ["httpx", "bibtexparser>=2.0.0b9"]  # v2 (beta) for failed_blocks
 # ///
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import subprocess
 import sys
+import time
 import tomllib
 import unicodedata
 from dataclasses import dataclass
@@ -42,6 +44,8 @@ from pathlib import Path
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
+# zotero-api-plus >= 0.4.0 forces a registered BBT auto-export to run on demand.
+RUN_AUTOEXPORT_ENDPOINT = "http://localhost:23119/api/plus/run-autoexport"
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 RENDER_SCRIPT = Path(__file__).resolve().parent / "render.py"
 
@@ -243,6 +247,168 @@ def normalize_bbt_hit(hit: dict) -> Paper:
         library=hit.get("library", "") or "",
         library_id=None,
         collection_keys=(),
+    )
+
+
+# --- make-citeable consumer: pure core ---------------------------------------
+
+
+@dataclass(frozen=True)
+class BibCheck:
+    """Whether one citekey is safely citeable in a bib's text.
+
+    well_formed: the whole file parsed with ZERO failed blocks. bibtexparser v2
+      collects malformed/truncated/duplicate blocks in `failed_blocks` rather than
+      raising, so a partial write that truncates an entry surfaces here.
+    citekey_present: an entry whose key is EXACTLY citekey exists. Keyed on the
+      parsed entry key, so the citekey appearing inside a field value (a grep
+      false-positive) does not count.
+    citeable: both hold — the only state in which the paper is safely citeable.
+    """
+
+    well_formed: bool
+    citekey_present: bool
+    failed_count: int
+    entry_count: int
+
+    @property
+    def citeable(self) -> bool:
+        return self.well_formed and self.citekey_present
+
+
+def check_bib(bib_text: str, citekey: str) -> BibCheck:
+    """Parse a bib's text and report whether `citekey` is citeable in it.
+
+    A grep is necessary but not sufficient: a truncated write can contain the
+    citekey string yet be broken BibLaTeX. So we require the file to parse with no
+    failed blocks AND the citekey to resolve to a real entry. bibtexparser is
+    imported lazily so the module stays importable without the PEP 723 deps (the
+    httpx idiom); its per-failed-block logging is silenced because a briefly
+    truncated mid-write file during polling is expected, not news.
+    """
+    import bibtexparser  # noqa: PLC0415
+
+    logging.getLogger("bibtexparser").setLevel(logging.CRITICAL)
+    library = bibtexparser.parse_string(bib_text)
+    entry_keys = {e.key for e in library.entries}
+    return BibCheck(
+        well_formed=not library.failed_blocks,
+        citekey_present=citekey in entry_keys,
+        failed_count=len(library.failed_blocks),
+        entry_count=len(library.entries),
+    )
+
+
+@dataclass(frozen=True)
+class AutoexportOutcome:
+    """Semantic reading of a /api/plus/run-autoexport HTTP response.
+
+    kind is one of: triggered | no-autoexport | bbt-unavailable | bbt-starting |
+    endpoint-absent | error.
+    """
+
+    kind: str
+    registered_paths: tuple[str, ...] = ()
+    detail: str = ""
+
+
+def classify_autoexport_response(status_code: int, body_text: str) -> AutoexportOutcome:
+    """Map the endpoint's (status, body) to a semantic outcome.
+
+    The two 404s never collide: a path-bearing request that finds no registered
+    export returns JSON `{"status": "no-autoexport", ...}`, while an unregistered
+    route returns Zotero's generic plain-text 'No endpoint found'. We tell them
+    apart by parsing the body as a JSON object carrying a `status`.
+    """
+    body = (body_text or "").strip()
+    try:
+        obj = json.loads(body)
+    except ValueError:
+        obj = None
+    parsed = obj if isinstance(obj, dict) else None
+    status = parsed.get("status") if parsed else None
+
+    if status_code == 200 and status == "triggered":
+        return AutoexportOutcome(kind="triggered", detail=body)
+    if status == "no-autoexport":
+        paths = parsed.get("registeredPaths") or [] if parsed else []
+        return AutoexportOutcome(
+            kind="no-autoexport",
+            registered_paths=tuple(str(p) for p in paths),
+            detail=body,
+        )
+    if status == "bbt-unavailable":
+        return AutoexportOutcome(kind="bbt-unavailable", detail=body)
+    if status == "bbt-starting":
+        return AutoexportOutcome(kind="bbt-starting", detail=body)
+    if status_code == 404:
+        # A 404 without our JSON status means the route is not registered.
+        return AutoexportOutcome(kind="endpoint-absent", detail=body)
+    return AutoexportOutcome(kind="error", detail=body)
+
+
+def bib_arg_error(bib: str | None, citekey: str | None) -> str | None:
+    """Validate the --bib/--citekey pair for make-citeable mode (None = ok).
+
+    The bib path must be ABSOLUTE — the caller supplies the exact path from the
+    project's `bibliography:` declaration, never a guessed or relative name. A
+    citekey is required: make-citeable verifies one specific key, never inferred.
+    """
+    if not bib or not bib.strip():
+        return "Error: --bib requires an absolute path to the project bib file."
+    if not Path(bib).is_absolute():
+        return f"Error: --bib must be an absolute path, got {bib!r}."
+    if not citekey or not citekey.strip():
+        return "Error: --bib requires --citekey (the exact key to make citeable)."
+    return None
+
+
+def explain_autoexport_failure(outcome: AutoexportOutcome, bib_path: Path) -> str:
+    """The human-facing message for a non-`triggered` run-autoexport outcome.
+
+    endpoint-absent directs the user to install/upgrade the plugin — there is no
+    faithful collection-scoped force-refresh without it, and a library pull-export
+    would clobber the project bib with whole-library content. no-autoexport
+    surfaces the setup gap and lists the paths BBT actually holds.
+    """
+    if outcome.kind == "endpoint-absent":
+        return (
+            "  the run-autoexport endpoint is not installed (HTTP 404, no route).\n"
+            "  Install/upgrade zotero-api-plus to >= 0.4.0 (it adds\n"
+            "  POST /api/plus/run-autoexport), then retry. There is no faithful\n"
+            "  collection-scoped force-refresh without it — a library pull-export\n"
+            "  would clobber this project bib with whole-library content."
+        )
+    if outcome.kind == "no-autoexport":
+        lines = [
+            "  no registered 'Keep updated' auto-export targets this bib path.",
+            "  Set one up in Zotero (Export Collection -> Keep updated) pointing at",
+            f"  {bib_path}. Polling will never succeed until it exists.",
+        ]
+        lines += [f"    registered: {p}" for p in outcome.registered_paths]
+        return "\n".join(lines)
+    if outcome.kind == "bbt-unavailable":
+        return "  Better BibTeX is not installed in this Zotero."
+    if outcome.kind == "bbt-starting":
+        return "  Better BibTeX is still starting; retry shortly."
+    return f"  unexpected run-autoexport response: {outcome.detail[:200]}"
+
+
+def _timeout_message(
+    last: BibCheck | None, bib_path: Path, citekey: str, poll_timeout: float
+) -> str:
+    """Explain a verification timeout from the last bib check seen."""
+    if last is None:
+        return f"  timed out: bib never appeared at {bib_path}."
+    if not last.well_formed:
+        return (
+            f"  timed out: bib still has {last.failed_count} malformed block(s) — "
+            "the write may be mid-flight or the export failed."
+        )
+    return (
+        f"  timed out: {citekey} did not appear after {poll_timeout:.0f}s. "
+        "Either the export is still running, or the paper sits in a different "
+        "collection than this bib exports."
     )
 
 
@@ -512,6 +678,114 @@ def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False)
     return "failed"
 
 
+def post_run_autoexport(bib_path: str, timeout: float = 30.0) -> tuple[int, str]:
+    """POST the bib path to the run-autoexport endpoint; return (status, body).
+
+    The endpoint forces BBT's own registered auto-export for this path to run. It
+    is trigger-only: a 200 means it fired, NOT that the export succeeded — the
+    caller proves success against the written file (check_bib).
+    """
+    import httpx  # noqa: PLC0415
+
+    r = httpx.post(RUN_AUTOEXPORT_ENDPOINT, json={"path": bib_path}, timeout=timeout)
+    return r.status_code, r.text
+
+
+def _read_bib_text(bib_path: Path) -> str | None:
+    """Read the bib file's text; None if it does not exist yet."""
+    try:
+        return bib_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+
+
+def _poll_until_citeable(
+    bib_path: Path, citekey: str, poll_timeout: float, poll_interval: float
+) -> BibCheck | None:
+    """Poll the bib until `citekey` is citeable or the timeout elapses.
+
+    Returns the last BibCheck seen (None if the bib never appeared). The wait
+    lives here, caller-side: the endpoint only triggers, the written file is the
+    truth.
+    """
+    deadline = time.monotonic() + poll_timeout
+    last: BibCheck | None = None
+    while True:
+        text = _read_bib_text(bib_path)
+        if text is not None:
+            last = check_bib(text, citekey)
+            if last.citeable:
+                return last
+        if time.monotonic() >= deadline:
+            return last
+        time.sleep(poll_interval)
+
+
+def ensure_citeable(
+    bib_path: Path,
+    citekey: str,
+    *,
+    poll_timeout: float = 30.0,
+    poll_interval: float = 1.0,
+) -> int:
+    """Force `citekey` to be citeable in `bib_path`, then verify it landed.
+
+    Trigger-then-verify: the endpoint only fires BBT's registered auto-export, so
+    the truth is the written file, checked with the parser (check_bib), never the
+    endpoint's response. Returns 0 iff the citekey ends up present in a well-formed
+    bib, non-zero otherwise. The branchy parts (failure messaging, the poll loop)
+    live in pure/extracted helpers so this stays a thin orchestrator.
+    """
+    print(f"\n=== make citeable: {citekey} ===", flush=True)
+    print(f"  bib: {bib_path}", flush=True)
+
+    # Pre-check: the configured auto-export may already have written it on its own
+    # debounce, in which case no trigger is needed.
+    pre_text = _read_bib_text(bib_path)
+    if pre_text is None:
+        print("  bib not on disk yet.", flush=True)
+    else:
+        pre = check_bib(pre_text, citekey)
+        if pre.citeable:
+            print("  already citeable: present in a well-formed bib.", flush=True)
+            return 0
+        if not pre.well_formed:
+            print(
+                f"  bib currently has {pre.failed_count} malformed block(s); "
+                "a fresh export should replace it.",
+                flush=True,
+            )
+
+    # Trigger the registered auto-export.
+    try:
+        status_code, body = post_run_autoexport(str(bib_path))
+    except Exception as e:
+        print(
+            f"  could not reach the run-autoexport endpoint ({e}).\n"
+            "  Is Zotero running with zotero-api-plus >= 0.4.0?",
+            flush=True,
+        )
+        return 1
+
+    outcome = classify_autoexport_response(status_code, body)
+    if outcome.kind != "triggered":
+        print(explain_autoexport_failure(outcome, bib_path), flush=True)
+        return 1
+
+    # Triggered: poll the written file for the citekey in a well-formed bib.
+    print("  triggered; verifying the written bib ...", flush=True)
+    last = _poll_until_citeable(bib_path, citekey, poll_timeout, poll_interval)
+    if last is not None and last.citeable:
+        print(
+            f"  citeable: {citekey} is present in a well-formed bib "
+            f"({last.entry_count} entries).",
+            flush=True,
+        )
+        return 0
+    print(_timeout_message(last, bib_path, citekey, poll_timeout), flush=True)
+    return 1
+
+
 def print_no_match(
     tokens: list[str], *, doi: str | None, search_errors: list[str]
 ) -> None:
@@ -644,6 +918,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "config.toml."
         ),
     )
+    parser.add_argument(
+        "--bib",
+        help=(
+            "Make --citekey citeable in this project bib: force its registered BBT "
+            "auto-export to run (POST /api/plus/run-autoexport, zotero-api-plus "
+            ">= 0.4.0), then verify the citekey lands in a well-formed bib. Pass "
+            "the ABSOLUTE path you read from the project's bibliography: "
+            "declaration, never a guessed filename. Requires --citekey."
+        ),
+    )
     args = parser.parse_args()
 
     # --- Classify the bare positional query (if given) -----------------------
@@ -671,6 +955,12 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "--citekey, --author, --title, --doi, or a bare QUERY. "
             "(--year/--date alone cannot drive a Zotero search.)"
         )
+
+    # --- Validate the make-citeable pair early (before going live) -----------
+    if args.bib is not None:
+        bib_err = bib_arg_error(args.bib, args.citekey)
+        if bib_err:
+            parser.error(bib_err)
 
     # --- Go live -------------------------------------------------------------
     cfg = load_config()
@@ -746,6 +1036,13 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
     if not papers:
         print_no_match(tokens, doi=args.doi, search_errors=search_errors)
+        if args.bib:
+            print(
+                "\n  cannot make citeable: the paper did not resolve in Zotero, so a\n"
+                "  registered export will not include it. Get it into the exported\n"
+                "  collection first, then retry --bib.",
+                flush=True,
+            )
         return 1
 
     # --- Enrich, classify, optionally render ---------------------------------
@@ -791,7 +1088,15 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
         print_match(info, state)
 
-    return 1 if render_errors else 0
+    # --- Make citeable (trigger the registered export + verify the bib) ------
+    # Runs only after the paper resolved in Zotero (above): a registered export
+    # writes what BBT holds, so the paper must already be in the exported
+    # collection. The citekey is the validated --bib companion (bib_arg_error).
+    cite_failed = False
+    if args.bib:
+        cite_failed = ensure_citeable(Path(args.bib), args.citekey) != 0
+
+    return 1 if (render_errors or cite_failed) else 0
 
 
 if __name__ == "__main__":
