@@ -26,6 +26,7 @@ Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import logging
 import re
@@ -86,6 +87,97 @@ def select_citekey_matches(hits: list[dict], citekey: str) -> list[dict]:
     (My Library + a group), so this returns every exact-match hit, not just one.
     """
     return [h for h in hits if h.get("citation-key") == citekey]
+
+
+# Trailing disambiguator: BBT breaks a citekey collision by appending a/b/...
+# after the 4-digit year (chengGenerativeAIRequirements2026a).
+_DISAMBIGUATOR_RE = re.compile(r"([0-9]{4})[a-z]+$")
+# Leading author component: lowercase surname, possibly hyphenated, before the
+# first capitalised title word (malsiner-walliModel... -> "malsiner-walli").
+_CITEKEY_AUTHOR_RE = re.compile(r"^[a-z]+(?:-[a-z]+)*")
+_CITEKEY_KIND_RANK = {"exact": 0, "variant": 1, "prefix": 2, "fuzzy": 3}
+
+
+def citekey_base(ck: str) -> str:
+    """The citekey without BBT's trailing disambiguation suffix.
+
+    BBT appends a/b/... after the year to break a citekey collision, so
+    'chengGenerativeAIRequirements2026' (what a human types) and '...2026a' (what
+    BBT stored) share a base. A key with no 4-digit year is returned unchanged.
+    """
+    return _DISAMBIGUATOR_RE.sub(r"\1", ck)
+
+
+def citekey_author(ck: str) -> str:
+    """The leading author component of a BBT citekey (lowercase, may be hyphenated).
+
+    Used to widen search recall: a mid-string typo in the title portion of a
+    citekey still surfaces the neighbourhood when we also search the surname.
+    """
+    m = _CITEKEY_AUTHOR_RE.match(ck)
+    return m.group(0) if m else ""
+
+
+def classify_citekey(
+    query: str, candidate: str, *, fuzzy_threshold: float = 0.85
+) -> tuple[str, float]:
+    """Classify a candidate citekey against the query. Returns (kind, score).
+
+    kind, in decreasing confidence:
+      exact   - byte-identical (1.0); the ONLY render-eligible kind.
+      variant - same base, differing only by disambiguation suffix (…2026 vs
+                …2026a, or sibling …a vs …b): the missing-suffix bug and the
+                duplicate signal.
+      prefix  - one key is a prefix of the other (a query truncated before year).
+      fuzzy   - difflib similarity of the bases ≥ fuzzy_threshold (a typo).
+      none    - below threshold; not a candidate.
+    """
+    if query == candidate:
+        return ("exact", 1.0)
+    qb, cb = citekey_base(query), citekey_base(candidate)
+    if qb == cb:
+        return ("variant", 0.98)
+    if candidate.startswith(query) or query.startswith(candidate):
+        return ("prefix", 0.95)
+    ratio = difflib.SequenceMatcher(None, qb, cb).ratio()
+    if ratio >= fuzzy_threshold:
+        return ("fuzzy", ratio)
+    return ("none", ratio)
+
+
+@dataclass(frozen=True)
+class ScoredHit:
+    """A BBT item.search hit tagged with how its citekey matched the query."""
+
+    hit: dict
+    kind: str
+    score: float
+
+
+def _candidate_sort_key(s: ScoredHit) -> tuple[int, float, str]:
+    """Kind confidence, then score descending, then citekey for stable output."""
+    return (_CITEKEY_KIND_RANK[s.kind], -s.score, s.hit.get("citation-key") or "")
+
+
+def rank_citekey_candidates(
+    hits: list[dict], query: str, *, fuzzy_threshold: float = 0.85
+) -> list[ScoredHit]:
+    """Classify every hit's citekey against query, drop non-candidates, rank them.
+
+    Ordered by kind confidence (exact, variant, prefix, fuzzy), then score
+    descending, then citekey for stable output. This is the near-match layer the
+    shell RETURNS without rendering; only kind == 'exact' is render-eligible, so a
+    near match hands back the real citekey for the caller to re-run against.
+    """
+    scored: list[ScoredHit] = []
+    for h in hits:
+        kind, score = classify_citekey(
+            query, h.get("citation-key") or "", fuzzy_threshold=fuzzy_threshold
+        )
+        if kind != "none":
+            scored.append(ScoredHit(hit=h, kind=kind, score=score))
+    scored.sort(key=_candidate_sort_key)
+    return scored
 
 
 def search_tokens(
@@ -906,6 +998,65 @@ def print_match(info: dict, state: str) -> None:
         print(f"  render dir: {info['out_dir']}", flush=True)
 
 
+def report_near_matches(
+    near: list[ScoredHit],
+    library_map: dict[str, int],
+    papers_dir: Path,
+    *,
+    requested: str,
+) -> None:
+    """Report near citekey matches for a query that had NO exact hit.
+
+    These are returned, never rendered: BBT held the paper under a slightly
+    different key (a missing disambiguation suffix, a truncation, a typo), so we
+    surface the real key, its library, and its PDF/render state, and let the
+    caller re-run resolve with the exact key. Each candidate is enriched for its
+    live PDF status, then printed with the same block as an exact match.
+    """
+    print(
+        f"\nNo exact citekey match for {requested!r}. "
+        "Nearest paper(s) in Zotero — NOT rendered:",
+        flush=True,
+    )
+    for cand in near:
+        paper = normalize_bbt_hit(cand.hit)
+        info = enrich_paper(paper, library_map)
+        info = check_rendered(info, papers_dir)
+        state = classify_state(
+            found=True,
+            has_pdf=info["pdf_status"] == "present",
+            pdf_exists=info["pdf_exists"],
+            rendered=info["rendered"],
+        )
+        if info["pdf_status"] == "unknown":
+            state = "pdf-unknown"
+        print(f"\n  near match: {cand.kind} (score {cand.score:.2f})", flush=True)
+        print_match(info, state)
+    print(
+        "\n  Re-run resolve with the exact citekey shown above to render it "
+        "(near matches are never auto-rendered).",
+        flush=True,
+    )
+
+
+def print_duplicate_note(near: list[ScoredHit]) -> None:
+    """List base-variant siblings of an exact match as possible duplicates.
+
+    A citekey that resolved exactly can still have disambiguation siblings (…a,
+    …b) sitting in Zotero — the trace of a duplicate. Surface where they live so
+    the human can merge them; we never touch Zotero. Only the `variant` kind
+    counts: a fuzzy or prefix near-match is not a duplicate of this paper.
+    """
+    variants = [c for c in near if c.kind == "variant"]
+    if not variants:
+        return
+    print("\n  possible duplicate(s) of this citekey in Zotero:", flush=True)
+    for c in variants:
+        lib = c.hit.get("library") or "(unknown library)"
+        print(f"    {c.hit.get('citation-key')}  in {lib}", flush=True)
+    print("    merge these in Zotero if they are the same paper.", flush=True)
+
+
 # main() is the CLI orchestrator (parse → search → filter → enrich → render); the
 # shell has no unit tests, so it is not split here — that is a separate refactor.
 def main() -> int:  # noqa: PLR0912, PLR0915
@@ -1022,6 +1173,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     # bug that reported present papers as absent.
     papers: list[Paper]
     tokens: list[str]
+    near: list[ScoredHit] = []
     search_errors: list[str] = []
     if args.doi:
         # BBT can't search the DOI field — use the Crossref-surname fallback.
@@ -1034,6 +1186,13 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             freeterm=freeterm,
             title=args.title,
         )
+        # Widen recall for citekey near-matching: BBT prefix-matches the base key
+        # (surfacing disambiguation siblings) and the author surname reaches a
+        # typo'd key's neighbourhood. rank_citekey_candidates filters precision back.
+        if args.citekey:
+            for extra in (citekey_base(args.citekey), citekey_author(args.citekey)):
+                if extra and extra not in tokens:
+                    tokens.append(extra)
         seen: set[tuple[str, str]] = set()
         raw_hits: list[dict] = []
         for tok in tokens:
@@ -1052,8 +1211,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 seen.add(dedup)
                 raw_hits.append(h)
 
-        # A citekey query keeps only exact matches (search is fuzzy near-miss).
+        # A citekey query: exact matches are render-eligible (the unchanged happy
+        # path via select_citekey_matches). The NEAR matches (variant/prefix/fuzzy)
+        # are surfaced without rendering when no exact hit exists, and flagged as
+        # possible duplicates when one does.
         if args.citekey:
+            near = [
+                c
+                for c in rank_citekey_candidates(raw_hits, args.citekey)
+                if c.kind != "exact"
+            ]
             raw_hits = select_citekey_matches(raw_hits, args.citekey)
 
         papers = [normalize_bbt_hit(h) for h in raw_hits]
@@ -1078,6 +1245,19 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         papers = [p for p in papers if p.library.lower() == lib_lower]
 
     if not papers:
+        if near:
+            # Found under a near key (missing suffix / truncation / typo): surface
+            # the real key WITHOUT rendering (the no-render-on-near rule), so the
+            # caller re-runs with the exact key.
+            report_near_matches(near, library_map, papers_dir, requested=args.citekey)
+            if args.bib:
+                print(
+                    "\n  cannot make citeable: no EXACT citekey match, so the "
+                    "registered export cannot target it.\n"
+                    "  Re-run --bib with the exact citekey shown above.",
+                    flush=True,
+                )
+            return 1
         print_no_match(tokens, doi=args.doi, search_errors=search_errors)
         if args.bib:
             print(
@@ -1130,6 +1310,11 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 render_errors += 1
 
         print_match(info, state)
+
+    # An exact match can still have disambiguation siblings — surface them so the
+    # human can merge the duplicate in Zotero (we never touch Zotero).
+    if args.citekey and near:
+        print_duplicate_note(near)
 
     # --- Make citeable (trigger the registered export + verify the bib) ------
     # Runs only after the paper resolved in Zotero (above): a registered export

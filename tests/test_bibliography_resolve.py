@@ -646,3 +646,177 @@ def test_trigger_autoexport_unreachable_returns_none(monkeypatch):
     # post_run_autoexport returns None on an httpx transport error (Zotero down).
     monkeypatch.setattr(resolve, "post_run_autoexport", lambda _p, **_k: None)
     assert resolve._trigger_autoexport(Path("/p.bib"), retry_delay=0) is None
+
+
+# --- fuzzy citekey candidates ------------------------------------------------
+#
+# BBT item.search already prefix-matches the citation-key, so a constructed key
+# missing its disambiguation suffix (chengGenerativeAIRequirements2026 for the
+# stored chengGenerativeAIRequirements2026a) surfaces the real item — but the
+# exact-equality filter then discards it, reporting "no matches". These pure
+# functions classify a hit's citekey against the query so the shell can RETURN
+# the near matches (never render them — the caller re-runs with the real key).
+
+_CHENG_REAL = "chengGenerativeAIRequirements2026a"
+_CHENG_CONSTRUCTED = "chengGenerativeAIRequirements2026"  # the key the session built
+
+
+# citekey_base ----------------------------------------------------------------
+
+
+def test_citekey_base_strips_disambiguator_after_year():
+    assert resolve.citekey_base(_CHENG_REAL) == _CHENG_CONSTRUCTED
+    assert resolve.citekey_base("dignathHowCanPrimary2008a") == "dignathHowCanPrimary2008"
+
+
+def test_citekey_base_leaves_bare_year_unchanged():
+    assert resolve.citekey_base(_CHENG_CONSTRUCTED) == _CHENG_CONSTRUCTED
+    assert resolve.citekey_base("smithFoo2020") == "smithFoo2020"
+
+
+def test_citekey_base_no_year_returned_unchanged():
+    # No 4-digit year to anchor the suffix strip — leave the key alone.
+    assert resolve.citekey_base("noYearHere") == "noYearHere"
+
+
+# citekey_author --------------------------------------------------------------
+
+
+def test_citekey_author_extracts_leading_surname():
+    assert resolve.citekey_author(_CHENG_REAL) == "cheng"
+    assert resolve.citekey_author("vehtariPracticalBayesianModel2017") == "vehtari"
+
+
+def test_citekey_author_keeps_hyphenated_surname():
+    assert (
+        resolve.citekey_author("malsiner-walliModelbasedClustering2016")
+        == "malsiner-walli"
+    )
+
+
+# classify_citekey ------------------------------------------------------------
+
+
+def test_classify_citekey_exact():
+    kind, score = resolve.classify_citekey(_CHENG_REAL, _CHENG_REAL)
+    assert kind == "exact"
+    assert score == 1.0
+
+
+def test_classify_citekey_variant_is_the_demonstrated_bug():
+    # The constructed key (no 'a') vs the stored key (with 'a'): same base ->
+    # 'variant'. This is exactly the pair the exact filter used to drop.
+    kind, _ = resolve.classify_citekey(_CHENG_CONSTRUCTED, _CHENG_REAL)
+    assert kind == "variant"
+
+
+def test_classify_citekey_variant_between_sibling_suffixes():
+    # Two disambiguation siblings (a vs b) share a base -> variant (the dupe pair).
+    kind, _ = resolve.classify_citekey(
+        "dignathHowCanPrimary2008a", "dignathHowCanPrimary2008b"
+    )
+    assert kind == "variant"
+
+
+def test_classify_citekey_prefix_when_year_omitted():
+    # Query truncated before the year is a prefix of the stored key.
+    kind, _ = resolve.classify_citekey("chengGenerativeAIRequirements", _CHENG_REAL)
+    assert kind == "prefix"
+
+
+def test_classify_citekey_fuzzy_typo_above_threshold():
+    # A mid-string typo (Requirement for Requirements) won't prefix-match but is
+    # a near-identical string -> fuzzy.
+    kind, score = resolve.classify_citekey(
+        "chengGenerativeAIRequirement2026", _CHENG_REAL
+    )
+    assert kind == "fuzzy"
+    assert score >= 0.85
+
+
+def test_classify_citekey_none_for_unrelated_keys():
+    kind, _ = resolve.classify_citekey(
+        "lakatosFalsification1970", "vehtariPracticalBayesianModel2017"
+    )
+    assert kind == "none"
+
+
+def test_classify_citekey_threshold_is_tunable():
+    # Raising the bar past the pair's similarity demotes fuzzy to none.
+    kind, _ = resolve.classify_citekey(
+        "chengGenerativeAIRequirement2026", _CHENG_REAL, fuzzy_threshold=0.999
+    )
+    assert kind == "none"
+
+
+# rank_citekey_candidates -----------------------------------------------------
+
+_RANK_HITS = [
+    {"citation-key": "vehtariPracticalBayesianModel2017", "library": "My Library"},
+    {"citation-key": _CHENG_REAL, "library": "2026-LegoGrant"},
+    {"citation-key": "chengGenerativeAIRequirement2026", "library": "My Library"},
+]
+
+
+def test_rank_citekey_candidates_orders_by_kind_then_drops_none():
+    ranked = resolve.rank_citekey_candidates(_RANK_HITS, _CHENG_CONSTRUCTED)
+    kinds = [c.kind for c in ranked]
+    # The unrelated Vehtari hit is dropped (none); the real key is a variant, the
+    # typo'd key is fuzzy; variant sorts before fuzzy.
+    assert "none" not in kinds
+    assert kinds[0] == "variant"
+    assert ranked[0].hit["citation-key"] == _CHENG_REAL
+    assert "fuzzy" in kinds
+
+
+def test_rank_citekey_candidates_exact_sorts_first():
+    hits = [{"citation-key": _CHENG_REAL, "library": "2026-LegoGrant"}]
+    ranked = resolve.rank_citekey_candidates(hits, _CHENG_REAL)
+    assert ranked[0].kind == "exact"
+
+
+def test_rank_citekey_candidates_empty_when_nothing_close():
+    hits = [{"citation-key": "vehtariPracticalBayesianModel2017", "library": "x"}]
+    assert resolve.rank_citekey_candidates(hits, _CHENG_CONSTRUCTED) == []
+
+
+# print_duplicate_note --------------------------------------------------------
+#
+# When an exact citekey resolves but disambiguation siblings (variant kind) also
+# exist, list them with their library as the dupe-management signal. Only true
+# base-variant siblings count — a fuzzy/prefix near-match is not a duplicate. No
+# live duplicate exists to smoke-test against, so this pins the filtering here.
+
+
+def test_print_duplicate_note_lists_only_variant_siblings(capsys):
+    near = [
+        resolve.ScoredHit(
+            hit={"citation-key": "dignathHowCanPrimary2008b", "library": "My Library"},
+            kind="variant",
+            score=0.98,
+        ),
+        resolve.ScoredHit(
+            hit={"citation-key": "dignathHowCanOther2009", "library": "Group-X"},
+            kind="fuzzy",
+            score=0.9,
+        ),
+    ]
+    resolve.print_duplicate_note(near)
+    out = capsys.readouterr().out
+    assert "dignathHowCanPrimary2008b" in out
+    assert "My Library" in out
+    assert "duplicate" in out.lower()
+    # The fuzzy near-match is NOT a duplicate and must not be listed.
+    assert "dignathHowCanOther2009" not in out
+
+
+def test_print_duplicate_note_silent_without_variants(capsys):
+    near = [
+        resolve.ScoredHit(
+            hit={"citation-key": "somethingClose2020", "library": "x"},
+            kind="fuzzy",
+            score=0.88,
+        )
+    ]
+    resolve.print_duplicate_note(near)
+    assert capsys.readouterr().out == ""
