@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-bibliography] 0.12.0
+
+`resolve.py` near matches now carry a distinct exit code, and SKILL.md directs the caller to use the real key the resolver returns rather than construct one.
+
+**New:**
+- Exit code `2` for a citekey query with no exact hit but near matches surfaced (missing suffix / truncation / typo), distinct from `1` (genuinely absent or an error). A caller can branch on "wrong key, here is the right one" and re-run with the real key. Documented in the module docstring (`--help`) and SKILL.md.
+
+**Changed:**
+- SKILL.md front-door guidance gains "pass the citekey you have, not one you construct" — BBT's disambiguation suffix cannot be reliably guessed, and a fabricated key is the most common way a present paper is misreported as absent — plus the 0/1/2 exit-code table. The stale "a constructed citekey returns an honest No matches" line is retired: a near key now returns the real paper without rendering.
+
 ## [denubis-bibliography] 0.11.0
 
 Citekey resolution is now near-match aware: a query that misses the exact key (a missing BBT disambiguation suffix, a truncation, or a typo) surfaces the real paper instead of reporting "no matches", and never renders on a near match.
