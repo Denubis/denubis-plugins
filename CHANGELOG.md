@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-bibliography] 0.11.0
+
+Citekey resolution is now near-match aware: a query that misses the exact key (a missing BBT disambiguation suffix, a truncation, or a typo) surfaces the real paper instead of reporting "no matches", and never renders on a near match.
+
+**Fixed:**
+- A citekey query whose key lacked BBT's trailing disambiguation suffix (`chengGenerativeAIRequirements2026` for the stored `…2026a`) was surfaced by BBT's prefix search but then discarded by the exact-equality filter, so `resolve.py` reported "no matches" — repeatedly misread as "the paper has no PDF". The exact filter no longer silently drops the near hit.
+
+**New:**
+- Near-match resolution for citekey queries: `classify_citekey` / `rank_citekey_candidates` grade each BBT hit as exact / variant (a disambiguation sibling) / prefix / fuzzy (difflib similarity, tunable threshold). With no exact hit, the nearest paper(s) are RETURNED with their real citekey, library, and PDF status but NEVER rendered — the caller re-runs with the exact key. Base-variant siblings of an exact match are listed as possible duplicates with their library, so duplicates can be merged in Zotero. Recall is widened for the citekey path (base key + author surname) so a mid-string typo still surfaces the neighbourhood. 17 new unit tests; the shell path verified live against Zotero + BBT.
+
 ## [denubis-bibliography] 0.10.0
 
 On-demand project-bib refresh: `resolve.py --bib` triggers a paper's registered BBT auto-export and verifies the citekey lands in a well-formed bib, retiring the hand-rolled `item.export` + diff splice and the wrong-scope library pull.
