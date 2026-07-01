@@ -15,6 +15,10 @@ For each match it reports the libraries AND collections the paper is in, whether
 a PDF is attached and on disk, and whether it has been rendered — and renders it
 when it hasn't. An optional library constraint narrows the search.
 
+Exit codes: 0 the paper resolved (rendered or ready); 1 genuinely absent or an
+error; 2 no exact citekey match but NEAR matches were surfaced — re-run with the
+real key shown (a near match is never rendered).
+
 Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 """
 
@@ -1257,7 +1261,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     "  Re-run --bib with the exact citekey shown above.",
                     flush=True,
                 )
-            return 1
+            # Distinct from no-match (1): the paper IS here under a near key, so a
+            # caller can branch on 2 to re-run with the real key printed above.
+            return 2
         print_no_match(tokens, doi=args.doi, search_errors=search_errors)
         if args.bib:
             print(

@@ -89,8 +89,7 @@ BBT, **not** per library copy), PDF path (+ exists), and `state`: `not-in-zotero
 Auto-render is ON by default (`--no-render` suppresses; `--force` re-renders;
 `--allow-mocr` escalates to GPU OCR).
 
-**Truthful by construction:** a wrong/constructed citekey returns an honest "No
-matches" rather than a guess; the same paper is listed once per library it lives
+**Truthful by construction:** the same paper is listed once per library it lives
 in; a PDF that can't be confirmed (unresolved library name / failed lookup) is
 `pdf-unknown`, never a false `no-pdf`. `resolve.py` searches **every** supplied
 key and unions the hits, so a query keyed on a co-author still resolves when
@@ -103,6 +102,19 @@ index is ASCII-folded); initials and arbitrary substrings still do not match. A
 genuine no-match prints what was searched and states plainly that, `item.search`
 being AND-fuzzy and first-author-only, **a no-match is not proof of absence** —
 retry with the first author's surname or a distinctive `--title` word.
+
+**Pass the citekey you have, not one you construct.** BBT appends a
+disambiguation suffix you cannot reliably guess (`chengGenerativeAIRequirements2026a`
+— the trailing `a`), and a fabricated key is the most common way a present paper
+gets misreported as absent. When the key you pass is close (missing suffix,
+truncation, typo), `resolve.py` prints the **real** citekey with its library and
+PDF status and exits `2` **without rendering** — re-run with the exact key it
+shows to render it. Disambiguation siblings of an exact match are flagged as
+possible duplicates so you can merge them in Zotero.
+
+**Exit codes:** `0` resolved (rendered/ready) · `1` genuinely absent or an error ·
+`2` near match(es) surfaced, no exact hit — re-run with the real key shown. A `2`
+means "wrong key, here is the right one", never "the paper is missing".
 
 **Known behaviour:** copies of one citekey across libraries share a single render
 dir `papers/<citekey>/`. The paper renders **once** — render state is per-citekey,
