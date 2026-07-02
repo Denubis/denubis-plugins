@@ -3,7 +3,6 @@
 // Upstream repo: https://github.com/obra/superpowers
 
 digraph STYLE_GUIDE {
-
     // The style guide for our process DSL, written in the DSL itself
 
     // Node type examples with their shapes
