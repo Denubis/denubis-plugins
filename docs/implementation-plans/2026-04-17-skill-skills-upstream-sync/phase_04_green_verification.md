@@ -96,3 +96,19 @@ The Phase 4 closure proleptic challenge (Opus) raised that the file-scoped-hunt 
 Across the enumerated claim set, the CSO instance (fixed in `68843a8`) was the only confabulation found; the sweep discharges CA3 with evidence rather than diagnosis. This is a bounded claim about the enumerated denubis-authored claim-sources — not a proof that no confabulation exists anywhere in the imports. (Quantifiers tightened here per the 2026-07-05 codex/GPT-5.5 external peer review, which flagged the original "every/only" wording as unreproducible without a recorded enumeration trail.)
 
 **Claim-scope disambiguation (CA2):** the GREEN four-check result certifies the cornerstone is *non-regressing at n=1, Sonnet-tier* — a Sonnet-tier agent following it did not obviously mis-route. It does **not** validate correct three-skill sequencing across model tiers or under adversarial prompting; no variance was measured. "Done when: GREEN pressure scenario committed" is satisfied in the non-regressing sense only. Downstream phases (6, refactor) must not cite this GREEN as stronger evidence than that.
+
+## Dated append — 2026-07-06 (Phase 4 refactor-pipeline gate — Phase 4 CLOSES)
+
+The last Phase 4 gate step, the §3d phase-refactor pipeline (`executing-an-implementation-plan`), ran over the three in-scope denubis-authored files — `SKILL.md` (152), `README.md` (29), `examples/CLAUDE_MD_TESTING.md` (198). The two verbatim obra imports (`anthropic-best-practices.md`, `render-graphs.js`) were excluded from measurement and assessment: touching them would break the byte-identity claim.
+
+**Measurement (mechanical, all-zero as expected for Markdown):** `complexipy` reported no parseable functions (one parse error per file); all four `exec-refactoring-rubric` ast-grep rules (fcis-violation, global-mutable-state, long-parameter-list, nesting-depth) matched `[]`. SKILL.md's 152 lines sit inside the ≤250 AC1.2 envelope.
+
+**smell-assessor (Opus 4.8): 0 findings — clean.** Two items logged below-threshold, not reported: (a) the Core-Principle sentence restated at SKILL.md:9 and :13 (2 instances, below Rule of Three; an overview-then-anchor affordance); (b) the epistemic-humility rubric callback at :42, :101–102, :129–130 (3 instances, but design-plan-specified for those sections separately and yielding no meaningful extraction). The SKILL.md↔README.md Supporting-Files overlap was assessed as intended progressive disclosure (:109 "See `README.md`"), not Inappropriate Intimacy. Corroborating on-disk checks: every sibling-skill and supporting-file cross-reference resolves (AC1.3/AC1.4 hold as observed). Full report preserved at `refactor-pipeline-smell-report-phase-4.md`.
+
+**Gate:** empty Findings → critical-peer-review and refactoring-executor both skipped per the §3d.3 gate. No refactor was warranted; the working tree is unchanged and the full suite is 879 green (re-run 2026-07-06).
+
+**Dispatch note (audit record):** the first smell-assessor dispatch (Opus, background) returned a degenerate non-response — 0 tool uses, ~15s, final message a fragment of echoed system/agent-registry boilerplate; no `smell-report.md` written. Not turn exhaustion. Recovered by a single foreground re-dispatch (13 tool uses, report written). One occurrence, on the current Opus tier; recorded in case it recurs at dispatch time.
+
+**Scope caveat:** this is a within-phase assessment of the three in-scope files only. It does not cover the two excluded obra imports (byte-identity rests on the prior true-up SHA check, obra@`6fd4507`), nor cross-file orchestrator/sub-skill redundancy — the latter (the V6 rubric-callback pair) remains queued as task #7 and is Tier-3, out of this pipeline's scope.
+
+**Non-causal framing:** this append records that the phase-refactor gate produced no change; it alters no GREEN or AC result. With this step complete, **Phase 4 CLOSES.** Execution order for the remaining phases is phase_06 → phase_05.
