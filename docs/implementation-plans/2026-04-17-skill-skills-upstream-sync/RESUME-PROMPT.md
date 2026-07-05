@@ -1,4 +1,4 @@
-# Resume Prompt — Skill-Skills Upstream Sync — Phase 4 Review Gate DONE except the Refactor Pipeline
+# Resume Prompt — Skill-Skills Upstream Sync — Phase 4 COMPLETE; next Phase 6 → Phase 5
 
 **Copy this prompt verbatim into a fresh Claude Code session after `/clear`.**
 
@@ -15,30 +15,24 @@ If the branch is anything else, STOP — `cd` into the worktree or start a sessi
 
 I'm resuming the skill-skills upstream sync at `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`, branch `skill-skills-upstream-sync`.
 
-**State (2026-07-05 — Phases 1–3 complete; Phase 4 Tasks 1–6 complete; Phase 4 review gate all done EXCEPT the refactor pipeline):**
+**State (2026-07-06 — Phases 1–4 COMPLETE; next execution target is Phase 6, then Phase 5):**
 
 - **Phases 1, 2, 2.5, 2.6, 3: COMPLETE.** Unchanged.
-- **Phase 4 Tasks 1–6: COMPLETE** (`phase_04_green_verification.md`). GREEN 4/4 first run (Sonnet-tier, **non-causal reading binding**). V1–V7 dispositioned earlier.
-- **Phase 4 review gate — completed steps (all committed, 2026-07-05):**
-  - **Code review DONE** (Sonnet, scope `f04995f..87946b4`): APPROVED, 0C / 2I / 1M, worked one-by-one under halt-and-discuss. Imp#1 CSO preface confabulation FIXED (`68843a8`); Imp#2 edit-path-untested ACCEPTED non-blocking (obligation bound to task #7); Minor V6 — reviewer named the wrong pair, corrected in record. See `code-review-findings-phase-4.md` (`a38f3fc`).
-  - **Proleptic challenge DONE** (Opus): 4 CAs. CA3 directory-wide claim-about-content sweep RUN — clean beyond the already-fixed CSO; CA1 edit-path obligation strengthened with boundary conditions; CA2 GREEN claim disambiguated ("non-regressing n=1, Sonnet-tier", not "validated"); CA4 V6-correction method recorded (`aa483e8`).
-  - **Codex external peer review DONE** (GPT-5.5; provenance gate passed 6/6 quotes): 0 High / 1 Medium. Medium = the sweep record overclaimed "every/only"; reworded to a bounded claim + enumeration method + byte-identity caveat (`aa483e8`).
-  - **UAT gate DONE** — provisional confirm, definitive deferred: five back-referenced deferred-observation entries (DR-P1-DR1/DR2/DR4, DR-P2-DR8, DR-P3-DR7) provisionally confirmed by operator; recorded in `uat-requirements.md` §"UAT gate outcome — 2026-07-05". ISSUE-12 flagged as the live novel case to shatter DR-P1-DR1/DR2/DR4 later.
-- **Commits since previous handoff (`87946b4`):** `d1162ef` (ISSUE-12 filed) → `68843a8` (CSO fix) → `a38f3fc` (findings + dispositions) → `aa483e8` (proleptic + codex hardening) → UAT-record commit (tip).
+- **Phase 4: COMPLETE and CLOSED.** All tasks (1–6) and the full review gate done: code review (Sonnet), proleptic (Opus), codex external (GPT-5.5), UAT provisional-confirm, and — the final gate step — the §3d refactor pipeline (2026-07-06). Refactor pipeline ran clean: smell-assessor (Opus) **0 findings**; gate skipped critical-peer-review + refactoring-executor; no code changed; 879 green. Closure recorded by dated append in `phase_04_green_verification.md`; full smell-report at `refactor-pipeline-smell-report-phase-4.md`. Closure commit `b0c8fb0`.
+- **Remaining phases execute OUT OF NUMERIC ORDER: phase_06 → phase_05.** Phase 6 is cross-plugin hardening of `impl-plan-write`; Phase 5 is the terminal coherent-set commit (version bumps + marketplace + CHANGELOG) that must capture Phase 6's deltas, so Phase 6 lands first.
 
-## NEXT ACTION — the last Phase 4 gate step: the REFACTOR PIPELINE
+## ⚠️ PRECONDITION before Phase 6 — the step-0 main merge (currently PENDING)
 
-Invoke `denubis-plan-and-execute:executing-an-implementation-plan` and run its §3d phase refactor over the Phase 4 files (`plugins/denubis-extending-claude/skills/writing-skills/`: `SKILL.md`, `README.md`, `anthropic-best-practices.md`, `render-graphs.js`, `examples/CLAUDE_MD_TESTING.md`):
+This branch is **58 commits behind `main`** as of 2026-07-06 (main tip `bd77b2e`; last main→branch merge was `5487da7`, now stale). Both `phase_06.md` and `phase_05.md` state their line anchors and version baselines are stale and must be re-verified **after a step-0 main merge** — and that merge is NOT yet done this cycle.
 
-1. Measurement (`wc -l`, `complexipy`, ast-grep rubric rules) → SCRATCHPAD.
-2. `smell-assessor` (**pin model** — Sonnet or Opus; never Haiku/Fable).
-3. Gate: empty findings → announce and skip to verify. Else `critical-peer-review` (scoped: evidence-grading only).
-4. `refactoring-executor` on "proceed"-verdict findings only, one transformation at a time; revert on red.
-5. Verify **879 tests green**; commit the refactor separately.
+- Phase 6 edits `plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md` at scattered anchors (the phase names SKILL.md 728–734 and 1285 against an assumed 1337 lines). The file is **1350 lines** in this worktree right now, and main has drifted further. Every anchor in `phase_06.md` MUST be re-verified against the post-merge file before editing — "exact boundaries determined at execution time."
+- Phase 5's version baselines (denubis-extending-claude, denubis-plan-and-execute), `.claude-plugin/marketplace.json`, and `CHANGELOG.md` are likewise stale — re-verify at execution.
 
-Most Phase 4 files are markdown/JS docs — smell yield is likely low; a near-empty assessment is expected and fine. Do NOT force refactors on prose. `anthropic-best-practices.md` and `render-graphs.js` are byte-identical obra imports — **out of scope for refactoring** (touching them breaks the verbatim/byte-identity claim).
+**First action for the Phase 6 session: HALT and decide the main-merge with the operator.** Merging 58 commits of main into a mid-refactor branch is its own task — use `denubis-extending-claude:syncing-with-upstream` for the ed3d→denubis rename handling. Do not start Phase 6 anchor edits until the merge is done and every anchor re-verified. Do not execute the plan on `main`.
 
-**After the refactor pipeline, Phase 4 CLOSES.** Then execution order is **phase_06 → phase_05**.
+## NEXT ACTION — Phase 6 (only after the step-0 main merge)
+
+Invoke `denubis-plan-and-execute:executing-an-implementation-plan`, create a fresh task list for Phase 6 from `phase_06.md`, and execute it: convert the three anti-smuggling tests (Decomposition / Reduction / Disagreement) from rubric-as-text into a forcing gate in `impl-plan-write/SKILL.md` — template mandating `**What's automatable:**` / `**What's NOT automatable:**` before every UAT falsification template, three-lens-table amendment making "no UAT entry" first-class, per-phase ND rejection gate firing before user approval, Finalization existence gate on `uat-requirements.md`, one-time collation audit via a dedicated Sonnet subagent, and a retroactive audit of this plan's own accumulated UAT entries (`uat-audit-2026-04-17.md`). Phase Type: functionality. Full phase gate applies (code review → proleptic → UAT/coherence → refactor). Then Phase 5.
 
 ## Post-resume verification (run before any work)
 
@@ -46,6 +40,7 @@ Most Phase 4 files are markdown/JS docs — smell yield is likely low; a near-em
 pwd; git branch --show-current            # skill-skills-upstream-sync
 git log --oneline -6
 uv sync --all-packages && uv run pytest -q | tail -2   # 879 passed
+git rev-list --count HEAD..main           # commits behind main (was 58 on 2026-07-06)
 ```
 
 (`uv sync --all-packages` is required; uv.lock self-modifying its exclude-newer stanza is expected, not drift.)
@@ -56,22 +51,23 @@ uv sync --all-packages && uv run pytest -q | tail -2   # 879 passed
 2. **R6 reconciliation still open** (Phase 3 V5): inline model anchors in `testing-skills-with-subagents/SKILL.md`; the uncommitted `docs/audits/2026-07-02-model-anchor-sweep.md` maps them. Reconcile at Phase 5.
 3. **Edit path is ACCEPTED-and-bound, not tested:** task #7 (queued obra-import) must exercise the edit-re-entry rule against a boundary-condition scenario — see `phase_04_true_up_sweep.md` §"Boundary-condition specification (2026-07-05 proleptic CA1)" — not an incidental edit.
 4. **Dispatch-time staleness check:** read `model-tier-notes.md` `last-verified` (2026-07-02) before dispatching subagents; if a model shipped since, HALT and re-verify.
+5. **Dispatch reliability note (2026-07-06):** during the Phase 4 refactor pipeline, the first Opus smell-assessor dispatch (background) degenerated — 0 tool uses, echoed system/agent-registry boilerplate, no output file; recovered by one foreground re-dispatch (13 tool uses). If a subagent returns a non-response with **0 tool uses**, re-dispatch (foreground) once before treating it as turn exhaustion — this is a distinct failure mode from budget exhaustion.
+6. **Model policy for this work (operator, 2026-07-05):** core pipeline agents = Opus (pinned explicitly). Fable and Codex call-outs are pre-authorised without cost-gate hesitation as a **session-scoped human trigger** — NOT a standing revocation of the Fable cost gate. Re-confirm per session; the standing cost-gate doctrine in `model-tier-notes.md` is unchanged.
 
-## Queued / parked (do NOT start before Phase 4 closes)
+## Queued / parked (do NOT start before Phase 6)
 
 - **task #7 — obra-import work item** (`phase_04_true_up_sweep.md`, 2026-07-05 append): import obra's "Match the Form to the Failure" + "Micro-Test Wording" into the sub-skills; author a denubis-native worked example (repoint the worked-example reference); decide Rule-of-Three extraction of the V6 rubric-callback pair (`writing-claude-directives/SKILL.md:135` + `testing-skills-with-subagents/SKILL.md:36`); exercise the edit path per carry-forward 3.
-- **Two uncommitted audit docs await operator read:** `docs/audits/2026-07-02-skill-engagement-audit.md`, `docs/audits/2026-07-02-model-anchor-sweep.md`.
-- **ISSUE-12** (`docs/issues.md`): "can it do it by default?" skill-authoring pre-check — candidate fold into task #7; MS "stop overloading your skills" post recorded unread/unverified.
+- **Two uncommitted audit docs await operator read:** `docs/audits/2026-07-02-skill-engagement-audit.md`, `docs/audits/2026-07-02-model-anchor-sweep.md`. (Also untracked and parked: `.review/`.)
+- **ISSUE-12** (`docs/issues.md`): "can it do it by default?" skill-authoring pre-check — candidate fold into task #7.
 - **Minor tooling note:** `denubis-external-agents:codex-peer-review` v0.3.0 fails on a directory target (`cp: -r not specified`); file-only in practice — worth a fix/issue.
 
 ## Read first
 
-1. `phase_04_green_verification.md` — Task 6 record, V1–V7, and the three 2026-07-05 dated appends (CSO fix; proleptic sweep + CA2; codex rewording).
-2. `code-review-findings-phase-4.md` — reviewer output + orchestrator corrections.
-3. `phase_04.md` incl. the 2026-06-10 amendment — what the phase built and against what.
+1. `phase_06.md` incl. the L3 execution-order note and 2026-06-10 amendment — the next phase; re-verify every SKILL.md anchor after the step-0 main merge.
+2. `phase_05.md` incl. the L3 note and 2026-06-10 amendment — terminal phase; re-verify version/marketplace/CHANGELOG baselines.
+3. `phase_04_green_verification.md` — Phase 4 record incl. the 2026-07-06 refactor-pipeline closure append.
 4. `phase_04_true_up_sweep.md` — task #7 + the edit-path/boundary-condition obligation.
-5. `uat-requirements.md` §"UAT gate outcome — 2026-07-05".
-6. `plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md` — tier doctrine (Sonnet 5 caution, advisor rules, Fable cost gate).
+5. `plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md` — tier doctrine (Sonnet 5 caution, advisor rules, Fable cost gate; last-verified 2026-07-02).
 
 ## Standing rules (unchanged)
 
@@ -79,7 +75,7 @@ uv sync --all-packages && uv run pytest -q | tail -2   # 879 passed
 - Do not re-edit the H/M/L revision-history markers, the Phase 1 C1–C4 artefacts, the Phase 2/2.5/2.6 GREEN/checkpoint artefacts, the Phase 3 records, or the Phase 4 GREEN/red/findings artefacts except by **dated append** — audit trail.
 - Do not reverse the 2026-04-22/23 or 2026-06-10 amendment passes without explicit operator direction.
 - Do not route judgement-requiring subagent tasks to Haiku 4.5.
-- **Fable cost gate (2026-06-10, extended):** never auto-dispatch Fable-tier subagents or set a Fable advisor on automated runs — human-triggered only. Pin `model` explicitly on every Agent dispatch.
+- **Fable cost gate (2026-06-10, extended):** never auto-dispatch Fable-tier subagents or set a Fable advisor on automated runs — human-triggered only. Pin `model` explicitly on every Agent dispatch. (See carry-forward 6 for the current session-scoped human authorisation.)
 - **Operator rule (2026-07-02):** never configure Sonnet as advisor at any tier; treat Sonnet 5 outputs with heightened hallucination scrutiny — verify quotes/claims against files.
 - Do not push without checking with the user. The remote (`origin/skill-skills-upstream-sync` at `c394d63`) predates the 2026-04-22 rebase; any push needs `--force-with-lease` and explicit approval.
 - Do not `git worktree remove` this worktree from inside it; `finishing-a-development-branch` handles cleanup.
