@@ -39,7 +39,7 @@ Write test cases (pressure scenarios), watch them fail (baseline behaviour), wri
 - Standard practices documented elsewhere
 - Project-specific conventions (use CLAUDE.md)
 
-**Before committing to creation, apply the rubric:** run the artefact-under-consideration through `denubis-extending-claude:epistemic-humility`. If it fails Scope (Jones's three conditions), Observability (three screens), Process (Schön's four questions), or the Failure-pattern screen, the right next step is to re-scope, not to author. Directive-writing is a protective belt around a scope decision, not a substitute for it.
+**Before committing to creation — or to an edit that changes a skill's scope — apply the rubric:** run the artefact-under-consideration through `denubis-extending-claude:epistemic-humility`. If it fails Scope (Jones's three conditions), Observability (three screens), Process (Schön's four questions), or the Failure-pattern screen, the right next step is to re-scope, not to author. Directive-writing is a protective belt around a scope decision, not a substitute for it.
 
 ## Skill Types
 
@@ -102,6 +102,8 @@ Authoring a skill sequences the three sub-skills in order. Each owns a phase of 
 2. **Phrasing and compliance** — `denubis-extending-claude:writing-claude-directives`. Token efficiency, discovery optimisation, model-tier notes, aggressive-language dial-back. Covers Compelling Skill Organisation (CSO) and the per-model behavioural specifics.
 3. **RED/GREEN/REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Pressure testing, conversation-precedent sourcing for the RED baseline, and bulletproofing against rationalisations. This is where the Iron Law's "failing test first" becomes operational.
 
+**Editing an existing skill re-enters this sequence, scoped to the change.** A scope-changing edit (new triggers, new verdict space, different audience) re-runs step 1. A phrasing edit runs step 2 on the touched sections. Any edit that could weaken compliance re-runs the pressure scenarios it could plausibly weaken (step 3). "I'm only editing, not creating" is not an exit — an edit that skips re-testing ships an untested change to a tested skill.
+
 ## Supporting Files
 
 Three files imported from obra/superpowers ship alongside this skill. See `README.md` for dependencies and invocation.
@@ -120,6 +122,8 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 ## Skill Creation Checklist
 
 **IMPORTANT:** Use TaskCreate to track each item.
+
+**Editing instead of creating?** Run the items your change touches. The REFACTOR re-test items are never skippable: name which pressure scenarios the edit could weaken and re-run them.
 
 **Scope:**
 - [ ] Run the artefact through `denubis-extending-claude:epistemic-humility`
