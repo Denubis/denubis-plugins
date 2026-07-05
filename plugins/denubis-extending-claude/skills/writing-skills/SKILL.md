@@ -144,7 +144,7 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 **REFACTOR Phase:**
 - [ ] Identify new rationalisations
 - [ ] Add explicit counters
-- [ ] Re-test until bulletproof
+- [ ] Re-test until a pressure run surfaces no new rationalisations (the "When Skill is Bulletproof" signs in `denubis-extending-claude:testing-skills-with-subagents`)
 
 **Deployment:**
 - [ ] Present GREEN/REFACTOR evidence to your human partner; explicit acceptance required
