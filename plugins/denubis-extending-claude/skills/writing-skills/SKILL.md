@@ -99,7 +99,7 @@ What goes wrong + fixes.
 Authoring a skill sequences the three sub-skills in order. Each owns a phase of the work; this orchestrator only points.
 
 1. **Scope check** — `denubis-extending-claude:epistemic-humility`. Apply the rubric before committing to a skill. A skill that fails Scope, Observability, Process, or the Failure-pattern screen wants re-scoping, not authoring.
-2. **Phrasing and compliance** — `denubis-extending-claude:writing-claude-directives`. Token efficiency, discovery optimisation, model-tier notes, aggressive-language dial-back. Covers Compelling Skill Organisation (CSO) and the per-model behavioural specifics.
+2. **Phrasing and compliance** — `denubis-extending-claude:writing-claude-directives`. Token efficiency, skill discovery optimisation, model-tier notes, aggressive-language dial-back, and the per-model behavioural specifics.
 3. **RED/GREEN/REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Pressure testing, conversation-precedent sourcing for the RED baseline, and bulletproofing against rationalisations. This is where the Iron Law's "failing test first" becomes operational.
 
 **Editing an existing skill re-enters this sequence, scoped to the change.** A scope-changing edit (new triggers, new verdict space, different audience) re-runs step 1. A phrasing edit runs step 2 on the touched sections. Any edit that could weaken compliance re-runs the pressure scenarios it could plausibly weaken (step 3). "I'm only editing, not creating" is not an exit — an edit that skips re-testing ships an untested change to a tested skill.
