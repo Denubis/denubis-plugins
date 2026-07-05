@@ -147,5 +147,6 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 - [ ] Re-test until bulletproof
 
 **Deployment:**
-- [ ] Commit and push
+- [ ] Present GREEN/REFACTOR evidence to your human partner; explicit acceptance required
+- [ ] Commit and push (only after acceptance)
 - [ ] Consider contributing via PR
