@@ -50,7 +50,6 @@ These make Claude Code noticeably better to work with.
 | Plugin | What it does |
 |--------|-------------|
 | **`denubis-hook-skill-reinforcement`** | Reminds Claude to actually use its skills (you'd be surprised how often it forgets). |
-| **`denubis-hook-shortcut-detection`** | E-STOP when Claude tries to take shortcuts — blocks and asks before proceeding. |
 | **`denubis-extending-claude`** | Meta-skills for writing plugins, agents, skills, CLAUDE.md maintenance, and syncing with upstream. |
 | **`denubis-git-commit`** | `/commit` as a proper skill with multi-commit support. |
 | **`denubis-hook-claudemd-reminder`** | Reminds Claude to update CLAUDE.md before committing when things have changed. |
@@ -126,7 +125,6 @@ Inside Claude Code:
 /plugin install denubis-basic-agents@denubis-plugins
 /plugin install denubis-research-agents@denubis-plugins
 /plugin install denubis-hook-skill-reinforcement@denubis-plugins
-/plugin install denubis-hook-shortcut-detection@denubis-plugins
 /plugin install denubis-extending-claude@denubis-plugins
 /plugin install denubis-git-commit@denubis-plugins
 /plugin install denubis-hook-claudemd-reminder@denubis-plugins
@@ -220,7 +218,6 @@ denubis-plugins/
 │   ├── denubis-extending-claude/
 │   ├── denubis-git-commit/
 │   ├── denubis-hook-skill-reinforcement/
-│   ├── denubis-hook-shortcut-detection/
 │   ├── denubis-hook-claudemd-reminder/
 │   ├── denubis-hook-pretooluse-dispatcher/
 │   ├── denubis-hook-gh-fork-guard/

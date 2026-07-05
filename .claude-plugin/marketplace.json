@@ -94,20 +94,6 @@
       ]
     },
     {
-      "name": "denubis-hook-shortcut-detection",
-      "description": "Stop hook that detects shortcut phrases and blocks with E-STOP for user go/no-go decision.",
-      "version": "2.0.4",
-      "source": "./plugins/denubis-hook-shortcut-detection",
-      "author": {
-        "name": "Brian Ballsun-Stanton",
-        "github": "denubis"
-      },
-      "license": "CC-BY-SA-4.0",
-      "keywords": [
-        "hooks"
-      ]
-    },
-    {
       "name": "denubis-git-commit",
       "description": "Git commit skill for Claude Code. Handles /commit as a proper skill.",
       "version": "1.2.1",

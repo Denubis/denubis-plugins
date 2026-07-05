@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-hook-shortcut-detection] removed
+
+Retired the plugin. Its `shortcut-detector.py` Stop hook is deleted, the marketplace entry and README references are gone, and the dedicated `tests/test_shortcut_detector.py` is removed.
+
+**Why:** an audit of chat history found 50 genuine firings across Sonnet and Opus sessions and zero true positives. The hook greps the last assistant message for narration connectives (`easier to`, `directly rather than`, `simpler approach`, `for simplicity`), which saturate ordinary explanation. Its two most common triggers were the model choosing the more rigorous path (`directly rather than guess`) and a plain comparative (`easier to diagnose`). A Stop hook reading prose cannot tell a mention of a phrase from its use, nor a change of code approach from a tooling workaround, so precision was zero. It also fired on this very investigation for quoting a trigger phrase.
+
+**Removed:**
+- `plugins/denubis-hook-shortcut-detection/` (the Stop hook, `hooks.json`, manifest)
+- `tests/test_shortcut_detector.py`
+- The `denubis-hook-shortcut-detection` entry in `.claude-plugin/marketplace.json` and its three README references
+
 ## [denubis-bibliography] 0.12.0
 
 `resolve.py` near matches now carry a distinct exit code, and SKILL.md directs the caller to use the real key the resolver returns rather than construct one.
