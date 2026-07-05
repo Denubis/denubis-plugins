@@ -65,5 +65,5 @@ Registered in `plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json` (`dd
 - **Plugin manifest:** `plugins/denubis-hook-pretooluse-dispatcher/hooks/.claude-plugin/plugin.json` (`a9b22d8`), version 1.1.0.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **README:** `plugins/denubis-hook-pretooluse-dispatcher/README.md`.
-- **Sub-hooks discovered today (in this marketplace, both with empty `hooks.json` and a `pretooluse-bash.sh` wrapper):** `denubis-hook-gh-fork-guard` (priority 10), `denubis-hook-rtk-rewrite` (priority 50).
+- **Sub-hook discovered today (in this marketplace, with an empty `hooks.json` and a `pretooluse-bash.sh` wrapper):** `denubis-hook-gh-fork-guard` (priority 10).
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

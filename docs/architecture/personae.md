@@ -18,7 +18,7 @@ User types, their goals, access patterns, and constraints.
 - Drops slash commands (`/commit`, `/getting-started`, `/setup`, `/starting-a-design-plan`, `/starting-an-implementation-plan`, `/executing-an-implementation-plan`, `/maintain-architecture`, `/flesh-it-out`, `/how-to-customize`) for repeatable workflows.
 - Reads and edits skill markdown directly when refining workflows.
 - Works against forks of GitHub repos — the `gh-fork-guard` hook denies `gh` calls targeting any repo other than the configured fork.
-- Uses `uv` for Python tooling, `git` everywhere, `gh` for GitHub work, `rtk` for token-saving wrappers (the `rtk-rewrite` hook handles this transparently).
+- Uses `uv` for Python tooling, `git` everywhere, and `gh` for GitHub work.
 
 **Constraints:**
 - Local-only operation — no remote sync of plugin state beyond git.

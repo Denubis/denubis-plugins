@@ -17,7 +17,6 @@ Measurable limits on the behaviour of `brian-ed3d-plugins` and the disciplines i
 | Constraint | Requirement | Verification |
 |------------|-------------|-------------|
 | Fork isolation | `gh` CLI commands targeting any repo other than the user's fork are denied. The allowed repo is set via `ALLOWED_GH_REPO` or inferred from `git remote get-url origin`. | `denubis-hook-gh-fork-guard`'s `gh-fork-guard.py` (`f62e8a6`) running under the `pretooluse-bash` dispatcher at priority 10. |
-| Token economy | Commands matching the RTK rewrite catalogue (git, gh, file ops, JS/TS tooling, Docker, Python tooling, etc.) are transparently rewritten to `rtk <cmd>` to reduce token output. | `denubis-hook-rtk-rewrite`'s `pretooluse-bash.sh` (`c580ff0`) running under the dispatcher at priority 50. |
 | Banned-pattern writes | File writes/edits that match patterns the user has banned (e2e JS injection, `create_all`, migration edits, debug statements, easy-mode shortcuts, spec weakening) are denied or warned at `PreToolUse:Write|Edit`. | `denubis-plan-and-execute/hooks/code-quality-guard.py` (`9bac7ed`) with 5s timeout. |
 
 ## Process Discipline (encoded by skills)
