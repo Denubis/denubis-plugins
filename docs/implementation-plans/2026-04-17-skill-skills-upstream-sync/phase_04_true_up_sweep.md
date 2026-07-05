@@ -101,3 +101,23 @@ The dispatch-time staleness tripwire (RESUME-PROMPT carry-forward #4) fired on P
 - Flag #1 (graphviz-conventions.dot cosmetic drift) remains open, awaiting operator disposition.
 
 Operator notes recorded 2026-07-02 in `model-tier-notes.md`: Sonnet 5 hallucination caution (operator-directed); Fable-tier availability is intermittent ("briefly back").
+
+---
+
+## 2026-07-05 dated append — upstream drift check (operator-directed, mid-V-walk)
+
+During the V1–V7 rubric-walk-through disposition, the operator directed a freshness check on the advice sources ("go see if the advice has changed"). Checked 2026-07-05 against obra/superpowers HEAD (`d884ae0`) and Anthropic's live skill-authoring best-practices page.
+
+**Flag #1 (graphviz-conventions.dot cosmetic drift) is closed.** Operator approved deletion of the stray blank line; body byte-identity with obra@6fd4507 restored and SHA-verified in commit `71301fb` (2026-07-02). Upstream check today confirms obra has not touched `graphviz-conventions.dot` or `render-graphs.js` since the pin — both byte-identity claims remain sound against HEAD.
+
+**Anthropic live doc: no substantive change.** Section structure identical to the 2026-06-11 verification; residual diff is editorial micro-wording and link formatting. The vendored copy stands. (`last-verified-against-live-docs` bump to 2026-07-05 folded into the next commit touching that file.)
+
+**obra/superpowers: substantive drift in `skills/writing-skills` (8 commits since pin `6fd4507`):**
+
+1. **New section "Match the Form to the Failure"** (`cbc8273`, refined `fdb0f42`, `1aa45d2`): form-selection table matching guidance form to baseline-failure type (prohibition for discipline failures; positive recipe for wrong-shape output; structural REQUIRED slot for omissions; conditional-on-observable-predicate for conditional behaviour). Includes obra-observed empirical claim that prohibitions backfire on shaping problems (prohibition arm worse than no-guidance control in their wording tests; "fully separated distributions"). Evidence grade: **documented (obra-observed, unpublished, not reproduced by denubis)**.
+2. **New section "Micro-Test Wording Before Full Scenarios"** (`cbc8273`): cheap wording micro-tests before pressure scenarios — no-guidance control mandatory ("control doesn't fail → don't author"), 5+ reps, manual read of every flagged match, variance-as-metric. Convergent with the denubis epistemic-humility gate and RED-baseline doctrine (independent arrival, mild external validation of the rubric).
+3. **CSO → SDO rename** (`f0e5117`, agent-neutral prose pass): not imported — the denubis cornerstone now uses plain "skill discovery optimisation" (see below). Same pass reworded obra's *vendored* `anthropic-best-practices.md` ("Claude" → "agents"), so obra's copy is no longer verbatim-Anthropic; the denubis copy at pin 6fd4507 is now closer to Anthropic's live text than obra HEAD is.
+
+**Local fix landed during the check:** cornerstone line 102 expanded "CSO" as "Compelling Skill Organisation" — matching neither obra coinage, with the acronym absent from the sub-skill it was attributed to. Confabulated expansion removed in commit `dd37aff`.
+
+**Queued work item (operator-approved 2026-07-05, deliberately NOT folded into Phase 4 Task 6):** import the form-selection table into `writing-claude-directives` and the micro-test method into `testing-skills-with-subagents` (plus at most two cornerstone checklist lines), with obra attribution and evidence-grading per the sources convention. These are scope-changing edits to tested skills: per the cornerstone's edit-path rule (commit `f88007c`), they require a rubric re-check and re-running the pressure scenarios they could weaken. Pick up after Phase 4 closes (Phase 5 or standalone follow-on). A subagent probe of where current denubis guidance fails obra's form-taxonomy was dispatched 2026-07-05 to inform this item; findings to be filed alongside.
