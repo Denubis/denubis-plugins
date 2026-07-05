@@ -52,7 +52,7 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 - **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Used heavily by `denubis-hook-skill-reinforcement` (`UserPromptSubmit`), `denubis-basic-agents` and `denubis-plan-and-execute` session-start hooks, and `denubis-hook-claudemd-reminder`.
 - **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Used by `denubis-hook-gh-fork-guard`, the `code-quality-guard` hook in `denubis-plan-and-execute`, and the `denubis-hook-rtk-rewrite` rewriter (which always emits `allow` but with an `updatedInput`).
 - **`updatedInput`**: a hook return value that rewrites the tool input before it is executed. Used by `denubis-hook-rtk-rewrite` to swap a command for its `rtk` equivalent.
-- **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. Used by `denubis-hook-shortcut-detection`.
+- **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. No shipped plugin currently emits it.
 - **MCP server**: an external tool provider connected to Claude Code via the Model Context Protocol. The marketplace consumes MCP (Gmail/Calendar/Drive, `context7`, `ast-grep`) but does not host servers.
 
 ## Repository Conventions

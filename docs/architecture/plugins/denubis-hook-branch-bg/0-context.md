@@ -59,4 +59,4 @@ Registered in `plugins/denubis-hook-branch-bg/hooks/hooks.json` (`22d2148`):
 - **Plugin manifest:** `plugins/denubis-hook-branch-bg/hooks/.claude-plugin/plugin.json` (`22d2148`), version 0.2.3.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **Related architecture docs:** `../../README.md` (index), `../../glossary.md`, `../../constraints.md`.
-- **Sibling hook plugins** (peer entities under Claude Code's hook system, not consumers of this plugin's output): `denubis-hook-claudemd-reminder`, `denubis-hook-shortcut-detection`, `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`, `denubis-hook-rtk-rewrite`, `denubis-hook-skill-reinforcement`.
+- **Sibling hook plugins** (peer entities under Claude Code's hook system, not consumers of this plugin's output): `denubis-hook-claudemd-reminder`, `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`, `denubis-hook-rtk-rewrite`, `denubis-hook-skill-reinforcement`.

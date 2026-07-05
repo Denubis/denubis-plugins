@@ -9,7 +9,7 @@ User types, their goals, access patterns, and constraints.
 **Goals:**
 - Use Claude Code productively across long-running sessions in multiple projects.
 - Maintain disciplined workflows (brainstorm → design → plan → execute) without losing process to fatigue or context drift.
-- Catch behavioural drift in Claude before it ships bad work — via hooks (`shortcut-detection`, `code-quality-guard`, `gh-fork-guard`), code-review loops, and proleptic-challenge passes.
+- Catch behavioural drift in Claude before it ships bad work — via hooks (`code-quality-guard`, `gh-fork-guard`), code-review loops, and proleptic-challenge passes.
 - Re-use disciplined knowledge across sessions and machines by keeping markdown skills, agents, and CLAUDE.md files as the durable artefact set.
 
 **Access patterns:**
@@ -23,7 +23,7 @@ User types, their goals, access patterns, and constraints.
 **Constraints:**
 - Local-only operation — no remote sync of plugin state beyond git.
 - Linux desktop assumed by some components: `/proc` access (used by `branch-bg` for TTY discovery), fish shell, ghostty terminal (referenced in `branch-bg`'s keywords).
-- Limited attention budget — relies on hooks (`skill-reinforcement`, `claudemd-reminder`, `shortcut-detection`) to enforce process rather than memory.
+- Limited attention budget — relies on hooks (`skill-reinforcement`, `claudemd-reminder`) to enforce process rather than memory.
 
 **Key scenarios:**
 1. **Starting a new feature.** Invokes `/starting-a-design-plan`. Claude runs `denubis-plan-and-execute`'s brainstorming, clarification, write, and proleptic-challenge skills, dispatching `denubis-research-agents:codebase-investigator` for codebase reality checks. A design plan lands in `docs/design-plans/`.
