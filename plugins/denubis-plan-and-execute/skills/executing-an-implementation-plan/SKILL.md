@@ -2,6 +2,7 @@
 name: executing-an-implementation-plan
 description: Use when executing an implementation plan in the current session - dispatches a fresh subagent per task and reviews once per phase
 user-invocable: true
+argument-hint: "[absolute-plan-dir] [absolute-working-dir]"
 ---
 
 # Executing an Implementation Plan

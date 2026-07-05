@@ -43,7 +43,9 @@ class WriteContext:
     allocates ``scan_run_id``.
     """
 
-    conn: object  # typed as object to allow mock connections in tests; callers always pass sqlite3.Connection
+    # typed as object to allow mock connections in tests;
+    # callers always pass sqlite3.Connection
+    conn: object
     ctx: ScanContext
     scan_run_id: int
 
@@ -90,8 +92,8 @@ def _upsert_session(
         INSERT INTO sessions (
             uuid, project_path, cwd, jsonl_path, jsonl_mtime, jsonl_last_ts,
             classification, classification_reason, classifier_version, state_summary,
-            first_seen, last_scanned, user_notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            first_seen, last_scanned, user_notes, pane_title, last_substantive
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
         ON CONFLICT(uuid) DO UPDATE SET
             project_path = excluded.project_path,
             cwd = excluded.cwd,
@@ -102,7 +104,9 @@ def _upsert_session(
             classification_reason = excluded.classification_reason,
             classifier_version = excluded.classifier_version,
             state_summary = excluded.state_summary,
-            last_scanned = excluded.last_scanned
+            last_scanned = excluded.last_scanned,
+            pane_title = excluded.pane_title,
+            last_substantive = excluded.last_substantive
         """,
         (
             fact.uuid,
@@ -117,6 +121,8 @@ def _upsert_session(
             fact.tail_summary.state_summary,
             wctx.ctx.now,
             wctx.ctx.now,
+            fact.pane_title,
+            fact.last_substantive,
         ),
     )
 
@@ -216,12 +222,8 @@ def _orphan_sweep(
             )
         else:
             tail_summary = parse_tail(Path(jsonl_path_str))
-            liveness_state = LivenessState(
-                present=False, boot_id_current=False
-            )
-            new_classification = classify(
-                tail_summary, liveness_state, pid_alive=None
-            )
+            liveness_state = LivenessState(present=False, boot_id_current=False)
+            new_classification = classify(tail_summary, liveness_state, pid_alive=None)
         wctx.conn.execute(
             "UPDATE sessions SET classification = ?, classification_reason = ?, "
             "classifier_version = ?, state_summary = ?, last_scanned = ? "

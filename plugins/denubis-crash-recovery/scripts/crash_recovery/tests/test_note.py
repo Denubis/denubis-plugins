@@ -23,14 +23,15 @@ import os
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
-
 from crash_recovery import db as db_mod
 from crash_recovery import note as note_mod
 from crash_recovery import render as render_mod
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,7 +45,9 @@ def _init_db(tmp_path: Path) -> Path:
     return db_path
 
 
-def _seed_concluded_session(db_path: Path, uuid: str, *, user_notes: str | None = None) -> None:
+def _seed_concluded_session(
+    db_path: Path, uuid: str, *, user_notes: str | None = None
+) -> None:
     """Insert one ``concluded`` sessions row.
 
     Mirrors the column set documented in :class:`crash_recovery.db.SESSIONS_DDL`
@@ -211,7 +214,8 @@ def _run_cli(*args: str, db_path: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_note_cli_unknown_uuid_exits_nonzero_with_error_text(tmp_path: Path) -> None:
-    """AC4.5 (CLI): unknown UUID → exit code != 0 and "no session with uuid" in stderr."""
+    """AC4.5 (CLI): unknown UUID → exit code != 0 and "no session with uuid" in stderr.
+    """
     db_path = _init_db(tmp_path)
     result = _run_cli("no-such-uuid", "hello", db_path=db_path)
     assert result.returncode != 0, (result.stdout, result.stderr)

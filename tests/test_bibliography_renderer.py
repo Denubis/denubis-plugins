@@ -186,7 +186,7 @@ def test_one_below_threshold_is_empty():
 # markers. fold_mocr_markdown splits it into the per-page list the papers/
 # writer expects, replacing the throwaway /tmp/convert_polanyi.py.
 
-fold = lambda t: renderer.fold_mocr_markdown(t)  # noqa: E731
+fold = renderer.fold_mocr_markdown
 
 
 def test_fold_splits_on_page_markers():
@@ -279,7 +279,9 @@ def test_needs_mocr_when_cascade_exhausts_and_not_allowed(tmp_path, monkeypatch)
     _patch_lower_tiers_to_fail(monkeypatch)
     with pytest.raises(renderer.NeedsMocr):
         renderer.render_pdf_with_fallback(
-            _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None,
+            _fake_pdf(tmp_path),
+            tmp_path / "out",
+            progress=lambda *_: None,
             allow_mocr=False,
         )
 
@@ -289,8 +291,11 @@ def test_allow_mocr_without_session_still_needs_mocr(tmp_path, monkeypatch):
     _patch_lower_tiers_to_fail(monkeypatch)
     with pytest.raises(renderer.NeedsMocr):
         renderer.render_pdf_with_fallback(
-            _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None,
-            allow_mocr=True, mocr_session=None,
+            _fake_pdf(tmp_path),
+            tmp_path / "out",
+            progress=lambda *_: None,
+            allow_mocr=True,
+            mocr_session=None,
         )
 
 
@@ -302,8 +307,11 @@ def test_escalates_to_mocr_session_when_allowed(tmp_path, monkeypatch):
             return (["Real readable page content here. " * 5] * 5, "/tmp/x_nohf.md")
 
     meta = renderer.render_pdf_with_fallback(
-        _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None,
-        allow_mocr=True, mocr_session=FakeSession(),
+        _fake_pdf(tmp_path),
+        tmp_path / "out",
+        progress=lambda *_: None,
+        allow_mocr=True,
+        mocr_session=FakeSession(),
     )
     assert meta["renderer"] == "mocr"
     assert meta["ocr"] is True
@@ -322,6 +330,9 @@ def test_mocr_session_output_still_quality_checked(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError):
         renderer.render_pdf_with_fallback(
-            _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None,
-            allow_mocr=True, mocr_session=BadSession(),
+            _fake_pdf(tmp_path),
+            tmp_path / "out",
+            progress=lambda *_: None,
+            allow_mocr=True,
+            mocr_session=BadSession(),
         )

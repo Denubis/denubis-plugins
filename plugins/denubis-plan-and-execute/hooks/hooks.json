@@ -6,7 +6,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh",
+            "command": "uv run python \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py\"",
+            "timeout": 5,
+            "suppressOutput": true
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/update-live-marker.py\"",
             "suppressOutput": true
           }
         ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 
 from workflow_statusline import cache
 
@@ -20,7 +21,7 @@ def maybe_rename(name: str) -> None:
     pane_id = tmux_pane.lstrip("%")
 
     lock_file = f"/tmp/claude-statusline-tmux-lock-{pane_id}"
-    if os.path.exists(lock_file):
+    if Path(lock_file).exists():
         return
 
     cache_file = f"/tmp/claude-statusline-tmux-{pane_id}"
@@ -28,5 +29,7 @@ def maybe_rename(name: str) -> None:
     if cached_name == name:
         return
 
-    subprocess.run(["tmux", "rename-window", f"Cl:{name}"], check=False, capture_output=True)
+    subprocess.run(
+        ["tmux", "rename-window", f"Cl:{name}"], check=False, capture_output=True
+    )
     cache.write(cache_file, name)

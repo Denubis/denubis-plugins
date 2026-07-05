@@ -1,4 +1,7 @@
 """Test fixtures: functions that SHOULD trigger ast-grep smell rules."""
+# ruff: noqa — ast-grep pattern fixtures: this file is deliberately full of smells
+# (undefined names, no-timeout requests, bare open, unused args) as positive-match
+# targets for the rules. It is matched structurally, never executed.
 
 
 # === nesting-depth: >3 levels nested control flow ===
@@ -18,11 +21,13 @@ def reads_file(path):
 
 def calls_requests(url):
     import requests
+
     return requests.get(url).json()
 
 
 def uses_pathlib(path):
     from pathlib import Path
+
     return Path(path).read_text()
 
 

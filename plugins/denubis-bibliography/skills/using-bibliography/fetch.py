@@ -4,15 +4,17 @@ via the zotero-api-plus local API.
 
 This replaces the fragile, hand-written `python3 -c "..."` JSON-parsing that the
 SKILL used to leave to improvisation. The brittle step was turning a human group
-+ collection name ("BJET group", "Bayesian / Methods") into the numeric groupID
++ collection name ("Project group", "Bayesian / Methods") into the numeric groupID
 and collectionKey that add-item-by-id requires. That lives in `resolve_target`,
 a pure function with unit tests.
 
 Usage (resolve + preview only — NO write):
-    uv run fetch.py --group 6549571 --collection "Bayesian / Methods" 10.1007/s11136-018-1798-3
+    uv run fetch.py --group 6549571 --collection "Bayesian / Methods" \
+        10.1007/s11136-018-1798-3
 
 Usage (DOI in, working paper out — fetch then render, gated behind --fetch):
-    uv run fetch.py --group 6549571 --collection "Bayesian / Methods" --fetch 10.1007/s11136-018-1798-3
+    uv run fetch.py --group 6549571 --collection "Bayesian / Methods" \
+        --fetch 10.1007/s11136-018-1798-3
 
 With --fetch the item is written to the library and then rendered to per-page
 markdown under <zettelkasten_root>/papers/<citekey>/ (via ingest.py). Pass
@@ -133,7 +135,9 @@ def _find_library(libraries: list[dict], group: str | None) -> dict:
     return matches[0]
 
 
-def _find_collection(lib: dict, collection: str | None) -> tuple[str | None, str | None]:
+def _find_collection(
+    lib: dict, collection: str | None
+) -> tuple[str | None, str | None]:
     """Resolve a collection name within one library to (name, key).
 
     Returns (None, None) when no collection is requested. Collection names are
@@ -260,7 +264,11 @@ def add_item(identifier: str, group_id: int | None, collection_key: str | None) 
 
 
 def render_dois(
-    dois: list[str], *, allow_mocr: bool = False, retries: int = 1, retry_wait: float = 4.0
+    dois: list[str],
+    *,
+    allow_mocr: bool = False,
+    retries: int = 1,
+    retry_wait: float = 4.0,
 ) -> int:
     """Render freshly fetched papers by delegating to ingest.py (DOI -> per-page
     markdown under <zettelkasten_root>/papers/<citekey>/).
@@ -280,7 +288,7 @@ def render_dois(
     attempt = 0
     while True:
         print(f"\n=== render {dois} (via ingest.py) ===", flush=True)
-        proc = subprocess.run(cmd)
+        proc = subprocess.run(cmd, check=False)
         if proc.returncode == 0:
             return 0
         attempt += 1
@@ -302,7 +310,10 @@ def render_dois(
 def _print_target(target: ResolvedTarget, identifiers: list[str]) -> None:
     print("=== resolved target ===", flush=True)
     if target.group_id is not None:
-        print(f"  library:    {target.library_name} (groupID {target.group_id})", flush=True)
+        print(
+            f"  library:    {target.library_name} (groupID {target.group_id})",
+            flush=True,
+        )
     else:
         print(f"  library:    {target.library_name} (My Library)", flush=True)
     if target.collection_key:
@@ -379,7 +390,8 @@ def main() -> int:
     if not args.fetch:
         print(
             "\nPreview only (no write). add-item-by-id does NOT dedup — confirm each\n"
-            "identifier is absent from Zotero first, then re-run with --fetch to write.",
+            "identifier is absent from Zotero first, then re-run with --fetch"
+            " to write.",
             flush=True,
         )
         return 0
@@ -408,7 +420,8 @@ def main() -> int:
             )
             if item.get("pdf") in ("unavailable", "error"):
                 print(
-                    "    -> no PDF on disk; attach via the Zotero connector, then render.",
+                    "    -> no PDF on disk; attach via the Zotero connector,"
+                    " then render.",
                     flush=True,
                 )
 

@@ -54,7 +54,7 @@ The cross-reference audit currently lives as an embedded Python script in `phase
    - `PostToolUse` on `Edit` / `Write` when the touched path matches `**/SKILL.md`, `docs/**/*.md`, or known plan/design directories — run the audit, surface FAILs as `additionalContext`.
    - `Stop` — run the full audit at session end; emit `decision: "block"` with `reason` if there are unresolved FAILs in the working tree.
    - Optional pre-commit-style via `PreToolUse` on `Bash` when the command is `git commit …` — block commits that would ship broken references.
-   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the existing `shortcut-detector.py` Stop hook's surfacing pattern.)
+   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the `code-quality-guard.py` hook's deny/warn surfacing pattern.)
 
 **Why deferred from skill-skills upstream sync:**
 

@@ -32,12 +32,26 @@ CR="uv run --project ${BATS_TEST_DIRNAME}/../plugins/denubis-crash-recovery/scri
   [ -f "$CRASH_RECOVERY_DB" ]
 }
 
-@test "triage on empty filesystem prints minimal render with six sections" {
+@test "triage (lean) on empty filesystem shows actionable sections, collapses bulk" {
   $CR init
   run $CR triage
   [ "$status" -eq 0 ]
+  echo "$output" | grep -q "Probable system-crash victims"
   echo "$output" | grep -q "Currently unfinished"
-  echo "$output" | grep -q "Idle-live killed"
+  echo "$output" | grep -q "Ambiguous correlation"
+  echo "$output" | grep -q "Needs investigation"
+  # Lean view: with nothing on the filesystem there is no bulk, so the
+  # concluded/irrecoverable sections are absent and there is no Collapsed summary.
+  ! echo "$output" | grep -q "Recently concluded"
+  ! echo "$output" | grep -q "Irrecoverable"
+}
+
+@test "triage --all on empty filesystem prints the full six-section roster" {
+  $CR init
+  run $CR triage --all
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "Probable system-crash victims"
+  echo "$output" | grep -q "Currently unfinished"
   echo "$output" | grep -q "Ambiguous correlation"
   echo "$output" | grep -q "Needs investigation"
   echo "$output" | grep -q "Recently concluded"

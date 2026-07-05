@@ -23,7 +23,7 @@ flowchart LR
 ## System Boundary
 
 **In scope:**
-- Match the executed Bash command against `^(rtk\s+)?git\s+(status|log(?!\s+--oneline\s+-\d+$))` and emit a reminder when it matches. The negative lookahead deliberately ignores short `git log --oneline -N` one-liners (`git-command-reminder.py`, `6b7bd86`).
+- Match the executed Bash command against `^git\s+(status|log(?!\s+--oneline\s+-\d+$))` and emit a reminder when it matches. The negative lookahead deliberately ignores short `git log --oneline -N` one-liners (`git-command-reminder.py`, `6b7bd86`).
 - Emit nothing when the tool is not `Bash`, when stdin is not valid JSON, or when the command does not match the regex (`git-command-reminder.py`, `6b7bd86`).
 
 **Out of scope:**

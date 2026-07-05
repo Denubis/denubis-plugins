@@ -61,26 +61,28 @@ def test_linux_label_with_space():
 def test_windows_unescaped_drive_letter():
     """The shape Brian's parser couldn't handle in 0.2.1 and earlier."""
     bib = _wrap(
-        r"Full Text:C:\Users\jodie\Zotero\storage\XYZ\paper.pdf:application/pdf"
+        r"Full Text:C:\Users\example\Zotero\storage\XYZ\paper.pdf:application/pdf"
     )
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path(r"C:\Users\jodie\Zotero\storage\XYZ\paper.pdf")]
+    assert paths == [Path(r"C:\Users\example\Zotero\storage\XYZ\paper.pdf")]
 
 
 def test_windows_escaped_drive_letter():
     """BibLaTeX convention escapes `:` as `\\:`."""
     bib = _wrap(
-        r"Full Text:C\:\Users\jodie\Zotero\storage\XYZ\paper.pdf:application/pdf"
+        r"Full Text:C\:\Users\example\Zotero\storage\XYZ\paper.pdf:application/pdf"
     )
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path(r"C:\Users\jodie\Zotero\storage\XYZ\paper.pdf")]
+    assert paths == [Path(r"C:\Users\example\Zotero\storage\XYZ\paper.pdf")]
 
 
 def test_windows_forward_slash_drive_letter():
     """Some BBT versions normalise to forward slashes after the drive letter."""
-    bib = _wrap("Full Text:C:/Users/jodie/Zotero/storage/XYZ/paper.pdf:application/pdf")
+    bib = _wrap(
+        "Full Text:C:/Users/example/Zotero/storage/XYZ/paper.pdf:application/pdf"
+    )
     paths = bbt.parse_pdf_paths(bib)
-    assert paths == [Path("C:/Users/jodie/Zotero/storage/XYZ/paper.pdf")]
+    assert paths == [Path("C:/Users/example/Zotero/storage/XYZ/paper.pdf")]
 
 
 # --- Multi-entry ----------------------------------------------------------
@@ -150,8 +152,8 @@ def test_only_non_pdf_entry_returns_empty():
 @pytest.mark.parametrize(
     "fragment",
     [
-        "Submitted Version:/home/brian/Zotero/storage/936D8S6A/Arksey and O'Malley - 2005 - Scoping studies towards a methodological framework.pdf:application/pdf",
-        "Full Text PDF:/home/brian/Zotero/storage/S2P7TUKN/Keshav - 2007 - How to read a paper.pdf:application/pdf",
+        "Submitted Version:/home/brian/Zotero/storage/936D8S6A/Arksey and O'Malley - 2005 - Scoping studies towards a methodological framework.pdf:application/pdf",  # noqa: E501 — real Zotero path literal
+        "Full Text PDF:/home/brian/Zotero/storage/S2P7TUKN/Keshav - 2007 - How to read a paper.pdf:application/pdf",  # noqa: E501 — real Zotero path literal
     ],
 )
 def test_real_linux_entries_from_repo_bib(fragment):

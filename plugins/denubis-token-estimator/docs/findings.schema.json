@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "codex-review-findings",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "voice": {
+      "type": "string",
+      "description": "Which model produced this set, e.g. 'codex/gpt-5.5' or 'claude/code-reviewer'"
+    },
+    "target": {
+      "type": "string",
+      "description": "What was reviewed (path, PR, design doc, or proposal text)"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "description": "Short stable id, e.g. C1, I3 — unique within this voice" },
+          "severity": { "type": "string", "enum": ["Critical", "Important", "Minor"] },
+          "location": { "type": "string", "description": "file:line or section; empty string if not applicable (e.g. a proleptic objection)" },
+          "title": { "type": "string" },
+          "body": { "type": "string", "description": "The finding plus a one-line 'why it matters'" },
+          "needs_research": { "type": "boolean", "description": "true if confirming/refuting this needs external info you cannot access offline" },
+          "research_question": { "type": "string", "description": "What to look up, if needs_research is true; empty otherwise" }
+        },
+        "required": ["id", "severity", "location", "title", "body", "needs_research", "research_question"]
+      }
+    }
+  },
+  "required": ["voice", "target", "findings"]
+}

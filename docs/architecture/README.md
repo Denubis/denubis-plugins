@@ -9,8 +9,6 @@ Hook plugins:
 - [`denubis-hook-claudemd-reminder/0-context.md`](plugins/denubis-hook-claudemd-reminder/0-context.md) — `PostToolUse:Bash`: reminds to update CLAUDE.md after `git status`/`git log`.
 - [`denubis-hook-gh-fork-guard/0-context.md`](plugins/denubis-hook-gh-fork-guard/0-context.md) — `PreToolUse:Bash` (via dispatcher): blocks `gh` against non-fork repos.
 - [`denubis-hook-pretooluse-dispatcher/0-context.md`](plugins/denubis-hook-pretooluse-dispatcher/0-context.md) — `PreToolUse:Bash`: discovers and runs sibling `pretooluse-bash.sh` hooks, merges outputs.
-- [`denubis-hook-rtk-rewrite/0-context.md`](plugins/denubis-hook-rtk-rewrite/0-context.md) — `PreToolUse:Bash` (via dispatcher): rewrites CLI calls to `rtk` equivalents.
-- [`denubis-hook-shortcut-detection/0-context.md`](plugins/denubis-hook-shortcut-detection/0-context.md) — `Stop`: scans transcript for shortcut phrases and blocks with E-STOP.
 - [`denubis-hook-skill-reinforcement/0-context.md`](plugins/denubis-hook-skill-reinforcement/0-context.md) — `UserPromptSubmit`: reminds the model to invoke applicable skills.
 
 Agent-and-skill plugins:
@@ -18,7 +16,7 @@ Agent-and-skill plugins:
 - [`denubis-research-agents/0-context.md`](plugins/denubis-research-agents/0-context.md) — four research agents (codebase, internet, combined, remote-code) + three companion skills.
 
 Orchestration:
-- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md) — the largest plugin: 34 skills, 10 agents, 6 commands, 2 hooks (`session-start.sh`, `code-quality-guard.py`), and 2 scripts (`workflow_statusline/`, `claude-wrapper.sh` — the wrapper writes liveness files consumed by `denubis-crash-recovery`).
+- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md) — the largest plugin: 34 skills, 10 agents, 6 commands, 2 hooks (`session-start.py`, `code-quality-guard.py`), and 2 scripts (`workflow_statusline/`, `claude-wrapper.sh` — the wrapper writes liveness files consumed by `denubis-crash-recovery`).
 
 Crash recovery:
 - [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) — 9 CLI subcommands + `/denubis-crash-recovery:triage` skill + SQLite schema; classifies live/crashed/concluded sessions deterministically. Linux-only (`/proc`-dependent). Sibling-coupled to `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes the liveness files this plugin reads.

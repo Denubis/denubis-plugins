@@ -46,87 +46,72 @@ combined-researcher
 
 ## Academic Research Protocol
 
-When research involves academic papers, technical standards, or scholarly sources, follow this protocol. The user is an academic -- proper citations and DOIs are non-negotiable.
+The user is an academic, so citations and DOIs are non-negotiable, and a claim is
+citable only once its primary source has been read in full. Reading happens
+through the user's Zotero corpus and the `using-bibliography` pipeline, never from
+an abstract or a web summary. Discovery's job is therefore to *identify* papers so
+they can be loaded into Zotero and read, not to fetch, summarise, or stockpile
+them from the web. The flow has three stages: identify, load, read.
 
-### Step 1: Build a bibliography
+### Stage 1: Identify (the research agent's job)
 
-The research agent searches for relevant papers and produces a bibliography. For each paper:
+A research agent (usually `internet-researcher`) searches for relevant work and
+returns, for each candidate, a locator the loader can act on:
 
-```
-Author(s). (Year). Title. *Journal/Venue*, volume(issue), pages.
-https://doi.org/10.xxxx/xxxxx
+- a DOI as a URL (`https://doi.org/10.xxxx/xxxxx`), preferred
+- failing a DOI, another stable identifier (ISBN, PMID, arXiv id)
+- only as a last resort, an unstable locator (a landing-page URL, or a plausible
+  author, title, and year), flagged as unverified so a human can find and add it
 
-Access: Open access / Institutional access required
-curl: curl -L -o docs/papers/author-year-slug.pdf "https://doi.org/10.xxxx/xxxxx"
-      (only if open access)
-```
+Give the full citation and a one-line reason each candidate is relevant, then
+stop. Do not fetch the PDF, do not write a summary from the abstract, and do not
+build a parallel `docs/papers/` library, because the corpus is Zotero and a
+second pile of PDFs outside it only invites hand-rolled extraction.
 
-**Requirements:**
-- Full citation (author, year, title, journal/venue, volume, pages)
-- DOI as a URL (`https://doi.org/...`), never bare (`DOI: 10.xxxx`)
-- Access note (open access or institutional)
-- `curl` command if open access (so the human can fetch without browser)
+### Stage 2: Load into Zotero (orchestrator, behind confirmation)
 
-### Step 2: Human fetches PDFs
+The identified papers are brought into Zotero with their PDFs and then rendered.
+The mechanics live in `using-bibliography` ("Fetching a missing paper"); in brief:
 
-Present the bibliography to the human. They fetch papers via DOIs -- institutional access, library proxies, or open access. PDFs go into `docs/papers/` (which should be gitignored).
+- **Already in the corpus?** Resolve first with `resolve.py`. A present paper is
+  loaded, so skip fetching it: the fetch endpoint does not dedup, and a second add
+  creates a duplicate.
+- **Fetchable?** Use `fetch.py` (the `zotero-api-plus` path). It writes to the
+  library, so it HALTs for explicit confirmation of the exact items and target
+  collection, then attaches the PDF and renders.
+- **Paywalled with no open-access copy?** `fetch.py` returns metadata only. The
+  Zotero connector with an institutional session is the path, taken by the human
+  or a human-supervised step. Wait for the paper to appear, then render.
 
-**Do not** try to fetch papers yourself. **Do not** summarise based on abstracts alone. **Do not** route around access restrictions.
+Loading writes to the user's library, so it is never silent and never inferred
+from an earlier "research this" instruction.
 
-### Step 3: Agent reads full paper
+### Stage 3: Read (the using-bibliography fan-out)
 
-Once PDFs are available, an agent reads the FULL paper -- not the abstract, not a web summary, the actual document. Use the Read tool on the PDF.
-
-### Step 4: Agent writes discussion
-
-For each paper read, write a discussion file:
-
-```
-docs/papers/{author-year-slug}.md
-```
-
-**Format:**
-
-```markdown
-# {Author} ({Year}) -- {Short Title}
-
-**Full citation:** {complete citation with DOI URL}
-
-## Summary
-{What the paper argues, in 2-3 paragraphs}
-
-## Key Claims
-{Numbered list of the paper's main claims or contributions}
-
-## Relevance
-{How this paper relates to the current work -- be specific}
-
-## Limitations
-{What the paper doesn't cover, methodological concerns, scope constraints}
-
-## Quotes
-{Direct quotes with page numbers for anything you might cite}
-```
+Once papers are in Zotero with rendered markdown, read them with the reader
+fan-out in `using-bibliography` ("Fanning out readers over a rendered corpus"):
+the orchestrator resolves and renders each paper once, then dispatches one reader
+per paper given only the rendered markdown path. Page-keyed citations come from
+the markers in the rendered text and are verified with `blockquote.py`.
 
 ### Anti-patterns
 
-| Anti-pattern | Why it's wrong | What to do instead |
-|--------------|---------------|-------------------|
-| Citing a paper from its abstract | You don't know what it actually says | Build bibliography, human fetches, read full paper |
-| "Based on Smith (2023)..." without reading | Academic misconduct dressed as research | Only cite papers you've read in full |
-| Summarising web summaries of papers | Telephone game -- errors compound | Read the primary source |
-| Skipping DOIs | DOIs are permanent; URLs rot | Always include DOI URL |
-| Bare DOI format (`DOI: 10.xxxx`) | Not clickable, harder to use | Use `https://doi.org/10.xxxx` |
+| Anti-pattern | Why it's wrong | Instead |
+|--------------|---------------|---------|
+| Citing a paper from its abstract or a web summary | You do not know what it says, and the telephone game compounds errors | Load it into Zotero, render it, read the primary source |
+| "Based on Smith (2023)..." without reading the full text | Academic misconduct dressed as research | Cite only papers read in full via the rendered text |
+| Fetching PDFs into a `docs/papers/` dump and reading them ad hoc | Forks a second corpus outside Zotero and invites hand-rolled extraction | Load with `fetch.py`, read the render |
+| Reaching for `pdftotext` or another extractor | The render cascade already produced better text | Read the rendered markdown; PDF to text is always the cascade |
+| Skipping DOIs or writing them bare (`DOI: 10.xxxx`) | DOIs are permanent and a bare one is not clickable | Always `https://doi.org/10.xxxx` |
+| Routing around access restrictions for a paywalled PDF | Not the agent's call to make | Identify it and leave the connector and institutional session to the human |
 
 ### When this protocol applies
 
-- Any time a research agent finds academic papers relevant to the work
-- When the user asks for scholarly sources or citations
-- When design decisions need theoretical grounding (e.g. Popper, Lakatos, Haraway references in other skills)
-- When evaluating claims that reference academic literature
+- Any time research surfaces academic papers relevant to the work.
+- When the user asks for scholarly sources or citations.
+- When a design decision needs theoretical grounding (Popper, Lakatos, Haraway, and the like).
+- When evaluating claims that reference academic literature.
 
-### When this protocol does NOT apply
+### When it does NOT apply
 
-- Looking up API documentation (just use internet-researcher)
-- Finding blog posts or tutorials (not academic sources)
-- Stack Overflow answers and GitHub issues (not scholarly)
+- API documentation, blog posts, tutorials, Stack Overflow, or GitHub issues. Those are not scholarly sources, so use `internet-researcher` directly without this protocol.

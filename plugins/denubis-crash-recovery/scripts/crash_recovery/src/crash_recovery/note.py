@@ -16,9 +16,12 @@ user wonders why their note never appeared in the rendered file.
 from __future__ import annotations
 
 from contextlib import closing
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from crash_recovery import db
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class UnknownSessionError(LookupError):
@@ -37,14 +40,13 @@ def set_note(db_path: Path, uuid: str, text: str) -> None:
     the UPDATE in a transaction so a mid-call interrupt cannot leave the
     row half-written.
     """
-    with closing(db.open_db(db_path)) as conn:
-        with conn:
-            cur = conn.execute(
-                "UPDATE sessions SET user_notes = ? WHERE uuid = ?",
-                (text, uuid),
-            )
-            if cur.rowcount == 0:
-                raise UnknownSessionError(f"no session with uuid {uuid}")
+    with closing(db.open_db(db_path)) as conn, conn:
+        cur = conn.execute(
+            "UPDATE sessions SET user_notes = ? WHERE uuid = ?",
+            (text, uuid),
+        )
+        if cur.rowcount == 0:
+            raise UnknownSessionError(f"no session with uuid {uuid}")
 
 
 def clear_note(db_path: Path, uuid: str) -> None:
@@ -53,11 +55,10 @@ def clear_note(db_path: Path, uuid: str) -> None:
     Symmetric with :func:`set_note`: both honour the rowcount guard so a
     typo'd UUID raises rather than silently no-ops.
     """
-    with closing(db.open_db(db_path)) as conn:
-        with conn:
-            cur = conn.execute(
-                "UPDATE sessions SET user_notes = NULL WHERE uuid = ?",
-                (uuid,),
-            )
-            if cur.rowcount == 0:
-                raise UnknownSessionError(f"no session with uuid {uuid}")
+    with closing(db.open_db(db_path)) as conn, conn:
+        cur = conn.execute(
+            "UPDATE sessions SET user_notes = NULL WHERE uuid = ?",
+            (uuid,),
+        )
+        if cur.rowcount == 0:
+            raise UnknownSessionError(f"no session with uuid {uuid}")

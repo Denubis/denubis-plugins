@@ -49,7 +49,10 @@ def init(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
 ) -> None:
     """Initialise the crash-recovery SQLite database.
@@ -81,17 +84,34 @@ def scan(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
     run_dir: Path = typer.Option(
         None,
         "--run-dir",
-        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+        help=(
+            "Liveness-file directory"
+            " (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run)."
+        ),
     ),
     projects_root: Path = typer.Option(
         None,
         "--projects-root",
-        help="Projects root (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects).",
+        help=(
+            "Projects root"
+            " (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects)."
+        ),
+    ),
+    resurrect_dir: Path = typer.Option(
+        None,
+        "--resurrect-dir",
+        help=(
+            "tmux-resurrect snapshot dir"
+            " (default: $CRASH_RECOVERY_RESURRECT_DIR or ~/.byobu-sessions)."
+        ),
     ),
 ) -> None:
     """Walk the filesystem, classify each session, upsert to the DB."""
@@ -110,6 +130,9 @@ def scan(
             projects_root, "CRASH_RECOVERY_PROJECTS_ROOT", "~/.claude/projects"
         ),
         now=int(time.time()),
+        resurrect_dir=_resolve(
+            resurrect_dir, "CRASH_RECOVERY_RESURRECT_DIR", "~/.byobu-sessions"
+        ),
     )
     try:
         _liveness.assert_local_filesystem(ctx.run_dir)
@@ -128,6 +151,7 @@ def _build_scan_ctx_and_run(
     db_path: Path | None,
     run_dir: Path | None,
     projects_root: Path | None,
+    resurrect_dir: Path | None = None,
 ) -> _scan.ScanContext:
     """Resolve scan options, apply Linux + local-filesystem guards, then scan.
 
@@ -151,6 +175,9 @@ def _build_scan_ctx_and_run(
             projects_root, "CRASH_RECOVERY_PROJECTS_ROOT", "~/.claude/projects"
         ),
         now=int(time.time()),
+        resurrect_dir=_resolve(
+            resurrect_dir, "CRASH_RECOVERY_RESURRECT_DIR", "~/.byobu-sessions"
+        ),
     )
     try:
         _liveness.assert_local_filesystem(ctx.run_dir)
@@ -185,7 +212,7 @@ def _render_to_file(db_path: Path, output: Path) -> int:
     ) as tmp:
         tmp.write(content)
         tmp_path = Path(tmp.name)
-    os.replace(tmp_path, output)
+    tmp_path.replace(output)
     return n
 
 
@@ -194,12 +221,18 @@ def render(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
     output: Path = typer.Option(
         None,
         "--output",
-        help="Path to the rendered markdown file (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md).",
+        help=(
+            "Path to the rendered markdown file"
+            " (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md)."
+        ),
     ),
 ) -> None:
     """Render the crash-recovery DB to a markdown file.
@@ -223,26 +256,51 @@ def triage(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
     run_dir: Path = typer.Option(
         None,
         "--run-dir",
-        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+        help=(
+            "Liveness-file directory"
+            " (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run)."
+        ),
     ),
     projects_root: Path = typer.Option(
         None,
         "--projects-root",
-        help="Projects root (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects).",
+        help=(
+            "Projects root"
+            " (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects)."
+        ),
+    ),
+    resurrect_dir: Path = typer.Option(
+        None,
+        "--resurrect-dir",
+        help=(
+            "tmux-resurrect snapshot dir"
+            " (default: $CRASH_RECOVERY_RESURRECT_DIR or ~/.byobu-sessions)."
+        ),
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        help="Show the full all-means-all roster. Default is the lean view: "
+        "crash victims and active/ambiguous sessions in full, with concluded, "
+        "irrecoverable, and unrecognised-ending sessions collapsed to counts.",
     ),
 ) -> None:
     """Scan the filesystem, then print the rendered report to stdout.
 
     Composite of ``scan`` + ``render``-to-stdout. Same Linux + local-filesystem
-    guards as ``scan``.
+    guards as ``scan``. The terminal read is lean by default — "what crashed" is
+    a glance; pass ``--all`` for the full roster (also always in ``~/llm-resume.md``).
     """
-    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
-    content, _ = _render.render(ctx.db_path)
+    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root, resurrect_dir)
+    content, _ = _render.render(ctx.db_path, show_all=show_all)
     typer.echo(content, nl=False)
 
 
@@ -251,22 +309,42 @@ def regenerate(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
     run_dir: Path = typer.Option(
         None,
         "--run-dir",
-        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+        help=(
+            "Liveness-file directory"
+            " (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run)."
+        ),
     ),
     projects_root: Path = typer.Option(
         None,
         "--projects-root",
-        help="Projects root (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects).",
+        help=(
+            "Projects root"
+            " (default: $CRASH_RECOVERY_PROJECTS_ROOT or ~/.claude/projects)."
+        ),
+    ),
+    resurrect_dir: Path = typer.Option(
+        None,
+        "--resurrect-dir",
+        help=(
+            "tmux-resurrect snapshot dir"
+            " (default: $CRASH_RECOVERY_RESURRECT_DIR or ~/.byobu-sessions)."
+        ),
     ),
     output: Path = typer.Option(
         None,
         "--output",
-        help="Path to the rendered markdown file (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md).",
+        help=(
+            "Path to the rendered markdown file"
+            " (default: $CRASH_RECOVERY_RESUME_PATH or ~/llm-resume.md)."
+        ),
     ),
 ) -> None:
     """Scan the filesystem, then write the rendered report to the output file.
@@ -275,7 +353,7 @@ def regenerate(
     path as the standalone ``render`` subcommand so an interrupted write
     cannot leave a partial markdown file at the destination.
     """
-    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root)
+    ctx = _build_scan_ctx_and_run(db_path, run_dir, projects_root, resurrect_dir)
     resolved_out = _resolve(output, "CRASH_RECOVERY_RESUME_PATH", "~/llm-resume.md")
     try:
         count = _render_to_file(ctx.db_path, resolved_out)
@@ -288,12 +366,19 @@ def regenerate(
 @app.command()
 def note(
     uuid: str = typer.Argument(..., help="Session UUID."),
-    text: str = typer.Argument(None, help="Note text. Omit and pass --clear to remove."),
-    clear: bool = typer.Option(False, "--clear", help="Remove the existing note for this UUID."),
+    text: str = typer.Argument(
+        None, help="Note text. Omit and pass --clear to remove."
+    ),
+    clear: bool = typer.Option(
+        False, "--clear", help="Remove the existing note for this UUID."
+    ),
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
 ) -> None:
     """Set, overwrite, or clear the user note for a session.
@@ -307,7 +392,9 @@ def note(
     try:
         if clear:
             if text is not None:
-                raise typer.BadParameter("--clear cannot be combined with a text argument")
+                raise typer.BadParameter(
+                    "--clear cannot be combined with a text argument"
+                )
             _note.clear_note(resolved_db, uuid)
             typer.echo(f"Cleared note for {uuid}")
         else:
@@ -326,7 +413,10 @@ def history(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
 ) -> None:
     """Show all recorded classifications for a session, chronologically.
@@ -362,7 +452,10 @@ def prune(
     db_path: Path = typer.Option(
         None,
         "--db",
-        help="Path to crash-recovery SQLite DB (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db).",
+        help=(
+            "Path to crash-recovery SQLite DB"
+            " (default: $CRASH_RECOVERY_DB or ~/.claude/crash-recovery.db)."
+        ),
     ),
 ) -> None:
     """Delete concluded sessions whose JSONLs are gone (gated).
@@ -389,9 +482,9 @@ def prune(
     survey = _prune.survey(resolved_db)
     if survey.stale_version_concluded_rows > 0:
         typer.echo(
-            f"warning: {survey.stale_version_concluded_rows} concluded session(s) are at a stale "
-            f"classifier_version and were excluded from this prune. Run `crash-recovery scan` to "
-            f"refresh them, then re-run prune.",
+            f"warning: {survey.stale_version_concluded_rows} concluded session(s)"
+            " are at a stale classifier_version and were excluded from this prune."
+            " Run `crash-recovery scan` to refresh them, then re-run prune.",
             err=True,
         )
     if dry_run:
@@ -427,7 +520,10 @@ def list_live(
     run_dir: Path = typer.Option(
         None,
         "--run-dir",
-        help="Liveness-file directory (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run).",
+        help=(
+            "Liveness-file directory"
+            " (default: $CRASH_RECOVERY_RUN_DIR or ~/.claude/run)."
+        ),
     ),
     json_out: bool = typer.Option(
         False,

@@ -16,14 +16,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Optional
 
 from crash_recovery.db import CLASSIFICATION_VALUES
 from crash_recovery.jsonl import TailKind, TailSummary
 
-CLASSIFIER_VERSION: int = 1
-"""Bump when RULES changes shape. Scan re-classifies any row whose stored
-classifier_version is below this constant. See design plan DR9."""
+CLASSIFIER_VERSION: int = 2
+"""Bump when RULES changes shape; the scan stamps this value onto every row it
+touches and re-considers version-stale orphans. See design plan DR9.
+
+v2 (2026-06-20): added the ``liveness_dead_pid_concluded_tail`` rule, which
+renames the sole real ``unmatched`` case to a calm, specific reason. The bump
+follows the convention (RULES shape changed) and records which ruleset last
+classified each row. It is not what migrates existing data: an on-disk session
+is re-derived from its tail + liveness on every scan via ``_upsert_session``, so
+a row stored ``borderline/unmatched`` by v1 picks up the new reason on the next
+scan through the normal walk, independent of the version stamp."""
 
 
 # Derived at module load from db.CLASSIFICATION_VALUES — single authoritative
@@ -69,10 +76,10 @@ class Rule:
     equals the corresponding input.
     """
 
-    trailing_kind: Optional[TailKind]
-    liveness_present: Optional[bool]
-    pid_alive: Optional[bool]
-    boot_id_current: Optional[bool]
+    trailing_kind: TailKind | None
+    liveness_present: bool | None
+    pid_alive: bool | None
+    boot_id_current: bool | None
     classification: ClassificationValue
     reason: str
 
@@ -162,6 +169,23 @@ RULES: tuple[Rule, ...] = (
         classification=ClassificationValue.HARD_CRASH,
         reason="liveness_dead_pid_unknown_tail",
     ),
+    # A present marker + dead PID on the current boot + a CONCLUDED tail: the
+    # session finished a turn, then its process was killed (idle-kill; or, before
+    # the wrapper-cleanup-ordering fix, a terminal closed at the archive prompt on
+    # a cleanly-concluded session). The marker surviving proves the wrapper did
+    # not exit cleanly — worth surfacing — but the concluded tail means it is not
+    # a resume-these crash victim, so it is BORDERLINE with its own reason rather
+    # than HARD_CRASH. This was previously the sole input that reached the
+    # ``unmatched`` review-queue net; naming it here retires ``unmatched`` to a
+    # defensive-only fallback (see test_classify partition lists).
+    Rule(
+        trailing_kind=TailKind.CONCLUDED,
+        liveness_present=True,
+        pid_alive=False,
+        boot_id_current=True,
+        classification=ClassificationValue.BORDERLINE,
+        reason="liveness_dead_pid_concluded_tail",
+    ),
     Rule(
         trailing_kind=TailKind.CONCLUDED,
         liveness_present=False,
@@ -208,7 +232,7 @@ RULES: tuple[Rule, ...] = (
 def classify(
     tail_summary: TailSummary,
     liveness_state: LivenessState,
-    pid_alive: Optional[bool],
+    pid_alive: bool | None,
 ) -> Classification:
     """Return the first :class:`Classification` whose rule matches the inputs.
 
@@ -244,13 +268,22 @@ def classify(
             "got None. Phase 3 caller must run kill -0 when a liveness file exists."
         )
     for rule in RULES:
-        if rule.trailing_kind is not None and rule.trailing_kind is not tail_summary.kind:
+        if (
+            rule.trailing_kind is not None
+            and rule.trailing_kind is not tail_summary.kind
+        ):
             continue
-        if rule.liveness_present is not None and rule.liveness_present is not liveness_state.present:
+        if (
+            rule.liveness_present is not None
+            and rule.liveness_present is not liveness_state.present
+        ):
             continue
         if rule.pid_alive is not None and rule.pid_alive is not pid_alive:
             continue
-        if rule.boot_id_current is not None and rule.boot_id_current is not liveness_state.boot_id_current:
+        if (
+            rule.boot_id_current is not None
+            and rule.boot_id_current is not liveness_state.boot_id_current
+        ):
             continue
         return Classification(value=rule.classification, reason=rule.reason)
     return Classification(value=ClassificationValue.BORDERLINE, reason="unmatched")

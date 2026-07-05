@@ -2,7 +2,7 @@
 name = "workflow-statusline"
 version = "0.1.0"
 description = "Claude Code tmux status line renderer"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 
 [project.scripts]
 workflow-statusline = "workflow_statusline.__main__:main"

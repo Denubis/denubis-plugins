@@ -3,9 +3,10 @@
 PostToolUse hook that reminds to invoke project-claude-librarian
 before committing when git status or git log shows changes.
 """
+
 import json
-import sys
 import re
+import sys
 
 try:
     input_data = json.load(sys.stdin)
@@ -29,10 +30,11 @@ if re.match(r"^git\s+(status|log(?!\s+--oneline\s+-\d+$))", command):
             "hookEventName": "PostToolUse",
             "additionalContext": (
                 "Reminder: If you're about to commit changes that affect contracts, "
-                "APIs, or domain structure, consider invoking `project-claude-librarian` "
-                "(denubis-extending-claude:project-claude-librarian) to review and update "
-                "CLAUDE.md files before committing."
-            )
+                "APIs, or domain structure, consider invoking"
+                " `project-claude-librarian` "
+                "(denubis-extending-claude:project-claude-librarian)"
+                " to review and update CLAUDE.md files before committing."
+            ),
         }
     }
     print(json.dumps(output))

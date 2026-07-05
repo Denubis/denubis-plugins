@@ -3,7 +3,10 @@
 # Uses environment variable overrides to isolate from real hooks.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-DISPATCHER="$REPO_ROOT/plugins/denubis-hook-pretooluse-dispatcher/hooks/pretooluse-bash-dispatcher.sh"
+# The dispatcher is a pure-stdlib Python script; invoke via `uv run python`
+# (the same entrypoint hooks.json uses). uv is silent on stderr in a synced
+# project, so the `[ -z "$output" ]` assertions stay valid.
+DISPATCHER="$REPO_ROOT/plugins/denubis-hook-pretooluse-dispatcher/hooks/pretooluse-bash-dispatcher.py"
 
 setup() {
     export TEST_DIR="$(mktemp -d)"
@@ -52,7 +55,7 @@ enable_plugin() {
 # ═══════════════════════════════════════════════════════════════════════
 
 @test "empty state exits silently" {
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -65,7 +68,7 @@ exit 0
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/10-noop"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -78,7 +81,7 @@ echo '{"hookSpecificOutput":{"permissionDecision":"deny"},"systemMessage":"block
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/10-deny"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     result=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision')
     [ "$result" = "deny" ]
@@ -92,7 +95,7 @@ echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-rewrite"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision')
     [ "$decision" = "allow" ]
@@ -115,7 +118,7 @@ echo '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"comma
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-allow"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision')
     [ "$decision" = "deny" ]
@@ -136,7 +139,7 @@ echo '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"comma
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-rewrite"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"fork policy"* ]]
@@ -148,7 +151,7 @@ HOOK
     echo "This is not a hook script." > "$DISPATCHER_DROP_DIR/README"
     # Deliberately NOT chmod +x
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -168,7 +171,7 @@ echo '{"hookSpecificOutput":{"additionalContext":"from good hook"}}'
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-good"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"from good hook"* ]]
@@ -183,7 +186,7 @@ HOOK
         'cat > /dev/null; echo "{\"hookSpecificOutput\":{\"additionalContext\":\"should not appear\"}}"'
     # Plugin NOT enabled in settings
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -193,7 +196,7 @@ HOOK
         'cat > /dev/null; echo "{\"hookSpecificOutput\":{\"additionalContext\":\"from plugin\"}}"'
     enable_plugin "test-plugin" "test-mp"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"from plugin"* ]]
@@ -213,7 +216,7 @@ echo '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"comma
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-rewrite"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     # Deny from plugin at priority 10 should win
     decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision')
@@ -234,7 +237,7 @@ echo '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"comma
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-rewrite"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"plugin advisory"* ]]
@@ -263,7 +266,7 @@ echo '{"hookSpecificOutput":{"additionalContext":"first hook"}}'
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/10-first"
 
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     # Both should appear in context (concatenated)
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
@@ -281,7 +284,7 @@ HOOK
     enable_plugin "cached" "test-mp"
 
     # First run — builds cache
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -f "$DISPATCHER_CACHE_FILE" ]
 
@@ -289,7 +292,7 @@ HOOK
     head -1 "$DISPATCHER_CACHE_FILE" | grep -q "^HASH:"
 
     # Second run — should use cache (same result)
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"cached result"* ]]
@@ -300,7 +303,7 @@ HOOK
         'cat > /dev/null; echo "{\"hookSpecificOutput\":{\"additionalContext\":\"should appear\"}}"'
 
     # First run — plugin not enabled, cache built with no hooks
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 
@@ -312,7 +315,7 @@ HOOK
     enable_plugin "cached" "test-mp"
 
     # Second run — cache should be invalidated, plugin discovered
-    run bash "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]
     context=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
     [[ "$context" == *"should appear"* ]]
@@ -332,7 +335,7 @@ exit 0
 HOOK
     chmod +x "$DISPATCHER_DROP_DIR/50-rewrite"
 
-    run bash "$DISPATCHER" --list
+    run uv run python "$DISPATCHER" --list
     [ "$status" -eq 0 ]
     [[ "$output" == *"plugin:guard@test-mp"* ]]
     [[ "$output" == *"drop:50-rewrite"* ]]
@@ -340,7 +343,7 @@ HOOK
 }
 
 @test "--list shows empty state" {
-    run bash "$DISPATCHER" --list
+    run uv run python "$DISPATCHER" --list
     [ "$status" -eq 0 ]
     [[ "$output" == *"(none)"* ]]
 }

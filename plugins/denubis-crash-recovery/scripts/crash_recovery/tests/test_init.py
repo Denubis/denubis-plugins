@@ -10,10 +10,12 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
-
 from crash_recovery import db
 
 # Columns documented in the design's Data Model. Each tuple is
@@ -39,6 +41,8 @@ _EXPECTED_SESSIONS_COLUMNS: tuple[tuple[str, str, int], ...] = (
     ("first_seen", "INTEGER", 1),
     ("last_scanned", "INTEGER", 1),
     ("user_notes", "TEXT", 0),
+    ("pane_title", "TEXT", 0),
+    ("last_substantive", "TEXT", 0),
 )
 
 
@@ -58,7 +62,12 @@ class TestInitCreatesSchema:
                     "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
                 ).fetchall()
             ]
-            assert tables == ["classification_history", "scan_runs", "sessions"], tables
+            assert tables == [
+                "classification_history",
+                "scan_runs",
+                "sessions",
+                "uncorrelated_markers",
+            ], tables
 
             cols = conn.execute("PRAGMA table_info(sessions)").fetchall()
             # Project (name, type, notnull) for comparison.
@@ -97,12 +106,22 @@ class TestInitIsIdempotent:
             first_hash = db._schema_hash(conn)
             first_counts = {
                 table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("sessions", "scan_runs", "classification_history")
+                for table in (
+                    "sessions",
+                    "scan_runs",
+                    "classification_history",
+                    "uncorrelated_markers",
+                )
             }
         finally:
             conn.close()
 
-        assert first_counts == {"sessions": 0, "scan_runs": 0, "classification_history": 0}
+        assert first_counts == {
+            "sessions": 0,
+            "scan_runs": 0,
+            "classification_history": 0,
+            "uncorrelated_markers": 0,
+        }
 
         # Re-run init on the same path. Should be a no-op.
         db.init(tmp_db_path)
@@ -112,13 +131,184 @@ class TestInitIsIdempotent:
             second_hash = db._schema_hash(conn)
             second_counts = {
                 table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                for table in ("sessions", "scan_runs", "classification_history")
+                for table in (
+                    "sessions",
+                    "scan_runs",
+                    "classification_history",
+                    "uncorrelated_markers",
+                )
             }
         finally:
             conn.close()
 
         assert second_hash == first_hash, (first_hash, second_hash)
         assert second_counts == first_counts
+
+    def test_uncorrelated_markers_reason_check_rejects_unknown(
+        self, tmp_db_path: Path
+    ) -> None:
+        """The ``reason`` CHECK enforces the closed ``MARKER_REASON_VALUES`` domain.
+
+        Every allowed value inserts; an unknown reason violates the CHECK. This
+        gives the marker ``reason`` column the same schema-level guard that
+        ``classification`` already has (project CLAUDE.md, "Schema Constants from
+        Authoritative Source").
+        """
+        db.init(tmp_db_path)
+        conn = db.open_db(tmp_db_path)
+        try:
+            for i, reason in enumerate(db.MARKER_REASON_VALUES):
+                conn.execute(
+                    "INSERT INTO uncorrelated_markers "
+                    "(boot_id, pid, cwd, started, reason, last_scanned) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    ("boot", i, "/work", 100, reason, 200),
+                )
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    "INSERT INTO uncorrelated_markers "
+                    "(boot_id, pid, cwd, started, reason, last_scanned) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    ("boot", 99, "/work", 100, "not_a_real_reason", 200),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+# ---------------------------------------------------------------------------
+# AC7.1 / AC7.2 — additive pane_title/last_substantive migration
+# ---------------------------------------------------------------------------
+
+# Old-shape sessions DDL: the column set *before* pane_title/last_substantive
+# were added. Hand-built so the migration test exercises a real pre-migration
+# DB rather than one that already has the columns from current DDL.
+_OLD_SHAPE_SESSIONS_DDL = """
+CREATE TABLE sessions (
+    uuid                  TEXT PRIMARY KEY NOT NULL,
+    project_path          TEXT NOT NULL,
+    cwd                   TEXT NOT NULL,
+    jsonl_path            TEXT,
+    jsonl_mtime           INTEGER,
+    jsonl_last_ts         INTEGER,
+    classification        TEXT NOT NULL,
+    classification_reason TEXT,
+    classifier_version    INTEGER NOT NULL,
+    state_summary         TEXT,
+    first_seen            INTEGER NOT NULL,
+    last_scanned          INTEGER NOT NULL,
+    user_notes            TEXT
+)
+"""
+
+
+def _build_old_shape_db(path: Path) -> None:
+    """Create a WAL-mode DB whose ``sessions`` table lacks the new columns.
+
+    WAL is mandatory: ``open_db`` rejects a non-WAL DB before reaching the
+    migration, so a non-WAL fixture would mask the migration under the WAL
+    RuntimeError instead of exercising it.
+    """
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute(_OLD_SHAPE_SESSIONS_DDL)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+class TestAdditiveMigration:
+    def test_fresh_init_creates_new_columns(self, tmp_db_path: Path) -> None:
+        """AC7.2: a fresh ``init()`` produces pane_title + last_substantive."""
+        db.init(tmp_db_path)
+        conn = sqlite3.connect(tmp_db_path)
+        try:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(sessions)")}
+        finally:
+            conn.close()
+        assert {"pane_title", "last_substantive"} <= cols, cols
+
+    def test_init_migrates_old_shape_without_data_loss(self, tmp_db_path: Path) -> None:
+        """AC7.1: ``init()`` on a pre-existing DB lacking the new columns adds them
+        without data loss; re-running ``init`` is a no-op.
+
+        Durability is verified via a FRESH raw ``sqlite3.connect`` after the
+        connection closes — the property render/scan rely on via their own
+        connections.
+        """
+        _build_old_shape_db(tmp_db_path)
+
+        # Seed a row under the OLD schema, before migration runs.
+        seed = sqlite3.connect(tmp_db_path)
+        try:
+            seed.execute(
+                """
+                INSERT INTO sessions (
+                    uuid, project_path, cwd, classification,
+                    classifier_version, first_seen, last_scanned, state_summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                ("seed-uuid", "/p", "/c", "live", 1, 1_000_000, 1_000_000, "before"),
+            )
+            seed.commit()
+        finally:
+            seed.close()
+
+        # init() is the deliberate migration site.
+        db.init(tmp_db_path)
+
+        # Durability: read from a FRESH raw connection (not open_db) so we prove
+        # the columns are actually on disk, not just in-memory for this connection.
+        raw = sqlite3.connect(tmp_db_path)
+        try:
+            cols = {row[1] for row in raw.execute("PRAGMA table_info(sessions)")}
+            assert {"pane_title", "last_substantive"} <= cols, cols
+
+            row = raw.execute(
+                "SELECT state_summary, pane_title, last_substantive "
+                "FROM sessions WHERE uuid = ?",
+                ("seed-uuid",),
+            ).fetchone()
+            # Pre-migration data retained; new columns default to NULL.
+            assert row == ("before", None, None), row
+        finally:
+            raw.close()
+
+        # Idempotency: re-running init must not raise and must leave schema unchanged.
+        db.init(tmp_db_path)
+        raw2 = sqlite3.connect(tmp_db_path)
+        try:
+            cols2 = {row[1] for row in raw2.execute("PRAGMA table_info(sessions)")}
+        finally:
+            raw2.close()
+        assert {"pane_title", "last_substantive"} <= cols2, cols2
+
+    def test_open_db_does_not_migrate_and_refuses_unmigrated_db(
+        self, tmp_db_path: Path
+    ) -> None:
+        """open_db() must NOT mutate the schema; it must refuse an un-migrated DB.
+
+        Against an old-shape DB (WAL set, columns absent) open_db must raise a
+        RuntimeError pointing the operator at ``crash-recovery init``.  After the
+        raise, a fresh connection must confirm the columns were NOT added — open_db
+        left the schema untouched.
+        """
+        _build_old_shape_db(tmp_db_path)
+
+        with pytest.raises(RuntimeError, match="crash-recovery init"):
+            db.open_db(tmp_db_path)
+
+        # open_db must not have added the columns; schema on disk is unchanged.
+        raw = sqlite3.connect(tmp_db_path)
+        try:
+            cols = {row[1] for row in raw.execute("PRAGMA table_info(sessions)")}
+        finally:
+            raw.close()
+        assert "pane_title" not in cols, "open_db must not have added pane_title"
+        assert "last_substantive" not in cols, (
+            "open_db must not have added last_substantive"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +374,12 @@ class TestCliInit:
                     "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
                 ).fetchall()
             ]
-            assert tables == ["classification_history", "scan_runs", "sessions"], tables
+            assert tables == [
+                "classification_history",
+                "scan_runs",
+                "sessions",
+                "uncorrelated_markers",
+            ], tables
         finally:
             conn.close()
 
@@ -218,7 +413,8 @@ class TestConstraints:
     def test_sessions_classification_check_rejects_invalid_value(
         self, tmp_db_path: Path
     ) -> None:
-        """CHECK on sessions.classification rejects values not in CLASSIFICATION_VALUES."""
+        """CHECK on sessions.classification rejects values not in
+        CLASSIFICATION_VALUES."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -284,7 +480,8 @@ class TestConstraints:
     def test_classification_history_scan_id_fk_is_restrict(
         self, tmp_db_path: Path
     ) -> None:
-        """ON DELETE RESTRICT on scan_id prevents deleting a scan_runs row that has history."""
+        """ON DELETE RESTRICT on scan_id prevents deleting a scan_runs row
+        that has history."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -322,7 +519,8 @@ class TestConstraints:
     def test_classification_history_cascades_on_session_delete(
         self, tmp_db_path: Path
     ) -> None:
-        """ON DELETE CASCADE on uuid removes history rows when the parent session is deleted."""
+        """ON DELETE CASCADE on uuid removes history rows when the parent session
+        is deleted."""
         db.init(tmp_db_path)
         conn = db.open_db(tmp_db_path)
         try:
@@ -378,6 +576,8 @@ class TestConstraints:
                 "SELECT uuid FROM classification_history WHERE uuid = ?",
                 ("11111111-1111-1111-1111-111111111111",),
             ).fetchone()
-            assert row is None, "CASCADE on sessions.uuid must delete child history rows"
+            assert row is None, (
+                "CASCADE on sessions.uuid must delete child history rows"
+            )
         finally:
             conn.close()

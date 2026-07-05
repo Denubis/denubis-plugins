@@ -6,12 +6,15 @@ Branch hash offsets hue (±40°), lightness (±0.03), and saturation (±0.10)
 to create visually related but distinct colours per worktree.
 """
 
+from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
+
 import colorsys
 import hashlib
 import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 
 def get_git_info() -> tuple[str | None, str | None]:
@@ -22,17 +25,25 @@ def get_git_info() -> tuple[str | None, str | None]:
     try:
         common = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         branch = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if common.returncode == 0 and branch.returncode == 0:
             # Resolve to absolute so the hash is stable regardless of cwd
             common_dir = os.path.realpath(common.stdout.strip())
             return common_dir, branch.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except subprocess.TimeoutExpired:
+        pass
+    except FileNotFoundError:
         pass
     return None, None
 
@@ -55,9 +66,9 @@ def git_info_to_colour(repo_id: str, branch: str) -> str:
     else:
         branch_hash = hashlib.sha256(branch.encode()).hexdigest()
         bh = int(branch_hash[:8], 16)
-        hue_offset = (bh % 81) - 40            # -40 to +40 degrees
+        hue_offset = (bh % 81) - 40  # -40 to +40 degrees
         lightness_offset = ((bh >> 8) % 7 - 3) * 0.01  # -0.03 to +0.03
-        sat_offset = ((bh >> 16) % 21 - 10) * 0.01     # -0.10 to +0.10
+        sat_offset = ((bh >> 16) % 21 - 10) * 0.01  # -0.10 to +0.10
 
         hue = ((base_hue + hue_offset) % 360) / 360.0
         lightness = max(0.08, min(0.16, 0.12 + lightness_offset))
@@ -72,16 +83,18 @@ def find_terminal() -> str | None:
     pid = os.getpid()
     while pid > 1:
         try:
-            fd0 = os.readlink(f"/proc/{pid}/fd/0")
+            fd0 = str(Path(f"/proc/{pid}/fd/0").readlink())
             if fd0.startswith("/dev/pts/") or fd0.startswith("/dev/tty"):
                 return fd0
-        except (OSError, PermissionError):
+        except OSError:  # PermissionError is an OSError subclass
             pass
         try:
-            with open(f"/proc/{pid}/stat") as f:
+            with Path(f"/proc/{pid}/stat").open() as f:
                 parts = f.read().split()
                 pid = int(parts[3])  # ppid
-        except (OSError, ValueError):
+        except OSError:
+            break
+        except ValueError:
             break
     return None
 
@@ -92,7 +105,7 @@ def set_terminal_bg(colour: str) -> None:
     if not tty_path:
         return
     try:
-        with open(tty_path, "w") as tty:
+        with Path(tty_path).open("w") as tty:
             tty.write(f"\033]11;{colour}\007")
     except OSError:
         pass
@@ -106,12 +119,15 @@ def main() -> None:
         set_terminal_bg(colour)
 
     # Hook JSON output
-    json.dump({
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": "Success",
+    json.dump(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": "Success",
+            },
         },
-    }, sys.stdout)
+        sys.stdout,
+    )
 
 
 if __name__ == "__main__":

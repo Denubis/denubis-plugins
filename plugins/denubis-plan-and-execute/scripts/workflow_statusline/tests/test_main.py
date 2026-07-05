@@ -9,10 +9,8 @@ import re
 import sys
 from unittest import mock
 
-import pytest
-
 from workflow_statusline.__main__ import main
-from workflow_statusline.colours import BLUE, BOLD, CYAN, DIM, GREEN, RED, RST, YELLOW
+from workflow_statusline.colours import BOLD, CYAN, RED
 from workflow_statusline.git import LocationInfo
 
 _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
@@ -38,9 +36,7 @@ def _run_main(
     with (
         mock.patch.object(sys, "stdin", fake_stdin),
         mock.patch.object(sys, "stdout", buf),
-        mock.patch(
-            "workflow_statusline.__main__.git_location", return_value=location
-        ),
+        mock.patch("workflow_statusline.__main__.git_location", return_value=location),
         mock.patch(
             "workflow_statusline.__main__.git_changes",
             return_value=(staged, modified),
@@ -78,7 +74,9 @@ class TestLine1NoModelPrefix:
         lines = _run_main(_base_payload())
         line1 = lines[0]
         visible = _strip_ansi(line1)
-        assert visible.startswith("testrepo"), f"Expected location start, got: {visible!r}"
+        assert visible.startswith("testrepo"), (
+            f"Expected location start, got: {visible!r}"
+        )
         assert "[opus]" not in visible, "Model prefix should not appear in line 1"
 
 
@@ -120,7 +118,9 @@ class TestLine1Churn:
         lines = _run_main(payload)
         line1 = lines[0]
         visible = _strip_ansi(line1)
-        assert "+156/-23" not in visible, f"churn should be hidden when agent present: {visible!r}"
+        assert "+156/-23" not in visible, (
+            f"churn should be hidden when agent present: {visible!r}"
+        )
         assert "agt:reviewer" in visible
 
 
@@ -136,8 +136,12 @@ class TestLine1MainWarning:
         assert RED in line1, "RED missing for MAIN warning"
         assert BOLD in line1, "BOLD missing for MAIN warning"
         visible = _strip_ansi(line1)
-        assert visible.startswith("myrepo"), f"Expected location start, got: {visible!r}"
-        assert "\u2717MAIN" in visible, f"Expected ✗MAIN after location, got: {visible!r}"
+        assert visible.startswith("myrepo"), (
+            f"Expected location start, got: {visible!r}"
+        )
+        assert "\u2717MAIN" in visible, (
+            f"Expected ✗MAIN after location, got: {visible!r}"
+        )
 
     def test_on_main_worktree_uses_display(self) -> None:
         """Worktree on main should NOT show ✗MAIN — uses display instead."""
@@ -166,7 +170,9 @@ class TestLine1AgentName:
         lines = _run_main(_base_payload())
         line1 = lines[0]
         visible = _strip_ansi(line1)
-        assert "agt:" not in visible, f"agt: should not appear without agent: {visible!r}"
+        assert "agt:" not in visible, (
+            f"agt: should not appear without agent: {visible!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -217,8 +223,11 @@ class TestLine2RateLimits:
 # ---------------------------------------------------------------------------
 class TestLine2PaceDisplay:
     @staticmethod
-    def _local_ts(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> float:
+    def _local_ts(
+        year: int, month: int, day: int, hour: int = 0, minute: int = 0
+    ) -> float:
         import datetime as _dt
+
         return _dt.datetime(year, month, day, hour, minute).timestamp()
 
     def test_pace_displayed_for_seven_day_under_pace(self) -> None:
@@ -281,18 +290,25 @@ class TestLine2PaceDisplay:
             main()
         line2 = buf.getvalue().splitlines()[1]
         # 1 day elapsed → pace ≈ 14%. Must contain RED before "7d:".
-        assert RED + "7d:80% \u226e 14%" in line2, f"expected RED colour before cell: {line2!r}"
+        assert RED + "7d:80% \u226e 14%" in line2, (
+            f"expected RED colour before cell: {line2!r}"
+        )
 
 
 class TestLine2ForecastCells:
     """Tests for DayStop / WeekStop cells driven by Theil-Sen slope."""
 
     @staticmethod
-    def _local_ts(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> float:
+    def _local_ts(
+        year: int, month: int, day: int, hour: int = 0, minute: int = 0
+    ) -> float:
         import datetime as _dt
+
         return _dt.datetime(year, month, day, hour, minute).timestamp()
 
-    def _run(self, now_ts: float, payload: dict, samples: list[tuple[float, float]]) -> str:
+    def _run(
+        self, now_ts: float, payload: dict, samples: list[tuple[float, float]]
+    ) -> str:
         fake_stdin = io.StringIO(json.dumps(payload))
         buf = io.StringIO()
         loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
@@ -366,8 +382,8 @@ class TestLine2ForecastCells:
         # Slow burn, plenty of time left in window
         now = self._local_ts(2026, 4, 18, 12, 0)
         resets = now + 3600  # resets in 1 hour
-        # Very slow burn: 10% over 1h = 0.00278 pct/s. 90% to go → 32400s = 9h to exhaust.
-        # Reset comes first → no WeekStop.
+        # Very slow burn: 10% over 1h = 0.00278 pct/s.
+        # 90% to go → 32400s = 9h to exhaust. Reset comes first → no WeekStop.
         samples = [(now - (60 - i) * 60.0, 10.0 + i * (10.0 / 60.0)) for i in range(60)]
         payload = _base_payload(
             rate_limits={"seven_day": {"used_percentage": 20, "resets_at": resets}},
@@ -407,7 +423,10 @@ class TestTmuxIntegration:
             mock.patch("workflow_statusline.__main__.cache") as mock_cache,
             mock.patch("workflow_statusline.tmux.subprocess") as mock_subprocess,
             mock.patch("workflow_statusline.tmux.cache") as mock_tmux_cache,
-            mock.patch.dict(os.environ, {"TMUX": "/tmp/tmux-1000/default,12345,0", "TMUX_PANE": "%42"}),
+            mock.patch.dict(
+                os.environ,
+                {"TMUX": "/tmp/tmux-1000/default,12345,0", "TMUX_PANE": "%42"},
+            ),
         ):
             mock_time.time.return_value = 1000000.0
             mock_cache.read_rate_samples.return_value = []

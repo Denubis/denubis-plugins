@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import subprocess
+from pathlib import Path
 from typing import NamedTuple
 
 from workflow_statusline import cache
 
 
 class LocationInfo(NamedTuple):
-    display: str       # e.g., "ed3d@feat" or "ed3d"
-    is_on_main: bool   # True if branch is main/master
+    display: str  # e.g., "ed3d@feat" or "ed3d"
+    is_on_main: bool  # True if branch is main/master
     is_worktree: bool  # True if in a git worktree
 
 
@@ -39,9 +39,7 @@ def git_location(cwd: str) -> LocationInfo:
     try:
         _git(cwd, "rev-parse", "--git-dir")
     except Exception:
-        return LocationInfo(
-            display=os.path.basename(cwd), is_on_main=False, is_worktree=False
-        )
+        return LocationInfo(display=Path(cwd).name, is_on_main=False, is_worktree=False)
 
     try:
         branch = _git(cwd, "branch", "--show-current")
@@ -53,18 +51,15 @@ def git_location(cwd: str) -> LocationInfo:
         # git-common-dir is relative to cwd when not a worktree; resolve against
         # cwd, not Python's CWD, or we mis-detect when Python runs from a dir
         # that happens to have its own .git.
-        common_dir = os.path.realpath(
-            os.path.join(cwd, _git(cwd, "rev-parse", "--git-common-dir"))
-        )
+        common_dir = (Path(cwd) / _git(cwd, "rev-parse", "--git-common-dir")).resolve()
         is_worktree = (
-            common_dir != os.path.realpath(os.path.join(toplevel, ".git"))
-            and os.path.isdir(common_dir)
+            common_dir != (Path(toplevel) / ".git").resolve() and common_dir.is_dir()
         )
     except Exception:
         is_worktree = False
         toplevel = cwd
 
-    display_name = os.path.basename(toplevel)
+    display_name = Path(toplevel).name
     is_on_main = branch in ("main", "master")
 
     if _should_show_branch(branch, display_name, is_worktree):
@@ -90,7 +85,7 @@ def _parse_cached_changes(cached: str) -> tuple[int, int]:
 
 def git_changes(cwd: str) -> tuple[int, int]:
     """Get staged count and modified count. Cached to /tmp with 5s TTL."""
-    dir_hash = hashlib.md5(cwd.encode()).hexdigest()
+    dir_hash = hashlib.md5(cwd.encode(), usedforsecurity=False).hexdigest()
     cache_file = f"/tmp/claude-statusline-git-cache-{dir_hash}"
 
     cached = cache.read_if_fresh(cache_file, max_age=5)

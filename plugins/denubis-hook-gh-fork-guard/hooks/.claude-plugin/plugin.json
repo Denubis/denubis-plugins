@@ -1,7 +1,7 @@
 {
     "name": "denubis-hook-gh-fork-guard",
     "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork. Auto-discovered by the pretooluse-bash dispatcher.",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

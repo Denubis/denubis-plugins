@@ -16,21 +16,21 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from crash_recovery.liveness import (
     Liveness,
+    _proc_start_time,
     assert_local_filesystem,
     current_boot_id,
     list_liveness_files,
     pid_alive,
+    pid_alive_checked,
     read_liveness,
 )
 
 # pytest injects tests/ onto sys.path when tests/__init__.py is absent (a
 # deliberate Phase 1 decision for workspace-wide collection), so the
 # fixtures package is addressable as top-level "fixtures", not "tests.fixtures".
-from fixtures.jsonl_builder import make_liveness_file
-
+from fixtures.jsonl_builder import _pick_dead_pid, make_liveness_file
 
 # ---------------------------------------------------------------------------
 # read_liveness
@@ -116,10 +116,47 @@ def test_read_liveness_lowercases_boot_id(tmp_path: Path) -> None:
     """boot_id is normalised to lowercase for deterministic comparison."""
     path = tmp_path / "12345.live"
     path.write_text(
-        "cwd=/tmp\nstarted=1\nargv=\n"
-        "boot_id=8B2F4A3D-6C0E-4F1A-9D2B-7E3C5A8B1C4D\n"
+        "cwd=/tmp\nstarted=1\nargv=\nboot_id=8B2F4A3D-6C0E-4F1A-9D2B-7E3C5A8B1C4D\n"
     )
     assert read_liveness(path).boot_id == "8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d"
+
+
+def test_read_liveness_parses_optional_session_id_and_start_time(
+    tmp_path: Path,
+) -> None:
+    """A .live carrying session_id/start_time surfaces both on the dataclass.
+    (AC4.2/AC4.4)"""
+    path = make_liveness_file(
+        tmp_path,
+        pid=4242,
+        session_id="db0cc58f-dc30-4195-a64a-4f25a5c19d6b",
+        start_time=218236304,
+    )
+    liveness = read_liveness(path)
+    assert liveness.session_id == "db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
+    assert liveness.start_time == 218236304
+
+
+def test_read_liveness_legacy_file_has_none_optional_fields(tmp_path: Path) -> None:
+    """A four-key legacy marker parses with session_id/start_time both None, no error.
+    """
+    path = make_liveness_file(tmp_path, pid=4242)
+    liveness = read_liveness(path)
+    assert liveness.session_id is None
+    assert liveness.start_time is None
+
+
+def test_read_liveness_start_time_non_int_is_tolerant_none(tmp_path: Path) -> None:
+    """A non-integer start_time tolerantly yields None (must NOT raise —
+    legacy/odd files)."""
+    path = tmp_path / "12345.live"
+    path.write_text(
+        "cwd=/tmp\nstarted=1\nargv=\n"
+        "boot_id=00000000-0000-0000-0000-000000000000\n"
+        "start_time=not-an-int\n"
+    )
+    liveness = read_liveness(path)
+    assert liveness.start_time is None
 
 
 # ---------------------------------------------------------------------------
@@ -128,12 +165,15 @@ def test_read_liveness_lowercases_boot_id(tmp_path: Path) -> None:
 
 
 def test_current_boot_id_returns_kernel_value() -> None:
-    """The returned value matches /proc/sys/kernel/random/boot_id verbatim. (AC5.6 read side)"""
+    """The returned value matches /proc/sys/kernel/random/boot_id verbatim.
+    (AC5.6 read side)"""
     expected = Path("/proc/sys/kernel/random/boot_id").read_text().strip().lower()
     assert current_boot_id() == expected
 
 
-def test_current_boot_id_lowercases_uppercase_input(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_current_boot_id_lowercases_uppercase_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Defensive normalisation: an uppercase kernel value is lowercased on return.
 
     The kernel writes the boot-id lowercase in practice, so the live-value
@@ -163,8 +203,11 @@ def test_pid_alive_sentinel_is_false() -> None:
     assert pid_alive(2**30) is False
 
 
-def test_pid_alive_permission_error_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pins return-False + UserWarning emitted + non-propagation; symmetric with test_pid_alive_unexpected_oserror_returns_false_with_warning.
+def test_pid_alive_permission_error_returns_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pins return-False + UserWarning emitted + non-propagation; symmetric with
+    test_pid_alive_unexpected_oserror_returns_false_with_warning.
 
     CA2 (2026-05-16) falsification anchor. Without this contract a recycled
     PID would silently return ``None`` (or propagate) and Phase 2's
@@ -204,6 +247,50 @@ def test_pid_alive_unexpected_oserror_returns_false_with_warning(
     monkeypatch.setattr(os, "kill", _raise_oserror)
     with pytest.warns(UserWarning):
         assert pid_alive(12345) is False
+
+
+# ---------------------------------------------------------------------------
+# _proc_start_time / pid_alive_checked
+# ---------------------------------------------------------------------------
+
+
+def test_proc_start_time_self_is_int() -> None:
+    """Reading the current process's start_time yields a positive int."""
+    value = _proc_start_time(os.getpid())
+    assert isinstance(value, int)
+    assert value > 0
+
+
+def test_proc_start_time_dead_pid_is_none() -> None:
+    """A pid with no /proc/<pid>/stat returns None (OSError swallowed)."""
+    assert _proc_start_time(_pick_dead_pid()) is None
+
+
+def test_pid_alive_checked_matching_start_time_is_true() -> None:
+    """Matching stored start_time against /proc → alive. (AC4.2)"""
+    pid = os.getpid()
+    assert pid_alive_checked(pid, _proc_start_time(pid)) is True
+
+
+def test_pid_alive_checked_mismatched_start_time_is_false() -> None:
+    """A recycled-PID marker (wrong start_time) classifies dead. (AC4.2)"""
+    pid = os.getpid()
+    actual = _proc_start_time(pid)
+    assert actual is not None
+    assert pid_alive_checked(pid, actual + 1) is False
+
+
+def test_pid_alive_checked_dead_pid_is_false_regardless_of_expected() -> None:
+    """A dead pid is dead whether or not an expected start_time is supplied. (AC4.2)"""
+    dead = _pick_dead_pid()
+    assert pid_alive_checked(dead, 12345) is False
+    assert pid_alive_checked(dead, None) is False
+
+
+def test_pid_alive_checked_none_falls_back_to_bare_liveness() -> None:
+    """expected=None → legacy back-compat: bare kill -0. (AC4.4)"""
+    assert pid_alive_checked(os.getpid(), None) is True
+    assert pid_alive_checked(_pick_dead_pid(), None) is False
 
 
 # ---------------------------------------------------------------------------

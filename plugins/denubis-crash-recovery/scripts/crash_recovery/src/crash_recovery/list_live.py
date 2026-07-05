@@ -20,7 +20,12 @@ files.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+from crash_recovery.liveness import current_boot_id, list_liveness_files, pid_alive
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -55,12 +60,6 @@ def survey_live(run_dir: Path) -> tuple[LiveEntry, ...]:
     state before any liveness file has ever been written. Malformed files
     are skipped with a ``UserWarning`` upstream in ``list_liveness_files``.
     """
-    from crash_recovery.liveness import (
-        current_boot_id,
-        list_liveness_files,
-        pid_alive,
-    )
-
     current_bid = current_boot_id()
     entries: list[LiveEntry] = []
     for live in list_liveness_files(run_dir):

@@ -65,7 +65,7 @@ wrapper PID.
 5. **Reboot the machine.** (This is the destructive step — save your work everywhere first.)
 6. After reboot, run: `crash-recovery scan && crash-recovery triage`.
 7. **Expected observation:** the session you had running pre-reboot appears in the
-   "Idle-live killed" section with `classification: hard_crash` and `reason: liveness_boot_id_mismatch`.
+   "Probable system-crash victims" section with `classification: hard_crash` and `reason: liveness_boot_id_mismatch`.
 
    It's wrong if: the session is misclassified as `live`, `concluded`, or shows a different
    reason. A misclassification here means the reboot-safety mechanism didn't engage —
@@ -94,7 +94,7 @@ wrapper was killed.
 5. Confirm the liveness file PERSISTED: `ls ~/.claude/run/` — your wrapper's PID
    should still have a `.live` file.
 6. Run: `crash-recovery scan && crash-recovery triage`.
-7. **Expected observation:** the session appears in "Idle-live killed" with
+7. **Expected observation:** the session appears in "Probable system-crash victims" with
    `classification: hard_crash`. The JSONL's tail looks concluded (the last entry
    was a clean assistant turn), but the liveness mechanism catches that the wrapper
    never got a chance to clean up.

@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 _FILE_FIELD_RE = re.compile(r"file\s*=\s*\{([^}]*)\}")
 _DRIVE_LETTER_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
@@ -42,8 +41,8 @@ def parse_pdf_paths(bib: str) -> list[Path]:
         return []
 
     paths: list[Path] = []
-    for entry in m.group(1).split(";"):
-        entry = _unescape_biblatex_colons(entry.strip())
+    for raw_entry in m.group(1).split(";"):
+        entry = _unescape_biblatex_colons(raw_entry.strip())
         if not entry:
             continue
         tokens = entry.split(":")

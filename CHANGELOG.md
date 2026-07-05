@@ -1,5 +1,245 @@
 # Changelog
 
+## [denubis-hook-shortcut-detection] removed
+
+Retired the plugin. Its `shortcut-detector.py` Stop hook is deleted, the marketplace entry and README references are gone, and the dedicated `tests/test_shortcut_detector.py` is removed.
+
+**Why:** an audit of chat history found 50 genuine firings across Sonnet and Opus sessions and zero true positives. The hook greps the last assistant message for narration connectives (`easier to`, `directly rather than`, `simpler approach`, `for simplicity`), which saturate ordinary explanation. Its two most common triggers were the model choosing the more rigorous path (`directly rather than guess`) and a plain comparative (`easier to diagnose`). A Stop hook reading prose cannot tell a mention of a phrase from its use, nor a change of code approach from a tooling workaround, so precision was zero. It also fired on this very investigation for quoting a trigger phrase.
+
+**Removed:**
+- `plugins/denubis-hook-shortcut-detection/` (the Stop hook, `hooks.json`, manifest)
+- `tests/test_shortcut_detector.py`
+- The `denubis-hook-shortcut-detection` entry in `.claude-plugin/marketplace.json` and its three README references
+
+## [denubis-bibliography] 0.12.0
+
+`resolve.py` near matches now carry a distinct exit code, and SKILL.md directs the caller to use the real key the resolver returns rather than construct one.
+
+**New:**
+- Exit code `2` for a citekey query with no exact hit but near matches surfaced (missing suffix / truncation / typo), distinct from `1` (genuinely absent or an error). A caller can branch on "wrong key, here is the right one" and re-run with the real key. Documented in the module docstring (`--help`) and SKILL.md.
+
+**Changed:**
+- SKILL.md front-door guidance gains "pass the citekey you have, not one you construct" — BBT's disambiguation suffix cannot be reliably guessed, and a fabricated key is the most common way a present paper is misreported as absent — plus the 0/1/2 exit-code table. The stale "a constructed citekey returns an honest No matches" line is retired: a near key now returns the real paper without rendering.
+
+## [denubis-bibliography] 0.11.0
+
+Citekey resolution is now near-match aware: a query that misses the exact key (a missing BBT disambiguation suffix, a truncation, or a typo) surfaces the real paper instead of reporting "no matches", and never renders on a near match.
+
+**Fixed:**
+- A citekey query whose key lacked BBT's trailing disambiguation suffix (`chengGenerativeAIRequirements2026` for the stored `…2026a`) was surfaced by BBT's prefix search but then discarded by the exact-equality filter, so `resolve.py` reported "no matches" — repeatedly misread as "the paper has no PDF". The exact filter no longer silently drops the near hit.
+
+**New:**
+- Near-match resolution for citekey queries: `classify_citekey` / `rank_citekey_candidates` grade each BBT hit as exact / variant (a disambiguation sibling) / prefix / fuzzy (difflib similarity, tunable threshold). With no exact hit, the nearest paper(s) are RETURNED with their real citekey, library, and PDF status but NEVER rendered — the caller re-runs with the exact key. Base-variant siblings of an exact match are listed as possible duplicates with their library, so duplicates can be merged in Zotero. Recall is widened for the citekey path (base key + author surname) so a mid-string typo still surfaces the neighbourhood. 17 new unit tests; the shell path verified live against Zotero + BBT.
+
+## [denubis-bibliography] 0.10.0
+
+On-demand project-bib refresh: `resolve.py --bib` triggers a paper's registered BBT auto-export and verifies the citekey lands in a well-formed bib, retiring the hand-rolled `item.export` + diff splice and the wrong-scope library pull.
+
+**New:**
+- `resolve.py --bib <abs path> --citekey <key>` makes a resolved paper citeable in a project bib. It forces the registered "Keep updated" export via `POST /api/plus/run-autoexport` (zotero-api-plus >= 0.4.0), then verifies the citekey is present in a WELL-FORMED bib using a real BibLaTeX parse (bibtexparser v2 `failed_blocks`, not a grep a truncated write could fool), with the wait/timeout caller-side. On `no-autoexport` it surfaces the setup gap and lists the registered paths; when the endpoint is absent it directs the user to install/upgrade rather than doing a wrong-scope library pull. Trigger-only by design — success is proven against the written file, never the endpoint response.
+- Adds a `bibtexparser>=2.0.0b9` dependency (the v2 `failed_blocks` API; v2 is the only line that detects malformed/truncated blocks). 16 unit tests cover the new pure core (`check_bib`, `classify_autoexport_response`, `bib_arg_error`, `explain_autoexport_failure`); the `--bib` shell flow was verified live against BBT 9.0.31.
+
+**Changed:**
+- SKILL.md "Refreshing the on-disk bib" now documents the trigger-plus-verify endpoint; the prior guidance (force a refresh with the library pull-export, or that no force-run exists) is retired as wrong-scope/incorrect. Common-mistakes gains rows naming the hand-rolled `item.export` + diff splice and the wrong-scope library pull, both pointing at `resolve.py --bib`.
+
+## [denubis-external-agents] 0.3.0
+
+The codex-peer-review skill now takes a one-line focus note and tells Claude to lean on the runner's staging instead of hand-building context for the reviewer.
+
+**New:**
+- Optional second argument: a one-line focus note (e.g. `"check the RQ2 fixes hold and that RQ1 calibration matches the prereg"`) injected into codex's prompt as a priority hint. It sits after the anti-fabrication grounding rules and never narrows the target's scope or relaxes the verbatim-quote requirement. A specific ask is what makes a run worth it; with none, codex roams the repo and returns a sprawling, low-signal review. The note is echoed in the run banner.
+
+**Changed:**
+- The skill instructs Claude to pass a focus note and NOT to assemble a hand-picked `context/` directory or write the reviewer an orientation README — the runner already stages the surrounding repo, so that scaffolding was a `0.1.0`-era workaround for the old single-file staging. Quick-reference and common-mistakes updated to match.
+
+## [denubis-external-agents] 0.2.0
+
+The codex-peer-review skill now runs with repository context and persists reviews in a gitignored `.review/`, replacing the single-file `/tmp` smoke test.
+
+**Changed:**
+- The runner stages the target's git repo — minus gitignored files and binaries — as `./context/` and points codex at it, so the review can follow the target's cross-references (cited code, run logs) instead of flagging "I wasn't given that." Context stops at the repo; references outside it (papers, external datasets) are flagged `[unverified]`, not chased. Gitignored files (raw data, secrets) are absent from codex's tree; a target that is itself gitignored is still staged as an explicit override.
+- Review output moved from `/tmp` to `./.review/<target>.<timestamp>.REVIEW.md` in the working directory (gitignored, persistent); the script auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review.
+- Honest bound: `-s read-only` does not confine reads, so staging bounds the repo's own files (codex runs in `/tmp`, never told the real repo path) but does not stop codex reading its own `~/.codex`/`~/.ssh` — an external sandbox (bwrap) remains the follow-up.
+
+## [denubis-crash-recovery] 1.1.0
+
+Triage output overhaul after a UAT run found it unreadable and ~9,000 lines long with the crash sections empty.
+
+**New:**
+- Lean triage terminal view (default): crash victims, live, ambiguous, and genuine investigation rows render in full; concluded, irrecoverable, and unrecognised-ending sessions collapse to a `## Collapsed` count summary. `triage --all` and `~/llm-resume.md` keep the full all-means-all roster. On a real database this was 9,127 → 120 lines.
+- `uncorrelated_markers` table + a supplementary "Uncorrelated crash markers" render section: a dead or previous-boot `.live` marker that cannot be correlated to a session is now surfaced as crash evidence (cwd + time) instead of being silently dropped. `reason` is CHECK-enforced from `MARKER_REASON_VALUES`.
+- `triage --all` flag for the full roster.
+
+**Changed:**
+- A dead marker with a concluded tail (a turn finished, then the process was killed) classifies as `borderline/liveness_dead_pid_concluded_tail` with a calm "likely nothing to resume" note instead of the generic `unmatched` "Something fucky" route. `unmatched` is now a defensive-only fallback. `CLASSIFIER_VERSION` → 2.
+
+**Fixed:**
+- `last_substantive` is single-lined (whitespace and newlines collapsed) so a multi-line markdown assistant message no longer spills across rows and shatters the report; render also single-lines already-stored rows defensively.
+- After upgrade, run `crash-recovery init` once to add the `uncorrelated_markers` table; `open_db` asserts its presence.
+
+## [denubis-plan-and-execute] 2.35.3
+
+**Fixed:**
+- `claude-wrapper.sh` removes the crash-recovery `.live` marker immediately on a clean exit, before the transcript-archive prompt (which blocks on input). Previously, closing the terminal at that prompt stranded a marker on a cleanly-concluded session, which crash-recovery triage misread as a crash.
+
+## [denubis-hook-shortcut-detection] 2.0.4
+
+Restore portability so the Stop hook runs under the user's interpreter, not only 3.14.
+
+**Fixed:**
+- `shortcut-detector.py` is invoked `uv run python …` from the user's working directory, where the resolved interpreter may be older than 3.14, so the 3.14-only syntax it had acquired killed the hook before any logic ran. A stock-3.9 machine hit a def-time `TypeError` on the `str | None` annotation; the parenthesis-less `except` would have raised `SyntaxError` on the same interpreter. Added `from __future__ import annotations` and collapsed the except to `except OSError:` (which already covers `FileNotFoundError` and `PermissionError`). The hook now imports and runs on Python 3.9 through 3.14.
+
+## [denubis-hook-branch-bg] 0.2.4
+
+Restore portability for the SessionStart hook.
+
+**Fixed:**
+- `branch-bg.py` carried three parenthesis-less excepts (3.14-only) and runtime-evaluated union annotations, so it failed on pre-3.14 interpreters. Added `from __future__ import annotations` and rewrote the excepts in portable form (collapsed `except OSError:` where a base class subsumes the others, split into single-exception clauses otherwise).
+
+## [denubis-hook-gh-fork-guard] 1.2.1
+
+Restore portability for the fork-guard hook.
+
+**Fixed:**
+- `gh-fork-guard.py` declared several `str | None` return annotations that are evaluated at definition time, raising `TypeError` on Python below 3.10. Added `from __future__ import annotations` so the annotations stay strings. The hook runs via the dispatcher's `uv run python3`, which inherits the user's interpreter.
+
+## [denubis-plan-and-execute] 2.35.2
+
+Restore portability for the code-quality PreToolUse hook.
+
+**Fixed:**
+- `code-quality-guard.py` used a parenthesis-less `except json.JSONDecodeError, EOFError:` (3.14-only) and a runtime union annotation. Added `from __future__ import annotations` and split the except into single-exception clauses so the hook parses and runs on Python 3.9 through 3.14.
+
+## [denubis-bibliography] 0.9.0
+
+Fan-out reader protocol for investigating many corpus papers at once, and citekey made the primary handle for paper work.
+
+**New:**
+- "Fanning out readers over a rendered corpus" section in `using-bibliography`: the orchestrator resolves and renders each paper once, then dispatches one reader subagent per paper given only the rendered `full.md` path. A reader that never receives a PDF cannot reach for `pdftotext`, so the extraction-improvisation failure dissolves by construction rather than being policed.
+- A reader-prompt template and a dispatch gate that stats the rendered file on disk before dispatch, never trusting a "rendered" report unverified.
+
+**Changed:**
+- "Work by citekey": the citekey is the stable handle for the render dir, citation, note, and dispatch. Resolve by citekey wherever you have one, and use first-author plus a title word only to find the citekey before switching to it.
+
+## [denubis-research-agents] 1.2.0
+
+Academic Research Protocol rewritten to route through the Zotero corpus instead of a parallel `docs/papers/` PDF pile.
+
+**Changed:**
+- The protocol is now identify, load, read. Discovery returns locators (DOI preferred, then a stable id, then an unstable locator flagged unverified), papers are loaded into Zotero via `fetch.py` behind confirmation (or the connector for paywalled work with no open-access copy), and reading uses the `using-bibliography` fan-out.
+- Removed the "Use the Read tool on the PDF" step and the `docs/papers/{slug}.md` discussion-file model, which forked a second corpus outside Zotero and invited hand-rolled PDF extraction.
+
+**Note:**
+- A project still relying on the old `docs/papers/` discussion files is a migration, not covered by this change.
+
+## [denubis-external-agents] 0.1.0
+
+New plugin: dispatch review tasks to external CLI models as a heterogeneous second voice. First skill packages the codex peer-review smoke test that was validated end-to-end.
+
+**New:**
+- `codex-peer-review` skill: runs OpenAI's codex (GPT-5.5) as a critical peer reviewer of a file or directory, shaped by a bundled copy of the `critical-peer-review` rubric. The script stages rubric + target into one throwaway working dir and runs `codex exec -s read-only`, so codex sees only that root; it writes the review and prints a provenance smoke-check.
+- The SKILL.md makes the provenance gate non-negotiable: every review's quotes are `grep -F`'d against the real target before anything is presented, because codex will confabulate a fluent, correctly-formatted review (faked "Verification" section included) of a document it never read. A review is a claim until its quotes are verified.
+- Codex's voice is presented source-tagged and unmerged — a second opinion for the human to weigh, not folded into Claude's own review.
+
+## [denubis-bibliography] 0.8.0
+
+Diacritic-insensitive citation search, so queries match regardless of accents.
+
+**New:**
+- `resolve.py` `search_tokens` with ASCII-folding (`_ascii_fold`): both the query and the corpus text are folded to ASCII before matching, so a plain-ASCII query resolves accented author and title tokens (e.g. "Lowenthal" finds "Löwenthal").
+- `print_no_match` reports a clear miss instead of a silent empty result.
+
+**Changed:**
+- The `using-bibliography` skill scripts are ruff-clean under the repo-wide strict config.
+
+## [denubis-plan-and-execute] 2.35.1
+
+Port the SessionStart hook from bash to Python.
+
+**Changed:**
+- `hooks/session-start.py` replaces `session-start.sh`: JSON encoding is delegated to `json.dumps`, correct for every control character rather than the five the bash hand-rolled. The injected SessionStart context is byte-identical to the prior output. Invoked via `uv run python`.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.1
+
+Port the PreToolUse:Bash dispatcher from bash to Python.
+
+**Changed:**
+- `hooks/pretooluse-bash-dispatcher.py` replaces the 255-line jq-driven shell script, gated on the existing 17-test bats contract: identical discovery, priority merge, deny short-circuit, caching, and `--list` diagnostics. Kept portable (runs on interpreters older than 3.14) because it executes via `uv run python` under the user's own project. Invoked via `uv run python`.
+
+**Fixed:**
+- `additionalContext` and `systemMessage` from multiple hooks now join with real newlines instead of a literal `\n\n`.
+
+## [denubis-token-estimator] 0.1.0
+
+New plugin: measure AI token/word usage from Claude Code and Codex logs for an AI-use disclosure. Reports two real measures — output tokens and human input words — not proxies.
+
+**New:**
+- `/estimate` command and `using-token-estimator` skill: per-project AI usage rolled up from the directory, split into main-thread vs subagent output tokens and human-authored input words, optionally by month or as CSV leaf grain. The `.token-estimator` mapper binds moved/renamed dirs to one canonical project (pure longest-prefix match on the recorded cwd string, so defunct paths still resolve).
+- Corrected, reproducible methodology (`docs/DESIGN.md`, nodes 1–5): origin-based dedup for Claude (`message.id`, classify by where work originated, since subagent transcripts replay the parent); additive per-file accounting for Codex (subagents have independent token counters — merging them into the parent erases real work); human-word counting via a named machine-tag allow-list, not "starts with `<`/`#`" (humans paste markup and write headings).
+- `scripts/verify.py`: single source of truth for the rules and an audit harness that re-derives every headline number from the live logs, asserting structural invariants (no Codex resumes, subagents additive across all of them, person-grain reconciliation) separately from point-in-time counts that drift as logs grow.
+- `~/.token-estimator` config for people-roots; absent it, the tool scopes to the local directory.
+- `docs/AUDIT-BRIEF.md` + `docs/findings.schema.json`: adversarial brief to hand the methodology to a different engine for independent falsification (pending).
+
+## [denubis-plan-and-execute] 2.35.0
+
+The academic-writing register as an always-on output style, and the prose skill renamed for discoverability.
+
+**New:**
+- `Academic Writing` output style (`output-styles/academic-writing.md`): the prose register (cut scar tissue, em-dash never, rebuild crammed sentences, pinpoint-citation discipline) as a system-prompt-level style applied to every response once selected via `/config`. Sets `keep-coding-instructions: true`, so it shapes prose without dropping Claude Code's built-in coding behaviour. Not force-applied; you opt in per session.
+
+**Changed:**
+- Renamed the `writing-academic-prose` skill to `academic-writing`, so it answers to `/academic-writing`. The skill runs the `.notes/` gate and the revision-pass workflow, the output style is the always-on floor, both carry the same register, and the project's `.notes/` overrides both.
+
+## [denubis-bibliography] 0.7.0
+
+One-call paper resolution by any key, plus a pass to genericise project-identifying strings ahead of a public deposit.
+
+**New:**
+- `resolve.py`: resolve a paper in Zotero by citekey, author, year, title, date, or DOI in a single live call (BBT JSON-RPC, no stale `.bib` cache). Reports which libraries and collections hold the paper, takes an optional `--library` constraint, and auto-renders the match. Classifies pipeline state (not-in-zotero / no-pdf / pdf-unknown / ready-to-render / rendered) and is truthful — a paper that is in Zotero is never reported as NOT FOUND. Pure functional core unit-tested in `tests/test_bibliography_resolve.py` (26 tests); the httpx/subprocess shell verified live.
+- `using-bibliography` SKILL.md documents `resolve.py` as the front door for paper lookup.
+
+**Changed:**
+- Genericised project-identifying strings (an old venue label and a collaborator name) in the skill docs and test fixtures, so the publicly-linked plugin and the registered-report deposit carry a neutral worked-example library name. No behaviour change.
+- Trimmed the `using-bibliography` skill description back under the 200-character lint.
+
+## [denubis-plan-and-execute] 2.34.0
+
+New `writing-academic-prose` skill: a portable academic-writing discipline that fires the project's own register rules before drafting and keeps prose clean across revision passes.
+
+**New:**
+- `writing-academic-prose` skill. Before the first prose edit each session it opens the project's full `.notes/` register and writing rules, the gate that a CLAUDE.md summary alone does not enforce. It then cuts scar tissue (sentences whose subject is the manuscript rather than the study), holds a punctuation hierarchy (em-dash never, semicolon exceptionally rare, colon sparing for lists and definitions), and rebuilds crammed sentences from the idea rather than laundering the mark into a semicolon or lapsing into staccato. Carries pinpoint-citation (APA paraphrase) discipline. Built with RED-GREEN-REFACTOR subagent testing: a baseline agent under deadline pressure skipped the notes and grew scar tissue, while the skill fires the gate and produces genuine rebuilds on Haiku.
+
+## [denubis-bibliography] 0.6.0
+
+Annotate cited passages back onto the source PDF: `annotate.py` highlights a quoted passage in the Zotero PDF with the pandoc citation as its note, via the zotero-api-plus position (rects) mode.
+
+**New:**
+- `annotate.py`: given (citekey, page, verbatim quote, note), highlights that passage in the Zotero PDF carrying `[@citekey, p. N]` as the annotation comment. Computes the geometry locally with PyMuPDF (`search_for` + page height) and posts position (rects) mode, so highlights work on any page — the recogniser's text mode caps at 5. Idempotent via a per-quote `⟦ax:<fp>⟧` marker read back through `read-annotations`; falls back to a page-anchored note when the quote has no text layer (scanned/OCR'd pages). `--batch` applies a JSONL of passages; `--dry-run` and `--list` preview and inspect.
+- 26 unit tests for the functional core (`tests/test_bibliography_annotate.py`): item-key extraction, quote fingerprint, comment/marker round-trip, payload building, response/structured-error parsing, and multi-library copy selection.
+
+**Changed:**
+- `using-bibliography` SKILL.md documents the annotate-back workflow and the zotero-api-plus annotation endpoints (`add-highlight` rects mode, `read-annotations`, `add-note`, `open-pdf`, `delete-annotation`); plugin description notes the new capability.
+
+## [denubis-plan-and-execute] 2.33.0
+
+Removes the four command wrappers that shared a name with their skills. Commands and skills share one namespace, and the Skill tool was resolving the namespaced name to the command wrapper — whose `$1`/`$2` substitution mangled model-passed arguments and whose "now invoke the skill" instruction was circular. The skills are user-invocable and serve the slash-command role directly.
+
+**Changed:**
+- `executing-an-implementation-plan` skill gains `argument-hint: "[absolute-plan-dir] [absolute-working-dir]"` frontmatter, preserving the autocomplete hint the command provided.
+
+**Fixed:**
+- Removed shadowing command wrappers: `executing-an-implementation-plan`, `maintain-architecture`, `starting-a-design-plan`, `starting-an-implementation-plan`. `/name` invocations now load the skill itself; model Skill-tool invocations no longer dead-end in the wrapper. `flesh-it-out` and `how-to-customize` remain (command-only, no collision).
+
+## [denubis-extending-claude] 1.8.0
+
+Plugin-authoring guidance catches up with commands-merged-into-skills, and repairs byte corruption in creating-a-plugin.
+
+**New:**
+- `creating-a-plugin`: "Commands vs Skills: One Artefact Per Name" section — new behaviour belongs in user-invocable skills; never define a command and skill with the same name (documents the observed Skill-tool wrapper-shadowing failure); Component Reference reordered to put Skills first and mark Commands legacy.
+
+**Fixed:**
+- `creating-a-plugin`: restored 48 mangled bytes in the two directory-tree code blocks (UTF-8 box-drawing characters had been reduced to their low bytes, e.g. `├──` → `1C 00 00`), which made the file register as binary to grep/file and other text tools.
+
 ## [denubis-bibliography] 0.5.0
 
 DOI in, working paper out — `fetch.py` now renders by default — plus a `dots.mocr` GPU escalation tier for scanned books the docling cascade can't handle.

@@ -1,0 +1,6 @@
+# Ephemeral review artifacts — codex peer-review (and future proleptic) runs.
+# Reviews are disposable and may carry content sent to an external model; none
+# of it is committed. This file ignores everything here except itself, so the
+# directory exists in the tree while its contents never do.
+*
+!.gitignore

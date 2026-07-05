@@ -34,20 +34,22 @@ AGGREGATE_BUDGET = 9500
 # user said "popper is complete noise, mate" (2026-04-16); Toulmin/Lakatos/Mantyla
 # never appeared as user-side trigger words in chat history. Names belong in the
 # skill body, where they document technique without burning skill-listing budget.
-SCHOLAR_NAMES: frozenset[str] = frozenset({
-    "Toulmin",
-    "Popper",
-    "Lakatos",
-    "Haraway",
-    "Mantyla",
-    "Fowler",
-    "Schön",
-    "Schon",
-    "Wirth",
-    "Kudina",
-    "Ballsun",
-    "Alfano",
-})
+SCHOLAR_NAMES: frozenset[str] = frozenset(
+    {
+        "Toulmin",
+        "Popper",
+        "Lakatos",
+        "Haraway",
+        "Mantyla",
+        "Fowler",
+        "Schön",
+        "Schon",
+        "Wirth",
+        "Kudina",
+        "Ballsun",
+        "Alfano",
+    }
+)
 
 TRIGGER_PREFIXES: tuple[str, ...] = (
     "use when",

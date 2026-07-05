@@ -32,8 +32,8 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bbt import parse_pdf_paths  # noqa: E402
-from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback  # noqa: E402
+from bbt import parse_pdf_paths
+from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -100,7 +100,11 @@ def crossref_first_author_family(doi: str) -> str | None:
     try:
         r = httpx.get(
             f"https://api.crossref.org/works/{doi}",
-            headers={"User-Agent": "denubis-bibliography/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"},
+            headers={
+                "User-Agent": (
+                    "denubis-bibliography/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
+                )
+            },
             timeout=10,
         )
         r.raise_for_status()
@@ -128,14 +132,14 @@ def find_by_doi(doi: str) -> dict | None:
     if surname:
         queries.append(surname)
     queries.append(doi)
-    last_segment = doi.split("/")[-1]
+    last_segment = doi.rsplit("/", maxsplit=1)[-1]
     if last_segment not in queries:
         queries.append(last_segment)
 
     for q in queries:
         try:
             hits = rpc("item.search", [q]) or []
-        except Exception:
+        except Exception:  # noqa: S112 (skip a query that errors; try the next)
             continue
         for h in hits:
             key = h.get("citation-key") or h.get("id") or ""
@@ -174,7 +178,9 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
     return m.get("sha256_prefix") == expected
 
 
-def render_pdf(pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_session=None) -> dict:
+def render_pdf(
+    pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_session=None
+) -> dict:
     """Render PDF -> markdown with auto-escalation (pymupdf4llm -> docling ->
     +OCR -> mocr when allowed).
 
@@ -189,8 +195,14 @@ def render_pdf(pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_sessi
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("dois", nargs="*", help="DOIs to ingest. Use '-' to read from stdin.")
-    parser.add_argument("--force", action="store_true", help="Re-render even if cached output is current.")
+    parser.add_argument(
+        "dois", nargs="*", help="DOIs to ingest. Use '-' to read from stdin."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-render even if cached output is current.",
+    )
     parser.add_argument(
         "--allow-mocr",
         action="store_true",
@@ -263,14 +275,20 @@ def main() -> int:
                     continue
                 out = papers_dir / citekey
                 if not args.force and current_render_matches(out, pdf):
-                    print(f"  cache current — skipped (use --force to re-render)", flush=True)
+                    print(
+                        "  cache current — skipped (use --force to re-render)",
+                        flush=True,
+                    )
                     skipped += 1
                     continue
                 meta = render_pdf(
                     pdf, out, allow_mocr=args.allow_mocr, mocr_session=mocr_session
                 )
                 label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
-                print(f"  rendered {meta['page_count']} pages via {label} → {out}", flush=True)
+                print(
+                    f"  rendered {meta['page_count']} pages via {label} → {out}",
+                    flush=True,
+                )
                 successes += 1
             except NeedsMocr as e:
                 print(f"  NEEDS MOCR: {e}", flush=True)
@@ -279,7 +297,9 @@ def main() -> int:
                 print(f"  ERROR: {e}", flush=True)
                 failures += 1
 
-    print(f"\n=== summary: {successes} rendered, {skipped} cached, {failures} failed ===")
+    print(
+        f"\n=== summary: {successes} rendered, {skipped} cached, {failures} failed ==="
+    )
     return 0 if failures == 0 else 1
 
 

@@ -5,8 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 _HOOK_PATH = (
     Path(__file__).resolve().parent.parent
     / "plugins"
@@ -40,7 +38,10 @@ class TestMatchingCommands:
         _, output = _run(_bash_input("git status"))
         assert output is not None
         assert "additionalContext" in output["hookSpecificOutput"]
-        assert "project-claude-librarian" in output["hookSpecificOutput"]["additionalContext"]
+        assert (
+            "project-claude-librarian"
+            in output["hookSpecificOutput"]["additionalContext"]
+        )
 
     def test_git_log(self):
         _, output = _run(_bash_input("git log"))

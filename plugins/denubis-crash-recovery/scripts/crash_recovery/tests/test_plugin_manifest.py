@@ -46,7 +46,8 @@ class TestPluginJson:
         assert data["name"] == "denubis-crash-recovery", data["name"]
 
     def test_plugin_json_version_string_shape(self) -> None:
-        """Version is a non-empty string (semver-ish; full semver enforced elsewhere)."""
+        """Version is a non-empty string (semver-ish; full semver enforced elsewhere).
+        """
         with _PLUGIN_JSON.open() as fh:
             data = json.load(fh)
         assert isinstance(data["version"], str), type(data["version"])
@@ -71,11 +72,18 @@ class TestMarketplaceEntry:
         with _MARKETPLACE_JSON.open() as fh:
             marketplace = json.load(fh)
         entry = next(
-            (p for p in marketplace["plugins"] if p["name"] == "denubis-crash-recovery"),
+            (
+                p
+                for p in marketplace["plugins"]
+                if p["name"] == "denubis-crash-recovery"
+            ),
             None,
         )
         assert entry is not None, "denubis-crash-recovery missing from marketplace.json"
-        assert entry["version"] == plugin["version"], (entry["version"], plugin["version"])
+        assert entry["version"] == plugin["version"], (
+            entry["version"],
+            plugin["version"],
+        )
 
 
 class TestMalformedPluginJsonDetectable:
@@ -86,6 +94,5 @@ class TestMalformedPluginJsonDetectable:
         """
         bad = tmp_path / "plugin.json"
         bad.write_text("{not valid json")
-        with pytest.raises(json.JSONDecodeError):
-            with bad.open() as fh:
-                json.load(fh)
+        with pytest.raises(json.JSONDecodeError), bad.open() as fh:
+            json.load(fh)

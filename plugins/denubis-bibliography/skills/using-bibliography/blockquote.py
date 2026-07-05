@@ -15,7 +15,7 @@ from pathlib import Path
 
 def normalise(s: str) -> str:
     """Collapse whitespace and normalise common PDF-extraction noise."""
-    return re.sub(r"\s+", " ", s.replace("‐", "-")).strip().lower()
+    return re.sub(r"\s+", " ", s.replace("\u2010", "-")).strip().lower()
 
 
 def main() -> int:

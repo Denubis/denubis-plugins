@@ -26,12 +26,15 @@ properties from real session logs:
 from __future__ import annotations
 
 import json
+import re
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Allow-list filter: keep only top-level ``type`` values in ``_REAL_TYPES``
 # that carry real signal; everything else is treated as bookkeeping and
@@ -112,7 +115,7 @@ def _parse_ts(value: Any) -> int | None:
         # Python 3.11+ accepts the trailing ``Z`` directly.
         ts = datetime.fromisoformat(value.replace("Z", "+00:00"))
         return int(ts.timestamp())
-    except (ValueError, OSError):
+    except ValueError, OSError:
         return None
 
 
@@ -149,7 +152,8 @@ def _has_matching_tool_result(
     start_idx: int,
     tool_use_id: str,
 ) -> bool:
-    """Scan forward through ``entries`` from ``start_idx + 1`` for a matching tool_result.
+    """Scan forward through ``entries`` from ``start_idx + 1`` for a matching
+    tool_result.
 
     Per Phase 2B: attachments and other bookkeeping entries can interleave
     between an assistant tool_use dispatch and the user tool_result. We
@@ -169,9 +173,7 @@ def _has_matching_tool_result(
     return False
 
 
-def _has_ask_question_answer(
-    entries: list[dict[str, Any]], start_idx: int
-) -> bool:
+def _has_ask_question_answer(entries: list[dict[str, Any]], start_idx: int) -> bool:
     """Scan forward for a user entry carrying ``toolUseResult.answers``."""
     for j in range(start_idx + 1, len(entries)):
         nxt = entries[j]
@@ -192,9 +194,7 @@ def _is_concluded(entry: dict[str, Any]) -> bool:
     items = _content_items(entry)
     if not items:
         return False
-    return all(
-        isinstance(item, dict) and item.get("type") == "text" for item in items
-    )
+    return all(isinstance(item, dict) and item.get("type") == "text" for item in items)
 
 
 def _parse_ts_pair(value: Any) -> tuple[int | None, str | None]:
@@ -323,9 +323,7 @@ def _classify_dispatch(
                 total_entries,
             )
 
-        if isinstance(tool_id, str) and _has_matching_tool_result(
-            filtered, i, tool_id
-        ):
+        if isinstance(tool_id, str) and _has_matching_tool_result(filtered, i, tool_id):
             # This dispatch was resolved — look further back for an earlier
             # unmatched dispatch.
             continue
@@ -345,6 +343,52 @@ def _classify_dispatch(
             f"{tool_name} dispatched" if tool_name else "tool dispatched",
         )
 
+    return None
+
+
+# Bound the forward scan: a real session's first cwd/timestamp record sits within
+# the first few parseable records (after the snapshot prefix). Measured across
+# 7683 real ~/.claude/projects transcripts, the first non-empty cwd appears by
+# record 9 at the deepest (p99 = 4), so 50 is ~5x headroom. The limit counts
+# parseable records, not raw lines (blank and unparseable lines are skipped
+# without consuming it), so it bounds cost on the well-formed transcripts this
+# reads; the line-by-line read keeps memory bounded regardless of file size.
+_FIRST_FIELD_SCAN_LIMIT = 50
+
+
+def first_record_field(
+    path: Path, field: str, limit: int = _FIRST_FIELD_SCAN_LIMIT
+) -> str | None:
+    """Return the value of ``field`` from the first JSONL record that carries it
+    as a non-empty value, scanning forward up to ``limit`` parseable records.
+
+    Best-effort: returns ``None`` on missing file, unreadable file, or no record
+    carrying the field within the window. Never raises. Blank lines and lines that
+    fail to JSON-decode are skipped and do not consume the record budget — only
+    parseable dict records count toward ``limit``.
+    """
+    try:
+        f = path.open("r", encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    with f:
+        count = 0
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                d = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(d, dict):
+                continue
+            count += 1
+            value = d.get(field)
+            if isinstance(value, str) and value:
+                return value
+            if count >= limit:
+                return None
     return None
 
 
@@ -429,7 +473,9 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
             kind=TailKind.UNKNOWN,
             last_ts=None,
             total_entries=total_entries,
-            state_summary=_summarise(TailKind.UNKNOWN, None, "only bookkeeping entries"),
+            state_summary=_summarise(
+                TailKind.UNKNOWN, None, "only bookkeeping entries"
+            ),
         )
 
     last_entry = filtered[-1]
@@ -438,18 +484,120 @@ def parse_tail(path: Path, n: int = 20) -> TailSummary:
     # --- Classify the tail ----------------------------------------------
     # CONCLUDED: last entry is assistant end_turn with text-only content.
     if _is_concluded(last_entry):
-        return _make_tail(
-            TailKind.CONCLUDED, last_ts, last_ts_str, total_entries
-        )
+        return _make_tail(TailKind.CONCLUDED, last_ts, last_ts_str, total_entries)
 
     # Tool dispatch: walk backward through ``filtered`` for the most recent
     # unmatched assistant tool_use. ``None`` means every dispatch in the
     # window was satisfied — fall through to UNKNOWN.
-    dispatch_summary = _classify_dispatch(
-        filtered, last_ts, last_ts_str, total_entries
-    )
+    dispatch_summary = _classify_dispatch(filtered, last_ts, last_ts_str, total_entries)
     if dispatch_summary is not None:
         return dispatch_summary
 
     # Nothing matched — clean parse, no end_turn, no dangling dispatch.
     return _make_tail(TailKind.UNKNOWN, last_ts, last_ts_str, total_entries)
+
+
+# Content-level bookkeeping markers: a real (assistant/user) turn whose
+# extracted text *starts with* any of these is operator leakage, not a
+# substantive turn. This is distinct from the type-level ``_REAL_TYPES``
+# filter — these turns ARE assistant/user entries, but their text is noise
+# (``<usage>`` accounting, ``<summary>`` recaps, task-notification envelopes,
+# and the standard post-compaction recovery notice).
+_BOOKKEEPING_MARKERS: tuple[str, ...] = (
+    "<usage>",
+    "<summary>",
+    "</task-notification>",
+    "<task-notification>",
+    "If you need specific details from before compaction",
+)
+
+# Cap on the returned snippet. Mirrors ``state_summary``'s short-string spirit
+# (kept well under a sentence) so the ``sessions.last_substantive`` column and
+# the render line it feeds stay compact.
+_LAST_SUBSTANTIVE_CAP = 200
+
+# A real assistant/user turn is multi-line markdown (``##`` headings,
+# ``**bold**``, fenced code). The render places the snippet on a single
+# ``- Last substantive:`` row, so any embedded newline would push the rest of
+# the message to column 0 of a new line — an embedded ``## heading`` then reads
+# as a new report section and shreds the structure. Collapse every whitespace
+# run (newlines, tabs, repeated spaces) to one space so the snippet is always a
+# single line. Markdown *inline* styling (``**``/`` ` ``) is left intact: it no
+# longer breaks structure once the value is single-line and not column-0.
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def _entry_text(entry: dict[str, Any]) -> str:
+    """Extract the human-readable text of one assistant/user entry.
+
+    Assistant entries carry ``message.content`` as a list of items; we join
+    the ``text`` of every ``type == "text"`` item. User entries carry
+    ``message.content`` as either a plain string (the common shape) or a list
+    of items (join the ``text`` items, mirroring the assistant path). Anything
+    else yields the empty string.
+    """
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            item["text"]
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and isinstance(item.get("text"), str)
+        ]
+        return "".join(parts)
+    return ""
+
+
+def _is_bookkeeping_text(text: str) -> bool:
+    """True when ``text`` is empty or starts with a content-level bookkeeping marker."""
+    stripped = text.strip()
+    if not stripped:
+        return True
+    return stripped.startswith(_BOOKKEEPING_MARKERS)
+
+
+def last_substantive_text(path: Path, n: int = 20) -> str | None:
+    """Return the most recent substantive assistant/user text in the last ``n`` lines.
+
+    Reads the last ``n`` lines via a bounded ``deque`` (same memory-bounded
+    approach as :func:`parse_tail`), keeps only ``_REAL_TYPES`` entries, then
+    walks them newest-first and returns the first whose extracted text is
+    non-empty and not content-level bookkeeping. The result is stripped and
+    truncated to :data:`_LAST_SUBSTANTIVE_CAP` characters.
+
+    Returns ``None`` when the file is missing/unreadable or every real turn in
+    the window is empty or bookkeeping. Never raises.
+    """
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as f:
+            tail: deque[str] = deque(f, maxlen=n)
+    except OSError:
+        return None
+
+    real: list[dict[str, Any]] = []
+    for line in tail:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and obj.get("type") in _REAL_TYPES:
+            real.append(obj)
+
+    for entry in reversed(real):
+        text = _entry_text(entry)
+        if _is_bookkeeping_text(text):
+            continue
+        single_line = _WHITESPACE_RUN.sub(" ", text).strip()
+        return single_line[:_LAST_SUBSTANTIVE_CAP]
+    return None

@@ -20,11 +20,13 @@ import os
 import sqlite3
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from crash_recovery import db as db_mod
 from crash_recovery import history as history_mod
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -70,7 +72,8 @@ def _seed_scan_run(db_path: Path, ts: int, classifier_version: int = 1) -> int:
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.execute(
-            "INSERT INTO scan_runs (ts, live_pids, sessions_scanned, classifier_version) "
+            "INSERT INTO scan_runs"
+            " (ts, live_pids, sessions_scanned, classifier_version) "
             "VALUES (?, '[]', 0, ?)",
             (ts, classifier_version),
         )

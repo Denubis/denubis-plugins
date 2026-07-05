@@ -23,9 +23,12 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from crash_recovery import db
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -58,7 +61,8 @@ def fetch_history(db_path: Path, uuid: str) -> tuple[HistoryEntry, ...]:
     """
     with closing(db.open_db(db_path)) as conn:
         rows = conn.execute(
-            "SELECT ch.scan_id, sr.ts, ch.classification, ch.reason, ch.classifier_version "
+            "SELECT ch.scan_id, sr.ts, ch.classification,"
+            " ch.reason, ch.classifier_version "
             "FROM classification_history ch "
             "JOIN scan_runs sr ON sr.id = ch.scan_id "
             "WHERE ch.uuid = ? "
