@@ -3,7 +3,7 @@ source: obra/superpowers/skills/writing-skills/examples/CLAUDE_MD_TESTING.md
 source-repo: https://github.com/obra/superpowers
 source-commit: 6fd4507659784c351abbd2bc264c7162cfd386dc
 imported: 2026-06-11
-adaptation: light-touch — denubis voice tweaks and one cross-reference annotation; scenario content obra-authored
+adaptation: light-touch — denubis voice tweaks and one cross-reference annotation; scenario content obra-authored. 2026-07-05 — merged the available_skills XML correction from the earlier (2026-04-20) testing-skills-with-subagents copy during duplicate consolidation; that copy is deleted
 ---
 
 # Testing CLAUDE.md Skills Documentation
@@ -97,15 +97,14 @@ Search: `grep -r "keyword" ~/.claude/skills/`
 
 ### Variant C: Claude.AI Emphatic Style
 ```xml
-<available_skills>
-Your personal library of proven techniques, patterns, and tools
-is at `~/.claude/skills/`.
+<!-- NOTE: Skills are injected into system context automatically by Claude Code.
+     Do NOT reference an <available_skills> XML tag — that tag does not exist.
+     Instead, refer to "your available skills" or "skills shown in your system context". -->
 
-Browse categories: `ls ~/.claude/skills/`
-Search: `grep -r "keyword" ~/.claude/skills/ --include="SKILL.md"`
+Your personal library of proven techniques, patterns, and tools
+is available in your system context as a list of skills.
 
 Instructions: `skills/using-skills`
-</available_skills>
 
 <important_info_about_skills>
 Claude might think it knows how to approach tasks, but the skills
