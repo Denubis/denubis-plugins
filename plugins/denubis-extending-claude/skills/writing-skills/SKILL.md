@@ -108,9 +108,9 @@ Authoring a skill sequences the three sub-skills in order. Each owns a phase of 
 
 Three files imported from obra/superpowers ship alongside this skill. See `README.md` for dependencies and invocation.
 
-- `anthropic-best-practices.md` (obra verbatim) — Anthropic-authored reference on skill structure, CSO, and anti-patterns. Reference material, not denubis-authored guidance.
-- `render-graphs.js` (obra verbatim) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime.
-- `examples/CLAUDE_MD_TESTING.md` (obra adapted) — worked example of pressure-testing CLAUDE.md documentation.
+- `anthropic-best-practices.md` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Anthropic-authored reference on skill structure, discovery optimisation, and anti-patterns. Reference material, not denubis-authored guidance.
+- `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime.
+- `examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11, consolidated 2026-07-05) — worked example of pressure-testing CLAUDE.md documentation.
 
 ## Anti-Patterns
 
