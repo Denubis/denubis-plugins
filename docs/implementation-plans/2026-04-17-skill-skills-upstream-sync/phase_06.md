@@ -315,7 +315,7 @@ Between the current step 6 ("Present to user") and step 7 ("Use AskUserQuestion"
 ```markdown
 6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
 
-This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in Task 4 (UAT Requirements Collation section, SKILL.md line 1285), which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit at Task 4 is what actually prevents smuggled entries from reaching `uat-requirements.md`.
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is what actually prevents smuggled entries from reaching `uat-requirements.md`.
 
 Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
 
@@ -330,7 +330,7 @@ Before presenting the DR set to the user for approval (step 7), run each propose
 - If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
 - If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
 
-**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in Task 4, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; Task 4 is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
+**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in the UAT Requirements Collation section, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; the collation audit is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
 
 **Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
 ```
@@ -399,14 +399,14 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md"
 
 **Step 1: Amend Finalization task — add uat-requirements.md existence gate**
 
-Within the Finalization section, add a new Step 4 (after existing Step 3 "Complete finalization"):
+Within the Finalization section, add an existence gate for `uat-requirements.md`. **Placement correction (code review, 2026-07-06):** the gate must fold INTO Step 3 as a precondition that fires BEFORE "Mark the Finalization task as completed" — NOT as a separate Step 4 *after* Step 3's completion line, which would leave the anti-silent-skip gate itself silently skippable. The gate body is shown below as a `### Step 4` block for illustration; in the shipped skill it lives inside Step 3, before the completion line:
 
 ```markdown
 ### Step 4: Existence gate — verify `uat-requirements.md` exists at PLAN_DIR
 
 Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md`. If the file is missing:
 - Halt Finalization
-- Dispatch the UAT Requirements Collation section (SKILL.md line 1285) now — do not proceed without it
+- Dispatch the UAT Requirements Collation section now — do not proceed without it
 - If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form:
   ```
   # UAT Requirements — [Plan Name]
@@ -449,7 +449,7 @@ Only after all entries either pass OR have human-acknowledged overrides does `ua
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
-**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This Task 4 collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
 ```
 
 **Step 3: Verify edits**
