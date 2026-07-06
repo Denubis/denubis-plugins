@@ -850,6 +850,9 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Recommendation:** [Option A] — [why, in one sentence].
 
+**What's automatable:** [name the mechanism that CAN be verified by a named command or operational check. If nothing is automatable here, this UAT entry is probably a disguised test-requirement — flag and re-route.]
+**What's NOT automatable:** [name the surface judgment that requires a human who has used the built thing. If nothing is NOT automatable, the entry is smuggled — reject.]
+
 **This decision assumes:** [the assumption baked into the implementation]
 **To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
 **It's wrong if:** [the specific experience that shows the assumption failed your intent]
@@ -874,6 +877,9 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Recommendation:** [...]
 
+**What's automatable:** [name the mechanism that CAN be verified by a named command or operational check. If nothing is automatable here, this UAT entry is probably a disguised test-requirement — flag and re-route.]
+**What's NOT automatable:** [name the surface judgment that requires a human who has used the built thing. If nothing is NOT automatable, the entry is smuggled — reject.]
+
 **This decision assumes:** [assumption]
 **To shatter it:** Deferred to Phase [M] — the user-facing experience doesn't exist yet.
 **It's wrong if:** [what you'd see in Phase M that proves this foundation was wrong]
@@ -884,6 +890,45 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 [Continue for all non-trivial decisions in this phase...]
 ```
+
+### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
+
+**Example 1: Smuggled entry (REJECT)**
+
+Proposed:
+> **DR3: Token validation rejects expired tokens**
+> **What's automatable:** (left blank or filled with something like "the rejection logic works")
+> **What's NOT automatable:** (left blank or filled with "the user experience of seeing the rejection")
+> **This decision assumes:** ...
+> **To shatter it:** Run the test suite and verify expired tokens return 401.
+> **It's wrong if:** Expired tokens don't return 401.
+
+**Why this is smuggled:** "To shatter it: Run the test suite" is a test-requirement. The three anti-smuggling tests would flag:
+- Decomposition test FAILS: the mechanism ("tokens return 401 on expiry") IS automatable and there is no distinct surface judgment.
+- Disagreement test FAILS: "401 vs 200" is not something two reasonable people can disagree about.
+
+**Re-routing:** Add to test-requirements.md as `test_expired_token_returns_401`. Do NOT create a UAT entry.
+
+**Example 2: Genuine UAT entry (ACCEPT)**
+
+Proposed:
+> **DR5: Error messages guide users to the fix**
+> **What's automatable:** The error message format (e.g., "includes a link to documentation") can be grep-checked. The text itself is present or absent.
+> **What's NOT automatable:** Whether the message's wording actually helps a new user form the next action. "Helpful" is a subjective quality of the language, not a mechanical property.
+> **This decision assumes:** Users will understand the next step after reading the error.
+> **To shatter it:** Use the feature with a deliberately-wrong input as a first-time user and assess whether the error's wording guides you to the fix.
+> **It's wrong if:** You read the error and reach for documentation to understand what to do next, meaning the error names the fault without scaffolding the next action.
+
+**Why this is genuine:** The Decomposition test separates mechanism (format) from surface (helpfulness). The Disagreement test is satisfied — reasonable people could disagree whether an error message is "guiding" vs "naming." The Reduction test passes — it's a single integrated human experience, not a multi-step integration test.
+
+**Example 3: Zero-UAT output (infrastructure phase)**
+
+A preparatory-refactor phase whose Done-when is "tests stay green after restructuring" has:
+- All verification automatable (tests pass or don't)
+- No surface-judgment experience (the restructure is inspectable via diff)
+- Every proposed UAT decomposes to test-requirement or test-of-behaviour-preservation
+
+**Correct output:** Zero UAT entries in this phase's section of `uat-requirements.md`. The phase writes `## Phase N: [Name]` and a one-line "No native UAT entries; all verification routes to test-requirement" marker. This is a first-class valid outcome — NOT a failure to find UAT entries.
 
 7. **Use AskUserQuestion:**
 
