@@ -930,6 +930,27 @@ A preparatory-refactor phase whose Done-when is "tests stay green after restruct
 
 **Correct output:** Zero UAT entries in this phase's section of `uat-requirements.md`. The phase writes `## Phase N: [Name]` and a one-line "No native UAT entries; all verification routes to test-requirement" marker. This is a first-class valid outcome — NOT a failure to find UAT entries.
 
+6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
+
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in Task 4 (UAT Requirements Collation section, SKILL.md line 1285), which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit at Task 4 is what actually prevents smuggled entries from reaching `uat-requirements.md`.
+
+Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
+
+1. **Decomposition test** — Is the What's-automatable genuinely separate from the What's-NOT-automatable, or does the What's-automatable already cover what the falsification claims to test?
+2. **Reduction test** — Would each step in the "To shatter it" scenario be automatable in isolation? If yes, the entry is a multi-step integration test a human is running by hand — automate it.
+3. **Disagreement test** — Would two reasonable people, after using the thing, plausibly disagree about whether "It's wrong if" was met? If every observer would reach the same verdict, the entry is an automated check, not a UAT.
+
+**Self-audit behaviour:**
+- If an entry passes all three tests → retain and present to user.
+- If an entry fails the Decomposition test → re-route to test-requirements.md (mechanism was automatable; no surface judgment exists).
+- If an entry fails the Reduction test → decompose into automatable test-requirements (the scenario is an integration test).
+- If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
+- If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
+
+**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in Task 4, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; Task 4 is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
+
+**Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
+
 7. **Use AskUserQuestion:**
 
 **The question MUST summarise what's being approved.** State the number of decisions reviewed, any Lakatos/Haraway flags raised, and the phase's key deliverables.
