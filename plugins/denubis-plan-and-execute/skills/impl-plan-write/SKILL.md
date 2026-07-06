@@ -1311,6 +1311,26 @@ Mark the Finalization task as completed.
 
 Proceed to Test Requirements generation.
 
+### Step 4: Existence gate — verify `uat-requirements.md` exists at PLAN_DIR
+
+Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md`. If the file is missing:
+- Halt Finalization
+- Dispatch the UAT Requirements Collation section now — do not proceed without it
+- If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form:
+  ```
+  # UAT Requirements — [Plan Name]
+
+  No human-judgment UAT entries. All verification routes to automated tests or operational checks. Phases route to `exec-coherence-review`, not the UAT gate.
+  ```
+
+The file must exist regardless. Silent-skip is the failure mode this gate closes — sessions that compact or interrupt during planning can drop the collation step entirely, leaving no record that UAT was considered. Explicit minimal-file output distinguishes "considered and found empty" from "never ran."
+
+Run:
+```bash
+test -f "$PLAN_DIR/uat-requirements.md" || { echo "FAIL: uat-requirements.md missing"; exit 1; }
+```
+Exit 0 → Finalization proceeds. Exit 1 → halt, dispatch collation.
+
 ## Test Requirements Generation
 
 **Tracked task: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"**
@@ -1403,6 +1423,29 @@ Quality gate: every entry must have (1) what the human DOES (an action, not insp
 ```
 
 **If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+
+**Collation audit — dispatch Sonnet subagent to run three-test rubric on each entry**
+
+Before writing `uat-requirements.md` to disk, dispatch a subagent (`denubis-basic-agents:sonnet-general-purpose`) with each proposed entry, the three anti-smuggling tests (Decomposition / Reduction / Disagreement), and a prompt instructing:
+
+> For each UAT entry provided below, score:
+> 1. Decomposition pass/fail — is What's-automatable genuinely separate from What's-NOT-automatable? If no separation, FAIL.
+> 2. Reduction pass/fail — is the "To shatter it" scenario a single integrated experience or a multi-step integration test? If multi-step with each step automatable, FAIL.
+> 3. Disagreement pass/fail — would two reasonable people plausibly disagree on "It's wrong if"? If every observer would reach the same verdict, FAIL.
+>
+> For each entry, output: PASS / FAIL with the failing test named; or PASS with short rationale. If FAIL, propose how to re-route (test-requirement? rewrite? delete?).
+
+Pass the subagent's structured output back. For any FAIL, block the collation write and surface to the human:
+- Display the entry text
+- Display the failing test
+- Propose the rewrite or re-route
+- Accept human decision: retain-with-rewrite, retain-with-override-acknowledgement, delete, re-route
+
+Only after all entries either pass OR have human-acknowledged overrides does `uat-requirements.md` get written.
+
+**Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
+
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This Task 4 collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
 
 **Step: Write and complete**
 
