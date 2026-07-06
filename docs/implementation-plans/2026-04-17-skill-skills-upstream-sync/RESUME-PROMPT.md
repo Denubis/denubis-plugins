@@ -21,16 +21,18 @@ I'm resuming the skill-skills upstream sync at `docs/implementation-plans/2026-0
 - **Phase 4: COMPLETE and CLOSED.** All tasks (1–6) and the full review gate done: code review (Sonnet), proleptic (Opus), codex external (GPT-5.5), UAT provisional-confirm, and — the final gate step — the §3d refactor pipeline (2026-07-06). Refactor pipeline ran clean: smell-assessor (Opus) **0 findings**; gate skipped critical-peer-review + refactoring-executor; no code changed; 879 green. Closure recorded by dated append in `phase_04_green_verification.md`; full smell-report at `refactor-pipeline-smell-report-phase-4.md`. Closure commit `b0c8fb0`.
 - **Remaining phases execute OUT OF NUMERIC ORDER: phase_06 → phase_05.** Phase 6 is cross-plugin hardening of `impl-plan-write`; Phase 5 is the terminal coherent-set commit (version bumps + marketplace + CHANGELOG) that must capture Phase 6's deltas, so Phase 6 lands first.
 
-## ⚠️ PRECONDITION before Phase 6 — the step-0 main merge (currently PENDING)
+## Step-0 main merge — DONE (2026-07-06, merge commit `c702205`)
 
-This branch is **58 commits behind `main`** as of 2026-07-06 (main tip `bd77b2e`; last main→branch merge was `5487da7`, now stale). Both `phase_06.md` and `phase_05.md` state their line anchors and version baselines are stale and must be re-verified **after a step-0 main merge** — and that merge is NOT yet done this cycle.
+The branch was 58 commits behind `main`; merged clean via `git merge --no-ff main`. Branch is now **0 behind main**, full suite **1116 green** (was 879 pre-merge — main added net test suites). Three conflicts resolved: `pyproject.toml` (took main's `requires-python >=3.14`, kept this branch's `pyyaml>=6.0.3`; `uv.lock` regenerated via `uv add`), `CLAUDE.md` (both sides added a distinct convention section under Schema Constants — kept both). **Tooling gotcha for future merges:** conflict markers in the root `pyproject.toml` deadlock the `uv run`-based PreToolUse hooks (Edit/Write/Bash all blocked), because `uv` can't parse a TOML with `<<<<<<<` markers. Resolve any future root-`pyproject.toml`/`uv.lock` conflict from a plain terminal (outside Claude's tool hooks) first, then Claude's tools unblock.
 
-- Phase 6 edits `plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md` at scattered anchors (the phase names SKILL.md 728–734 and 1285 against an assumed 1337 lines). The file is **1350 lines** in this worktree right now, and main has drifted further. Every anchor in `phase_06.md` MUST be re-verified against the post-merge file before editing — "exact boundaries determined at execution time."
-- Phase 5's version baselines (denubis-extending-claude, denubis-plan-and-execute), `.claude-plugin/marketplace.json`, and `CHANGELOG.md` are likewise stale — re-verify at execution.
+**Phase 6 anchors have shifted — re-verify before editing.** With main merged, `impl-plan-write/SKILL.md` is **1350 lines** and the anchors phase_06 names against an assumed 1337 are now:
+- three anti-smuggling tests (Decomposition / Reduction / Disagreement): lines **732 / 734 / 736** (phase_06 says 728–734).
+- `## UAT Requirements Collation`: line **1298** (phase_06 says 1285).
+Treat these as the current baseline but re-grep at execution — "exact boundaries determined at execution time."
 
-**First action for the Phase 6 session: HALT and decide the main-merge with the operator.** Merging 58 commits of main into a mid-refactor branch is its own task — use `denubis-extending-claude:syncing-with-upstream` for the ed3d→denubis rename handling. Do not start Phase 6 anchor edits until the merge is done and every anchor re-verified. Do not execute the plan on `main`.
+**Phase 5 version baselines moved too:** denubis-extending-claude **1.8.0** (was 1.7.0), denubis-plan-and-execute **2.35.3** (was 2.30.0). Re-verify `.claude-plugin/marketplace.json` + `CHANGELOG.md` against these at Phase 5. Do not execute the plan on `main`.
 
-## NEXT ACTION — Phase 6 (only after the step-0 main merge)
+## NEXT ACTION — Phase 6 (main merge done; re-verify anchors, then execute)
 
 Invoke `denubis-plan-and-execute:executing-an-implementation-plan`, create a fresh task list for Phase 6 from `phase_06.md`, and execute it: convert the three anti-smuggling tests (Decomposition / Reduction / Disagreement) from rubric-as-text into a forcing gate in `impl-plan-write/SKILL.md` — template mandating `**What's automatable:**` / `**What's NOT automatable:**` before every UAT falsification template, three-lens-table amendment making "no UAT entry" first-class, per-phase ND rejection gate firing before user approval, Finalization existence gate on `uat-requirements.md`, one-time collation audit via a dedicated Sonnet subagent, and a retroactive audit of this plan's own accumulated UAT entries (`uat-audit-2026-04-17.md`). Phase Type: functionality. Full phase gate applies (code review → proleptic → UAT/coherence → refactor). Then Phase 5.
 
@@ -39,8 +41,8 @@ Invoke `denubis-plan-and-execute:executing-an-implementation-plan`, create a fre
 ```bash
 pwd; git branch --show-current            # skill-skills-upstream-sync
 git log --oneline -6
-uv sync --all-packages && uv run pytest -q | tail -2   # 879 passed
-git rev-list --count HEAD..main           # commits behind main (was 58 on 2026-07-06)
+uv sync --all-packages && uv run pytest -q | tail -2   # 1116 passed (post-merge baseline)
+git rev-list --count HEAD..main           # should be 0 (main merged 2026-07-06, c702205)
 ```
 
 (`uv sync --all-packages` is required; uv.lock self-modifying its exclude-newer stanza is expected, not drift.)
