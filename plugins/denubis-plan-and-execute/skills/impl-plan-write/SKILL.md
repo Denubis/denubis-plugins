@@ -110,9 +110,11 @@ Review investigator findings and note any differences from design assumptions.
 - "Create or update `types.py`"
 
 **Based on investigator report, ALWAYS write:**
-- "Create `src/auth.py`" (investigator confirmed doesn't exist)
-- "Modify `src/main.py:45-67`" (investigator confirmed exists, checked line numbers)
+- "Create `<src>/auth.py`" (investigator confirmed doesn't exist)
+- "Modify `<src>/main.py:45-67`" (investigator confirmed exists, checked line numbers)
 - "No changes needed to `config.py`" (investigator confirmed already correct)
+
+**Teaching-material placeholder convention:** Illustrative file paths in this skill use angle-bracket prefixes — `<src>/auth.py`, `<tests>/services/test_auth.py` — so they are not audited by the cross-reference tool (see `docs/issues.md` ISSUE-01 and Phase 5 of the 2026-04-17 skill-skills upstream sync plan). Real file references use path-form without angle brackets.
 
 **If codebase state differs from design assumptions:** Document the difference and adjust the implementation plan accordingly.
 
@@ -575,9 +577,9 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 ### Task 1: [Component Name]
 
 **Files:**
-- Create: `src/services/auth.py`
-- Modify: `src/services/existing.py:123-145`
-- Test: `tests/services/test_auth.py`
+- Create: `<src>/services/auth.py`
+- Modify: `<src>/services/existing.py:123-145`
+- Test: `<tests>/services/test_auth.py`
 
 **Step 1: Write the failing test**
 [Complete code example]
@@ -601,7 +603,7 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 
 **The question MUST summarise what's being approved.** Don't just say "Approved?" — state the key deliverables of this phase in the question text so the human knows what they're signing off on.
 
-Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
+Example question: "Phase 2 creates `<src>/auth/middleware.py` and `<src>/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
 
 **Options:**
 - "Approved - proceed to next phase"
@@ -985,7 +987,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
 
 **Files:**
 - Create: `pyproject.toml`
-- Create: `src/__init__.py`
+- Create: `<src>/__init__.py`
 
 **Step 1: Create the files**
 
@@ -1017,9 +1019,9 @@ git commit -m "chore: initialize project structure"
 **Verifies:** {slug}.AC1.1, {slug}.AC1.3 (list specific AC cases this task tests)
 
 **Files:**
-- Create: `src/services/feature.py`
-- Modify: `src/services/existing.py:123-145`
-- Test: `tests/services/test_feature.py` (unit|integration|e2e)
+- Create: `<src>/services/feature.py`
+- Modify: `<src>/services/existing.py:123-145`
+- Test: `<tests>/services/test_feature.py` (unit|integration|e2e)
 
 **Implementation:**
 [Describe what to implement - contracts, behavior, key logic. Include code for complex/non-obvious implementations.]
