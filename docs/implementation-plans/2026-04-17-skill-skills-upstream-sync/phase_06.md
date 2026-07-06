@@ -189,10 +189,10 @@ Scope summary: **DR1 and DR3 get the amendment; DR2 and DR4 do not.**
 
 **Step 2: Add worked example immediately after the DR templates**
 
-Append a new subsection `#### Worked Examples — smuggled entry, genuine entry, zero-UAT phase`:
+Append a new subsection `### Worked Examples — smuggled entry, genuine entry, zero-UAT phase`:
 
 ```markdown
-#### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
+### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
 
 **Example 1: Smuggled entry (REJECT)**
 
