@@ -91,7 +91,7 @@ Amended text:
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 assert 'Zero UAT entries is a first-class valid outcome' in content, 'three-lens table amendment missing'
@@ -103,7 +103,7 @@ print('three-lens table amendment verified')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "refactor(impl-plan-write): amend three-lens table — 'no UAT entry' is first-class
 
@@ -236,7 +236,7 @@ A preparatory-refactor phase whose Done-when is "tests stay green after restruct
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.1: template lines present
@@ -277,7 +277,7 @@ print('Task 2 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): mandate What's-automatable/What's-NOT-automatable template lines + worked examples
 
@@ -343,7 +343,7 @@ Verify the new step 6.5 inserts cleanly between step 6 and step 7 without breaki
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.6: per-phase ND pre-presentation self-audit present (M6 revision: reframed from "gate" to "self-audit" — the structural gate is Task 4 collation audit)
@@ -365,7 +365,7 @@ print('Task 3 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): per-phase ND pre-presentation self-audit (step 6.5)
 
@@ -456,7 +456,7 @@ Only after all entries either pass OR have human-acknowledged overrides does `ua
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.8: Finalization existence gate
@@ -474,7 +474,7 @@ print('Task 4 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): Finalization existence gate on uat-requirements.md + UAT Requirements Collation audit
 
@@ -580,7 +580,7 @@ Commit the uat-requirements.md edits separately.
 **Step 4: Commit audit file + any remediation edits**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 # First commit: audit file
 git add docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/uat-audit-2026-04-17.md
 git commit -m "docs(phase-06): retroactive UAT audit for skill-skills upstream sync plan
@@ -643,7 +643,7 @@ Insert a brief note near the top of `impl-plan-write/SKILL.md` (e.g., near the "
 **Step 2: Verify no illustrative path-form backticks remain**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 # Hunt for any remaining backticked illustrative paths that would match
 # the path-form regex. Expect zero hits after the rewrites above land.
 python3 -c "
@@ -668,7 +668,7 @@ Expected: `PASS: N path-form references remain; none are illustrative src/ or te
 **Step 3: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): angle-bracket placeholder convention for illustrative paths
 
