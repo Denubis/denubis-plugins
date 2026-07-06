@@ -893,6 +893,49 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 [Continue for all non-trivial decisions in this phase...]
 ```
 
+6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
+
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is what actually prevents smuggled entries from reaching `uat-requirements.md`.
+
+Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
+
+1. **Decomposition test** — Is the What's-automatable genuinely separate from the What's-NOT-automatable, or does the What's-automatable already cover what the falsification claims to test?
+2. **Reduction test** — Would each step in the "To shatter it" scenario be automatable in isolation? If yes, the entry is a multi-step integration test a human is running by hand — automate it.
+3. **Disagreement test** — Would two reasonable people, after using the thing, plausibly disagree about whether "It's wrong if" was met? If every observer would reach the same verdict, the entry is an automated check, not a UAT.
+
+**Self-audit behaviour:**
+- If an entry passes all three tests → retain and present to user.
+- If an entry fails the Decomposition test → re-route to test-requirements.md (mechanism was automatable; no surface judgment exists).
+- If an entry fails the Reduction test → decompose into automatable test-requirements (the scenario is an integration test).
+- If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
+- If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
+
+**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in the UAT Requirements Collation section, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; the collation audit is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
+
+**Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
+
+7. **Use AskUserQuestion:**
+
+**The question MUST summarise what's being approved.** State the number of decisions reviewed, any Lakatos/Haraway flags raised, and the phase's key deliverables.
+
+Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — retry wrapper). Creates auth middleware and token service, covers AC2.1-AC2.3."
+
+**Options:**
+- "Approved - proceed to write phase and continue"
+- "Needs revision - [describe changes]"
+- "Other"
+
+8. **Task ND: Write phase file and persist UAT entries (if approved)**
+   - Mark task ND as in_progress
+   - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
+   - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
+   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Generation below). Automatable entries go to test-requirements.md as before.
+   - Mark task ND as completed, continue to next phase
+
+9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
+
+---
+
 ### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
 
 **Example 1: Smuggled entry (REJECT)**
@@ -931,49 +974,6 @@ A preparatory-refactor phase whose Done-when is "tests stay green after restruct
 - Every proposed UAT decomposes to test-requirement or test-of-behaviour-preservation
 
 **Correct output:** Zero UAT entries in this phase's section of `uat-requirements.md`. The phase writes `## Phase N: [Name]` and a one-line "No native UAT entries; all verification routes to test-requirement" marker. This is a first-class valid outcome — NOT a failure to find UAT entries.
-
-6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
-
-This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in Task 4 (the UAT Requirements Collation section), which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit at Task 4 is what actually prevents smuggled entries from reaching `uat-requirements.md`.
-
-Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
-
-1. **Decomposition test** — Is the What's-automatable genuinely separate from the What's-NOT-automatable, or does the What's-automatable already cover what the falsification claims to test?
-2. **Reduction test** — Would each step in the "To shatter it" scenario be automatable in isolation? If yes, the entry is a multi-step integration test a human is running by hand — automate it.
-3. **Disagreement test** — Would two reasonable people, after using the thing, plausibly disagree about whether "It's wrong if" was met? If every observer would reach the same verdict, the entry is an automated check, not a UAT.
-
-**Self-audit behaviour:**
-- If an entry passes all three tests → retain and present to user.
-- If an entry fails the Decomposition test → re-route to test-requirements.md (mechanism was automatable; no surface judgment exists).
-- If an entry fails the Reduction test → decompose into automatable test-requirements (the scenario is an integration test).
-- If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
-- If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
-
-**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in Task 4, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; Task 4 is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
-
-**Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
-
-7. **Use AskUserQuestion:**
-
-**The question MUST summarise what's being approved.** State the number of decisions reviewed, any Lakatos/Haraway flags raised, and the phase's key deliverables.
-
-Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — retry wrapper). Creates auth middleware and token service, covers AC2.1-AC2.3."
-
-**Options:**
-- "Approved - proceed to write phase and continue"
-- "Needs revision - [describe changes]"
-- "Other"
-
-8. **Task ND: Write phase file and persist UAT entries (if approved)**
-   - Mark task ND as in_progress
-   - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
-   - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
-   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Generation below). Automatable entries go to test-requirements.md as before.
-   - Mark task ND as completed, continue to next phase
-
-9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
-
----
 
 ## Task Structure
 
@@ -1309,11 +1309,7 @@ Do NOT rationalize skipping minor issues during the first fix cycle. Mark Finali
 - Zero issues on the one re-review, OR
 - User-chosen resolution path resolved (fix-now cycle completed, issues accepted, or halt-for-discussion concluded with explicit direction).
 
-Mark the Finalization task as completed.
-
-Proceed to Test Requirements generation.
-
-### Step 4: Existence gate — verify `uat-requirements.md` exists at PLAN_DIR
+**Existence gate (must pass BEFORE marking complete):**
 
 Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md`. If the file is missing:
 - Halt Finalization
@@ -1331,7 +1327,9 @@ Run:
 ```bash
 test -f "$PLAN_DIR/uat-requirements.md" || { echo "FAIL: uat-requirements.md missing"; exit 1; }
 ```
-Exit 0 → Finalization proceeds. Exit 1 → halt, dispatch collation.
+Exit 0 → gate passes. Exit 1 → halt, dispatch collation.
+
+**Only after the existence gate passes:** Mark the Finalization task as completed, then proceed to Test Requirements generation.
 
 ## Test Requirements Generation
 
@@ -1447,7 +1445,7 @@ Only after all entries either pass OR have human-acknowledged overrides does `ua
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
-**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This Task 4 collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
 
 **Step: Write and complete**
 
