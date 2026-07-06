@@ -40,15 +40,21 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** The author ends up having to re-derive the coherence argument from scratch because `self-application.md` is too abstract to map onto the live decision. That would mean the walk-through is illustrative, not operative — the rubric inherits Schön but the self-application doesn't transmit Schön's reflective posture to new cases.
 
-### DR-P1-DR2 (back-ref) — Companion citations file is load-bearing at decision time
+### DR-P1-DR2 (back-ref) — Companion citations file changes the decision when consulted
+
+<!-- PROVENANCE: rewritten 2026-07-06 per Phase 6 Task 5 retroactive audit; original failed Decomposition + Disagreement — falsification was framed as file-access frequency ("do you reach for it every time / never"), an observable/automatable fact, not a human judgment. The access-frequency check is re-routed to test-requirements.md (Phase 5). This entry now isolates the genuine judgment: was consulting the companion file substantive? -->
 
 **Originating decision:** Phase 1 DR2 (separate `absencejudgement-citations.md` rather than inlining quotations in SKILL.md).
 
-**This decision assumes:** Keeping quotations in a companion file preserves skim-speed for orchestrators invoking the rubric while retaining verifiability for reviewers.
+**What's automatable:** Whether the companion file was opened during a rubric-use session (recoverable from session transcripts, e.g. `cc-search-chats`) and how often, relative to rubric invocations. This access-frequency signal belongs in test-requirements.md (Phase 5); it is NOT this UAT entry.
 
-**To shatter it:** In a real scope-assessment cycle triggered by Phase 4's `writing-skills`, observe whether SKILL.md alone suffices or whether you reach for `absencejudgement-citations.md`. If you reach for it every time, the split was artificial — quotations *are* load-bearing at decision time and should have been inlined.
+**What's NOT automatable:** Whether, on the occasions the companion file *was* consulted, its verbatim quotations substantively informed the scope decision — or whether SKILL.md's paraphrase would have sufficed and the open was a reflex. "Substantively informed" is a judgment about whether the citation earned its separate-file cost, not a fact about whether a file was opened.
 
-**It's wrong if:** Every rubric use requires loading both files, meaning the companion-file architecture cost overhead without the skim-speed benefit. Alternatively, it's wrong if the companion file is never loaded, meaning the quotations were overhead no one actually consulted — the skill would have been better grounding the claims inline with tighter paraphrase discipline.
+**This decision assumes:** When an orchestrator consults `absencejudgement-citations.md` during a live scope-assessment, the verbatim quotations add something the SKILL.md paraphrase does not — grounding the decision, not just decorating it.
+
+**To shatter it:** In a real scope-assessment cycle triggered by Phase 4's `writing-skills`, when you find yourself opening `absencejudgement-citations.md`, pause and ask: did reading the verbatim quotation change or sharpen the call you were about to make, or would the SKILL.md summary have carried you to the same decision?
+
+**It's wrong if:** On reflection the companion file's quotations never changed a decision they were consulted for — the paraphrase in SKILL.md would have sufficed every time — meaning the separate-file split bought verifiability that no decision-maker actually cashed in, and the quotations should have been inlined with tighter paraphrase discipline.
 
 ### DR-P1-DR4 (back-ref) — Verbatim wording beats paraphrase in rubric use
 
@@ -80,19 +86,21 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** You consistently discover the rubric-callback only after drafting directive text, and find yourself re-scoping or rewriting because the rubric screens surface concerns the early phases should have caught. That would mean the placement didn't achieve pre-authoring timing — either the section needs to move higher, or the rubric-callback needs to be wired into a different entry point (e.g., the skill's opening Core Principles).
 
-### DR-P2-DR3 — "Dial back aggressive language" guidance changes actual authoring behaviour
+### DR-P2-DR3 — "Dial back aggressive language" guidance changes authoring behaviour
+
+<!-- PROVENANCE: rewritten 2026-07-06 per Phase 6 Task 5 retroactive audit; original failed Reduction + Disagreement — "To shatter it" was "count CRITICAL:/YOU MUST occurrences, compare to baseline" (grep + arithmetic two auditors could not disagree on). Despite carrying the What's-automatable/NOT header lines, the falsification PROCEDURE tested an automatable count, not the judgment. Meta-finding for Phase 6: the template header lines are necessary but not sufficient; the Task 4 collation audit is the structural backstop. The occurrence-count is re-routed to test-requirements.md (Phase 5); this entry now tests the judgment underneath. -->
 
 **Originating decision:** Phase 2 DR3 (update aggressive-language guidance at SKILL.md lines 96, 237 to match current Anthropic docs with explicit before/after example and URL citation).
 
-**What's automatable:** The updated guidance string is present with the current Anthropic source URL; grep SKILL.md for both. The before/after example ("CRITICAL: You MUST → Use this tool when...") is present. Added to test-requirements.md.
+**What's automatable:** The updated guidance string is present with the current Anthropic source URL, and the before/after example ("CRITICAL: You MUST → Use this tool when...") is present — grep SKILL.md for both. Also automatable: the raw count of all-caps imperatives / "CRITICAL:" / "YOU MUST" across new directives and its trend vs the pre-Phase-2 baseline. Both belong in test-requirements.md (the count trend is a Phase 5 test-requirement, not this UAT entry).
 
-**What's NOT automatable:** Whether authors writing NEW directives actually dial back aggressive phrasing after reading this skill, or whether the guidance is absorbed intellectually but not operationally — "I know the recommendation, but this case genuinely needs CRITICAL."
+**What's NOT automatable:** For each aggressive-phrasing occurrence the count surfaces, whether it is a *documented, reasoned exception* (the author considered the dial-back guidance and judged this case genuinely needs the emphasis) or an *unreflective habit* (the guidance was never engaged). The count cannot tell these apart; only reading the surrounding authoring context and judging the author's reasoning can.
 
-**This decision assumes:** The updated guidance (with concrete example + current URL) will change authoring behaviour when applied, not just provide a rule authors can cite and override.
+**This decision assumes:** The updated guidance (concrete example + current URL) actually engages authors' judgment when they reach for aggressive phrasing — prompting a reasoned keep-or-soften decision — rather than being a rule they can cite and reflexively override.
 
-**To shatter it:** Audit the next 5-10 new directive additions across denubis skills after Phase 2 lands. Count all-caps imperatives and "CRITICAL:" / "YOU MUST" occurrences. Compare against the pre-Phase-2 baseline.
+**To shatter it:** Take the aggressive-phrasing occurrences a test-requirement count surfaces in new post-Phase-2 directives, and read the context around each: did the author visibly weigh the dial-back guidance and document why this case warrants the emphasis, or does the occurrence read as habitual all-caps with no sign the guidance was consulted?
 
-**It's wrong if:** Aggressive-language patterns persist at pre-Phase-2 rates or higher, suggesting the guidance is known but overridden in practice. That would mean either the guidance needs stronger framing (e.g., "before using aggressive language, document why the dial-back pattern fails for this case") or the directive genre genuinely needs aggressive phrasing and the guidance is wrong for denubis's use cases.
+**It's wrong if:** The flagged occurrences read overwhelmingly as unreflective habit — no evidence the author engaged the guidance before choosing aggressive phrasing — meaning the guidance is known-but-inert: cited-and-overridden or never reached. That points to needing stronger framing (e.g., "before using aggressive language, document why the dial-back fails here") or that the directive genre genuinely needs the emphasis and the guidance is miscalibrated for denubis.
 
 ## Phase 3: `testing-skills-with-subagents` restructure
 
