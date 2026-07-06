@@ -737,6 +737,10 @@ The developer uses the system for its purpose and asks: does this match what I m
 
 3. **Disagreement test:** The "It's wrong if" must describe something two reasonable people could disagree about. If every observer would reach the same verdict ("the page shows an error" / "the row is missing"), it's an automated check, not a judgment. This kills "feels" padding — "timing feels unreliable" is either measurable (automate it) or genuinely subjective (keep it, but say what "unreliable" looks like).
 
+   **Disclosed-oracle check (sharpens Decomposition + Disagreement; added after adversarial rounds 1–2, 2026-07-06):** Experiential wording in "It's wrong if" is not enough to pass. If **This decision assumes** discloses a scalar, a boundary, OR a relational comparison — a number, count, rate, latency, threshold, status code, resolves/404 line, or a parity-to-baseline comparison ("no larger a share than the model it replaces", "≤ the current rate", "no worse than the incumbent") — whose value would settle the verdict, the entry FAILS however experientially "It's wrong if" is phrased. The boundary need not be a literal number: a disclosed relation to an unnamed baseline still pre-computes the verdict. Test it directly: write an automated check using ONLY the facts stated in **This decision assumes**; if that check's output would determine "It's wrong if", the sensory wording ("feels sluggish", "reads as complete", "a step backward in trust") is laundering a deterministic check → FAIL, route to test-requirements. A genuine entry's assumes-clause names the human construct ("users evaluate responsiveness holistically"), not a constant or a parity-to-baseline comparison that pre-computes the boundary.
+
+**Rubric maintenance — this rubric is LLM-judged and wording-sensitive:** adversarial testing (rounds 1–3, 2026-07-06) showed the gate's catch rate changes with exact rubric phrasing — twice. Any edit to these three tests or the disclosed-oracle check must be re-validated against the E1–E8 adversarial smuggle fixture before shipping; inspection-equivalence ("the new wording obviously covers it") is not sufficient evidence. The fixture, the three rounds, and the residual-risk record live in the Phase 6 adversarial-test record of the 2026-04-17 skill-skills-upstream-sync implementation plan. Known ceiling: every fixture smuggle discloses its oracle in-text; the gate has not been tested against a smuggler who scrubs the tell entirely.
+
 **A bad Popper entry restates what automated tests verify:**
 - "Run the validator and see it validates" — that's a unit test
 - "Call the endpoint and see 200 OK" — that's an integration test
@@ -902,6 +906,7 @@ Before presenting the DR set to the user for approval (step 7), run each propose
 1. **Decomposition test** — Is the What's-automatable genuinely separate from the What's-NOT-automatable, or does the What's-automatable already cover what the falsification claims to test?
 2. **Reduction test** — Would each step in the "To shatter it" scenario be automatable in isolation? If yes, the entry is a multi-step integration test a human is running by hand — automate it.
 3. **Disagreement test** — Would two reasonable people, after using the thing, plausibly disagree about whether "It's wrong if" was met? If every observer would reach the same verdict, the entry is an automated check, not a UAT.
+   - **Disclosed-oracle sub-check:** if "This decision assumes" discloses a scalar/threshold/count/rate/status-code/resolves-404 boundary OR a parity-to-baseline comparison ("no worse than the incumbent", "≤ the current rate") whose value would settle "It's wrong if", FAIL however experientially "It's wrong if" is phrased — the boundary need not be a literal number; an automated check built from only the assumes-clause facts deciding the verdict means the sensory wording is laundering a deterministic check.
 
 **Self-audit behaviour:**
 - If an entry passes all three tests → retain and present to user.
@@ -1431,7 +1436,7 @@ Before writing `uat-requirements.md` to disk, dispatch a subagent (`denubis-basi
 > For each UAT entry provided below, score:
 > 1. Decomposition pass/fail — is What's-automatable genuinely separate from What's-NOT-automatable? If no separation, FAIL.
 > 2. Reduction pass/fail — is the "To shatter it" scenario a single integrated experience or a multi-step integration test? If multi-step with each step automatable, FAIL.
-> 3. Disagreement pass/fail — would two reasonable people plausibly disagree on "It's wrong if"? If every observer would reach the same verdict, FAIL.
+> 3. Disagreement pass/fail — would two reasonable people plausibly disagree on "It's wrong if"? If every observer would reach the same verdict, FAIL. **Disclosed-oracle sub-check:** if "This decision assumes" discloses a scalar/threshold/count/rate/status-code/resolves-404 boundary OR a parity-to-baseline comparison ("no worse than the incumbent", "≤ the current rate") whose value would settle "It's wrong if", FAIL however experientially "It's wrong if" is phrased — the boundary need not be a literal number; write an automated check from only the assumes-clause facts; if its output decides the verdict, the sensory wording is laundering a deterministic check.
 >
 > For each entry, output: PASS / FAIL with the failing test named; or PASS with short rationale. If FAIL, propose how to re-route (test-requirement? rewrite? delete?).
 
