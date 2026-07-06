@@ -680,7 +680,7 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 | Lens | Question | When to include |
 |------|----------|----------------|
-| **Popper (falsification)** | What would prove this decision wrong? | **Always.** Every decision gets a falsification test — but the output depends on whether a human can judge it or a machine can (see Popper discipline below). |
+| **Popper (falsification)** | What would prove this decision wrong? | **Always analyse; output depends on decomposition.** Every decision gets a falsifiability analysis (see Popper discipline below). The UAT entry is the subset of decisions where falsification genuinely requires human judgment. Zero UAT entries is a first-class valid outcome for infrastructure / preparatory-refactor phases and for any phase whose decisions all decompose to automatable checks — "no UAT entry" is NOT a failure to find one. |
 | **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
 | **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Only when interesting.** Include for: vendor/platform lock-in, data residency, accessibility, security model, cost distribution, technology that constrains future options. Omit for routine structural decisions. Its presence signals "someone bears an invisible cost." |
 
