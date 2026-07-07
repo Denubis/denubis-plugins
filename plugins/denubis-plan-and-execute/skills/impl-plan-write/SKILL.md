@@ -901,7 +901,7 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
 
-This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is what actually prevents smuggled entries from reaching `uat-requirements.md`.
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is the structural gate that rejects disclosed-oracle smuggles before they reach `uat-requirements.md` — a calibrated, evidence-bounded property, not a guarantee that "structurally prevents" all smuggling (the catch rate is LLM-judged and wording-sensitive; see the calibrated claim and residual risk in the rubric-maintenance note under the Disagreement test).
 
 Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
 
@@ -1319,23 +1319,25 @@ Do NOT rationalize skipping minor issues during the first fix cycle. Mark Finali
 
 **Existence gate (must pass BEFORE marking complete):**
 
-Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md`. If the file is missing:
+Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md` **and carries the collation-audit provenance stamp** (the marker the UAT Requirements Collation audit writes as the file's first line — see that section). If the file is missing, or present but unstamped:
 - Halt Finalization
 - Dispatch the UAT Requirements Collation section now — do not proceed without it
-- If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form:
+- If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form (stamp included):
   ```
+  <!-- collation-audit: PASS | 0 entries (all routed to test-requirements) | [YYYY-MM-DD] -->
   # UAT Requirements — [Plan Name]
 
   No human-judgment UAT entries. All verification routes to automated tests or operational checks. Phases route to `exec-coherence-review`, not the UAT gate.
   ```
 
-The file must exist regardless. Silent-skip is the failure mode this gate closes — sessions that compact or interrupt during planning can drop the collation step entirely, leaving no record that UAT was considered. Explicit minimal-file output distinguishes "considered and found empty" from "never ran."
+The file must exist **and be stamped** regardless. Silent-skip is the failure mode this gate closes — sessions that compact or interrupt during planning can drop the collation step entirely, leaving no record that UAT was considered. The provenance stamp closes the one-layer-up variant: a file that is present but unstamped (a stale file from a prior session, or one written without the audit) fails the gate, so the gate proves the collation audit *ran over these entries*, not merely that a file exists. Explicit minimal-file output distinguishes "considered and found empty" from "never ran."
 
 Run:
 ```bash
 test -f "$PLAN_DIR/uat-requirements.md" || { echo "FAIL: uat-requirements.md missing"; exit 1; }
+grep -q "collation-audit:" "$PLAN_DIR/uat-requirements.md" || { echo "FAIL: uat-requirements.md present but not stamped by the collation audit — the audit did not run over these entries"; exit 1; }
 ```
-Exit 0 → gate passes. Exit 1 → halt, dispatch collation.
+Exit 0 (present AND stamped) → gate passes. Exit 1 → halt, dispatch the UAT Requirements Collation audit (which re-scores every entry and writes a fresh stamp).
 
 **Only after the existence gate passes:** Mark the Finalization task as completed, then proceed to Test Requirements generation.
 
@@ -1430,7 +1432,7 @@ Quality gate: every entry must have (1) what the human DOES (an action, not insp
 ...
 ```
 
-**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` whose first line is the collation-audit stamp (`<!-- collation-audit: PASS | 0 entries (all routed to test-requirements) | [YYYY-MM-DD] -->`), followed by "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
 
 **Collation audit — dispatch Sonnet subagent to run three-test rubric on each entry**
 
@@ -1453,11 +1455,17 @@ Only after all entries either pass, split with human acknowledgement, OR have hu
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
-**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit — "close" in the architectural sense that an independent enforcing layer now exists; the gate's *catch rate* is a calibrated, wording-sensitive property, not a structural guarantee (see the rubric-maintenance note under the Disagreement test).
 
 **Step: Write and complete**
 
-Write to `[PLAN_DIR]/uat-requirements.md`. Mark task completed. Proceed to execution handoff.
+Write to `[PLAN_DIR]/uat-requirements.md`. The **first line** must be the collation-audit provenance stamp — an HTML comment only this audit produces, which the Finalization existence gate greps for:
+
+```
+<!-- collation-audit: PASS | [N] entries scored against Decomposition/Reduction/Disagreement (any FAIL/SPLIT resolved with human acknowledgement) | [YYYY-MM-DD] -->
+```
+
+Fill `[N]` (entry count; 0 for the minimal form) and the date at write time. The stamp is the durable evidence the audit ran; a `uat-requirements.md` without it (a stale file from a prior session, or a hand-written one) does not satisfy the Finalization gate. Mark task completed. Proceed to execution handoff.
 
 ## Execution Handoff
 
