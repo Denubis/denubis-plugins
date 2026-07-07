@@ -151,13 +151,34 @@ a place is still open. "No scoring gate" ≠ "no mechanism of any kind.")
 Either way: **commit these three files first** (see below) — right now they are
 untracked dirty state.
 
-## Persistence (READ — the record is not durable yet)
+## Persistence (done — record is committed)
 
-This resume and the two design-doc banners are **untracked worktree state**; `.notes/`
-is gitignored by design. One `git worktree` cleanup and this entire record is gone.
-**Commit the two tracked-able files** (`RESUME-PROMPT-proposer-verifier-core.md` and
-the two `docs/design-plans/*.md` banners) so the decisions survive. `.notes/` stays
-uncommitted per its convention; its durability is the human's, not git's.
+This resume and the two design-doc banners were committed 2026-07-06 (`a28b061`,
+`ea7334e`), so the decisions survive a worktree cleanup. `.notes/` stays uncommitted
+per its convention; its durability is the human's, not git's. Nothing pushed.
+
+## ADRs — NOT written yet (checklist for when the forks close)
+
+No ADR exists for this work (`docs/architecture/decisions/` holds only the three
+crash-recovery ADRs). Deliberately deferred: the test (from the 06-24 doc) is that an
+ADR records "a discovery made by looking, a refuted assumption" — NOT "Status:
+Accepted" decision-theatre. Most of this thread is still contested/parked, so ADR-ing
+it now would be theatre. When resolved, check each:
+
+- [ ] **ADR: the codex quote-grep "gate" is not a mechanism** (READY on the merits —
+  a discovery made by looking, an assumption refuted against source; see
+  Verified-facts). Held back only because it belongs to the `codex-peer-review` skill
+  in `denubis-external-agents`, which `skill-skills-upstream-sync` may be touching —
+  confirm no collision there first, and decide whether the ADR lives in that plugin's
+  scope rather than here.
+- [ ] **ADR: the loop is qualitative cross-model critique, human-terminal** — write
+  ONLY after the Contested fork (pure-discipline vs tiny-mechanical-home) closes.
+  Writing it now records an unfinished decision = theatre.
+- [ ] **ADR: what got killed and why** (Step-0 apparatus, scoring/harness) — optional;
+  a "refuted approach" ADR is legitimate, but the resume's Dead section may suffice.
+  Decide whether it earns a separate record or is just log noise.
+- [ ] Before writing any of them, re-read `docs/architecture/decisions/README.md` for
+  the repo's ADR convention (numbering, template) and match it.
 
 ## Recovering this thread's reasoning (context is lost across sessions)
 
