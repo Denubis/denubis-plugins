@@ -24,6 +24,7 @@ I'm resuming the skill-skills upstream sync at `docs/implementation-plans/2026-0
   - ✅ **M1** design-plan drift (AC6.6 said "blocks ND"; M6 reframe made it a non-blocking self-audit + collation-audit-as-structural-gate). Dated correction, commit `b3cafcf`.
   - ✅ **M4** existence gate checked file presence, not audit execution. Added an **audit-provenance stamp** the collation audit writes and the Finalization gate greps for. Commit `33b9144`.
   - ✅ **M3 (skill half)** efficacy phrasings ("actually prevents" / "close the gap") calibrated. Commit `33b9144`. **M3 CHANGELOG half → Phase 5 (binding, see carry-forward 1).**
+  - ✅ **Fable adversarial pass** (2026-07-07, day-scoped auth) over the M1/M3/M4 fixes caught a fresh overclaim in the M4 stamp prose ("proves the audit ran over these entries" — grep can't back it) + consistency gaps. Corrected to **honest attestation** (the stamp attests the collation step ran, not that it scored every current entry) + **first-line-anchored grep** (`head -1 | grep -q '^<!-- collation-audit:'`) + design-plan cleanups (residual ND-gate language, AC6.8 stamp-ratification, E1–E12 in the maintenance note). Follow-up fix commit.
   - ⏳ **M2** → finalization: ADRs for the implementation-time additions (disclosed-oracle check, mixed-signal exception + anchor, M6 reframe ratification, M4 stamp).
   - ⏳ **M6** → finalization: `constraints.md` row + ADR giving the E1–E12 re-validation protocol a discoverable home.
   - **L1** (brittle `assert "What's automatable" not in dr4_block` in `phase_06.md` Task 2 — false-positive-FAILs now): NOTED only; `phase_06.md` is append-only audit trail; historical guard, phase passed when it ran. **L2** (only collation-tier wording was blind-tested): documented in the adversarial record's residual risk; the canonical/step-6.5 sites are planner guidance, not the structural gate.
@@ -45,7 +46,7 @@ uv sync --all-packages && uv run pytest -q | tail -2   # expect 1116 passed
 git rev-list --count HEAD..main           # re-check behind-main; if >0, main advanced — assess before merging
 ```
 
-Current HEAD at handoff: `33b9144`. This session's commits: `29bbef8` `68a3700` (M5), `b3cafcf` (M1), `33b9144` (M4+M3).
+HEAD at handoff: the `fix(impl-plan-write): honest stamp attestation…` commit on top of `33b9144` (run `git log --oneline -1` for its sha). This session's commits: `29bbef8` `68a3700` (M5), `b3cafcf` (M1), `33b9144` (M4+M3), then the resume-prompt commit and the Fable-review fix commit.
 
 ## Carry-forwards (UPDATED this session — act on these)
 
