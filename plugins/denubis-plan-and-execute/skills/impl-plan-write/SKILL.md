@@ -441,27 +441,25 @@ Before creating tasks, capture absolute paths:
 
 **VERBATIM TASK NAMES — DO NOT PARAPHRASE.** Copy task names exactly as shown above. "Investigate codebase for Phase N and activate relevant skills" must include "and activate relevant skills" — that phrase triggers skill activation after compaction. Paraphrasing loses critical instructions.
 
-**After all phase tasks, create finalization task:**
+**After all phase tasks, create Test Requirements, UAT Requirements, then the Finalization task — in that order.** Finalization runs LAST so its plan-validation review also covers the generated `test-requirements.md` / `uat-requirements.md`, and its existence gate verifies an already-written, stamped `uat-requirements.md` instead of racing the task that produces it:
 
-Before creating the Finalization task, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
+```markdown
+- [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
+      → blocked by: all Phase *D tasks
+- [ ] UAT Requirements: Collate uat-requirements.md from phase decisions
+      → blocked by: Test Requirements
+```
+
+Then create the Finalization task. Before creating it, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
 
 ```markdown
 # If .ed3d/implementation-plan-guidance.md exists:
 - [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .ed3d/implementation-plan-guidance.md]), fix ALL issues including minor ones
-      → blocked by: all Phase *D tasks
+      → blocked by: UAT Requirements
 
 # If .ed3d/implementation-plan-guidance.md does NOT exist:
 - [ ] Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones
-      → blocked by: all Phase *D tasks
-```
-
-**After Finalization, create Test Requirements and UAT Requirements tasks:**
-
-```markdown
-- [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
-      → blocked by: Finalization
-- [ ] UAT Requirements: Collate uat-requirements.md from phase decisions
-      → blocked by: Test Requirements
+      → blocked by: UAT Requirements
 ```
 
 **Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth-99.md`:**
@@ -493,14 +491,14 @@ TaskCreate: "Phase 3C: Research external deps (Phase 3)"
 TaskCreate: "Phase 3D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth-99/phase_03.md"
   → TaskUpdate: addBlockedBy: [3C]
 
-TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"
-  → TaskUpdate: addBlockedBy: [1D, 2D, 3D]
-
 TaskCreate: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"
-  → TaskUpdate: addBlockedBy: [Finalization]
+  → TaskUpdate: addBlockedBy: [1D, 2D, 3D]
 
 TaskCreate: "UAT Requirements: Collate uat-requirements.md from phase decisions"
   → TaskUpdate: addBlockedBy: [Test Requirements]
+
+TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"
+  → TaskUpdate: addBlockedBy: [UAT Requirements]
 ```
 
 **Why absolute paths in task descriptions:** After compaction, the task list is all that remains. Absolute paths ensure you know exactly which files to read/write without relying on context.
@@ -1170,7 +1168,7 @@ Which approach should I take?
 - [ ] Ask user for review mode (batch vs interactive vs design decisions)
 - [ ] Capture absolute paths: DESIGN_PATH and PLAN_DIR
 - [ ] Read Acceptance Criteria section from design plan
-- [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Finalization + Test Requirements)
+- [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Test Requirements + UAT Requirements + Finalization)
 - [ ] Set up dependencies with TaskUpdate addBlockedBy (see Step 0)
 - [ ] Task descriptions include absolute paths (not relative)
 
@@ -1191,16 +1189,7 @@ Which approach should I take?
 - [ ] Exact commands with expected output
 - [ ] No conditional instructions ("if exists", "if needed")
 
-**Finalization (after all phase ND tasks completed):**
-- [ ] Mark Finalization task as in_progress
-- [ ] Dispatch code-reviewer to validate plan against design (SCOPE: `plan-validation`)
-- [ ] Fix ALL issues including Minor ones from the initial review
-- [ ] Re-run code-reviewer once to verify fixes (one cycle only — same SCOPE, PRIOR_FINDINGS_FILE pointing at `code-review-findings-plan-validation.md`)
-- [ ] If re-review finds anything unresolved or new, **HALT and present to the user** (options: fix now / accept remaining / halt for discussion). Do NOT auto-loop.
-- [ ] Mark Finalization task as completed when zero issues or user-chosen resolution path is taken
-- [ ] Proceed to Test Requirements
-
-**Test Requirements (after Finalization):**
+**Test Requirements + UAT Requirements (after all phase ND tasks completed):**
 - [ ] Mark Test Requirements task as in_progress
 - [ ] Dispatch Opus subagent to generate test requirements from Acceptance Criteria
 - [ ] **If interactive mode:** Present to user, use AskUserQuestion for approval
@@ -1208,15 +1197,25 @@ Which approach should I take?
 - [ ] Write test-requirements.md to PLAN_DIR
 - [ ] Mark Test Requirements task as completed
 - [ ] Collate uat-requirements.md from phase decisions (design decisions mode) or construct from ACs (other modes)
-- [ ] Write uat-requirements.md to PLAN_DIR
+- [ ] Write uat-requirements.md to PLAN_DIR (first line = collation-audit stamp)
 - [ ] Mark UAT Requirements task as completed
+- [ ] Proceed to Finalization
+
+**Finalization (after Test Requirements + UAT Requirements completed):**
+- [ ] Mark Finalization task as in_progress
+- [ ] Dispatch code-reviewer to validate plan against design (SCOPE: `plan-validation`)
+- [ ] Fix ALL issues including Minor ones from the initial review
+- [ ] Re-run code-reviewer once to verify fixes (one cycle only — same SCOPE, PRIOR_FINDINGS_FILE pointing at `code-review-findings-plan-validation.md`)
+- [ ] If re-review finds anything unresolved or new, **HALT and present to the user** (options: fix now / accept remaining / halt for discussion). Do NOT auto-loop.
+- [ ] Existence gate: `uat-requirements.md` present AND first-line-stamped (else halt, dispatch collation now)
+- [ ] Mark Finalization task as completed when zero issues or user-chosen resolution path is taken
 - [ ] Proceed to execution handoff
 
 ## Plan Validation (Finalization Task)
 
 **This is a tracked task: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"**
 
-After all phase D tasks are completed, mark the Finalization task as in_progress.
+Finalization runs LAST — after Test Requirements Generation and UAT Requirements Collation (both below) have written `test-requirements.md` and the stamped `uat-requirements.md`. Its plan-validation review therefore also covers those artefacts, and the existence gate below verifies the already-written stamp. When the UAT Requirements task is complete, mark the Finalization task as in_progress.
 
 ### Step 1: Dispatch code-reviewer
 
@@ -1339,13 +1338,13 @@ head -1 "$PLAN_DIR/uat-requirements.md" | grep -q '^<!-- collation-audit:' || { 
 ```
 The grep is anchored to the **first line** so a UAT entry that merely mentions the collation audit in its body cannot self-stamp the file. Exit 0 (present AND first-line-stamped) → gate passes. Exit 1 → halt, dispatch the UAT Requirements Collation audit (which re-scores every entry and writes a fresh stamp).
 
-**Only after the existence gate passes:** Mark the Finalization task as completed, then proceed to Test Requirements generation.
+**Only after the existence gate passes:** Mark the Finalization task as completed, then proceed to execution handoff.
 
 ## Test Requirements Generation
 
 **Tracked task: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"**
 
-Mark in_progress after Finalization completes.
+Mark in_progress after all phase D tasks complete.
 
 Test requirements map acceptance criteria to specific automated tests, and identify criteria requiring human verification. The test-analyst agent uses this during execution to validate coverage.
 
@@ -1455,7 +1454,7 @@ Only after all entries either pass, split with human acknowledgement, OR have hu
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
-**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit — "close" in the architectural sense that an independent enforcing layer now exists; the gate's *catch rate* is a calibrated, wording-sensitive property, not a structural guarantee (see the rubric-maintenance note under the Disagreement test).
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, scoring every entry the self-audit missed, added outside the design-decisions-mode flow, carried over from earlier sessions that pre-date the self-audit, or approved by the user at step 7 — catching smuggles in the tested disclosed-oracle categories among them, subject to the documented wording-sensitive catch-rate limits (not a catch-all; see the known ceiling under the Disagreement test). The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit — "close" in the architectural sense that an independent enforcing layer now exists; the gate's *catch rate* is a calibrated, wording-sensitive property, not a structural guarantee (see the rubric-maintenance note under the Disagreement test).
 
 **Step: Write and complete**
 
@@ -1465,7 +1464,7 @@ Write to `[PLAN_DIR]/uat-requirements.md`. The **first line** must be the collat
 <!-- collation-audit: PASS | [N] entries scored against Decomposition/Reduction/Disagreement (any FAIL/SPLIT resolved with human acknowledgement) | [YYYY-MM-DD] -->
 ```
 
-Fill `[N]` (entry count; 0 for the minimal form) and the date at write time. The stamp is the durable evidence the audit ran; a `uat-requirements.md` without it (a stale file from a prior session, or a hand-written one) does not satisfy the Finalization gate. Mark task completed. Proceed to execution handoff.
+Fill `[N]` (entry count; 0 for the minimal form) and the date at write time. The stamp is the marker the Finalization gate checks for; a `uat-requirements.md` without it (a stale file from a prior session, or a hand-written one) fails the gate. It attests the collation step ran — it is not proof, since a stale or hand-copied marker also passes (the honest bound at the existence gate above). Mark task completed. Proceed to Finalization (the Plan Validation (Finalization Task) section above).
 
 ## Execution Handoff
 
