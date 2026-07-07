@@ -653,6 +653,7 @@ Example question: "Phase 2 creates `<src>/auth/middleware.py` and `<src>/auth/to
    - Mark task NC as in_progress
    - Dispatch internet-researcher for docs/standards/API patterns
    - Escalate to remote-code-researcher if docs are insufficient
+   - Document findings for inclusion in phase output
    - Mark task NC as completed
    - (Skip if no external deps - still mark completed with note "N/A")
 
@@ -935,7 +936,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
    - Mark task ND as in_progress
    - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
    - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
-   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Generation below). Automatable entries go to test-requirements.md as before.
+   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Collation below). Automatable entries go to test-requirements.md as before.
    - Mark task ND as completed, continue to next phase
 
 9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
@@ -1468,7 +1469,7 @@ Fill `[N]` (entry count; 0 for the minimal form) and the date at write time. The
 
 ## Execution Handoff
 
-After UAT Requirements collation completes, announce:
+After Finalization completes (existence gate passed), announce:
 
 **"Implementation plan complete and validated. Saved to [count] phase files + test-requirements.md + uat-requirements.md in `docs/implementation-plans/YYYY-MM-DD-<feature-name>/`. The first phase file is `<full-path>`."**
 
