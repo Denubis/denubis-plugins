@@ -936,7 +936,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
    - Mark task ND as in_progress
    - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
    - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
-   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Collation below). Automatable entries go to test-requirements.md as before.
+   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` as an unstamped working accumulation (the UAT Requirements Collation step below audits every entry and re-writes the file with its provenance stamp — do not stamp it here). Automatable entries go to test-requirements.md as before.
    - Mark task ND as completed, continue to next phase
 
 9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
@@ -1399,7 +1399,7 @@ Mark in_progress after Test Requirements completes.
 
 UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `exec-uat-gate` skill reads this file during execution.
 
-**For design decisions mode:** UAT entries were already generated per-phase during step 8 (Task ND). Collate them into a single file.
+**For design decisions mode:** UAT entries were already appended to `uat-requirements.md` per-phase during step 8 (Task ND), unstamped. The collation audit below reads that accumulated file, scores every entry, and re-writes it with the provenance stamp.
 
 **For interactive and batch modes:** Review each phase for acceptance criteria that require human judgment (using the Carnap quality rubric). Construct falsification entries for any that qualify.
 
@@ -1436,7 +1436,7 @@ Quality gate: every entry must have (1) what the human DOES (an action, not insp
 
 **Collation audit — dispatch Sonnet subagent to run three-test rubric on each entry**
 
-Before writing `uat-requirements.md` to disk, dispatch a subagent (`denubis-basic-agents:sonnet-general-purpose`) with each proposed entry, the three anti-smuggling tests (Decomposition / Reduction / Disagreement), and a prompt instructing:
+Before the stamped `uat-requirements.md` is written, dispatch a subagent (`denubis-basic-agents:sonnet-general-purpose`) with each entry, the three anti-smuggling tests (Decomposition / Reduction / Disagreement), and a prompt instructing:
 
 > For each UAT entry provided below, score:
 > 1. Decomposition pass/fail — is What's-automatable genuinely separate from What's-NOT-automatable? If no separation, FAIL.
@@ -1451,7 +1451,7 @@ Pass the subagent's structured output back. For any FAIL or SPLIT, block the col
 - Propose the rewrite or re-route (for SPLIT: the test-requirement to add AND the trimmed UAT entry that remains)
 - Accept human decision: retain-with-rewrite, retain-with-override-acknowledgement, delete, re-route, or accept-split (write the test-requirement, keep the trimmed UAT entry)
 
-Only after all entries either pass, split with human acknowledgement, OR have human-acknowledged overrides does `uat-requirements.md` get written.
+Only after all entries either pass, split with human acknowledgement, OR have human-acknowledged overrides does the stamped `uat-requirements.md` get written.
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
