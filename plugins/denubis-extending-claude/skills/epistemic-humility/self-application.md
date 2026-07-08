@@ -13,7 +13,7 @@ The design-plan's Additional Considerations section defines the standard this wa
 
 Walking Jones's three conditions (from `SKILL.md`'s `## Scope — Jones's three conditions` section) over the rubric itself as the artefact under review:
 
-1. **90%+ unrescued completion.** A reader applying the rubric to a proposed skill reaches a judgement — pass, fail, or "needs more reflection" — without requiring outside intervention the majority of the time. The rubric's four sections are short and self-contained; the three supporting files are named and stable. "Needs more reflection" is a valid unrescued outcome, not a failure: Process is irreducibly reflective by design, and the rubric acknowledges this in its own `## Process` section. **Pass.**
+1. **90%+ unrescued completion.** A reader applying the rubric to a proposed skill reaches a judgement — pass, fail, or "needs more reflection" — without requiring outside intervention 90%+ of the time. The rubric's four sections are short and self-contained; the three supporting files are named and stable. "Needs more reflection" is a valid unrescued outcome, not a failure: Process is irreducibly reflective by design, and the rubric acknowledges this in its own `## Process` section. **Pass.**
 
 2. **Failures are bounded, auditable, and reversible.** Bounded: every rubric claim is attributable to a quotation in `absencejudgement-citations.md` with a line number; the space of possible claims is therefore enumerable against that file. Auditable: a reader can re-walk from SKILL.md → citations → source file with no hidden inferences. Reversible: the rubric is markdown, reversible via `git revert`, and its failure modes are advisory — no automation acts on a rubric verdict. **Pass on all three adjectives.**
 

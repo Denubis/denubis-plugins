@@ -22,7 +22,7 @@ AbsenceJudgement.tex:203 introduces `technoscholasticism` as "a digital scholast
 
 ## The Rubric
 
-The four sections below are the rubric, in design-locked order (Scope → Observability → Process → Failure-pattern screen). Each is an H2 so the verification scripts and the referring skills in Phases 2-4 can anchor on stable headings.
+The four sections below are the rubric, in design-locked order (Scope → Observability → Process → Failure-pattern screen). Each is an H2 so the verification scripts and the referring skills can anchor on stable headings.
 
 ## Scope — Jones's three conditions
 
@@ -32,7 +32,7 @@ The four sections below are the rubric, in design-locked order (Scope → Observ
 
 Applied as a three-item checklist to the artefact under review:
 
-1. **90%+ unrescued completion.** The artefact finishes its task the majority of the time without outside intervention. "Rescue" means any corrective step a human or another agent must take for the artefact's output to be usable.
+1. **90%+ unrescued completion.** The artefact finishes its task 90%+ of the time without outside intervention. "Rescue" means any corrective step a human or another agent must take for the artefact's output to be usable.
 2. **Failures are bounded, auditable, and reversible.** (Three adjectives — do not compress to "bounded and reversible" or "bounded-reversible"; the third adjective `auditable` is load-bearing and part of the source quotation.) Bounded: failure modes are enumerable and small. Auditable: a reader can inspect what the artefact did and why. Reversible: the state change can be undone without out-of-band recovery.
 3. **Every miss surfaces fast enough for a human — not a cron job — to decide whether to roll back or roll forward.** Silent failures fail this condition regardless of their rate.
 
@@ -87,6 +87,17 @@ Four named patterns from AbsenceJudgement §5.2. If the artefact under review ex
 
 **Positive counterpoint.** AbsenceJudgement.tex:868 names three success conditions for AI-assisted work: `mechanical, bounded, low-judgement tasks` (three adjectives — the paper's compression, not two); `heavy scaffolding`; and `reserving all evaluative and synthetic work for human judgement`. Framed as what the artefact should look like when the four failure patterns are absent: the task is mechanical and bounded and low in required judgement; the skill provides heavy scaffolding (concrete checks, named files, named commands); the skill reserves evaluative and synthetic work for a human reader rather than claiming to perform it.
 
+## On a failing screen
+
+A failed screen routes the artefact to a specific next step, not to a queue:
+
+- **Scope** → re-scope (shrink the mandate) before authoring; a broader skill will not meet a scope it already fails.
+- **Observability** → rewrite the offending DoD/AC entries so each names an actor and action or a checked command; do not proceed on artefact-only or modifier-only wording.
+- **Process** → stop and engage the question; a Process failure is stamping "coherent" without reflection, so the fix is reflection, not a wording patch.
+- **Failure-pattern** → gather the missing evidence (dates, scope bounds, load-bearing citations, explicit criteria), or reject the artefact if the pattern is intrinsic to it.
+
+The rubric screens; it does not decide for you.
+
 ## Cross-references
 
 This rubric is invoked from:
@@ -95,14 +106,14 @@ This rubric is invoked from:
 - `denubis-extending-claude:testing-skills-with-subagents` (rubric-callback at the red-phase review)
 - `denubis-extending-claude:writing-claude-directives` (rubric-callback at the directive-scope step)
 
-*These cross-references point forward; the referring skills are updated in Phases 2-4 of the upstream-sync implementation plan. If any reference fails to resolve, that is a Phase 5 cross-reference-audit issue, not a Phase 1 bug.*
+*If any of these cross-references fails to resolve, that is a cross-reference regression to fix in the referring skill.*
 
 ## Self-application
 
-The rubric-applied-to-itself walk-through (AC4.5 coherence demonstration) lives in `self-application.md`. That file surfaces the reflective vulnerabilities the walk-through reveals — notably the Observability tautology-screen's recursive bite on the rubric itself. Readers assessing whether this rubric earns its existence should read `self-application.md` before using the rubric on other artefacts.
+The rubric-applied-to-itself walk-through lives in `self-application.md`. That file surfaces the reflective vulnerabilities the walk-through reveals — notably the Observability tautology-screen's recursive bite on the rubric itself. Readers assessing whether this rubric earns its existence should read `self-application.md` before using the rubric on other artefacts.
 
 ## Note on fabricated taxonomy
 
-Prior-session handoffs for this project contained a nine-code taxonomy — TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, BOUN — presented as if it were from AbsenceJudgement.tex. **None of these codes appear in AbsenceJudgement.tex.** A word-boundary grep audit on 2026-04-17 returned zero hits for each code. This skill does not use them, does not treat them as legitimate citations, and does not recover them under any paraphrase. The codes are fabricated and rejected per DR4 of `docs/design-plans/2026-04-17-skill-skills-upstream-sync.md`.
+Prior-session handoffs for this project contained a nine-code taxonomy — TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, BOUN — presented as if it were from AbsenceJudgement.tex. **None of these codes appear in AbsenceJudgement.tex.** A word-boundary grep audit on 2026-04-17 returned zero hits for each code. This skill does not use them, does not treat them as legitimate citations, and does not recover them under any paraphrase. The codes are fabricated and rejected.
 
-This "Note on fabricated taxonomy" section is the only place in the `epistemic-humility` skill directory where those nine strings may appear, and they appear here solely in the rejection context that AC4.4 requires.
+This "Note on fabricated taxonomy" section is the only place in the `epistemic-humility` skill directory where those nine strings appear, and they appear here solely in a rejection context.
