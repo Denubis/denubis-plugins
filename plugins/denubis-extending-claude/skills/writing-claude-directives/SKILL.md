@@ -30,11 +30,11 @@ NEVER use ellipses
 Your response will be read aloud by a text-to-speech engine, so never use ellipses since the TTS engine cannot pronounce them.
 ```
 
-**4. Placement matters.** Instructions at prompt start and end receive higher attention. Critical rules go at boundaries.
+**4. Placement matters.** Put critical rules at the start or end of the prompt rather than the middle; boundary positions tend to be followed more reliably.
 
-**5. ~150 instruction limit.** More instructions = uniform degradation across ALL rules. Prune ruthlessly.
+**5. Long instruction lists dilute adherence.** As a prompt accumulates rules, the model tends to follow each one less reliably — not only the newest. Prune ruthlessly.
 
-**6. Repetition enforces critical rules.** For high-stakes requirements, repeat with different framings.
+**6. Repetition reinforces critical rules.** For high-stakes requirements, repeating them with different framings tends to improve adherence.
 
 ## Token Efficiency
 
@@ -132,7 +132,7 @@ A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agen
 
 ## Rubric Callback
 
-Before writing a new directive, check whether the underlying agent-task-or-skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
+Before writing a new directive — or editing one in a way that changes its scope, triggers, audience, or failure consequences — check whether the underlying agent-task-or-skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
 
 ## Structure Patterns
 
@@ -154,7 +154,7 @@ XML also works as format indicators:
 <structured_data>JSON or tables here</structured_data>
 ```
 
-XML outperforms markdown, JSON, or YAML for rule preservation in long prompts.
+In long prompts, XML tags tend to preserve rules more reliably than markdown, JSON, or YAML.
 
 ### Match Prompt Style to Desired Output
 
@@ -263,6 +263,8 @@ All mean: Follow the process.
 ```
 
 ## Testing Directives
+
+Directives are pressure-tested the same way skills are — baseline first, then close loopholes. The steps below are the short form; for the full method (independent-session RED sourcing, model-tier choice, edit-scoped re-testing), use `denubis-extending-claude:testing-skills-with-subagents`.
 
 1. **Baseline:** Run scenario WITHOUT directive, document failures
 2. **Apply:** Add directive, verify compliance
