@@ -96,20 +96,21 @@ What goes wrong + fixes.
 
 ## Workflow
 
-Authoring a skill sequences the three sub-skills in order. Each owns a phase of the work; this orchestrator only points.
+Authoring a skill runs the three sub-skills in TDD order — the failing test comes before the skill body. Each owns a phase; this orchestrator sequences them.
 
 1. **Scope check** — `denubis-extending-claude:epistemic-humility`. Apply the rubric before committing to a skill. A skill that fails Scope, Observability, Process, or the Failure-pattern screen wants re-scoping, not authoring.
-2. **Phrasing and compliance** — `denubis-extending-claude:writing-claude-directives`. Token efficiency, skill discovery optimisation, model-tier notes, aggressive-language dial-back, and the per-model behavioural specifics.
-3. **RED/GREEN/REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Pressure testing, conversation-precedent sourcing for the RED baseline, and bulletproofing against rationalisations. This is where the Iron Law's "failing test first" becomes operational.
+2. **RED baseline** — `denubis-extending-claude:testing-skills-with-subagents`. Watch the agent fail the pressure scenario *without* the skill; source the baseline from an independent session. This is where the Iron Law's "failing test first" becomes operational — it precedes authoring.
+3. **Write and phrase** — `denubis-extending-claude:writing-claude-directives`. Author the skill against the documented baseline failures: token efficiency, skill discovery optimisation, aggressive-language dial-back, and the per-model behavioural specifics.
+4. **GREEN / REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Re-run the scenarios *with* the skill present; close loopholes and re-test until no new rationalisations surface (the "When Skill is Bulletproof" signs in that skill).
 
-**Editing an existing skill re-enters this sequence, scoped to the change.** A scope-changing edit (new triggers, new verdict space, different audience) re-runs step 1. A phrasing edit runs step 2 on the touched sections. Any edit that could weaken compliance re-runs the pressure scenarios it could plausibly weaken (step 3). "I'm only editing, not creating" is not an exit — an edit that skips re-testing ships an untested change to a tested skill.
+**Editing an existing skill re-enters this sequence, scoped to the change.** A scope-changing edit (new triggers, new verdict space, different audience) re-runs step 1. A phrasing edit runs step 3 on the touched sections. Any edit that could weaken compliance re-runs the pressure scenarios it could plausibly weaken (steps 2 and 4). "I'm only editing, not creating" is not an exit — an edit that skips re-testing ships an untested change to a tested skill.
 
 ## Supporting Files
 
 Three files imported from obra/superpowers ship alongside this skill. See `README.md` for dependencies and invocation.
 
 - `anthropic-best-practices.md` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Anthropic-authored reference on skill structure, discovery optimisation, and anti-patterns. Reference material, not denubis-authored guidance.
-- `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime.
+- `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime: run it by hand when a SKILL.md you are authoring has `dot` blocks you want rendered to SVG for review.
 - `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11, consolidated 2026-07-05) — worked example of pressure-testing CLAUDE.md documentation.
 
 ## Anti-Patterns
