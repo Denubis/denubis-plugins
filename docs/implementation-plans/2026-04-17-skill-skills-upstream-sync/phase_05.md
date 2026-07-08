@@ -340,6 +340,26 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (AC5.4)
 ```
 <!-- END_TASK_1 -->
 
+### Execution note (2026-07-07) — audit refined at first run; the 32 failures were all false-positives
+
+At Phase 5 execution the as-designed script above reported **32 FAILURES** on first run (not the expected PASS). Investigation found **none were genuinely broken references**:
+
+- **24 inside `anthropic-best-practices.md`** — the obra-vendored, byte-identical Anthropic guide. Its internal example links (`FORMS.md`, `reference/finance.md`, `scripts/helper.py`, …) point at files in a hypothetical *consumer* skill, not this repo. Upstream illustrative content, not denubis cross-references.
+- **6 bare-sibling markdown links** (`writing-claude-directives/SKILL.md` ↔ `model-tier-notes.md`) — resolve correctly for a human/renderer; failed only because the script resolved markdown link-refs against repo root instead of the containing file's directory.
+- **2 backticked path-form labels** (`examples/CLAUDE_MD_TESTING.md` in `writing-skills/README.md` and `SKILL.md`) — real files at a skill-relative subdir, written without the `./` the convention requires for file-relative path-form refs.
+
+Resolution (honest, not rubric-gaming — a genuinely broken ref in a non-vendored, non-conditional file still FAILs):
+
+1. **Audit:** skip verbatim external imports when walking (`VENDORED_VERBATIM = {anthropic-best-practices.md}`); references *to* them from other files are still audited.
+2. **Audit:** resolve markdown link-refs relative to the containing file's directory (standard markdown semantics), via `resolve_path_ref(..., link_relative=True)`.
+3. **Content:** `./`-prefix the two `examples/CLAUDE_MD_TESTING.md` labels so they follow the plan's `./`-for-relative convention.
+
+After (1)–(3): `PASS` (37 references, 0 broken). The committed `phase_05_cross_ref_audit.py` is the authoritative as-run artifact; the embedded listing above is the as-designed version.
+
+### Execution note (2026-07-07) — version baselines re-verified (2026-06-10 amendment)
+
+The plan's target versions (extending-claude **1.8.0**, plan-and-execute **2.31.0**, Tasks 2–3) are now **taken**: both shipped on `main` for unrelated work (extending-claude 1.8.0 = commands-vs-skills guidance + byte-corruption repair; plan-and-execute up to 2.35.3 = crash-recovery marker fix, etc.) while this branch's sync content sat unversioned (128 commits ahead of main, `plugin.json` never bumped; `git diff main HEAD` confirms all sync content is branch-only). Re-baselined to next available minor: **extending-claude 1.9.0**, **plan-and-execute 2.36.0**. The 2.36.0 CHANGELOG ships the round-5 calibrated anti-smuggling claim (verbatim from `phase_06_adversarial_test.md`) and reflects the as-shipped Phase 6 state (disclosed-oracle check, mixed-signal SPLIT + "It's wrong if" anchor, provenance stamp, Test→UAT→Finalization order), plus the incidental plan-and-execute deltas on the branch (`proleptic-challenger` counterargument-naming; citation docs).
+
 <!-- START_TASK_2 -->
 ### Task 2: Bump denubis-extending-claude to 1.8.0; update marketplace.json and CHANGELOG.md
 
