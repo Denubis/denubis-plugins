@@ -8,6 +8,17 @@ _Last verified: 2026-07-02 (Sonnet 5 release pass; prior passes 2026-06-10/12)_
 
 This file carries per-model behavioural specifics (effort levels, steerability notes, instruction-following characteristics, extended-thinking behaviour) for the current Claude tier: Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5. Opus 4.7 and Sonnet 4.6 are retained below as previous-generation models (Sonnet 5 shipped 2026-06-30). It is a supporting file for [`SKILL.md`](SKILL.md) in this skill — refresh cycles for model-specific claims decouple from the orchestrator file so model notes can be updated without touching the directive-writing guidance itself. The header date marks the most recent verification pass, not a re-verification of every claim: previous-generation sections (Opus 4.7, Sonnet 4.6, Haiku 4.5) retain their earlier inline verification dates. If the dated header above is more than one model release behind current, treat every claim below as unverified and re-verify against the cited URLs.
 
+## Current tier (single source of truth)
+
+Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5 — the models currently accessible. Other files in this skill — including its `SKILL.md` — reference this roster rather than naming versions inline, so a model release is a one-place update. Per-model behavioural specifics are in the sections below.
+
+| Tier | Current | Model ID (alias) | Previous generation |
+|------|---------|------------------|---------------------|
+| Most capable | Fable 5 | `claude-fable-5` | — |
+| Opus | Opus 4.8 | `claude-opus-4-8` | Opus 4.7 |
+| Sonnet | Sonnet 5 | `claude-sonnet-5` | Sonnet 4.6 |
+| Haiku | Haiku 4.5 | `claude-haiku-4-5` | — |
+
 ## Fable 5
 
 These are vendor-guidance summaries, except the cost gate below, which is an operator-empirical rule.
@@ -104,7 +115,7 @@ Retained as previous-generation Sonnet (superseded by Sonnet 5, 2026-06-30). The
 
 **Safety profile:** Haiku 4.5 shows a statistically lower rate of misaligned behaviours than Sonnet 4.5 or Opus 4.1 per Anthropic's announcement. Source: <https://www.anthropic.com/news/claude-haiku-4-5> (verified 2026-04-17).
 
-**Operator-empirical note on judgement (2026-04-22 plan-amendment pass):** Haiku 4.5 is unsuitable for any task requiring judgement. This is the project's empirical position based on operator experience, and it overrides Anthropic's 2026-04 marketing framing of *"more consistent instruction following for nuanced tasks"* — that framing describes mechanical instruction-following, not evaluative or reflective judgement. Route judgement-heavy work (code review, proleptic challenge, coherence review, rubric application, scope decisions) to Sonnet 4.6 or Opus 4.8. Haiku 4.5 is appropriate for mechanical, bounded, low-judgement tasks only — which aligns with AbsenceJudgement.tex:868's three success conditions for AI-assisted work. This note retains and strengthens (does not retire) the structural principle encoded in `testing-skills-with-subagents`; Phase 3 of the upstream-sync plan reframes the SKILL.md-level Haiku-judgement passage with the same operator-empirical framing rather than removing it. Falsifier (operator-owned): overturned only by operator-run evidence — a dated, documented trial in which Haiku-tier output passes the judgement tasks that grounded this position; vendor framing or benchmark claims never overturn it on their own.
+**Operator-empirical note on judgement (2026-04-22 plan-amendment pass):** Haiku 4.5 is unsuitable for any task requiring judgement. This is the project's empirical position based on operator experience, and it overrides Anthropic's 2026-04 marketing framing of *"more consistent instruction following for nuanced tasks"* — that framing describes mechanical instruction-following, not evaluative or reflective judgement. Route judgement-heavy work (code review, proleptic challenge, coherence review, rubric application, scope decisions) to Sonnet 5 or Opus 4.8. Haiku 4.5 is appropriate for mechanical, bounded, low-judgement tasks only — which aligns with AbsenceJudgement.tex:868's three success conditions for AI-assisted work. This note retains and strengthens (does not retire) the structural principle encoded in `testing-skills-with-subagents`; Phase 3 of the upstream-sync plan reframes the SKILL.md-level Haiku-judgement passage with the same operator-empirical framing rather than removing it. Falsifier (operator-owned): overturned only by operator-run evidence — a dated, documented trial in which Haiku-tier output passes the judgement tasks that grounded this position; vendor framing or benchmark claims never overturn it on their own.
 
 **Model ID (API):** `claude-haiku-4-5-20251001`
 
