@@ -52,7 +52,7 @@ Same cycle as code TDD, different test format.
 
 ### RED Phase Model
 
-Run RED-phase tests at the model level you expect in production. If the skill will primarily be used by Sonnet agents, test with `denubis-basic-agents:sonnet-general-purpose`. If you're unsure which model users will run, use AskUserQuestion to ask — recommend Sonnet as the default.
+Run RED-phase tests at the model level you expect in production. If the skill will primarily be used by Sonnet agents, test with `denubis-basic-agents:sonnet-general-purpose`. If you're unsure which model users will run, use AskUserQuestion to ask — recommend Sonnet as the default. If AskUserQuestion is unavailable, ask inline and default to Sonnet if the question goes unanswered.
 
 The RED phase needs realistic baseline behaviour. A stronger model might avoid pitfalls naturally; a weaker one might fail for unrelated reasons. Test at the level that represents actual usage.
 
@@ -68,7 +68,7 @@ If the agent doesn't follow the skill, the skill is not clear enough. "Haiku is 
 
 1. The skill's instructions are ambiguous, incomplete, or rely on implicit knowledge
 2. The skill requires judgement the model tier cannot provide — which means the skill needs to replace that judgement with explicit rules
-3. You chose the wrong test tier — reconsider with AskUserQuestion
+3. You chose the wrong test tier — reconsider with AskUserQuestion (ask inline if it is unavailable)
 
 **Never conclude "the model is the problem."** The skill is always the problem. If you genuinely cannot make the skill clear enough for a given tier, that's useful information — document it as a minimum model requirement in the skill's frontmatter, with evidence for why.
 
@@ -91,7 +91,7 @@ This is identical to TDD's "write failing test first" - you MUST see what agents
 - [ ] **Independent of this session.** Record the session ID and a one-sentence independence argument: who ran it, when, and why its framing does not derive from yours.
 - [ ] **In-scope.** What failed is what the skill-under-test claims to prevent, not a neighbouring problem that resembles it.
 - [ ] **Externally confirmed.** Something other than the failing agent's self-assessment marks it as a failure: a user correction, a reviewer, a second tool, an observably broken outcome.
-- [ ] **Not self-licensing.** The evidence does not originate from the skill's own authoring or testing process. If only process-adjacent evidence exists, state explicitly why it still counts, grade it as weaker, or prefer path 2.
+- [ ] **Not self-licensing.** The evidence does not originate from the skill's own authoring or testing process. Process-adjacent evidence does not satisfy this gate on its own — record it as weaker supplementary signal if useful, but a qualifying independent source (path 1 or path 2) is still required, or the cycle halts for human decision. Arguing process-adjacent evidence back in is the generous reading the preamble above warns against.
 
 **There is no third path.** If neither source produces a qualifying observed failure, the skill-testing cycle halts for human decision — either run a sharper fresh-session scenario, or re-scope the skill.
 
