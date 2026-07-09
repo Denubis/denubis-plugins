@@ -83,7 +83,7 @@ Paragraph content (AbsenceJudgement.tex:810):
 
 > This evidence-accumulating approach contrasted with Elicit, which by design separates source discovery from evaluation. Even Elicit's superior architecture failed in execution, however, suggesting that its limitation stems from judgement deficiency rather than architectural constraints. [...] The result across all platforms was what we liken to an undergraduate 'source soup': uncritical aggregation lacking sufficient historiographical awareness to evaluate when claims were made, by whom, for what purpose, and whether such claims are valid and relevant.
 
-Framing note: the paper uses two phrases for this pattern — `stamp-collecting without evaluation` (section header at line 801) and `evidence-accumulating approach` (body text at line 810). Prior design-plan drafts paraphrased this as "evidence accumulation without evaluation"; the rubric uses the paper's own two phrases, not the paraphrase.
+Framing note: the paper uses two phrases for this pattern — `stamp-collecting without evaluation` (section header at line 801) and `evidence-accumulating approach` (body text at line 810). The rubric uses the paper's own two phrases; do not paraphrase them (e.g. as "evidence accumulation without evaluation").
 
 ### Vibes-based operation / 'vibes' or opaque heuristics (AbsenceJudgement.tex:816, 819)
 
@@ -103,7 +103,7 @@ From §5.4.2 Mundane Utility Patterns (AbsenceJudgement.tex:868), a single parag
 
 > Despite fundamental limitations, clear patterns of mundane utility emerged from our testing. We observed an inverse relationship: the more judgement a task required, the less utility the tools provided. Utility peaked on mechanical, bounded, low-judgement tasks such as data extraction with heavy scaffolding or initial literature discovery (not literature review composition) for well-defined topics. [...] These patterns suggest that researchers should deploy AI tools for initial aggregation and formatting tasks while reserving all evaluative and synthetic work for human judgement.
 
-Framing note: the paper lists three adjectives — `mechanical, bounded, low-judgement` — not two. Prior design drafts occasionally compressed this to "mechanical and bounded"; the rubric uses all three. The paper's third noun phrase is `heavy scaffolding`, and the final clause is `reserving all evaluative and synthetic work for human judgement` — the rubric uses the paper's phrase verbatim rather than the design's compression "human-reserved synthesis".
+Framing note: the paper lists three adjectives — `mechanical, bounded, low-judgement` — not two; the rubric uses all three and does not compress them to "mechanical and bounded". The paper's third noun phrase is `heavy scaffolding`, and the final clause is `reserving all evaluative and synthetic work for human judgement` — the rubric uses the paper's phrase verbatim, not a compression such as "human-reserved synthesis".
 
 ## Paper's own §Epistemic Humility subsection
 
@@ -129,12 +129,11 @@ The rubric's Observability section cites Latour to name what the three screens e
 
 ## Verified absences
 
-Load-bearing for DR4 of `docs/design-plans/2026-04-17-skill-skills-upstream-sync.md`: these absences bound what the rubric may and may not claim to draw from the paper.
+These absences bound what the rubric may and may not claim to draw from the paper.
 
 - **Haraway** — zero hits in AbsenceJudgement.tex (exhaustive word-boundary grep, 2026-04-17). The rubric does not cite Haraway.
 - **Popper** — one parenthetical mention at AbsenceJudgement.tex:829 ("falsifable statements (Popper)"), NOT a substantive discussion. The rubric does not draw from Popper via the paper.
 - **Lakatos** — the same parenthetical mention at AbsenceJudgement.tex:829 ("context-increasing research programmes (Lakatos)"), NOT a substantive discussion. The rubric does not draw from Lakatos via the paper.
 - **Prolepsis** — zero hits in AbsenceJudgement.tex. The Kudina/Ballsun-Stanton/Alfano 2025 paper is cited once at AbsenceJudgement.tex:905 but not for its prolepsis content; the rubric does not cite prolepsis as a paper concept.
-- **Fabricated taxonomy codes** — the nine fabricated taxonomy codes (TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, BOUN) all returned zero word-boundary hits in AbsenceJudgement.tex on 2026-04-17. They are not paper content and the rubric does not use them. Full rejection context is in `SKILL.md`'s `## Note on fabricated taxonomy` section per AC4.4.
 
-Why this list matters: the rubric's credibility depends on its citations being verifiable. An absent-but-asserted source is the same failure mode as technoscholasticism — substituting the form of a citation for the fact of one. Phase 5's fabricated-codes audit reads this section to confirm the baseline it asserts.
+Why this list matters: the rubric's credibility depends on its citations being verifiable. An absent-but-asserted source is the same failure mode as technoscholasticism — substituting the form of a citation for the fact of one.

@@ -1,6 +1,6 @@
 ---
 name: epistemic-humility
-description: Use when assessing whether a proposed skill, agent scaffold, or automated task earns its existence — screens scope, observability, reflective process, and failure patterns before building.
+description: Use when presenting results, conclusions, or findings — in chat or in any markdown artefact (report, audit, design doc) — and when assessing whether a proposed skill, agent scaffold, or automated task earns its existence. Tempers claim language to the evidence; screens scope, observability, reflective process, and failure patterns before building.
 user-invocable: false
 ---
 
@@ -10,19 +10,36 @@ user-invocable: false
 
 ## Why this skill exists
 
-AbsenceJudgement.tex:203 introduces `technoscholasticism` as "a digital scholasticism that privileges textual authority over critical assessment of knowledge claims." Skill authorship, agent-scaffold design, and automation decisions are precisely the loci where technoscholasticism can substitute for evidence: a well-formatted SKILL.md with a confident description reads as authoritative, regardless of whether its claims are falsifiable. This rubric screens for the substitution. It asks four questions — scope, observability, process, failure-pattern — that together bound what a proposed artefact may claim about itself. The rubric does not guarantee a good skill; it refuses the cheap form of a bad one.
+AbsenceJudgement.tex:203 introduces `technoscholasticism` as "a digital scholasticism that privileges textual authority over critical assessment of knowledge claims." Skill authorship, agent-scaffold design, automation decisions, and the presentation of results are precisely the loci where technoscholasticism can substitute for evidence: a well-formatted SKILL.md with a confident description — or a fluent report with confident conclusions — reads as authoritative, regardless of whether its claims are falsifiable. This rubric screens for the substitution. It asks four questions — scope, observability, process, failure-pattern — that together bound what a proposed artefact may claim about itself. The rubric does not guarantee a good skill; it refuses the cheap form of a bad one.
 
 ## When to invoke
 
+- Presenting results, conclusions, or findings: an end-of-task summary in chat, a report, an audit, a findings file — any artefact that states what is true. Announce and temper (next section).
 - Scope check on a new skill before authoring SKILL.md.
 - Agent-scaffold decision: should this work be an agent, a skill, a CLAUDE.md directive, or nothing?
 - Automation-task authorisation: before wiring a hook or a scheduled job.
 - Definition-of-Done review: before accepting DoD wording that may be artefact-only or modifier-only.
 - Any moment a reviewer, auditor, or the author themselves feels "this looks authoritative but I can't tell what would falsify it."
 
+## Announce and temper
+
+The rubric below gates artefacts before they are built. This section gates the language of anything that states what is true — results, conclusions, findings, whether in chat at the end of a task or in a markdown artefact.
+
+When presenting results or conclusions, announce: **"I'm using the epistemic-humility skill to temper my language."** The announcement is the observable that the tempering pass happened; its absence is the named falsifier.
+
+Tempering means the language tracks the evidence:
+
+- State a verified fact plainly, and name the verification (the command run, the file read, the quote matched).
+- Hedge an inference as an inference; flag a guess as a guess. Fluent prose must not imply certainty the evidence does not carry.
+- Where a claim's provenance matters, grade it: **observed** (reproduced here), **documented** (docs-only), or **reported** (second-hand).
+- A conclusion names what would falsify it, or what was not checked.
+- Claim exactly what was observed and no more: "the test passed" rather than "everything works".
+
+The Failure-pattern screen below doubles as the report checklist: date-stamp what decays (temporality), scope the claims to what was actually examined (scope/confabulation), show which sources are load-bearing (stamp-collecting), and tie every verdict to a named observable (vibes).
+
 ## The Rubric
 
-The four sections below are the rubric, in design-locked order (Scope → Observability → Process → Failure-pattern screen). Each is an H2 so the verification scripts and the referring skills can anchor on stable headings.
+The four sections below are the rubric, in design-locked order (Scope → Observability → Process → Failure-pattern screen). Each is an H2 so the referring skills can anchor on stable headings.
 
 ## Scope — Jones's three conditions
 
@@ -38,7 +55,7 @@ Applied as a three-item checklist to the artefact under review:
 
 **Application gloss.** For a proposed skill, "the task" is the scope the skill claims to handle. Apply condition (1) by naming the trigger moments and asking whether the skill's guidance leads a reader to a usable output without requiring a second skill or a human reviewer to unstick them. Apply condition (2) by asking what happens when the skill misfires: can the reader tell they are off-track, can they audit the reasoning, can they undo the step? Apply condition (3) by asking how a misfire becomes visible — a skill that silently produces a wrong-shape artefact that only surfaces under downstream review fails condition (3) even if (1) and (2) are comfortable.
 
-Full bibliographic citation (Jones 2025, Substack newsletter, not peer-reviewed) in `absencejudgement-citations.md`.
+Full bibliographic citation (Jones 2025) in `absencejudgement-citations.md`.
 
 ## Observability — three screens
 
@@ -54,7 +71,7 @@ The Observability section separates falsifiable DoD claims from authoritative-lo
 
 **Worked example.**
 - Fails Screen 2: `All tests pass.` (Passes vacuously against zero non-skipped tests.)
-- Passes all three screens: `pytest plugins/denubis-extending-claude/skills/epistemic-humility/tests/ --strict-markers` exits 0 with ≥1 non-skipped test. (Actor: the command. Action: exits 0. Non-vacuous: requires at least one real test. Named falsifier: a non-zero exit code or a skipped-only run.)
+- Passes all three screens (for a skill that ships tests): `pytest <skill-dir>/tests/ --strict-markers` exits 0 with ≥1 non-skipped test. (Actor: the command. Action: exits 0. Non-vacuous: requires at least one real test. Named falsifier: a non-zero exit code or a skipped-only run.)
 
 ## Process — Schön's four questions
 
@@ -111,9 +128,3 @@ This rubric is invoked from:
 ## Self-application
 
 The rubric-applied-to-itself walk-through lives in `self-application.md`. That file surfaces the reflective vulnerabilities the walk-through reveals — notably the Observability tautology-screen's recursive bite on the rubric itself. Readers assessing whether this rubric earns its existence should read `self-application.md` before using the rubric on other artefacts.
-
-## Note on fabricated taxonomy
-
-Prior-session handoffs for this project contained a nine-code taxonomy — TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, BOUN — presented as if it were from AbsenceJudgement.tex. **None of these codes appear in AbsenceJudgement.tex.** A word-boundary grep audit on 2026-04-17 returned zero hits for each code. This skill does not use them, does not treat them as legitimate citations, and does not recover them under any paraphrase. The codes are fabricated and rejected.
-
-This "Note on fabricated taxonomy" section is the only place in the `epistemic-humility` skill directory where those nine strings appear, and they appear here solely in a rejection context.
