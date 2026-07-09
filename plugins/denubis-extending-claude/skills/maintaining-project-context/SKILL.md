@@ -231,8 +231,7 @@ Dependency rationale maintenance is **not** handled by this skill. It requires s
 
 **Called by:**
 - **project-claude-librarian agent** - Uses this skill to coordinate updates
-- **executing-an-implementation-plan** (Step 5b) - After all tasks complete
-- **finishing-a-development-branch** (Step 4b) - Before merge/PR
+- **executing-an-implementation-plan** (Stage 1, step 4a "Librarian updates") - After all tasks complete
 
 **Uses:**
 - **writing-claude-md-files** - For actual context file creation/updates (works for both CLAUDE.md and AGENTS.md)
