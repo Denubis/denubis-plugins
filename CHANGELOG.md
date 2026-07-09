@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.36.0
+
+impl-plan-write gains UAT-collation discipline and non-determinism self-audits; small fixes ride along in proleptic-challenger, exec-refactoring-rubric, design-write, exec-uat-gate, and systematic-debugging.
+
+**New:**
+- `impl-plan-write`: per-phase non-determinism self-audit (step 6.5), a Finalization existence gate on `uat-requirements.md` with a UAT Requirements Collation audit, mandated What's-automatable / What's-NOT-automatable template lines with worked examples, a mixed-signal SPLIT exception, a disclosed-oracle check, and an angle-bracket placeholder convention for illustrative paths.
+
+**Changed:**
+- `impl-plan-write`: Test/UAT phases reordered before Finalization; the collation stamp is an honest attestation of what was audited; UAT write-path reconciled (per-phase append vs collation stamp).
+- `proleptic-challenger` agent: counterarguments must name the claim they argue against.
+- `exec-refactoring-rubric`: References section citing the sources actually consulted; Popper, Carnap, and Fowler cited at first use.
+
 ## [denubis-extending-claude] 1.9.0
 
 Upstream-sync overhaul of the skill-authoring chain: a new epistemic-humility rubric skill, writing-skills rebuilt as an orchestrator, and major reworks of testing-skills-with-subagents and writing-claude-directives.
