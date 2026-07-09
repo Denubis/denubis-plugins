@@ -1,6 +1,6 @@
 ---
 name: epistemic-humility
-description: Use when presenting results, conclusions, or findings — in chat or in any markdown artefact (report, audit, design doc) — and when assessing whether a proposed skill, agent scaffold, or automated task earns its existence. Tempers claim language to the evidence; screens scope, observability, reflective process, and failure patterns before building.
+description: Use when presenting results, conclusions, or findings, or when assessing whether a proposed skill, agent, or automation earns its existence - tempers claims to the evidence and screens scope first
 user-invocable: false
 ---
 
