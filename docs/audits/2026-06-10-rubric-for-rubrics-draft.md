@@ -79,7 +79,7 @@ A directive, standard, plan instruction, or note states its current position onl
 
 ## Pending reconciliation items (for skill-skills-upstream-sync Phase 2 or successor)
 
-1. model-tier-notes.md: add Opus 4.8 section (under-triggering, narration defaults, ask-rate, literal severity filters, same API surface as 4.7) and Fable 5 section (prescriptiveness warning, reasoning_extraction, longer turns, parallel subagents, memory affinity); refresh dated header.
-2. writing-claude-directives: fold R3 (trigger explicitness as the under-trigger fix) into the Compliance Techniques section the branch already rewrote; add R5 and R7 as new entries; align the description-writing section with R8 limits.
+1. DONE (skill-skills-upstream-sync Phase 2.6, commit `c7659d9`). model-tier-notes.md: added Opus 4.8 section (under-triggering with the prescriptive-trigger fix, narration defaults, literal severity filters, same API surface as 4.7) and Fable 5 section (prescriptiveness warning, reasoning_extraction, longer turns, parallel subagents, memory affinity); refreshed dated header to 2026-06-10. Cost gate and trigger-explicitness added to cross-model patterns.
+2. DONE (skill-skills-upstream-sync Phase 2.6, commit `47fca9d`). writing-claude-directives: folded R3 (trigger explicitness as the under-trigger fix) into the Compliance Techniques section as an extension of the rhetorical-emphasis vs true-boundary distinction; added R5 and R7 as new entries. The description-writing/R8 alignment was out of scope for Phase 2.6 (AC2.6.5/2.6.6 cover R3/R5/R7 only) and remains for a successor pass.
 3. writing-skills: add Discipline to the skill-type table; add R10's model matrix to the checklist.
 4. testing-skills-with-subagents: add per-tier testing requirement; remove its own dated-narrative violation.

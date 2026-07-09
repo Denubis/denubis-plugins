@@ -2,6 +2,8 @@
 
 **⚠️ EXECUTION ORDER (L3 revision):** Phase files sort lexically as `phase_01, phase_02, phase_02_5, phase_03, phase_04, phase_05, phase_06` — but the design plan requires **Phase 6 to execute BEFORE Phase 5.** Phase 5 is the terminal phase; its coherent-set commit captures Phase 6's cross-plugin changes too. **Do not execute phase_05.md until phase_06.md is complete.** Lexical sort is not the execution order.
 
+**2026-06-10 Amendment:** Version baselines from Phase 5B (denubis-extending-claude 1.7.0, denubis-plan-and-execute 2.30.0, verified 2026-04-17) are stale — main has moved (extending-claude at 1.7.2+, 164 commits of drift at amendment time). Re-verify all version, marketplace.json, and CHANGELOG baselines at execution time, after the step-0 main merge (see RESUME-PROMPT). Phase 2.6 (model-tier refresh) is in scope for this phase's coherent-set commit and cross-reference audit. Full execution order: `phase_01 → phase_02 → phase_02_5 → phase_02_6 → phase_03 → phase_04 → phase_06 → phase_05`.
+
 **Goal:** Close the sync as a coherent set. Run an exhaustive cross-reference audit to confirm every sub-skill invocation and every supporting-file reference resolves. Bump both affected plugins' versions in lockstep (denubis-extending-claude for Phases 1-4; denubis-plan-and-execute for Phase 6). Sync `.claude-plugin/marketplace.json` at repo root. Append `CHANGELOG.md` entries for both plugins following repo convention. Commit per the user's global commit-split preference.
 
 **Architecture:** Terminal phase — runs after all content phases (1-4 and 6) land. Python audit script is re-runnable and checked into the plan directory for provenance. Version bumps are MINOR for both plugins (feature-level change; no breaking behaviour).
@@ -338,6 +340,26 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (AC5.4)
 ```
 <!-- END_TASK_1 -->
 
+### Execution note (2026-07-07) — audit refined at first run; the 32 failures were all false-positives
+
+At Phase 5 execution the as-designed script above reported **32 FAILURES** on first run (not the expected PASS). Investigation found **none were genuinely broken references**:
+
+- **24 inside `anthropic-best-practices.md`** — the obra-vendored, byte-identical Anthropic guide. Its internal example links (`FORMS.md`, `reference/finance.md`, `scripts/helper.py`, …) point at files in a hypothetical *consumer* skill, not this repo. Upstream illustrative content, not denubis cross-references.
+- **6 bare-sibling markdown links** (`writing-claude-directives/SKILL.md` ↔ `model-tier-notes.md`) — resolve correctly for a human/renderer; failed only because the script resolved markdown link-refs against repo root instead of the containing file's directory.
+- **2 backticked path-form labels** (`examples/CLAUDE_MD_TESTING.md` in `writing-skills/README.md` and `SKILL.md`) — real files at a skill-relative subdir, written without the `./` the convention requires for file-relative path-form refs.
+
+Resolution (honest, not rubric-gaming — a genuinely broken ref in a non-vendored, non-conditional file still FAILs):
+
+1. **Audit:** skip verbatim external imports when walking (`VENDORED_VERBATIM = {anthropic-best-practices.md}`); references *to* them from other files are still audited.
+2. **Audit:** resolve markdown link-refs relative to the containing file's directory (standard markdown semantics), via `resolve_path_ref(..., link_relative=True)`.
+3. **Content:** `./`-prefix the two `examples/CLAUDE_MD_TESTING.md` labels so they follow the plan's `./`-for-relative convention.
+
+After (1)–(3): `PASS` (37 references, 0 broken). The committed `phase_05_cross_ref_audit.py` is the authoritative as-run artifact; the embedded listing above is the as-designed version.
+
+### Execution note (2026-07-07) — version baselines re-verified (2026-06-10 amendment)
+
+The plan's target versions (extending-claude **1.8.0**, plan-and-execute **2.31.0**, Tasks 2–3) are now **taken**: both shipped on `main` for unrelated work (extending-claude 1.8.0 = commands-vs-skills guidance + byte-corruption repair; plan-and-execute up to 2.35.3 = crash-recovery marker fix, etc.) while this branch's sync content sat unversioned (128 commits ahead of main, `plugin.json` never bumped; `git diff main HEAD` confirms all sync content is branch-only). Re-baselined to next available minor: **extending-claude 1.9.0**, **plan-and-execute 2.36.0**. The 2.36.0 CHANGELOG ships the round-5 calibrated anti-smuggling claim (verbatim from `phase_06_adversarial_test.md`) and reflects the as-shipped Phase 6 state (disclosed-oracle check, mixed-signal SPLIT + "It's wrong if" anchor, provenance stamp, Test→UAT→Finalization order), plus the incidental plan-and-execute deltas on the branch (`proleptic-challenger` counterargument-naming; citation docs).
+
 <!-- START_TASK_2 -->
 ### Task 2: Bump denubis-extending-claude to 1.8.0; update marketplace.json and CHANGELOG.md
 
@@ -376,16 +398,17 @@ Skill-skills upstream sync: new `epistemic-humility` reference skill, restructur
 **Changed:**
 - `writing-skills/SKILL.md` rewritten as thin cornerstone orchestrator (≤250 lines) sequencing three sub-skills: `epistemic-humility` (scope check) → `writing-claude-directives` (phrasing) → `testing-skills-with-subagents` (RED/GREEN/REFACTOR). Rubric callback folded into "When to Create a Skill" section. Workflow H2 makes sub-skill sequencing first-class.
 - `writing-claude-directives/SKILL.md` restructured: Opus 4.5 "Think Sensitivity" section removed (superseded); per-model anchors replacing generic "Claude 4.x"; aggressive-language guidance updated to current 2026-04 Anthropic dial-back-aggressive-language framing; new "Rubric Callback" H2 cross-referencing `epistemic-humility`.
-- `testing-skills-with-subagents/SKILL.md` restructured: conversation-precedent protocol (cc-search-chats:search-chat or user-run fresh chat session, independent-session gate) prepended to RED phase; synthetic pressure-scenarios demoted to REFACTOR completeness; obra's 7-pressure table absorbed; letter-vs-spirit promoted to foundational H3; meta-testing three-category framing verified and filled; Haiku-judgement specific claim removed (not supported by 2026-04 Anthropic docs); tier-test structural principle preserved; "No Blaming the Model" and flaky-result discipline preserved byte-identical.
+- `testing-skills-with-subagents/SKILL.md` restructured: conversation-precedent protocol (cc-search-chats:search-chat or user-run fresh chat session, independent-session gate) prepended to RED phase; synthetic pressure-scenarios demoted to REFACTOR completeness; obra's 7-pressure table absorbed; letter-vs-spirit promoted to foundational H3; meta-testing three-category framing verified and filled; Haiku-judgement passage retained and reframed with operator-empirical anchor (amended 2026-04-22 plan-amendment pass — not removed); tier-test structural principle preserved; "No Blaming the Model" and flaky-result discipline preserved byte-identical.
 - `writing-claude-directives/graphviz-conventions.dot` gains obra attribution comment (content byte-identical).
 
 **Fixed:**
 - Stale Opus 4.5 "Think Sensitivity" claim in `writing-claude-directives/SKILL.md` removed (superseded by Opus 4.7 effort-level controls).
-- Unsupported "Haiku struggles with judgement calls" claim in `testing-skills-with-subagents/SKILL.md` removed (not in current 2026-04 Anthropic docs).
 
 **Explicitly NOT imported from obra:**
 - `persuasion-principles.md` — denubis departs from obra on this point. Persuasion principles are compliance-induction levers that contradict the `epistemic-humility` rubric, Anthropic's current prompting guidance, and AbsenceJudgement's technoscholasticism critique. See design plan Additional Consideration *Persuasion principles do not belong in denubis skills*.
 ```
+
+**Template correction (2026-06-11, Phase 3 refactor pipeline P2):** the Fixed section previously claimed the Haiku-judgement passage was "removed". The 2026-04-22 plan-amendment pass reversed that decision — the passage was retained and reframed with an operator-empirical anchor, as the Changed bullet above correctly records. The stale Fixed bullet predated the amendment and contradicted the Changed bullet in the same template; it was deleted so the CHANGELOG entry written from this template stays true.
 
 **Step 4: Verify the triad is synchronised**
 
@@ -592,7 +615,7 @@ No `git commit --amend` of prior-plan commits. No `git push --force` or `--force
 
 Confirm each DoD entry:
 - [ ] Four artefacts exist at their target paths (epistemic-humility, writing-claude-directives, testing-skills-with-subagents, writing-skills) plus Phase 6's impl-plan-write changes
-- [ ] Each has committed RED evidence from an independent session (phase_0N_red_evidence.md files exist for Phases 2, 3, 4)
+- [ ] Each has committed RED evidence appropriate to its phase framing (amended 2026-04-22 plan-amendment pass): `phase_02_red_evidence.md` is a static code-smell inventory + the 2026-04-22 independent-session search record (Phase 2 is preventive); `phase_03_red_evidence.md` is session-transcript RED from an independent session (Phase 3 is corrective — its target methodology is transcript-sourcing); `phase_04_red_evidence.md` is a static file-shape diff with pre-rewrite SHA + line-count baseline (Phase 4 is preventive). All three files exist.
 - [ ] Each passed GREEN (phase_0N_green_verification.md files exist for Phases 2, 3, 4)
 - [ ] Each has a committed rubric self-application walk-through with any surfaced vulnerabilities acknowledged by user (H4 revision: walk-through + vulnerability-surfacing, not pass/fail)
 - [ ] `phase_04_green_verification.md` has a "Sub-skill Invocations" section recording which Phase 1-3 outputs were exercised in Phase 4's production (factual invocation record; integration-evidence framing was dropped in H3 revision and replaced with the Task 4.5 frustration-signal audit)
@@ -739,6 +762,8 @@ Refs: AC5.8; design plan Additional Consideration 'No integration test
 - [ ] Commit history shows the full sync cleanly: Phase 1 (3+) + Phase 2 (5+) + Phase 2.5 (1+ per smell) + Phase 3 (5+) + Phase 4 (6+) + Phase 6 (6+ — Tasks 1-5 plus Task 6 illustrative-path rewrite from H1 revision 2026-04-19) + Phase 5 (5 — includes Task 4.5 frustration-signal audit from H3 revision) → **≥ 31 commits** (count reconciled during H6 revision 2026-04-19)
 - [ ] All prior phases' DoD conditions verified (Task 4 Step 3)
 - [ ] Phase 5 UAT entry appended to `uat-requirements.md` using gate-form template
+
+**Note (2026-06-11, Phase 3 proleptic carry-forward CA3):** Phase 5 audits recompute line counts and commit counts from the files and git history at audit time — never from phase-summary prose. During Phase 3, three different line counts for the same artefact circulated in prose within days, each stale by the time it was read. The commit-count expectations above are floors to verify against `git log`, not figures to transcribe forward.
 
 **Not in scope for Phase 5:**
 - Any content changes to skills (Phases 1-4, 6 handle all content)

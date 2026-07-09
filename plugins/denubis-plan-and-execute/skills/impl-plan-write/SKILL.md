@@ -110,9 +110,11 @@ Review investigator findings and note any differences from design assumptions.
 - "Create or update `types.py`"
 
 **Based on investigator report, ALWAYS write:**
-- "Create `src/auth.py`" (investigator confirmed doesn't exist)
-- "Modify `src/main.py:45-67`" (investigator confirmed exists, checked line numbers)
+- "Create `<src>/auth.py`" (investigator confirmed doesn't exist)
+- "Modify `<src>/main.py:45-67`" (investigator confirmed exists, checked line numbers)
 - "No changes needed to `config.py`" (investigator confirmed already correct)
+
+**Teaching-material placeholder convention:** Illustrative file paths in this skill use angle-bracket prefixes — `<src>/auth.py`, `<tests>/services/test_auth.py` — so they are not audited by the cross-reference tool (see `docs/issues.md` ISSUE-01 and Phase 5 of the 2026-04-17 skill-skills upstream sync plan). Real file references use path-form without angle brackets.
 
 **If codebase state differs from design assumptions:** Document the difference and adjust the implementation plan accordingly.
 
@@ -439,27 +441,25 @@ Before creating tasks, capture absolute paths:
 
 **VERBATIM TASK NAMES — DO NOT PARAPHRASE.** Copy task names exactly as shown above. "Investigate codebase for Phase N and activate relevant skills" must include "and activate relevant skills" — that phrase triggers skill activation after compaction. Paraphrasing loses critical instructions.
 
-**After all phase tasks, create finalization task:**
+**After all phase tasks, create Test Requirements, UAT Requirements, then the Finalization task — in that order.** Finalization runs LAST so its plan-validation review also covers the generated `test-requirements.md` / `uat-requirements.md`, and its existence gate verifies an already-written, stamped `uat-requirements.md` instead of racing the task that produces it:
 
-Before creating the Finalization task, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
+```markdown
+- [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
+      → blocked by: all Phase *D tasks
+- [ ] UAT Requirements: Collate uat-requirements.md from phase decisions
+      → blocked by: Test Requirements
+```
+
+Then create the Finalization task. Before creating it, check if `.ed3d/implementation-plan-guidance.md` exists. If it does, include its absolute path in the task description:
 
 ```markdown
 # If .ed3d/implementation-plan-guidance.md exists:
 - [ ] Finalization: Run code-reviewer over all phase files (guidance: [absolute path to .ed3d/implementation-plan-guidance.md]), fix ALL issues including minor ones
-      → blocked by: all Phase *D tasks
+      → blocked by: UAT Requirements
 
 # If .ed3d/implementation-plan-guidance.md does NOT exist:
 - [ ] Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones
-      → blocked by: all Phase *D tasks
-```
-
-**After Finalization, create Test Requirements and UAT Requirements tasks:**
-
-```markdown
-- [ ] Test Requirements: Generate test-requirements.md from Acceptance Criteria
-      → blocked by: Finalization
-- [ ] UAT Requirements: Collate uat-requirements.md from phase decisions
-      → blocked by: Test Requirements
+      → blocked by: UAT Requirements
 ```
 
 **Example for a 3-phase design at `/home/user/project/docs/design-plans/2025-01-24-oauth-99.md`:**
@@ -491,14 +491,14 @@ TaskCreate: "Phase 3C: Research external deps (Phase 3)"
 TaskCreate: "Phase 3D: Write /home/user/project/docs/implementation-plans/2025-01-24-oauth-99/phase_03.md"
   → TaskUpdate: addBlockedBy: [3C]
 
-TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"
-  → TaskUpdate: addBlockedBy: [1D, 2D, 3D]
-
 TaskCreate: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"
-  → TaskUpdate: addBlockedBy: [Finalization]
+  → TaskUpdate: addBlockedBy: [1D, 2D, 3D]
 
 TaskCreate: "UAT Requirements: Collate uat-requirements.md from phase decisions"
   → TaskUpdate: addBlockedBy: [Test Requirements]
+
+TaskCreate: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"
+  → TaskUpdate: addBlockedBy: [UAT Requirements]
 ```
 
 **Why absolute paths in task descriptions:** After compaction, the task list is all that remains. Absolute paths ensure you know exactly which files to read/write without relying on context.
@@ -575,9 +575,9 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 ### Task 1: [Component Name]
 
 **Files:**
-- Create: `src/services/auth.py`
-- Modify: `src/services/existing.py:123-145`
-- Test: `tests/services/test_auth.py`
+- Create: `<src>/services/auth.py`
+- Modify: `<src>/services/existing.py:123-145`
+- Test: `<tests>/services/test_auth.py`
 
 **Step 1: Write the failing test**
 [Complete code example]
@@ -601,7 +601,7 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 
 **The question MUST summarise what's being approved.** Don't just say "Approved?" — state the key deliverables of this phase in the question text so the human knows what they're signing off on.
 
-Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
+Example question: "Phase 2 creates `<src>/auth/middleware.py` and `<src>/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
 
 **Options:**
 - "Approved - proceed to next phase"
@@ -653,6 +653,7 @@ Example question: "Phase 2 creates `src/auth/middleware.py` and `src/auth/tokens
    - Mark task NC as in_progress
    - Dispatch internet-researcher for docs/standards/API patterns
    - Escalate to remote-code-researcher if docs are insufficient
+   - Document findings for inclusion in phase output
    - Mark task NC as completed
    - (Skip if no external deps - still mark completed with note "N/A")
 
@@ -680,9 +681,11 @@ Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-
 
 | Lens | Question | When to include |
 |------|----------|----------------|
-| **Popper (falsification)** | What would prove this decision wrong? | **Always.** Every decision gets a falsification test — but the output depends on whether a human can judge it or a machine can (see Popper discipline below). |
+| **Popper (falsification)** | What would prove this decision wrong? | **Always analyse; output depends on decomposition.** Every decision gets a falsifiability analysis (see Popper discipline below). The UAT entry is the subset of decisions where falsification genuinely requires human judgment. Zero UAT entries is a first-class valid outcome for infrastructure / preparatory-refactor phases and for any phase whose decisions all decompose to automatable checks — "no UAT entry" is NOT a failure to find one. |
 | **Lakatos (research programmes)** | Is this decision extending the architecture or working around a prior commitment? | **Only when interesting.** Omit for routine choices. Its presence signals "pay attention." |
 | **Haraway (situated knowledge)** | Whose perspective shaped this? Who benefits, who bears cost, what's absent? | **Only when interesting.** Include for: vendor/platform lock-in, data residency, accessibility, security model, cost distribution, technology that constrains future options. Omit for routine structural decisions. Its presence signals "someone bears an invisible cost." |
+
+Full citations for the three lenses (Popper 1963, Lakatos 1978, Haraway 1988) are in the References section of the `restate-our-assumptions` skill.
 
 **Popper discipline — falsification tests must earn their format:**
 
@@ -696,7 +699,7 @@ Every design decision gets a falsification test. But the *output* of that test d
 | **Human judgment required** — the prediction requires interacting with the system and forming an opinion (usability, domain correctness, workflow fit) | Write it as a **Popper (your UAT)** entry using the falsification template below | `uat-requirements.md` — the `exec-uat-gate` skill uses it during execution. **These entries MUST be persisted.** |
 | **Judgment required, but not in this phase** — the user-facing experience doesn't exist yet | Note which future phase it belongs to | `uat-requirements.md` under the future phase's section, with a back-reference to the decision (DR[N]) made here |
 
-**Quality rubric — Carnap's "Mark I eyeball" test:**
+**Quality rubric — Carnap's "Mark I eyeball" test** (after Carnap, R. 1936. "Testability and Meaning." *Philosophy of Science* 3(4): 419–471; "Mark I eyeball" is operator slang for the human-as-instrument, not Carnap's phrase)**:**
 
 The developer is the instrument. A good UAT entry requires ALL THREE:
 
@@ -732,6 +735,12 @@ The developer uses the system for its purpose and asks: does this match what I m
 2. **Reduction test:** If each step in a multi-step scenario could be verified by an automated test in isolation, the scenario is an integration test the human is running by hand. Automate it. "Run the CLI, then switch to the browser, then watch the tabs" looks complex but each step is an assertion.
 
 3. **Disagreement test:** The "It's wrong if" must describe something two reasonable people could disagree about. If every observer would reach the same verdict ("the page shows an error" / "the row is missing"), it's an automated check, not a judgment. This kills "feels" padding — "timing feels unreliable" is either measurable (automate it) or genuinely subjective (keep it, but say what "unreliable" looks like).
+
+   **Disclosed-oracle check (sharpens Decomposition + Disagreement; added after adversarial rounds 1–2, 2026-07-06; refined for mixed-signal entries round 4, 2026-07-07):** Experiential wording in "It's wrong if" is not enough to pass. If **This decision assumes** discloses a scalar, a boundary, OR a relational comparison — a number, count, rate, latency, threshold, status code, resolves/404 line, or a parity-to-baseline comparison ("no larger a share than the model it replaces", "≤ the current rate", "no worse than the incumbent") — whose value would settle the verdict **on its own, leaving no irreducible human judgment**, the entry FAILS however experientially "It's wrong if" is phrased. The boundary need not be a literal number: a disclosed relation to an unnamed baseline still pre-computes the verdict. Test it directly: write an automated check using ONLY the facts stated in **This decision assumes**; if that check's output would determine "It's wrong if", the sensory wording ("feels sluggish", "reads as complete", "a step backward in trust") is laundering a deterministic check → FAIL, route to test-requirements. A genuine entry's assumes-clause names the human construct ("users evaluate responsiveness holistically"), not a constant or a parity-to-baseline comparison that pre-computes the boundary.
+
+   **Mixed-signal exception — split, do not over-reject:** A disclosed boundary that is *necessary but not sufficient* does not fail the entry wholesale. **The operative test is textual and lives in "It's wrong if" — not in the mood of "What's NOT automatable".** Route the disclosed boundary to a test-requirement, then read what remains of "It's wrong if": if a nonempty wrongness condition survives — one a human could trigger *while every routed check passes*, drawn from the entry's own "It's wrong if" rather than newly invented — the entry is mixed-signal: **SPLIT it.** Keep that surviving condition as the UAT entry and remove the settled boundary from **This decision assumes**. If nothing falsifiable survives in "It's wrong if" once the boundary is routed — the only residual is a judgment asserted in **This decision assumes** or **What's NOT automatable**, with no wrongness condition a human could trip — it is decorative: **FAIL the whole entry**, do not split. Two anchors: "latency > 100ms AND users feel it is sluggish" leaves an *empty* "It's wrong if" once latency is routed (the stutter IS the latency) → FAIL; "text falls below 4.5:1 contrast anywhere, or a low-vision user still cannot parse the visual hierarchy where contrast passes" leaves "a low-vision user cannot parse the hierarchy" after the ratio is routed → SPLIT. Every UAT entry has a nonempty "What's NOT automatable" because the template demands one; a vibe asserted there is not a surviving wrongness condition, and an entry whose "It's wrong if" enumerates only automatable conditions FAILs even if it invokes a coherence or gestalt judgment elsewhere.
+
+**Rubric maintenance — this rubric is LLM-judged and wording-sensitive:** adversarial testing (rounds 1–3, 2026-07-06; rounds 4–5 mixed-signal refinement, 2026-07-07) showed the gate's catch rate changes with exact rubric phrasing — repeatedly, including a round-4 laundering hole in which a smuggle whose "It's wrong if" enumerated only automatable conditions was wrongly SPLIT by invoking a coherence gestalt asserted elsewhere. Any edit to these three tests, the disclosed-oracle check, or the mixed-signal exception must be re-validated against the E1–E12 adversarial fixture before shipping; inspection-equivalence ("the new wording obviously covers it") is not sufficient evidence. Fixture roles: E9 (decorative human read bolted onto a fully-settling oracle → FAIL), E7 (automatable-only "It's wrong if" with a gestalt vibe attached elsewhere → FAIL, not SPLIT), and E12 (an in-clause decorative twin whose second "It's wrong if" disjunct is derivable from already-automatable facts → FAIL, not SPLIT) guard the fail side; E10 (already-decomposed, boundary carved into "What's automatable" → PASS) and E11 (genuine mixed-signal — a human-triggerable residual surviving in "It's wrong if" after the boundary is routed → SPLIT) guard that the exception neither over-rejects nor becomes a laundering hole. The fixture, all rounds, and the residual-risk record live in the Phase 6 adversarial-test record of the 2026-04-17 skill-skills-upstream-sync implementation plan. Known ceiling: every fixture smuggle discloses its oracle in-text; the gate has not been tested against a smuggler who scrubs the tell entirely.
 
 **A bad Popper entry restates what automated tests verify:**
 - "Run the validator and see it validates" — that's a unit test
@@ -848,6 +857,9 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Recommendation:** [Option A] — [why, in one sentence].
 
+**What's automatable:** [name the mechanism that CAN be verified by a named command or operational check. If nothing is automatable here, this UAT entry is probably a disguised test-requirement — flag and re-route.]
+**What's NOT automatable:** [name the surface judgment that requires a human who has used the built thing. If nothing is NOT automatable, the entry is smuggled — reject.]
+
 **This decision assumes:** [the assumption baked into the implementation]
 **To shatter it:** [use the built thing for its intended purpose and judge whether the assumption holds]
 **It's wrong if:** [the specific experience that shows the assumption failed your intent]
@@ -872,6 +884,9 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 **Recommendation:** [...]
 
+**What's automatable:** [name the mechanism that CAN be verified by a named command or operational check. If nothing is automatable here, this UAT entry is probably a disguised test-requirement — flag and re-route.]
+**What's NOT automatable:** [name the surface judgment that requires a human who has used the built thing. If nothing is NOT automatable, the entry is smuggled — reject.]
+
 **This decision assumes:** [assumption]
 **To shatter it:** Deferred to Phase [M] — the user-facing experience doesn't exist yet.
 **It's wrong if:** [what you'd see in Phase M that proves this foundation was wrong]
@@ -882,6 +897,29 @@ Result: Phase 2 has zero Popper UAT entries. The execution routing rubric sends 
 
 [Continue for all non-trivial decisions in this phase...]
 ```
+
+6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
+
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is the structural gate that rejects disclosed-oracle smuggles before they reach `uat-requirements.md` — a calibrated, evidence-bounded property, not a guarantee that "structurally prevents" all smuggling (the catch rate is LLM-judged and wording-sensitive; see the calibrated claim and residual risk in the rubric-maintenance note under the Disagreement test).
+
+Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
+
+1. **Decomposition test** — Is the What's-automatable genuinely separate from the What's-NOT-automatable, or does the What's-automatable already cover what the falsification claims to test?
+2. **Reduction test** — Would each step in the "To shatter it" scenario be automatable in isolation? If yes, the entry is a multi-step integration test a human is running by hand — automate it.
+3. **Disagreement test** — Would two reasonable people, after using the thing, plausibly disagree about whether "It's wrong if" was met? If every observer would reach the same verdict, the entry is an automated check, not a UAT.
+   - **Disclosed-oracle sub-check:** if "This decision assumes" discloses a scalar/threshold/count/rate/status-code/resolves-404 boundary OR a parity-to-baseline comparison ("no worse than the incumbent", "≤ the current rate") whose value would settle "It's wrong if" **on its own**, FAIL however experientially "It's wrong if" is phrased — the boundary need not be a literal number; an automated check built from only the assumes-clause facts deciding the verdict means the sensory wording is laundering a deterministic check. **Mixed-signal exception:** route the boundary to a test-requirement, then read what remains of "It's wrong if". If a nonempty wrongness condition survives — one a human could trigger while every routed check passes, drawn from the entry's own "It's wrong if" — **SPLIT** and keep that condition as the UAT entry. If nothing falsifiable survives in "It's wrong if" once the boundary is routed (only a vibe in **This decision assumes** / **What's NOT automatable**) it is decorative → FAIL, not SPLIT. Every entry has a nonempty **What's NOT automatable**; a judgment asserted only there is not a surviving wrongness condition, and an "It's wrong if" that enumerates only automatable conditions FAILs even if a coherence or gestalt judgment is invoked elsewhere.
+
+**Self-audit behaviour:**
+- If an entry passes all three tests → retain and present to user.
+- If an entry fails the Decomposition test → re-route to test-requirements.md (mechanism was automatable; no surface judgment exists).
+- If an entry fails the Reduction test → decompose into automatable test-requirements (the scenario is an integration test).
+- If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
+- If an entry is mixed-signal — after routing the disclosed boundary to test-requirements.md, a nonempty wrongness condition still survives in **It's wrong if** that a human could trigger while the routed check passes → **SPLIT**: keep that surviving condition as the UAT entry, remove the settled boundary from **This decision assumes**. If routing the boundary leaves an empty **It's wrong if** (the only residual is a judgment in **This decision assumes** / **What's NOT automatable**), it is decorative → FAIL, not SPLIT. Do not reject a genuine remainder wholesale; do not retain a decorative one.
+- If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
+
+**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in the UAT Requirements Collation section, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; the collation audit is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
+
+**Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
 
 7. **Use AskUserQuestion:**
 
@@ -898,12 +936,51 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
    - Mark task ND as in_progress
    - Write phase to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
    - Phase file contains ONLY the implementation tasks (no lens analysis, no verification findings)
-   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` (see UAT Requirements Generation below). Automatable entries go to test-requirements.md as before.
+   - **Persist Popper UAT entries:** Append all human-judgment falsification entries from this phase's decisions to `uat-requirements.md` as an unstamped working accumulation (the UAT Requirements Collation step below audits every entry and re-writes the file with its provenance stamp — do not stamp it here). Automatable entries go to test-requirements.md as before.
    - Mark task ND as completed, continue to next phase
 
 9. **If needs revision:** Revise implementation tasks based on decision feedback, re-identify decisions, present again (do NOT mark ND as in_progress until approved)
 
 ---
+
+### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
+
+**Example 1: Smuggled entry (REJECT)**
+
+Proposed:
+> **DR3: Token validation rejects expired tokens**
+> **What's automatable:** (left blank or filled with something like "the rejection logic works")
+> **What's NOT automatable:** (left blank or filled with "the user experience of seeing the rejection")
+> **This decision assumes:** ...
+> **To shatter it:** Run the test suite and verify expired tokens return 401.
+> **It's wrong if:** Expired tokens don't return 401.
+
+**Why this is smuggled:** "To shatter it: Run the test suite" is a test-requirement. The three anti-smuggling tests would flag:
+- Decomposition test FAILS: the mechanism ("tokens return 401 on expiry") IS automatable and there is no distinct surface judgment.
+- Disagreement test FAILS: "401 vs 200" is not something two reasonable people can disagree about.
+
+**Re-routing:** Add to test-requirements.md as `test_expired_token_returns_401`. Do NOT create a UAT entry.
+
+**Example 2: Genuine UAT entry (ACCEPT)**
+
+Proposed:
+> **DR5: Error messages guide users to the fix**
+> **What's automatable:** The error message format (e.g., "includes a link to documentation") can be grep-checked. The text itself is present or absent.
+> **What's NOT automatable:** Whether the message's wording actually helps a new user form the next action. "Helpful" is a subjective quality of the language, not a mechanical property.
+> **This decision assumes:** Users will understand the next step after reading the error.
+> **To shatter it:** Use the feature with a deliberately-wrong input as a first-time user and assess whether the error's wording guides you to the fix.
+> **It's wrong if:** You read the error and reach for documentation to understand what to do next, meaning the error names the fault without scaffolding the next action.
+
+**Why this is genuine:** The Decomposition test separates mechanism (format) from surface (helpfulness). The Disagreement test is satisfied — reasonable people could disagree whether an error message is "guiding" vs "naming." The Reduction test passes — it's a single integrated human experience, not a multi-step integration test.
+
+**Example 3: Zero-UAT output (infrastructure phase)**
+
+A preparatory-refactor phase whose Done-when is "tests stay green after restructuring" has:
+- All verification automatable (tests pass or don't)
+- No surface-judgment experience (the restructure is inspectable via diff)
+- Every proposed UAT decomposes to test-requirement or test-of-behaviour-preservation
+
+**Correct output:** Zero UAT entries in this phase's section of `uat-requirements.md`. The phase writes `## Phase N: [Name]` and a one-line "No native UAT entries; all verification routes to test-requirement" marker. This is a first-class valid outcome — NOT a failure to find UAT entries.
 
 ## Task Structure
 
@@ -917,7 +994,7 @@ Example question: "Phase 2: 4 decisions reviewed (1 DEGENERATING flagged — ret
 
 **Files:**
 - Create: `pyproject.toml`
-- Create: `src/__init__.py`
+- Create: `<src>/__init__.py`
 
 **Step 1: Create the files**
 
@@ -949,9 +1026,9 @@ git commit -m "chore: initialize project structure"
 **Verifies:** {slug}.AC1.1, {slug}.AC1.3 (list specific AC cases this task tests)
 
 **Files:**
-- Create: `src/services/feature.py`
-- Modify: `src/services/existing.py:123-145`
-- Test: `tests/services/test_feature.py` (unit|integration|e2e)
+- Create: `<src>/services/feature.py`
+- Modify: `<src>/services/existing.py:123-145`
+- Test: `<tests>/services/test_feature.py` (unit|integration|e2e)
 
 **Implementation:**
 [Describe what to implement - contracts, behavior, key logic. Include code for complex/non-obvious implementations.]
@@ -1092,7 +1169,7 @@ Which approach should I take?
 - [ ] Ask user for review mode (batch vs interactive vs design decisions)
 - [ ] Capture absolute paths: DESIGN_PATH and PLAN_DIR
 - [ ] Read Acceptance Criteria section from design plan
-- [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Finalization + Test Requirements)
+- [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Test Requirements + UAT Requirements + Finalization)
 - [ ] Set up dependencies with TaskUpdate addBlockedBy (see Step 0)
 - [ ] Task descriptions include absolute paths (not relative)
 
@@ -1113,16 +1190,7 @@ Which approach should I take?
 - [ ] Exact commands with expected output
 - [ ] No conditional instructions ("if exists", "if needed")
 
-**Finalization (after all phase ND tasks completed):**
-- [ ] Mark Finalization task as in_progress
-- [ ] Dispatch code-reviewer to validate plan against design (SCOPE: `plan-validation`)
-- [ ] Fix ALL issues including Minor ones from the initial review
-- [ ] Re-run code-reviewer once to verify fixes (one cycle only — same SCOPE, PRIOR_FINDINGS_FILE pointing at `code-review-findings-plan-validation.md`)
-- [ ] If re-review finds anything unresolved or new, **HALT and present to the user** (options: fix now / accept remaining / halt for discussion). Do NOT auto-loop.
-- [ ] Mark Finalization task as completed when zero issues or user-chosen resolution path is taken
-- [ ] Proceed to Test Requirements
-
-**Test Requirements (after Finalization):**
+**Test Requirements + UAT Requirements (after all phase ND tasks completed):**
 - [ ] Mark Test Requirements task as in_progress
 - [ ] Dispatch Opus subagent to generate test requirements from Acceptance Criteria
 - [ ] **If interactive mode:** Present to user, use AskUserQuestion for approval
@@ -1130,15 +1198,25 @@ Which approach should I take?
 - [ ] Write test-requirements.md to PLAN_DIR
 - [ ] Mark Test Requirements task as completed
 - [ ] Collate uat-requirements.md from phase decisions (design decisions mode) or construct from ACs (other modes)
-- [ ] Write uat-requirements.md to PLAN_DIR
+- [ ] Write uat-requirements.md to PLAN_DIR (first line = collation-audit stamp)
 - [ ] Mark UAT Requirements task as completed
+- [ ] Proceed to Finalization
+
+**Finalization (after Test Requirements + UAT Requirements completed):**
+- [ ] Mark Finalization task as in_progress
+- [ ] Dispatch code-reviewer to validate plan against design (SCOPE: `plan-validation`)
+- [ ] Fix ALL issues including Minor ones from the initial review
+- [ ] Re-run code-reviewer once to verify fixes (one cycle only — same SCOPE, PRIOR_FINDINGS_FILE pointing at `code-review-findings-plan-validation.md`)
+- [ ] If re-review finds anything unresolved or new, **HALT and present to the user** (options: fix now / accept remaining / halt for discussion). Do NOT auto-loop.
+- [ ] Existence gate: `uat-requirements.md` present AND first-line-stamped (else halt, dispatch collation now)
+- [ ] Mark Finalization task as completed when zero issues or user-chosen resolution path is taken
 - [ ] Proceed to execution handoff
 
 ## Plan Validation (Finalization Task)
 
 **This is a tracked task: "Finalization: Run code-reviewer over all phase files, fix ALL issues including minor ones"**
 
-After all phase D tasks are completed, mark the Finalization task as in_progress.
+Finalization runs LAST — after Test Requirements Generation and UAT Requirements Collation (both below) have written `test-requirements.md` and the stamped `uat-requirements.md`. Its plan-validation review therefore also covers those artefacts, and the existence gate below verifies the already-written stamp. When the UAT Requirements task is complete, mark the Finalization task as in_progress.
 
 ### Step 1: Dispatch code-reviewer
 
@@ -1239,15 +1317,35 @@ Do NOT rationalize skipping minor issues during the first fix cycle. Mark Finali
 - Zero issues on the one re-review, OR
 - User-chosen resolution path resolved (fix-now cycle completed, issues accepted, or halt-for-discussion concluded with explicit direction).
 
-Mark the Finalization task as completed.
+**Existence gate (must pass BEFORE marking complete):**
 
-Proceed to Test Requirements generation.
+Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md` **and carries the collation-audit provenance stamp** (the marker the UAT Requirements Collation audit writes as the file's first line — see that section). If the file is missing, or present but unstamped:
+- Halt Finalization
+- Dispatch the UAT Requirements Collation section now — do not proceed without it
+- If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form (stamp included):
+  ```
+  <!-- collation-audit: PASS | 0 entries (all routed to test-requirements) | [YYYY-MM-DD] -->
+  # UAT Requirements — [Plan Name]
+
+  No human-judgment UAT entries. All verification routes to automated tests or operational checks. Phases route to `exec-coherence-review`, not the UAT gate.
+  ```
+
+The file must exist **and be stamped** regardless. Silent-skip is the failure mode this gate closes — sessions that compact or interrupt during planning can drop the collation step entirely, leaving no record that UAT was considered. What the stamp gives is **attestation that the collation step ran**, not proof it scored every current entry: it is planner-written and its template appears in this skill, and nothing compares the stamp's count/date to the file's actual entries. So it closes the observed failure (the whole collation section dropped → no stamp) and legacy or hand-written files (unstamped); it does **not** close "a stamp older than entries appended beneath it." An unstamped file fails the gate; a stamped one is trusted as-is. Explicit minimal-file output distinguishes "considered and found empty" from "never ran."
+
+Run:
+```bash
+test -f "$PLAN_DIR/uat-requirements.md" || { echo "FAIL: uat-requirements.md missing"; exit 1; }
+head -1 "$PLAN_DIR/uat-requirements.md" | grep -q '^<!-- collation-audit:' || { echo "FAIL: uat-requirements.md present but unstamped — the collation step did not run"; exit 1; }
+```
+The grep is anchored to the **first line** so a UAT entry that merely mentions the collation audit in its body cannot self-stamp the file. Exit 0 (present AND first-line-stamped) → gate passes. Exit 1 → halt, dispatch the UAT Requirements Collation audit (which re-scores every entry and writes a fresh stamp).
+
+**Only after the existence gate passes:** Mark the Finalization task as completed, then proceed to execution handoff.
 
 ## Test Requirements Generation
 
 **Tracked task: "Test Requirements: Generate test-requirements.md from Acceptance Criteria"**
 
-Mark in_progress after Finalization completes.
+Mark in_progress after all phase D tasks complete.
 
 Test requirements map acceptance criteria to specific automated tests, and identify criteria requiring human verification. The test-analyst agent uses this during execution to validate coverage.
 
@@ -1301,7 +1399,7 @@ Mark in_progress after Test Requirements completes.
 
 UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `exec-uat-gate` skill reads this file during execution.
 
-**For design decisions mode:** UAT entries were already generated per-phase during step 8 (Task ND). Collate them into a single file.
+**For design decisions mode:** UAT entries were already appended to `uat-requirements.md` per-phase during step 8 (Task ND), unstamped. The collation audit below reads that accumulated file, scores every entry, and re-writes it with the provenance stamp.
 
 **For interactive and batch modes:** Review each phase for acceptance criteria that require human judgment (using the Carnap quality rubric). Construct falsification entries for any that qualify.
 
@@ -1334,15 +1432,44 @@ Quality gate: every entry must have (1) what the human DOES (an action, not insp
 ...
 ```
 
-**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` stating "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+**If no phases produced human-judgment entries:** Write a minimal `uat-requirements.md` whose first line is the collation-audit stamp (`<!-- collation-audit: PASS | 0 entries (all routed to test-requirements) | [YYYY-MM-DD] -->`), followed by "No human-judgment UAT entries. All verification is automated — phases route to exec-coherence-review, not UAT gate." This is a valid outcome for infrastructure-only plans.
+
+**Collation audit — dispatch Sonnet subagent to run three-test rubric on each entry**
+
+Before the stamped `uat-requirements.md` is written, dispatch a subagent (`denubis-basic-agents:sonnet-general-purpose`) with each entry, the three anti-smuggling tests (Decomposition / Reduction / Disagreement), and a prompt instructing:
+
+> For each UAT entry provided below, score:
+> 1. Decomposition pass/fail — is What's-automatable genuinely separate from What's-NOT-automatable? If no separation, FAIL.
+> 2. Reduction pass/fail — is the "To shatter it" scenario a single integrated experience or a multi-step integration test? If multi-step with each step automatable, FAIL.
+> 3. Disagreement pass/fail — would two reasonable people plausibly disagree on "It's wrong if"? If every observer would reach the same verdict, FAIL. **Disclosed-oracle sub-check:** if "This decision assumes" discloses a scalar/threshold/count/rate/status-code/resolves-404 boundary OR a parity-to-baseline comparison ("no worse than the incumbent", "≤ the current rate") whose value would settle "It's wrong if" **on its own**, FAIL however experientially "It's wrong if" is phrased — the boundary need not be a literal number; write an automated check from only the assumes-clause facts; if its output decides the verdict, the sensory wording is laundering a deterministic check. **Mixed-signal exception:** route the disclosed boundary to a test-requirement, then read what remains of "It's wrong if". If a nonempty wrongness condition survives — one a human could trigger while every routed check passes, drawn from the entry's own "It's wrong if" — return SPLIT (keep that condition as the UAT entry). If nothing falsifiable survives in "It's wrong if" once the boundary is routed — the only residual is a judgment asserted in "This decision assumes" or "What's NOT automatable", with no wrongness condition a human could trip — it is decorative → FAIL, not SPLIT. Every entry has a nonempty "What's NOT automatable"; a vibe there is not a surviving wrongness condition, and an entry whose "It's wrong if" enumerates only automatable conditions FAILs even if it invokes a coherence/gestalt judgment elsewhere.
+>
+> For each entry, output: PASS / FAIL / SPLIT with the deciding test named; or PASS with short rationale. If FAIL, propose how to re-route (test-requirement? rewrite? delete?). If SPLIT, name the automatable boundary to route to a test-requirement and state the residual human judgment that remains the UAT entry.
+
+Pass the subagent's structured output back. For any FAIL or SPLIT, block the collation write and surface to the human:
+- Display the entry text
+- Display the deciding test (failing test for FAIL; the necessary-but-not-sufficient boundary for SPLIT)
+- Propose the rewrite or re-route (for SPLIT: the test-requirement to add AND the trimmed UAT entry that remains)
+- Accept human decision: retain-with-rewrite, retain-with-override-acknowledgement, delete, re-route, or accept-split (write the test-requirement, keep the trimmed UAT entry)
+
+Only after all entries either pass, split with human acknowledgement, OR have human-acknowledged overrides does the stamped `uat-requirements.md` get written.
+
+**Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
+
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, scoring every entry the self-audit missed, added outside the design-decisions-mode flow, carried over from earlier sessions that pre-date the self-audit, or approved by the user at step 7 — catching smuggles in the tested disclosed-oracle categories among them, subject to the documented wording-sensitive catch-rate limits (not a catch-all; see the known ceiling under the Disagreement test). The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit — "close" in the architectural sense that an independent enforcing layer now exists; the gate's *catch rate* is a calibrated, wording-sensitive property, not a structural guarantee (see the rubric-maintenance note under the Disagreement test).
 
 **Step: Write and complete**
 
-Write to `[PLAN_DIR]/uat-requirements.md`. Mark task completed. Proceed to execution handoff.
+Write to `[PLAN_DIR]/uat-requirements.md`. The **first line** must be the collation-audit provenance stamp — an HTML comment written when this collation step runs, which the Finalization existence gate greps for on the first line (it attests the collation step ran; it is not proof a subagent scored every entry):
+
+```
+<!-- collation-audit: PASS | [N] entries scored against Decomposition/Reduction/Disagreement (any FAIL/SPLIT resolved with human acknowledgement) | [YYYY-MM-DD] -->
+```
+
+Fill `[N]` (entry count; 0 for the minimal form) and the date at write time. The stamp is the marker the Finalization gate checks for; a `uat-requirements.md` without it (a stale file from a prior session, or a hand-written one) fails the gate. It attests the collation step ran — it is not proof, since a stale or hand-copied marker also passes (the honest bound at the existence gate above). Mark task completed. Proceed to Finalization (the Plan Validation (Finalization Task) section above).
 
 ## Execution Handoff
 
-After UAT Requirements collation completes, announce:
+After Finalization completes (existence gate passed), announce:
 
 **"Implementation plan complete and validated. Saved to [count] phase files + test-requirements.md + uat-requirements.md in `docs/implementation-plans/YYYY-MM-DD-<feature-name>/`. The first phase file is `<full-path>`."**
 

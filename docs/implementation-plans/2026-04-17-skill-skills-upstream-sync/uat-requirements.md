@@ -40,15 +40,21 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** The author ends up having to re-derive the coherence argument from scratch because `self-application.md` is too abstract to map onto the live decision. That would mean the walk-through is illustrative, not operative — the rubric inherits Schön but the self-application doesn't transmit Schön's reflective posture to new cases.
 
-### DR-P1-DR2 (back-ref) — Companion citations file is load-bearing at decision time
+### DR-P1-DR2 (back-ref) — Companion citations file changes the decision when consulted
+
+<!-- PROVENANCE: rewritten 2026-07-06 per Phase 6 Task 5 retroactive audit; original failed Decomposition + Disagreement — falsification was framed as file-access frequency ("do you reach for it every time / never"), an observable/automatable fact, not a human judgment. The access-frequency check is re-routed to test-requirements.md (Phase 5). This entry now isolates the genuine judgment: was consulting the companion file substantive? -->
 
 **Originating decision:** Phase 1 DR2 (separate `absencejudgement-citations.md` rather than inlining quotations in SKILL.md).
 
-**This decision assumes:** Keeping quotations in a companion file preserves skim-speed for orchestrators invoking the rubric while retaining verifiability for reviewers.
+**What's automatable:** Whether the companion file was opened during a rubric-use session (recoverable from session transcripts, e.g. `cc-search-chats`) and how often, relative to rubric invocations. This access-frequency signal belongs in test-requirements.md (Phase 5); it is NOT this UAT entry.
 
-**To shatter it:** In a real scope-assessment cycle triggered by Phase 4's `writing-skills`, observe whether SKILL.md alone suffices or whether you reach for `absencejudgement-citations.md`. If you reach for it every time, the split was artificial — quotations *are* load-bearing at decision time and should have been inlined.
+**What's NOT automatable:** Whether, on the occasions the companion file *was* consulted, its verbatim quotations substantively informed the scope decision — or whether SKILL.md's paraphrase would have sufficed and the open was a reflex. "Substantively informed" is a judgment about whether the citation earned its separate-file cost, not a fact about whether a file was opened.
 
-**It's wrong if:** Every rubric use requires loading both files, meaning the companion-file architecture cost overhead without the skim-speed benefit. Alternatively, it's wrong if the companion file is never loaded, meaning the quotations were overhead no one actually consulted — the skill would have been better grounding the claims inline with tighter paraphrase discipline.
+**This decision assumes:** When an orchestrator consults `absencejudgement-citations.md` during a live scope-assessment, the verbatim quotations add something the SKILL.md paraphrase does not — grounding the decision, not just decorating it.
+
+**To shatter it:** In a real scope-assessment cycle triggered by Phase 4's `writing-skills`, when you find yourself opening `absencejudgement-citations.md`, pause and ask: did reading the verbatim quotation change or sharpen the call you were about to make, or would the SKILL.md summary have carried you to the same decision?
+
+**It's wrong if:** On reflection the companion file's quotations never changed a decision they were consulted for — the paraphrase in SKILL.md would have sufficed every time — meaning the separate-file split bought verifiability that no decision-maker actually cashed in, and the quotations should have been inlined with tighter paraphrase discipline.
 
 ### DR-P1-DR4 (back-ref) — Verbatim wording beats paraphrase in rubric use
 
@@ -80,19 +86,21 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** You consistently discover the rubric-callback only after drafting directive text, and find yourself re-scoping or rewriting because the rubric screens surface concerns the early phases should have caught. That would mean the placement didn't achieve pre-authoring timing — either the section needs to move higher, or the rubric-callback needs to be wired into a different entry point (e.g., the skill's opening Core Principles).
 
-### DR-P2-DR3 — "Dial back aggressive language" guidance changes actual authoring behaviour
+### DR-P2-DR3 — "Dial back aggressive language" guidance changes authoring behaviour
+
+<!-- PROVENANCE: rewritten 2026-07-06 per Phase 6 Task 5 retroactive audit; original failed Reduction + Disagreement — "To shatter it" was "count CRITICAL:/YOU MUST occurrences, compare to baseline" (grep + arithmetic two auditors could not disagree on). Despite carrying the What's-automatable/NOT header lines, the falsification PROCEDURE tested an automatable count, not the judgment. Meta-finding for Phase 6: the template header lines are necessary but not sufficient; the Task 4 collation audit is the structural backstop. The occurrence-count is re-routed to test-requirements.md (Phase 5); this entry now tests the judgment underneath. -->
 
 **Originating decision:** Phase 2 DR3 (update aggressive-language guidance at SKILL.md lines 96, 237 to match current Anthropic docs with explicit before/after example and URL citation).
 
-**What's automatable:** The updated guidance string is present with the current Anthropic source URL; grep SKILL.md for both. The before/after example ("CRITICAL: You MUST → Use this tool when...") is present. Added to test-requirements.md.
+**What's automatable:** The updated guidance string is present with the current Anthropic source URL, and the before/after example ("CRITICAL: You MUST → Use this tool when...") is present — grep SKILL.md for both. Also automatable: the raw count of all-caps imperatives / "CRITICAL:" / "YOU MUST" across new directives and its trend vs the pre-Phase-2 baseline. Both belong in test-requirements.md (the count trend is a Phase 5 test-requirement, not this UAT entry).
 
-**What's NOT automatable:** Whether authors writing NEW directives actually dial back aggressive phrasing after reading this skill, or whether the guidance is absorbed intellectually but not operationally — "I know the recommendation, but this case genuinely needs CRITICAL."
+**What's NOT automatable:** For each aggressive-phrasing occurrence the count surfaces, whether it is a *documented, reasoned exception* (the author considered the dial-back guidance and judged this case genuinely needs the emphasis) or an *unreflective habit* (the guidance was never engaged). The count cannot tell these apart; only reading the surrounding authoring context and judging the author's reasoning can.
 
-**This decision assumes:** The updated guidance (with concrete example + current URL) will change authoring behaviour when applied, not just provide a rule authors can cite and override.
+**This decision assumes:** The updated guidance (concrete example + current URL) actually engages authors' judgment when they reach for aggressive phrasing — prompting a reasoned keep-or-soften decision — rather than being a rule they can cite and reflexively override.
 
-**To shatter it:** Audit the next 5-10 new directive additions across denubis skills after Phase 2 lands. Count all-caps imperatives and "CRITICAL:" / "YOU MUST" occurrences. Compare against the pre-Phase-2 baseline.
+**To shatter it:** Take the aggressive-phrasing occurrences a test-requirement count surfaces in new post-Phase-2 directives, and read the context around each: did the author visibly weigh the dial-back guidance and document why this case warrants the emphasis, or does the occurrence read as habitual all-caps with no sign the guidance was consulted?
 
-**It's wrong if:** Aggressive-language patterns persist at pre-Phase-2 rates or higher, suggesting the guidance is known but overridden in practice. That would mean either the guidance needs stronger framing (e.g., "before using aggressive language, document why the dial-back pattern fails for this case") or the directive genre genuinely needs aggressive phrasing and the guidance is wrong for denubis's use cases.
+**It's wrong if:** The flagged occurrences read overwhelmingly as unreflective habit — no evidence the author engaged the guidance before choosing aggressive phrasing — meaning the guidance is known-but-inert: cited-and-overridden or never reached. That points to needing stronger framing (e.g., "before using aggressive language, document why the dial-back fails here") or that the directive genre genuinely needs the emphasis and the guidance is miscalibrated for denubis.
 
 ## Phase 3: `testing-skills-with-subagents` restructure
 
@@ -110,11 +118,31 @@ These entries originate in Phase 1 decisions but cannot be shattered until the r
 
 **It's wrong if:** Skill-testers consistently discover the rubric-callback only after investing in test-scenario authoring, and find themselves either (a) defending scope choices they'd reconsider if they'd caught them earlier, or (b) ignoring the rubric because they've sunk cost into testing as-is. That would mean the placement didn't achieve the pre-testing timing — either the H2 needs to move still earlier (before "When to Use", as the skill's opening check) or the rubric-callback needs a more intrusive trigger (e.g., wired into the subagent-dispatch prompt itself so the testing subagent raises the rubric as its first output).
 
+### AM2-P3 — Fable-tier verification of the restructured skill is a human-invoked manual checkpoint (2026-06-10 amendment item 2)
+
+**Originating decision:** phase_03.md 2026-06-10 Amendment item 2 (executor-tier test matrix per rubric R10, inside the Fable cost gate). "RED at production tier, GREEN one tier down" is retained, but production tier is defined per executor, and this skill's executors now include the Fable 5 main loop. Automated RED/GREEN passes run on Haiku/Sonnet/Opus subagents only; Fable-tier verification is human-triggered (operator rule 2026-06-10: Fable burns real money — never auto-dispatched).
+
+**What's automatable:** RED/GREEN subagent runs of the restructured skill on Haiku/Sonnet/Opus with `model` pinned per dispatch; grep checks that neither the restructured SKILL.md nor the phase artefacts instruct auto-dispatching a Fable-tier subagent.
+
+**What's NOT automatable:** The Fable-tier verification itself — the cost gate forbids automating it. Specifically: whether the restructured skill reads correctly when the executor IS a Fable 5 main loop, given the documented over-prescription risk (rubric R2: skills tuned for prior models can degrade Fable output; mechanical checklists may be exactly that).
+
+**This decision assumes:** A human-triggered Fable 5 session applying the restructured skill honours the Conversation-Precedent gate and the demoted role of synthetic scenarios at least as reliably as Opus-tier runs, without the checklist density degrading its output.
+
+**To shatter it:** In a human-triggered Fable 5 session, apply the restructured skill to a real skill-under-test and observe: does the Conversation-Precedent gate fire before any scenario is invented? Does the skill's checklist density visibly flatten or degrade the Fable output relative to an Opus subagent run of the same exercise?
+
+**It's wrong if:** The Fable run rationalises around the Conversation-Precedent gate (invents a baseline scenario anyway and labels it precedent), or compliance is only achievable by adding louder emphasis (which would overtrigger Sonnet-tier executors — the R3 trade-off the skill is supposed to respect), or the skill's mechanical structure measurably degrades Fable-tier output (the R2 over-prescription failure). Any of these means the skill needs a tier-split (mechanical core + judgement latitude) rather than one register for all executors.
+
 ## Phase 4: `writing-skills` cornerstone rewrite
 
 Phase 4 itself produces no native UAT entries — all DRs routed to test-requirements. Back-referenced UAT entries from Phase 2 (DR8 rubric-callback timing in `writing-claude-directives`) and Phase 3 (DR7 rubric-callback timing in `testing-skills-with-subagents`) manifest here because Phase 4 is when orchestrator-to-rubric timing can first be exercised in practice with all three sub-skills wired together.
 
 **DR-P4-INT-1 was DELETED during H3 revision (2026-04-18).** The original entry covered "Integration evidence: cornerstone production used the methodology it describes" — the meta-claim that Phase 4's production IS the integration evidence. The entry itself admitted the written evidence could be perfect while the lived process had skipped the methodology; the "To shatter it" procedure (compare commit history to GREEN narrative) offered no falsifiable test because the commits and the narrative share an author. Critical peer review flagged this as unauditable-by-design (H3 + H7). The replacement is Phase 5 Task 4.5 (frustration-signal audit, AC5.8): instead of auditing self-attested narrative against self-authored commits, the audit queries `cc-search-chats:search-chat` across all phase-authoring sessions within the plan's implementation window for user-expressed frustration signals. Frustration IS observable evidence that the methodology did NOT cohere at a given point — falsifiable, re-runnable by a later reviewer, and grounded in an independent record (the user's interaction transcript).
+
+### UAT gate outcome — 2026-07-05 (provisional confirm; definitive deferred to real use)
+
+The Phase 4 UAT gate presented the five back-referenced deferred-observation entries: DR-P1-DR1, DR-P1-DR2, DR-P1-DR4 (Phase 1 rubric-usability), DR-P2-DR8, DR-P3-DR7 (rubric-callback timing). All five are cognitive-timing claims — "the next time you author/test, observe *when* the callback fires" — validated only through real authoring use; the position/existence halves are automatable and enforced by `test-requirements.md` + Phase 5's cross-reference audit.
+
+**Operator disposition: provisionally confirmed.** The claims read as plausible against the wired-up cornerstone + sub-skills; definitive shattering is deferred to real skill-authoring/testing use. No entry was rejected. `ISSUE-12` (the "can it do it by default?" skill filed 2026-07-05) was identified as a live, novel scope-assessment case available to shatter DR-P1-DR1/DR2/DR4 when that work is picked up — the honest first opportunity to convert three of these from deferred to observed. Recorded so the Phase 4 refactor pipeline and phase close can proceed.
 
 ## Phase 5: Cross-reference audit, version bump, commit, frustration-signal audit
 

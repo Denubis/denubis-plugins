@@ -72,12 +72,12 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** The Phase 5 audit script walks each imported file and every cross-reference in the five touched skills; exits 1 if any unresolved reference is found. The ~5 phase commits landing without a clean audit run would surface here.
 - **Run command:** `python3 docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05_cross_ref_audit.py` — exit code 0 required.
 
-### AC1.7 — `test-requirements.md` for Phase 4 documents RED evidence from an independent session
+### AC1.7 — `test-requirements.md` for Phase 4 documents RED evidence (static file-shape diff)
 
-- **Type:** Operational check (file existence) + content presence + independent-session provenance
-- **Test location:** `phase_04.md` Task 1 Step 4 (phase_04_red_evidence.md committed). This document (test-requirements.md) covers the mapping; the evidence file itself is the primary artefact.
-- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` exists; documents an observed failure of the current `writing-skills/SKILL.md` from a session that is NOT the implementing executor (cc-search-chats transcript OR user-run fresh-session transcript) with session reference, SKILL.md SHA tested against, observed failure, direct quote(s), and deficiency-location analysis per the Phase 2/3/4 RED evidence template.
-- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` and inspection for independent-session provenance (session ID resolves in cc-search-chats, OR fresh-session prompt is committed and re-runnable).
+- **Type:** Operational check (file existence) + content presence + file-shape baseline
+- **Test location:** `phase_04.md` Task 1 Step 3 (phase_04_red_evidence.md committed).
+- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` exists; Phase 4 is a preventive cornerstone rewrite (amended 2026-04-22 plan-amendment pass — original independent-session-failure framing reversed, mirroring Phase 2). Evidence content includes (a) the pre-rewrite `writing-skills/SKILL.md` SHA and line-count baseline, (b) current H2-shape enumeration, (c) target-shape description per Task 2 (≤250 lines, Workflow H2 sequencing three sub-skills, Supporting Files section, rubric callback), and (d) explicit "preventive, not corrective" framing (file shape is a structural observation, not a session-observable failure).
+- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_red_evidence.md` and inspection for (i) pre-rewrite SHA + line-count baseline, (ii) file-shape diff with current vs target H2 list, (iii) preventive-restructure framing statement.
 
 ---
 
@@ -118,18 +118,18 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** `## Rubric Callback` H2 exists; `denubis-extending-claude:epistemic-humility` cross-reference present; position is between `## When to Use` and `## TDD Mapping`; cross-reference resolves via Phase 5 audit.
 - **Run command:** Inlined Python in `phase_03.md` Task 4 Step 4; plus `phase_05_cross_ref_audit.py`.
 
-### AC2.6 — "Haiku follows detailed instructions well but struggles with judgement calls" claim absent; tier-test structural principle preserved
+### AC2.6 — Haiku-no-judgement operator-empirical guidance PRESENT in `testing-skills-with-subagents/SKILL.md`; tier-test structural principle preserved (amended 2026-04-22)
 
-- **Type:** Grep-audit (negative + positive assertion)
+- **Type:** Grep-audit (positive assertion for operator-empirical framing; positive assertion for tier-test principle)
 - **Test location:** `phase_03.md` Task 2 Step 3 (inline Python)
-- **What it verifies:** `struggles with judgement` and `struggles with judgment` both ABSENT; `weakest` tier-phrasing PRESENT.
+- **What it verifies:** A passage citing `Haiku 4.5` together with a judgement term (`judgement`/`judgment`), an operator/empirical anchor, and a strong negation (`unsuitable`/`never`) is PRESENT. `weakest` tier-phrasing PRESENT. Amended 2026-04-22 plan-amendment pass — prior framing required the pre-amendment phrase "struggles with judgement" to be ABSENT; the amended framing requires the operator-empirical guidance to be PRESENT (pre-amendment phrasing may also be retained inside the reframed passage, which is fine). Operator position overrides Anthropic's 2026-04 marketing framing.
 - **Run command:** Inlined Python assertion block in `phase_03.md` Task 2 Step 3.
 
 ### AC2.7 — `test-requirements.md` for Phase 3 documents RED evidence from an independent session
 
 - **Type:** Operational check (file existence) + content presence + independent-session provenance
 - **Test location:** `phase_03.md` Task 1 Step 4 (phase_03_red_evidence.md committed)
-- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` exists on disk with the RED evidence structure (source, session reference, SKILL.md SHA tested against, observed failure, direct quote(s), deficiency-location analysis, how Phase 3 addresses). Source must be a session that is NOT the implementing executor — either a cc-search-chats transcript or a user-run fresh-session transcript.
+- **What it verifies:** `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` exists on disk with the RED evidence structure (source, session reference, SKILL.md SHA tested against, observed failure, direct quote(s), deficiency-location analysis, how Phase 3 addresses). Source must be a session that is NOT the implementing executor — either a cc-search-chats transcript or a user-run fresh-session transcript. cc-search-chats queries are FTS5-safe single-term (2026-04-22 plan-amendment pass: ISSUE-10 constraints applied, mirroring M2's Phase 5 treatment). Phase 3 remains corrective (Phase 2 and Phase 4 went to static-evidence RED in the same amendment pass; Phase 3 did not) — the skill's target methodology is explicitly transcript-sourcing, so transcripts are expected to land.
 - **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_03_red_evidence.md` and inspection for independent-session provenance.
 
 ---
@@ -190,12 +190,12 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** `Opus 4.5` and `Sonnet 4.5` ABSENT across restructured SKILL.md, `model-tier-notes.md`, AND `long-running-state-patterns.md`; `Opus 4.7` + `Sonnet 4.6` + `Haiku 4.5` PRESENT as the current model anchors; supporting files have dated headers + source URLs.
 - **Run command:** Inlined Python in `phase_02.md` Task 2 Step 5 + Task 3 Step 3 + Task 3.5 Step 3.
 
-### AC3.8 — `test-requirements.md` for Phase 2 documents RED evidence from an independent session and the Anthropic PDF consumption
+### AC3.8 — `test-requirements.md` for Phase 2 documents RED evidence (static code-smell inventory) and the Anthropic PDF consumption
 
-- **Type:** Operational check (file existence) + independent-session provenance + system-card cross-verification narrative in phase_02_red_evidence.md and implicitly in model-tier-notes.md authoring
+- **Type:** Operational check (file existence) + content presence + system-card cross-verification narrative in phase_02_red_evidence.md and implicitly in model-tier-notes.md authoring
 - **Test location:** `phase_02.md` Task 1 Step 4 (phase_02_red_evidence.md); `phase_02.md` Task 3 Step 2 (system-card PDF consumption)
-- **What it verifies:** `phase_02_red_evidence.md` exists; source is a session that is NOT the implementing executor (cc-search-chats transcript OR user-run fresh-session transcript); file contains observed-failure + deficiency-location analysis per template; system-card PDF was consumed during authoring (`pdftotext` or `Read` tool with `pages` parameter invoked per Step 2) and no claim in `model-tier-notes.md` contradicts the system card.
-- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md` and inspection for independent-session provenance; system-card consumption recorded as inspection step during Task 3 execution.
+- **What it verifies:** `phase_02_red_evidence.md` exists; Phase 2 is a preventive restructure (amended 2026-04-22 plan-amendment pass — original independent-session-failure framing reversed). Evidence content includes (a) the Phase 2B investigator code-smell inventory (SKILL.md line 215-220 stale Opus 4.5 section, lines 69/96/99/237 generic 4.x anchors, long-running-state-patterns.md stale 4.5 anchors) with file-SHA anchors and (b) the 2026-04-22 independent-session search record (FTS5-safe queries, projects covered, 0 qualifying transcripts found). System-card PDF was consumed during authoring (`pdftotext` or `Read` tool with `pages` parameter invoked per Step 2) and no claim in `model-tier-notes.md` contradicts the system card.
+- **Run command:** `test -f docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_02_red_evidence.md` and inspection for (i) code-smell inventory with file-SHA anchors, (ii) independent-session search record with FTS5-safe query list and 0-result finding; system-card consumption recorded as inspection step during Task 3 execution.
 
 ---
 

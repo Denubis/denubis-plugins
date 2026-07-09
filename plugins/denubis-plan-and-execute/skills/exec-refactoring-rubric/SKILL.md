@@ -7,7 +7,7 @@ user-invocable: false
 
 # Refactoring Rubric
 
-Grounding reference for code smell detection and refactoring decisions. Combines Mantyla's smell taxonomy, Fowler's refactoring catalogue, evidence grading, and structural detection rules.
+Grounding reference for code smell detection and refactoring decisions. Combines Mantyla's smell taxonomy, Fowler's refactoring catalogue, evidence grading, and structural detection rules. Full citations for every named source are in the References section at the end of this file.
 
 ## Part 1: Mantyla Taxonomy Checklist
 
@@ -173,7 +173,7 @@ These smells require cross-file, cross-module, or temporal analysis not feasible
 **Detection approach:**
 - Required data: Cross-hierarchy class pairing analysis across multiple files
 - Detection heuristic: Identify class hierarchies with 1:1 subclass correspondence. Flag when creating a subclass in hierarchy A consistently requires a new subclass in hierarchy B.
-- Reference: Fowler (1999) — often a sign of missing delegation or Strategy pattern
+- Reference: Fowler's refactoring catalogue (References) — often a sign of missing delegation or Strategy pattern
 
 **Why deferred:** Requires simultaneous structural comparison of two or more inheritance trees across file boundaries.
 
@@ -207,7 +207,7 @@ These smells require cross-file, cross-module, or temporal analysis not feasible
 **Detection approach:**
 - Required data: Cross-file reference analysis, naming convention consistency check
 - Detection heuristic: For each exported symbol, measure "name informativeness" relative to usage context. Flag symbols whose name does not convey their purpose at call sites.
-- Reference: No formal detection metric in literature. Fowler (1999) identifies naming as critical for revealing intent (Rename Method, Rename Variable refactorings).
+- Reference: No formal detection metric in literature. Fowler's catalogue identifies naming as critical for revealing intent (Rename Method, Rename Variable refactorings; References).
 
 **Why deferred:** Name quality is contextual — a name clear in one module may be mysterious when referenced from another. Requires cross-file usage analysis.
 
@@ -248,3 +248,15 @@ These smells require cross-file, cross-module, or temporal analysis not feasible
 **What a future skill would need:**
 - Module-level cohesion metrics (TCC, LCOM4)
 - Import fan-in computation across the project
+
+## References
+
+Webpages are the sources actually consulted when this rubric was designed (2026-04-08 design sessions); URLs re-verified live 2026-06-11. The papers ground the named detection strategies.
+
+- Mäntylä, M. "Bad Code Smells Taxonomy." <https://mmantyla.github.io/BadCodeSmellsTaxonomy> — the five-group taxonomy (Bloaters, Object-Orientation Abusers, Change Preventers, Dispensables, Couplers) that structures Part 1. The page's foundational study is Mäntylä & Lassenius (2006), *Empirical Software Engineering* 11(3).
+- Fowler, M. "Catalog of Refactorings." <https://refactoring.com/catalog/> — the 72-refactoring online catalogue behind the Refactoring columns and the smell-to-refactoring mapping in Part 2.
+- Fowler, M. "CodeSmell." <https://martinfowler.com/bliki/CodeSmell.html> — the smell concept itself: a surface indication that usually corresponds to a deeper problem.
+- "The Rule of Three in Refactoring." <https://understandlegacycode.com/blog/refactoring-rule-of-three/> — the duplication threshold referenced by the cross-file duplication entry.
+- Marinescu, R. (2004). "Detection strategies: metrics-based rules for detecting design flaws." *Proceedings of the 20th IEEE International Conference on Software Maintenance (ICSM 2004)*. DOI: 10.1109/ICSM.2004.1357820.
+- Lanza, M., & Marinescu, R. (2006). *Object-Oriented Metrics in Practice*. Springer. DOI: 10.1007/3-540-39538-5.
+- Moha, N., Guéhéneuc, Y.-G., Duchien, L., & Le Meur, A.-F. (2010). "DECOR: A Method for the Specification and Detection of Code and Design Smells." *IEEE Transactions on Software Engineering* (2010). DOI: 10.1109/TSE.2009.50.

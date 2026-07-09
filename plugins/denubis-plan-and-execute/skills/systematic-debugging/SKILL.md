@@ -35,7 +35,7 @@ Every change you make — every single one — must have a written prediction BE
 NO CLAIMING BEYOND YOUR EVIDENCE
 ```
 
-A hypothesis that survives testing is **not yet falsified** — it is not "confirmed." (Popper.) Express findings at the evidence grade they have earned: **demonstrated**, **plausible**, **possible**, or **speculative**. Never promote a finding beyond what the evidence supports. The self-audit gate (Phase 3d) exists to catch you doing this before your human partner has to.
+A hypothesis that survives testing is **not yet falsified** — it is not "confirmed." (Popper, K.R. 1959. *The Logic of Scientific Discovery*. Hutchinson.) Express findings at the evidence grade they have earned: **demonstrated**, **plausible**, **possible**, or **speculative**. Never promote a finding beyond what the evidence supports. The self-audit gate (Phase 3d) exists to catch you doing this before your human partner has to.
 
 ## Evidence Grading
 

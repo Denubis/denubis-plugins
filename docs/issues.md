@@ -317,6 +317,8 @@ Two independent paths:
    - Current review's M2 revision must reference this issue and prescribe the workaround pattern (one-term-per-query, executor unions results, avoid apostrophes by using alternative spellings).
    - Any future plan or skill invoking cc-search-chats documents the fragility and example-safe queries.
 
+**Operator direction (2026-06-11, Phase 3 gate):** prioritise path 1. The union-in-Python workaround has now been re-implemented at least twice (the 2026-04-19 thread audit and Phase 3's `red_search.py`), and the restructured testing-skills-with-subagents protocol documents the constraints again. Improving the tool beats reinventing the workaround in each consumer. Upstream fix scope should also cover the worktree project-path round-trip lossiness recorded in `phase_03_red_evidence.md` (encode/decode of `-` in project directory names is not invertible).
+
 **Related:**
 
 - `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/critical-peer-review-2026-04-18.md` M2 finding
@@ -357,6 +359,31 @@ Interaction with existing auto-memory: complementary, not redundant. Auto-memory
 - `plugins/denubis-extending-claude/skills/maintaining-project-context/SKILL.md`
 - `plugins/denubis-plan-and-execute/skills/finishing-a-development-branch/SKILL.md`
 - ISSUE-10 (cc-search-chats FTS5 fragility — must be resolved or worked around before this skill is reliable)
+
+---
+
+### ISSUE-12: Add a "can it do it by default?" pre-check to skill-authoring guidance
+
+- **Status:** open
+- **Opened:** 2026-07-05 (idea captured 2026-06-21 in `note20260621`)
+- **Origin:** Operator note `note20260621`, prompted by the Microsoft devblog "Stop overloading your skills" (https://devblogs.microsoft.com/blog/stop-overloading-your-skills). Given a home during the 2026-07-05 skill-skills-upstream-sync resume session.
+
+**Description:**
+
+Before authoring a skill, check whether the base model can already do the task by default. Skills that re-encode default capability are overload — they spend context and discovery budget for no behavioural gain. The captured heuristic is **"can it do it by default?"**: if yes, don't write the skill, or write only the thin part the default misses. The MS post is cited as the source of the framing but has not been read or verified in-session; confirm its actual argument before leaning on it.
+
+This is a candidate pre-flight gate for the skill-authoring skills (`writing-skills`, `writing-claude-directives`), sitting alongside the existing obra form-taxonomy guidance.
+
+**Proposed approach:**
+
+Small. Likely a short addition to `writing-skills` (cross-referenced from `writing-claude-directives`) framing the default-capability check as a pre-authoring question. Could fold into the Phase-4-queued obra form-guidance import — both edit the same skill-authoring surface — rather than land standalone. Read the MS post and evidence-grade its heuristics before importing any specific wording.
+
+**Related:**
+
+- `plugins/denubis-extending-claude/skills/writing-skills/SKILL.md`
+- `plugins/denubis-extending-claude/skills/writing-claude-directives/SKILL.md`
+- Phase-4-queued import work item in `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_true_up_sweep.md` (2026-07-05 dated append) — possible fold target
+- https://devblogs.microsoft.com/blog/stop-overloading-your-skills
 
 ---
 

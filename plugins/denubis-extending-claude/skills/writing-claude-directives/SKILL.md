@@ -30,11 +30,11 @@ NEVER use ellipses
 Your response will be read aloud by a text-to-speech engine, so never use ellipses since the TTS engine cannot pronounce them.
 ```
 
-**4. Placement matters.** Instructions at prompt start and end receive higher attention. Critical rules go at boundaries.
+**4. Placement matters.** Put critical rules at the start or end of the prompt rather than the middle; boundary positions tend to be followed more reliably.
 
-**5. ~150 instruction limit.** More instructions = uniform degradation across ALL rules. Prune ruthlessly.
+**5. Long instruction lists dilute adherence.** As a prompt accumulates rules, the model tends to follow each one less reliably — not only the newest. Prune ruthlessly.
 
-**6. Repetition enforces critical rules.** For high-stakes requirements, repeat with different framings.
+**6. Repetition reinforces critical rules.** For high-stakes requirements, repeating them with different framings tends to improve adherence.
 
 ## Token Efficiency
 
@@ -66,7 +66,7 @@ description: Use when tests have race conditions or timing dependencies - replac
 
 ## Compliance Techniques
 
-Claude 4.x models are highly responsive to instructions. Lead with context and motivation; reserve imperatives for critical boundaries.
+Current Claude models are highly responsive to instructions — the current tier and per-model specifics live in [`model-tier-notes.md`](model-tier-notes.md). Lead with context and motivation; reserve imperatives for critical boundaries.
 
 ### Primary: Context + Motivation
 
@@ -87,16 +87,20 @@ Use structure to make compliance the path of least resistance:
 | Pattern | Example |
 |---------|---------|
 | Workflow steps | Numbered steps with verification gates |
-| Task tracking (TaskCreate/TaskUpdate) | Checklists without tracking = skipped steps |
+| Task tracking (TaskCreate/TaskUpdate; if unavailable, keep a checklist file on disk so work survives session interruption) | Checklists without tracking = skipped steps |
 | Forced commitment | "Announce: I'm using [skill]" |
 | Explicit blocking | "If X happens, stop and do Y instead" |
 
 ### Escalation: Imperatives (Use Sparingly)
 
-For Claude 4.x, aggressive language ("YOU MUST", "CRITICAL") can cause overtriggering. Use normal language first:
+Imperatives divide into two cases, and the distinction is load-bearing. **Rhetorical emphasis** — stacking `CRITICAL` / `YOU MUST` / `NEVER` onto ordinary instructions to signal importance — should be dialled back. Current Claude models overtrigger on these markers, reading urgency as content-signal rather than emphasis. **True boundaries** — irreversibility, safety-critical operations, unconditional prohibitions — retain the imperative; they earn it. The cost of misfire differs between the two cases: rhetorical overtrigger degrades instruction-following in nearby unrelated contexts, while a missed true-boundary gate destroys work, rewrites shared history, or leaks secrets. Rather than `CRITICAL: You MUST use this tool when X`, prefer `Use this tool when X`; but leave `Never commit secrets to version control` alone. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-06-10).
+
+**Trigger explicitness fixes under-triggering — not stronger emphasis.** The dial-back above answers overtriggering; the opposite failure (a tool or skill that should fire and doesn't) has a different fix. The remedy for under-triggering is a plain, specific when-to-use condition in the description — `Use when X`, `Call this when the user asks about Y` — placed in the capability's own description, not just surrounding prose. This gives measurable should-call lift. Reaching for louder language instead is the trap: it does not raise the should-call rate and it overtriggers previous-generation tiers. Explicit trigger conditions, not emphasis, are the lever in both directions. Per-model specifics and provenance are in [`model-tier-notes.md`](model-tier-notes.md) → Cross-model patterns.
+
+One example of each case (the dial-back transformation itself is shown under Primary: Context + Motivation above):
 
 ```markdown
-# Often sufficient for 4.x
+# Often sufficient for current models
 Use this tool when searching for files.
 
 # Reserve imperatives for true boundaries
@@ -118,6 +122,18 @@ Write the test first. Code written before its test tends to test the implementat
 | Technique (patterns, how-to) | Clear steps, "we want quality" framing |
 | Reference (documentation) | Clarity only, no persuasion needed |
 
+### Ask for Evidence, Not Reasoning-Echo
+
+Do not instruct the model to echo, transcribe, or explain its internal reasoning as response text — on some tiers this can trigger a `reasoning_extraction` refusal and cause fallbacks (per-model specifics in [`model-tier-notes.md`](model-tier-notes.md)). Ask for evidence and justification *in the output* — "cite the line you changed", "state which check you ran" — rather than asking the model to reproduce the thinking that produced it. If reasoning visibility is genuinely needed, read the structured `thinking` blocks instead of prompting for a transcript.
+
+### Name a Fallback for Harness Tools
+
+A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agent`/`Task`, MCP tools) must state the fallback when the tool is absent — "if unavailable, ask inline". Tool rosters vary per session (operator evidence: the `claudew` alias disables specific tools), so a directive that assumes a tool is present misfires wherever it is not. Reference MCP tools by the fully qualified `Server:tool` form so the model can locate them.
+
+## Rubric Callback
+
+Before writing a new directive — or editing one in a way that changes its scope, triggers, audience, or failure consequences — check whether the underlying agent-task-or-skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
+
 ## Structure Patterns
 
 ### XML for Directives and Format Control
@@ -138,7 +154,7 @@ XML also works as format indicators:
 <structured_data>JSON or tables here</structured_data>
 ```
 
-XML outperforms markdown, JSON, or YAML for rule preservation in long prompts.
+In long prompts, XML tags tend to preserve rules more reliably than markdown, JSON, or YAML.
 
 ### Match Prompt Style to Desired Output
 
@@ -198,7 +214,7 @@ Do not jump into implementation or change files unless clearly instructed. When 
 
 ## Overengineering Prevention
 
-Claude 4.x tends to overengineer. Include this when needed:
+Current Claude models tend to overengineer — adding files, abstractions, or unrequested tidying, especially at higher effort (per-model specifics in [`model-tier-notes.md`](model-tier-notes.md) → Cross-model patterns):
 
 ```markdown
 Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
@@ -210,14 +226,11 @@ Don't add error handling, fallbacks, or validation for scenarios that can't happ
 Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task. Reuse existing abstractions where possible and follow DRY.
 ```
 
+The template adapts Anthropic's sample overengineering prompt — the negative framing is the vendor's own tested phrasing, kept as a deliberate exception to Principle 2. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-07-09).
+
 ## Model-Specific Notes
 
-### Opus 4.5: "Think" Sensitivity
-
-When extended thinking is disabled, Opus 4.5 is sensitive to the word "think" and variants. Replace with:
-- "consider" instead of "think about"
-- "evaluate" instead of "think through"
-- "determine" instead of "think whether"
+Per-model behavioural specifics (effort levels, steerability, instruction-following characteristics, extended-thinking budgets) live in [`model-tier-notes.md`](model-tier-notes.md) as a supporting file so they can be refreshed without touching this orchestrator. Consult that file when a directive's target model matters — e.g. choosing effort level, calibrating aggressive-language dial-back, or deciding whether to route judgement-heavy work away from the Haiku tier.
 
 ## Naming (for Skills)
 
@@ -234,7 +247,7 @@ When extended thinking is disabled, Opus 4.5 is sensitive to the word "think" an
 | Vague triggers | Specific symptoms: "tests flaky", "race condition" |
 | Deeply nested references | Keep one level deep from main file |
 | Windows paths | Always forward slashes |
-| Aggressive language for 4.x | Lead with context, reserve imperatives for boundaries |
+| Aggressive language for current models | Lead with context, reserve imperatives for boundaries (see Compliance Techniques section) |
 
 ## Anti-Rationalization
 
@@ -252,6 +265,8 @@ All mean: Follow the process.
 ```
 
 ## Testing Directives
+
+Directives are pressure-tested the same way skills are — baseline first, then close loopholes. The steps below are the short form; for the full method (independent-session RED sourcing, model-tier choice, edit-scoped re-testing), use `denubis-extending-claude:testing-skills-with-subagents`.
 
 1. **Baseline:** Run scenario WITHOUT directive, document failures
 2. **Apply:** Add directive, verify compliance
