@@ -87,7 +87,7 @@ Use structure to make compliance the path of least resistance:
 | Pattern | Example |
 |---------|---------|
 | Workflow steps | Numbered steps with verification gates |
-| Task tracking (TaskCreate/TaskUpdate) | Checklists without tracking = skipped steps |
+| Task tracking (TaskCreate/TaskUpdate; if unavailable, keep a checklist file on disk so work survives session interruption) | Checklists without tracking = skipped steps |
 | Forced commitment | "Announce: I'm using [skill]" |
 | Explicit blocking | "If X happens, stop and do Y instead" |
 
@@ -97,7 +97,7 @@ Imperatives divide into two cases, and the distinction is load-bearing. **Rhetor
 
 **Trigger explicitness fixes under-triggering — not stronger emphasis.** The dial-back above answers overtriggering; the opposite failure (a tool or skill that should fire and doesn't) has a different fix. The remedy for under-triggering is a plain, specific when-to-use condition in the description — `Use when X`, `Call this when the user asks about Y` — placed in the capability's own description, not just surrounding prose. This gives measurable should-call lift. Reaching for louder language instead is the trap: it does not raise the should-call rate and it overtriggers previous-generation tiers. Explicit trigger conditions, not emphasis, are the lever in both directions. Per-model specifics and provenance are in [`model-tier-notes.md`](model-tier-notes.md) → Cross-model patterns.
 
-Concrete before/after (the dial-back transformation itself is shown under Primary: Context + Motivation above):
+One example of each case (the dial-back transformation itself is shown under Primary: Context + Motivation above):
 
 ```markdown
 # Often sufficient for current models
@@ -225,6 +225,8 @@ Don't add error handling, fallbacks, or validation for scenarios that can't happ
 
 Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task. Reuse existing abstractions where possible and follow DRY.
 ```
+
+The template adapts Anthropic's sample overengineering prompt — the negative framing is the vendor's own tested phrasing, kept as a deliberate exception to Principle 2. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-07-09).
 
 ## Model-Specific Notes
 
