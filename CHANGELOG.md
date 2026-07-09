@@ -1,5 +1,19 @@
 # Changelog
 
+## [denubis-extending-claude] 1.9.0
+
+Upstream-sync overhaul of the skill-authoring chain: a new epistemic-humility rubric skill, writing-skills rebuilt as an orchestrator, and major reworks of testing-skills-with-subagents and writing-claude-directives.
+
+**New:**
+- `epistemic-humility` skill: four-screen rubric (Scope, Observability, Process, Failure-pattern) with paragraph-level source citations and a self-application walk-through. Presenting results, conclusions, or findings now falls in scope: the skill requires an explicit announcement and language tempered to the evidence.
+- `writing-claude-directives`: `model-tier-notes.md` behavioural notes for the 2026-06 model tier (Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5), with supersession history in a sibling log file.
+- `writing-skills`: obra/superpowers imports pinned at `6fd4507` — `anthropic-best-practices.md` (verbatim), the `render-graphs.js` authoring tool, and an `examples/CLAUDE_MD_TESTING.md` worked example — plus a README covering their dependencies.
+
+**Changed:**
+- `writing-skills` rewritten as a thin orchestrator sequencing epistemic-humility (scope check), testing-skills-with-subagents (RED baseline before authoring), and writing-claude-directives (phrasing). Deployment now requires explicit human acceptance, and editing an existing skill re-enters the sequence scoped to the change.
+- `testing-skills-with-subagents`: conversation-precedent protocol requiring independently sourced RED baselines, letter-vs-spirit distinction promoted to foundational guidance, hardened RED-baseline gate, AskUserQuestion fallbacks.
+- `writing-claude-directives`: restructured for the current model tier, rubric callback into epistemic-humility, plan-workflow vocabulary scrubbed from shipped guidance, supersession narratives moved out of SKILL.md.
+
 ## [denubis-hook-shortcut-detection] removed
 
 Retired the plugin. Its `shortcut-detector.py` Stop hook is deleted, the marketplace entry and README references are gone, and the dedicated `tests/test_shortcut_detector.py` is removed.
