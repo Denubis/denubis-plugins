@@ -74,6 +74,7 @@ A skill directory holds `SKILL.md` plus optional peer supporting files and an op
 ---
 name: skill-name-with-hyphens
 description: Use when [triggers/symptoms] - [what it does, third person]
+user-invocable: false  # true only when users should invoke it directly
 ---
 
 # Skill Name
