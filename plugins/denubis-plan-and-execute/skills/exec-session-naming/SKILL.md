@@ -2,7 +2,7 @@
 name: exec-session-naming
 family: executing-an-implementation-plan,starting-an-implementation-plan,starting-a-design-plan,systematic-debugging
 description: Use when starting an implementation, design, or debugging session - builds a structured slug and renames the current tmux pane's window
-user-invocable: false
+user-invocable: true
 ---
 
 # Session Naming
