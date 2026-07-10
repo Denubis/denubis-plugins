@@ -6,7 +6,7 @@ user-invocable: false
 
 # Writing Skills
 
-Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?), `denubis-extending-claude:testing-skills-with-subagents` (does it survive pressure?). Iron Law: no skill without a failing test first.
+Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:testing-skills-with-subagents` (does it fail without the skill, and survive pressure with it?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?). Iron Law: no skill without a failing test first.
 
 ## Core Principle
 
