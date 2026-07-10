@@ -111,7 +111,7 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 
 - `anthropic-best-practices.md` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Anthropic-authored reference on skill structure, discovery optimisation, and anti-patterns. Reference material, not denubis-authored guidance.
 - `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime: run it by hand when a SKILL.md you are authoring has `dot` blocks you want rendered to SVG for review.
-- `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11, consolidated 2026-07-05) — worked example of pressure-testing CLAUDE.md documentation.
+- `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11) — worked example of pressure-testing CLAUDE.md documentation.
 
 ## Anti-Patterns
 

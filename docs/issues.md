@@ -387,6 +387,30 @@ Small. Likely a short addition to `writing-skills` (cross-referenced from `writi
 
 ---
 
+### ISSUE-13: Denubis-native worked example to replace obra's CLAUDE_MD_TESTING as primary imitation target
+
+- **Status:** open
+- **Opened:** 2026-07-10 (intent first recorded 2026-07-05 in the example file's Denubis note)
+- **Origin:** Fable-pass skill-3 review of `writing-skills` (finding Minor 2). The promissory sentence "a denubis-native worked example … is queued to replace this" was scar tissue in `examples/CLAUDE_MD_TESTING.md`; the intent moves here with its state.
+
+**Description:**
+
+`writing-skills/examples/CLAUDE_MD_TESTING.md` is the plugin's only worked example of pressure-testing documentation. It is obra-authored (upstream commit `6fd4507`, imported 2026-06-11), and its scenarios were invented by the campaign's own author — which the denubis checklist forbids for RED baselines (the conversation-precedent protocol in `testing-skills-with-subagents`: source the RED baseline from an independent session). The file models variant-testing mechanics well but models RED-baseline sourcing wrongly; its in-file doctrinal caveat says imitate the mechanics, source scenarios independently.
+
+State at capture (2026-07-10): no denubis-native replacement exists or is drafted. The raw material the original intent named — "real campaign evidence" — now exists in-repo: the skill-skills branch's RED/GREEN records are independently-sourced pressure evidence from actual campaigns (`phase_02_red_evidence.md`, `phase_03_red_evidence.md`, `phase_05_announce_trigger_red_evidence.md` in `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`).
+
+**Proposed approach:**
+
+Assemble a worked example from one recorded campaign — the 2026-07-09 announce-and-temper trigger test is a complete two-round RED story with transcript evidence. Author it through writing-skills' own workflow (scope-check first). Decide at authoring time whether the obra file stays as a secondary mechanics reference or is deleted on replacement.
+
+**Related:**
+
+- `plugins/denubis-extending-claude/skills/writing-skills/examples/CLAUDE_MD_TESTING.md`
+- `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md` (conversation-precedent protocol)
+- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05_announce_trigger_red_evidence.md`
+
+---
+
 ## Closed
 
 *(No closed issues yet.)*
