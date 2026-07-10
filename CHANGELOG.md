@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-extending-claude] 1.9.1
+
+Fable-pass review fixes across the skill-authoring triad: scar-tissue removal, announce cadence, and checklist tracking discipline.
+
+**Changed:**
+- `epistemic-humility`: announce-and-temper fires once per session when the skill loads, not at every presentation.
+- `writing-skills`: checklist preamble mandates TaskCreate with a durable on-disk checklist mirror; intro sub-skill order aligned with the Iron Law workflow; skip-testing counter restored; SKILL.md template frontmatter gains `user-invocable`; consolidation scar scrubbed from the worked example (ISSUE-13).
+- `maintaining-project-context`: stale Called-by step pointers corrected.
+
+**Fixed:**
+- `testing-skills-with-subagents`: scar-tissue removal — unresolvable design-plan pointer cut, consolidation narration replaced with plain cross-references.
+
+## [denubis-plan-and-execute] 2.36.1
+
+Small release: exec-session-naming becomes user-invocable.
+
+**Changed:**
+- `exec-session-naming`: user-invocable, so `/exec-session-naming` can be called directly at session start.
+
 ## [denubis-plan-and-execute] 2.36.0
 
 impl-plan-write gains UAT-collation discipline and non-determinism self-audits; small fixes ride along in proleptic-challenger, exec-refactoring-rubric, design-write, exec-uat-gate, and systematic-debugging.

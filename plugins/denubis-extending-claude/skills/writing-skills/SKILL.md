@@ -6,7 +6,7 @@ user-invocable: false
 
 # Writing Skills
 
-Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?), `denubis-extending-claude:testing-skills-with-subagents` (does it survive pressure?). Iron Law: no skill without a failing test first.
+Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:testing-skills-with-subagents` (does it fail without the skill, and survive pressure with it?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?). Iron Law: no skill without a failing test first.
 
 ## Core Principle
 
@@ -74,6 +74,7 @@ A skill directory holds `SKILL.md` plus optional peer supporting files and an op
 ---
 name: skill-name-with-hyphens
 description: Use when [triggers/symptoms] - [what it does, third person]
+user-invocable: false  # true only when users should invoke it directly
 ---
 
 # Skill Name
@@ -111,7 +112,7 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 
 - `anthropic-best-practices.md` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Anthropic-authored reference on skill structure, discovery optimisation, and anti-patterns. Reference material, not denubis-authored guidance.
 - `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime: run it by hand when a SKILL.md you are authoring has `dot` blocks you want rendered to SVG for review.
-- `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11, consolidated 2026-07-05) — worked example of pressure-testing CLAUDE.md documentation.
+- `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11) — worked example of pressure-testing CLAUDE.md documentation.
 
 ## Anti-Patterns
 
@@ -122,7 +123,9 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 
 ## Skill Creation Checklist
 
-**IMPORTANT:** Use TaskCreate to track each item.
+Use TaskCreate to track each item, and mirror decisions and completion state to a checklist file on disk so the worklog survives session interruption. If TaskCreate is unavailable, the checklist file is the tracker.
+
+"Too simple to test" and "no time to test" are the rationalisations this checklist exists to overrule.
 
 **Editing instead of creating?** Run the items your change touches. The REFACTOR re-test items are never skippable: name which pressure scenarios the edit could weaken and re-run them.
 

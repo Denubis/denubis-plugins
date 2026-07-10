@@ -25,7 +25,7 @@ AbsenceJudgement.tex:203 introduces `technoscholasticism` as "a digital scholast
 
 The rubric below gates artefacts before they are built. This section gates the language of anything that states what is true — results, conclusions, findings, whether in chat at the end of a task or in a markdown artefact.
 
-When presenting results or conclusions, announce: **"I'm using the epistemic-humility skill to temper my language."** The announcement is the observable that the tempering pass happened; its absence is the named falsifier.
+When this skill first loads in a session, announce: **"I'm using the epistemic-humility skill to temper my language."** Announce once per session, at load — repeating it at every presentation degrades the announcement into a tic. The tempering itself applies to every presentation of results that follows. The announcement is the observable that the tempering discipline is active; a session that presents conclusions without ever having announced is the named falsifier.
 
 Tempering means the language tracks the evidence:
 
