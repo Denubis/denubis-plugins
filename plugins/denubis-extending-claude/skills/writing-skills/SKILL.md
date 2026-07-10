@@ -124,6 +124,8 @@ Three files imported from obra/superpowers ship alongside this skill. See `READM
 
 Use TaskCreate to track each item, and mirror decisions and completion state to a checklist file on disk so the worklog survives session interruption. If TaskCreate is unavailable, the checklist file is the tracker.
 
+"Too simple to test" and "no time to test" are the rationalisations this checklist exists to overrule.
+
 **Editing instead of creating?** Run the items your change touches. The REFACTOR re-test items are never skippable: name which pressure scenarios the edit could weaken and re-run them.
 
 **Scope:**
