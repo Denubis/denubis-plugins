@@ -60,7 +60,7 @@ The RED phase needs realistic baseline behaviour. A stronger model might avoid p
 
 Run GREEN-phase tests one model tier below your expected production model. If you tested RED with Sonnet, test GREEN with Haiku. If you tested RED with Opus, test GREEN with Sonnet.
 
-The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, the Sonnet and Opus tiers will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough. Structural principle retained: weakest-model-tier-that-follows = strongest-clarity-test.
+The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, the Sonnet and Opus tiers will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough.
 
 ### No Blaming the Model
 
@@ -152,11 +152,9 @@ C) Write tests now (30 min), then commit
 Choose A, B, or C. Be honest.
 ```
 
-Multiple pressures combine here. Forces explicit choice. The catalogue of
-pressure types and the criteria for a good scenario now live in the REFACTOR
-phase's **Pressure-Scenario Completeness Coverage** subsection — pressure
-scenarios are a completeness tool, so their reference material sits with the
-REFACTOR work that uses it.
+Multiple pressures combine here. Forces explicit choice. For the catalogue of
+pressure types and the criteria for a good scenario, see **Pressure-Scenario
+Completeness Coverage** in the REFACTOR phase.
 
 ### Testing Setup
 
@@ -262,8 +260,6 @@ Agent should now:
 
 Synthetic multi-factor pressure scenarios are a REFACTOR-phase completeness tool, not a RED baseline. After the skill passes GREEN against real-transcript failures (see the Conversation-Precedent Protocol in the RED phase), pressure scenarios check whether the skill holds up against additional failure modes that real transcripts may not have exercised. They supplement conversation-precedent evidence; they do not replace it.
 
-This example shares its sunk-cost/time/exhaustion framing with the "Great scenario" under VERIFY GREEN above — see that scenario for the side-by-side bad/good/great progression and the scenario-quality criteria it illustrates.
-
 **Example:**
 
 ```markdown
@@ -300,7 +296,7 @@ not dogmatic"), the skill has a loophole this completeness scenario surfaced.
 
 **Best tests combine 3+ pressures.**
 
-These are **environmental pressures** that induce rationalization in the subagent under test — situations where the tester would naturally look for shortcuts. They are NOT Cialdini persuasion principles (which is why the skill does not cross-reference a persuasion file — see the design plan's *Persuasion principles do not belong in denubis skills*).
+These are **environmental pressures** that induce rationalization in the subagent under test — situations where the tester would naturally look for shortcuts. They are NOT Cialdini persuasion principles.
 
 #### Key Elements of Good Scenarios
 
