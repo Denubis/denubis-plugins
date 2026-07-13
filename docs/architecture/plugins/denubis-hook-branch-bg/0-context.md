@@ -50,9 +50,10 @@ Registered in `plugins/denubis-hook-branch-bg/hooks/hooks.json` (`22d2148`):
 
 - **Event:** `SessionStart`
 - **Matcher:** `startup|resume|clear|compact`
-- **Command:** `uv run python "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"`
+- **Command:** `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"`
 - **Timeout:** 5 seconds
 - **suppressOutput:** `true`
+- **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
 ## Cross-References
 

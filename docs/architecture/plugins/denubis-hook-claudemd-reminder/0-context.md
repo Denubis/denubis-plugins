@@ -37,9 +37,10 @@ Registered in `plugins/denubis-hook-claudemd-reminder/hooks/hooks.json` (`22d214
 
 - **Event:** `PostToolUse`
 - **Matcher:** `Bash`
-- **Command:** `uv run python "${CLAUDE_PLUGIN_ROOT}/hooks/git-command-reminder.py"`
+- **Command:** `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/git-command-reminder.py"`
 - **Timeout:** 5 seconds
 - **suppressOutput:** `true`
+- **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
 ## Cross-References
 

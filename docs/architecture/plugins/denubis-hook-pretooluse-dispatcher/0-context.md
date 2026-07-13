@@ -57,8 +57,9 @@ Registered in `plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json` (`dd
 
 - **Event:** `PreToolUse`
 - **Matcher:** `Bash`
-- **Command:** `uv run python "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.py"`
+- **Command:** `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.py"`
 - **Timeout:** 15 seconds
+- **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs — and because this dispatcher gates every `Bash` call, that wedge is self-blocking during a merge. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
 ## Cross-References
 
