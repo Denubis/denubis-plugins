@@ -272,13 +272,17 @@ def build_output(final: dict) -> dict:
     hook_output: dict = {}
     if final["decision"]:
         hook_output["permissionDecision"] = final["decision"]
-        hook_output["hookEventName"] = "PreToolUse"
         if final["reason"]:
             hook_output["permissionDecisionReason"] = final["reason"]
     if final["updated"] is not None:
         hook_output["updatedInput"] = final["updated"]
     if final["context"]:
         hook_output["additionalContext"] = final["context"]
+    # Claude Code validates hookSpecificOutput.hookEventName on EVERY
+    # response, not only permission decisions — a context-only annotation
+    # without it is rejected ("missing required field hookEventName").
+    if hook_output:
+        hook_output["hookEventName"] = "PreToolUse"
     output = {"hookSpecificOutput": hook_output}
     if final["system"]:
         output["systemMessage"] = final["system"]
@@ -333,7 +337,16 @@ def main(argv: list[str]) -> int:
 
     final = run_hooks(hook_list, sys.stdin.buffer.read())
     if final["deny_output"] is not None:
-        print(final["deny_output"])
+        # Sub-hook deny output passes through verbatim; stamp the required
+        # hookEventName in case the sub-hook omitted it.
+        try:
+            deny_data = json.loads(final["deny_output"])
+            deny_hook_output = deny_data.get("hookSpecificOutput")
+            if isinstance(deny_hook_output, dict):
+                deny_hook_output["hookEventName"] = "PreToolUse"
+            print(json.dumps(deny_data))
+        except (json.JSONDecodeError, TypeError):
+            print(final["deny_output"])
         return 0
     if not (
         final["decision"]

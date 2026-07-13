@@ -266,3 +266,29 @@ class TestMainIntegration:
         )
         assert result.returncode == 0
         assert result.stdout.decode().strip() == ""
+
+
+class TestOutputContract:
+    """Every emitted hookSpecificOutput must carry hookEventName."""
+
+    def test_deny_carries_hook_event_name(self):
+        result = _mod.deny("nope")
+        assert result["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+
+    def test_advisory_context_carries_hook_event_name(self):
+        payload = json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": "gh issue list"}}
+        ).encode()
+        result = subprocess.run(
+            [sys.executable, str(_HOOK_PATH)],
+            input=payload,
+            capture_output=True,
+            timeout=10,
+            env={
+                "PATH": "/usr/bin:/bin",
+                "ALLOWED_GH_REPO": "denubis/denubis-plugins",
+            },
+        )
+        assert result.returncode == 0
+        out = json.loads(result.stdout.decode())
+        assert out["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
