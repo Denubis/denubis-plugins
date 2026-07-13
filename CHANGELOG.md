@@ -1,5 +1,33 @@
 # Changelog
 
+## [denubis-hook-pretooluse-dispatcher] 1.1.2
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `hooks.json` launches the dispatcher with `uv run --no-project --no-config`. A malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) previously wedged `uv` in settings discovery before the hook ran; because this dispatcher gates every `Bash` call, that wedge was self-blocking during a merge. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
+
+## [denubis-plan-and-execute] 2.36.2
+
+Both `uv`-launched hooks made independent of the caller's working directory.
+
+**Fixed:**
+- `session-start.py` and `code-quality-guard.py` launch with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs. `update-live-marker.py` was already immune (deliberate bare `python3`) and is unchanged.
+
+## [denubis-hook-claudemd-reminder] 1.1.4
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `git-command-reminder.py` launches with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs.
+
+## [denubis-hook-branch-bg] 0.2.5
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `branch-bg.py` launches with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs.
+
 ## [denubis-extending-claude] 1.9.1
 
 Fable-pass review fixes across the skill-authoring triad: scar-tissue removal, announce cadence, and checklist tracking discipline.
