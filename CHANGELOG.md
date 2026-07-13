@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-hook-pretooluse-dispatcher] 1.1.3 / [denubis-hook-gh-fork-guard] 1.2.2 / [denubis-plan-and-execute] 2.36.3
+
+Every emitted `hookSpecificOutput` now carries the required `hookEventName`.
+
+**Fixed:**
+- Claude Code validates `hookSpecificOutput.hookEventName` on every hook response, not only permission decisions. The dispatcher's `build_output` stamped it only on the decision branch, so context-only annotations (the common case) were rejected with "missing required field hookEventName"; the deny passthrough forwarded sub-hook output verbatim with the same hole. Both now stamp the field. `gh-fork-guard` (deny + advisory) and `code-quality-guard` (deny + warn) stamp it at source as well. Regression tests in all three suites, including dispatcher bats cases for context-only and deny-passthrough output.
+
 ## [denubis-hook-pretooluse-dispatcher] 1.1.2
 
 Hook launcher made independent of the caller's working directory.
