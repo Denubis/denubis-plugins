@@ -28,11 +28,12 @@ def tmux_env(monkeypatch, tmp_path):
 
 class TestMaybeRename:
     def test_renames_window_when_no_cache_or_lock(self, tmux_env):
-        """AC4.1: TMUX set, no lock, no cache -> calls tmux rename-window."""
+        """AC4.1: TMUX set, no lock, no cache -> targets the exact tmux pane."""
+        pane_id, _cache_file, _lock_file = tmux_env
         with mock.patch("workflow_statusline.tmux.subprocess") as mock_sub:
             tmux.maybe_rename("testrepo")
             mock_sub.run.assert_called_once_with(
-                ["tmux", "rename-window", "Cl:testrepo"],
+                ["tmux", "rename-window", "-t", f"%{pane_id}", "Cl:testrepo"],
                 check=False,
                 capture_output=True,
             )

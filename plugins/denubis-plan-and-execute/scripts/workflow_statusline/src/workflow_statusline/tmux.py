@@ -30,6 +30,8 @@ def maybe_rename(name: str) -> None:
         return
 
     subprocess.run(
-        ["tmux", "rename-window", f"Cl:{name}"], check=False, capture_output=True
+        ["tmux", "rename-window", "-t", tmux_pane, f"Cl:{name}"],
+        check=False,
+        capture_output=True,
     )
     cache.write(cache_file, name)

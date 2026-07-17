@@ -1,5 +1,10 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.36.4
+
+**Fixed:**
+- The workflow statusline now targets `tmux rename-window` at its own `$TMUX_PANE`. Previously, an untargeted rename could name whichever Byobu window was active and then suppress correction through the pane-specific 24-hour cache.
+
 ## [denubis-hook-pretooluse-dispatcher] 1.1.3 / [denubis-hook-gh-fork-guard] 1.2.2 / [denubis-plan-and-execute] 2.36.3
 
 Every emitted `hookSpecificOutput` now carries the required `hookEventName`.

@@ -434,7 +434,7 @@ class TestTmuxIntegration:
             main()
 
         mock_subprocess.run.assert_called_once_with(
-            ["tmux", "rename-window", "Cl:testrepo"],
+            ["tmux", "rename-window", "-t", "%42", "Cl:testrepo"],
             check=False,
             capture_output=True,
         )
