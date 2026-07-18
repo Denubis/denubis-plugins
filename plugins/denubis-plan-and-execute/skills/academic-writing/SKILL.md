@@ -25,7 +25,7 @@ Find them:
 ls .notes/ 2>/dev/null | grep -Ei 'prose|plain|scar|register|citation|pinpoint|writing|voice'
 ```
 
-Read every match. Read any `reference_*` whose own description mentions register, citation, or style. If the project has no such notes, the portable core below is the floor, and consider proposing one `.notes/feedback_*.md` once you learn the project's register.
+Read every match. Read any `reference_*` whose own description mentions register, citation, or style. If the project has no such notes, the portable core below is the floor, and consider proposing one once you learn the project's register: a starting template ships alongside this skill as `reference_register-TEMPLATE.md`.
 
 This gate fires on every kind of prose edit, including a two-sentence reviewer tweak deep in a long session. The cost is one read. The failure it prevents is a whole session of drift that no one catches until review.
 
