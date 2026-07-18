@@ -20,6 +20,8 @@ The recurring forms:
 - **Journal-requirement framing.** Justifying a choice by the venue ("per journal policy"). The choice stands on its own grounds.
 - **Procedural narration.** "We computed", "we then ran", where the sentence adds nothing beyond the step.
 
+Where the project's register note attests a signposting convention (sequential markers such as "First / Second / Finally", or a "this paper presents" opener), the convention wins, and the subject test governs the sentences the note is silent on.
+
 A reviewer asking you to "signpost how this follows", "make the contribution explicit", or "address concern X" is asking for a clearer **claim**, not a sentence about the manuscript. Satisfy the request with substance. Open with the substantive link rather than a structural announcement, put the novel claim where contributions live, and let a small-N worry live in limitations as a stated design fact rather than a defensive aside in the body.
 
 ## Plain language
