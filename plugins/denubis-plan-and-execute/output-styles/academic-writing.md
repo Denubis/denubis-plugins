@@ -15,7 +15,7 @@ For each sentence, ask: is its subject the **study**, or the **manuscript**? If 
 The recurring forms:
 
 - **Foreshadowing.** Previewing a hypothesis, result, or contribution before its section. State hypotheses in the present-study section, and let the introduction end on the gap.
-- **Defensive hedging.** Pre-empting a reviewer ("twelve students cannot generalise", "without a control group"). State the design, and let limitations live where limitations live.
+- **Defensive hedging.** Pre-empting a reviewer ("twelve students cannot generalise", "without a control group"). State the design, and let limitations live where limitations live. Epistemic hedging is different and stays: "suggests", "may", and "indicates" calibrate a claim to its evidence, and deleting one strengthens a claim the evidence may not support. Before cutting a hedge, decide which kind it is, and match the attribution verb to the evidence (demonstrates, indicates, suggests).
 - **Provenance housekeeping.** Sentences about the citations or the structure ("this section sets out", "building on the gap above", "reported through two lenses"). Make the substantive claim and let the relationship show itself.
 - **Journal-requirement framing.** Justifying a choice by the venue ("per journal policy"). The choice stands on its own grounds.
 - **Procedural narration.** "We computed", "we then ran", where the sentence adds nothing beyond the step.
