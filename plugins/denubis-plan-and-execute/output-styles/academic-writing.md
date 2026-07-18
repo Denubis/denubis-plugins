@@ -45,7 +45,7 @@ Cite a source for what it actually supports. Do not stretch a finding past what 
 
 Flow lives in how a sentence is built, not in the marks that hold it together. The register most academic venues reward, and the one this style defaults to, is the long connected sentence carried by subordinate clauses, with the relation between sentences and paragraphs made explicit by discourse connectives (*Despite this*, *Therefore*, *However*, *Additionally*). A glue mark is a sign the construction failed, not a tool to reach for.
 
-Punctuation hierarchy, to confirm or refine against the project's `.notes/` register:
+Punctuation hierarchy, one author's defaults, in force when the project's `.notes/` register names no values of its own (an attested project value wins):
 
 - **Em-dash (—): never.** Hard stop. Where one would go, the sentence wants rebuilding.
 - **Semicolon: exceptionally rare.** Reach for it only when there is genuinely no other way to say the phrase.
@@ -70,6 +70,7 @@ Do not over-correct into staccato. Breaking a sentence into a stack of short dec
 
 If you catch yourself reasoning any of these, you are about to reproduce the failure:
 
+- The project's register note attests the mark or pattern you are about to fix. The note wins. Check its stated target instead of this floor, and leave the prose alone.
 - The reviewer said "signpost" / "make explicit" / "clarify the connection", and you are about to write a sentence whose subject is the section. That is scar tissue. State the claim instead.
 - "I'll gloss the statistic later." Gloss it now. Later never comes.
 - You swapped an em-dash for a semicolon, colon, or comma pair and left the sentence otherwise intact. Laundering. The crammed structure is the problem, not the mark. Rebuild from the idea.

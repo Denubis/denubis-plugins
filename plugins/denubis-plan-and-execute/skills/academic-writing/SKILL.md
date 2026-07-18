@@ -62,7 +62,7 @@ Write to the audience the project names (often non-statisticians). Introduce a c
 
 ## Register: derive it from a target paper
 
-Match a concrete register target, usually a paper the team already published in the venue. Read it and derive the rules rather than guessing: sentence length and connective density, where first person is allowed, how hedging is calibrated, how every statistic gets a plain-words gloss, whether sections open on what they investigate, and the punctuation the register actually uses. The project's `.notes/` may already carry this rubric, and where it does, that rubric wins. This skill does not ship one project's register. It tells you to derive one, and the next section gives the construction and punctuation defaults to start from.
+Match a concrete register target, usually a paper the team already published in the venue. Read it and derive the rules rather than guessing: sentence length and connective density, where first person is allowed, how hedging is calibrated, how every statistic gets a plain-words gloss, whether sections open on what they investigate, and the punctuation the register actually uses. The project's `.notes/` may already carry this rubric, and where it does, that rubric wins. This skill does not ship a universal register. The construction discipline in the next section (the laundering test, the staccato guard, one idea per sentence) is portable; the punctuation hierarchy and connective defaults are one author's register, supplied as the starting point when the project's `.notes/` names none. Where a project note attests different values, the note wins, and those defaults do not fire as red flags.
 
 ## Pinpoint citations (APA paraphrase rule)
 
@@ -79,7 +79,7 @@ Cite a source for what it actually supports. Do not stretch a finding past what 
 
 Flow lives in how a sentence is built, not in the marks that hold it together. The register most academic venues reward, and the one this skill defaults to, is the long connected sentence carried by subordinate clauses, with the relation between sentences and paragraphs made explicit by discourse connectives (*Despite this*, *Therefore*, *However*, *Additionally*). A glue mark is a sign the construction failed, not a tool to reach for.
 
-Punctuation hierarchy, to confirm or refine against the project's `.notes/` register:
+Punctuation hierarchy, one author's defaults, in force when the project's `.notes/` register names no values of its own (an attested project value wins):
 
 - **Em-dash (—): never.** Hard stop. Where one would go, the sentence wants rebuilding.
 - **Semicolon: exceptionally rare.** Reach for it only when there is genuinely no other way to say the phrase.
@@ -104,6 +104,7 @@ Do not over-correct into staccato. Breaking a sentence into a stack of short dec
 
 If you catch yourself reasoning any of these, you are about to reproduce the failure:
 
+- The project's register note attests the mark or pattern you are about to fix. → The note wins. Check its stated target instead of this floor, and leave the prose alone.
 - "It's a small edit, I'll skip re-reading the notes." → Open them. The gate has no size threshold.
 - The reviewer said "signpost" / "make explicit" / "clarify the connection", and you are about to write a sentence whose subject is the section. → That is scar tissue. State the claim instead.
 - "I'll gloss the statistic later." → Gloss it now. Later never comes.
