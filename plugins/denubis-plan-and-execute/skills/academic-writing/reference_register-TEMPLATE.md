@@ -9,8 +9,7 @@ description: >-
   the words "register" or "style" so the gate's description scan
   finds it, and the filename must contain "register", "prose",
   "style", "voice", or "writing" so the gate's ls-grep finds it.
-metadata:
-  type: reference
+type: reference
 ---
 
 # AUTHOR — prose register (PROJECT)
