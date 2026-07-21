@@ -3,11 +3,22 @@
 #
 # The advisor is a full Claude Code session on a different model, briefed to
 # advise and denied the tools to implement. That claim is EMPIRICALLY VERIFIED,
-# not asserted: the last verification (2026-07-21) confirmed a callable surface
-# of Glob, Grep, Read and ReportFindings only, with Write, Bash and Task each
-# returning "No such tool available: <name>. <name> exists but is not enabled in
-# this context." Two earlier versions of this header made the same claim while
-# it was false. Re-verify whenever the list changes; see VERIFY below.
+# not asserted: the last verification (2026-07-21, second run) confirmed a
+# callable surface of Glob, Grep, Read, ReportFindings and EndConversation, with
+# Write returning "No such tool available: Write. Write exists but is not
+# enabled in this context." Two earlier versions of this header made the same
+# claim while it was false.
+#
+# EndConversation is deliberately available: an advisor that cannot end its own
+# session is worse than one that can, so it is a hard include on safety grounds
+# (operator ruling, 2026-07-21) and is absent from the deny list below.
+#
+# The first run of that same verification found EndConversation present in the
+# advisor's schema WHILE the deny list still named it — the harness re-injects
+# deferred tools, and no flag on the command line governs that. The list had not
+# been edited; the surface had moved underneath it. So re-verification cannot be
+# keyed to changes in this list, because upstream renames never touch it:
+# RE-VERIFY AT THE START OF EACH CONSULTATION. See VERIFY below.
 #
 # Two mechanisms carry it:
 #
@@ -49,6 +60,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 cwd="${1:-$PWD}"
 model="${2:-claude-fable-5}"
 
@@ -74,7 +87,7 @@ DENIED=(Bash BashOutput KillShell
         EnterWorktree ExitWorktree EnterPlanMode ExitPlanMode
         Artifact AskUserQuestion SendMessage
         Monitor PushNotification TaskOutput TaskStop
-        WebFetch WebSearch EndConversation
+        WebFetch WebSearch
         TodoWrite TaskCreate TaskUpdate
         # MCP: the auth stubs are callable, and their own descriptions say a
         # completed OAuth makes "the server's real tools become available
@@ -101,7 +114,14 @@ Stay in scope. Do not propose refactors, redesigns, or improvements beyond what 
 
 Give the findings and the evidence for them. Do not narrate your reasoning process."
 
+# Split the CALLER's pane, not tmux's active one. Without -t, tmux splits
+# whatever window is currently active, which is the window the operator happens
+# to be looking at rather than the one that ran this script. Since the caller is
+# normally a Claude Code session in a background window, the advisor landed on
+# top of unrelated work (observed 2026-07-21). $TMUX_PANE is set by tmux in
+# every pane, so it names the caller precisely.
 pane="$(tmux split-window -h -c "$cwd" -P -F '#{pane_id}' \
+  ${TMUX_PANE:+-t "$TMUX_PANE"} \
   claude --model "$model" \
          --disallowed-tools "${DENIED[@]}" \
          --disable-slash-commands \
@@ -124,10 +144,15 @@ echo "model:    $model"
 echo "cwd:      $cwd"
 echo "denied:   ${#DENIED[@]} tools incl. Bash/Write/Edit/Workflow/Cron*/Skill"
 echo "VERIFY:   ask the advisor to enumerate its surface and attempt a write."
-echo "          A deny list fails open on renamed or new tools."
+echo "          Do this EVERY consultation, not only when the list changes:"
+echo "          the harness has re-injected a denied tool with no edit here."
 echo
-echo "drive it with the pane scripts, e.g.:"
-echo "  codex-send.sh $pane 'your consultation'   # same send mechanics"
+echo "drive it with the bundled sender:"
+echo "  $SCRIPT_DIR/advisor-send.sh $pane 'your consultation'"
+echo "  $SCRIPT_DIR/advisor-send.sh $pane - < brief.md   # multi-line from stdin"
+echo
+echo "ARM A MONITOR — a pane advisor finishes silently, with no notification:"
+echo "  watch its transcript stop growing, or poll the pane title for idle."
 echo
 echo "READ ITS REPLY FROM ITS TRANSCRIPT, NOT THE PANE — the TUI redraws in"
 echo "place, so capture-pane returns the viewport, not what it said:"

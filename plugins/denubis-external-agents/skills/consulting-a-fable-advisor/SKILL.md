@@ -34,25 +34,38 @@ After the implementer has drafted and the verifier has run its mechanical checks
 
 ## How to run
 
+**Default: dispatch it as a background agent** (operator preference, 2026-07-21). Use the Agent tool with `model: "fable"` and a read-oriented agent type, and brief it in the prompt exactly as below. The work returns as a completion notification, follow-ups go through `SendMessage`, and there is no pane to babysit.
+
+What this costs, stated plainly: **the Agent tool has no tool-restriction parameter.** Agent types carry fixed tool sets, and the most restricted one available still has `Bash`. So a dispatched advisor *can* write to disk. Those writes are permission-prompted rather than silent, so the residual risk is alert fatigue on the operator's side, not unguarded modification. "Advises, never implements" is therefore a **brief it is asked to honour**, not a property the harness enforces. Do not describe it as enforced.
+
+### The pane variant, when the restriction must be real
+
 ```bash
 bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh [cwd] [model]
+bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/advisor-send.sh <pane-id> -   # brief on stdin
 ```
 
-It prints the pane id, the model, and the blocked tool list. Drive that pane with the same send-and-read mechanics as any other agent pane.
+Use this when the advisor is reviewing something it could damage, and accept the extra handling in exchange for a surface that genuinely lacks `Write` and `Bash`. The spawn prints the pane id, the model, and the denied count; `advisor-send.sh` ships alongside it and handles bracketed paste and submit confirmation.
 
-The advisor starts with a role brief appended to its system prompt, and with a **deny list of 37 tool names plus `--disable-slash-commands`**. What survives is `Glob`, `Grep`, `Read`, and `ReportFindings`. Read and search are the whole surface needed to ground a finding.
+The advisor starts with a role brief appended to its system prompt and a **deny list of 36 tool names plus `--disable-slash-commands`**. What survives is `Glob`, `Grep`, `Read`, `ReportFindings`, and `EndConversation` — the last deliberately, since an advisor that cannot end its own session is worse than one that can (operator ruling, 2026-07-21).
+
+**A pane advisor finishes silently.** Nothing notifies you, so arm a monitor when you dispatch one, or you will discover it concluded twenty minutes ago. This is the main practical reason the dispatched variant is the default.
 
 **`--disallowed-tools` is the only flag that restricts.** `--allowed-tools` means "pre-approve these without prompting"; it hides nothing. Getting that backwards was tried, and the advisor spawned under the resulting "allowlist" wrote a file on its first attempt.
 
 The deny list was derived from an advisor enumerating its own loaded schema, not from memory, because a first attempt written from memory named twelve tools and missed `Workflow`, `CronCreate`, `ScheduleWakeup`, `Skill`, `DesignSync`, and the worktree tools, while blocking four names that did not exist in that surface at all. `Workflow` was the worst omission: its agents inherit the session model, so one call was both fan-out and Fable spend multiplication.
 
-**A deny list fails open on every rename and addition, so the claim needs re-verifying empirically whenever the list changes.** Spawn an advisor and ask it to enumerate its surface and attempt a write. That consultation is the test, and it has caught three wrong mechanisms so far. A correct configuration answers a write attempt with `No such tool available: Write. Write exists but is not enabled in this context.`
+**A deny list fails open, and not only when someone edits it.** Re-verify at the start of *each* consultation, rather than when the list changes. The second verification run (2026-07-21) found `EndConversation` present in the advisor's schema while the deny list still named it: nothing in this repository had been touched, and the harness had re-injected a deferred tool underneath a claim that was already stale at ship time. Keying re-verification to list edits would never have caught that, because upstream renames do not edit the list.
+
+The verification is one consultation: ask the advisor to enumerate its surface and attempt a write. That consultation *is* the test, and it has now caught four wrong mechanisms. A correct configuration answers a write attempt with `No such tool available: Write. Write exists but is not enabled in this context.`
 
 Two residuals are closed and worth knowing about, because both were found this way rather than by reading: generic MCP resource tools (`ListMcpResourcesTool` and siblings) are built-ins that do **not** match an `mcp__*` pattern and still reach an attached server, and a `PreToolUse` hook approver auto-approved a Bash call independently of any flag. Denying `Bash` closes the latter here, but the hook pipeline is a surface no command-line flag controls.
 
 **Give it paths, not summaries.** Name the diff, the task brief, and the verification notes, and tell it to read them itself. A summary launders your own reading into its input and wastes the second opinion.
 
-**Read its reply from its transcript, not the pane.** The Claude Code TUI redraws in place, so `capture-pane` returns the current viewport rather than what the advisor said, and `-S -` does not help. The durable copy is the advisor's own session JSONL under `~/.claude/projects/<slugified-cwd>/`; take the newest file that is not your own session.
+**Read a pane advisor's reply from its transcript, not the pane.** The Claude Code TUI redraws in place, so `capture-pane` returns the current viewport rather than what the advisor said, and `-S -` does not help. The durable copy is the advisor's own session JSONL under `~/.claude/projects/<slugified-cwd>/`; take the newest file that is not your own session. A dispatched advisor has no such problem, since its report comes back as the agent's result.
+
+**The pane lands where the caller is.** `fable-advisor-spawn.sh` passes `-t "$TMUX_PANE"` so the split targets the pane that ran it. Without that, tmux splits whatever window is *active*, which is the one the operator is looking at rather than the one that called — so an advisor dispatched from a background session appeared on top of unrelated work (observed 2026-07-21, and fixed).
 
 ## If Fable is unavailable
 
@@ -95,3 +108,6 @@ The same discipline as `codex-peer-review`, for the same reason: a fluent review
 | Silently falling back to Opus when Fable is down | Label the fallback, or do not run it. |
 | Presenting its advice merged with yours | Keep the voices separate, as with codex. |
 | Treating a fluent consultation as verified | Run the provenance gate. Fluency is not provenance. |
+| Saying a dispatched advisor "cannot implement" | It can; the Agent tool has no restriction flag. Its writes are prompted, not blocked. Say that. |
+| Spawning a pane and walking away | It finishes silently. Arm a monitor, or dispatch it as an agent instead. |
+| Re-verifying the tool surface only when the deny list changes | The surface moves upstream with no local edit. Verify every consultation. |
