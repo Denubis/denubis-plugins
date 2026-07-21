@@ -166,7 +166,7 @@ make_repo() {
 @test "a single included file is staged outside the normal context tree" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
     printf 'external evidence\n' > "$TEST_DIR/evidence.md"
-    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md" --include-confirmed
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     diff "$pkg/included/001/evidence.md" "$TEST_DIR/evidence.md"
@@ -179,7 +179,7 @@ make_repo() {
     printf 'second evidence\n' > "$TEST_DIR/second/evidence.md"
     run bash "$SCRIPT" docs/target.md \
         --include "$TEST_DIR/first/evidence.md" \
-        --include "$TEST_DIR/second/evidence.md"
+        --include "$TEST_DIR/second/evidence.md" --include-confirmed
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     diff "$pkg/included/001/evidence.md" "$TEST_DIR/first/evidence.md"
@@ -191,7 +191,7 @@ make_repo() {
     mkdir -p "$TEST_DIR/evidence/nested"
     printf 'rendered result\n' > "$TEST_DIR/evidence/nested/result.txt"
     printf 'PDF\000\001\002binary\000content\n' > "$TEST_DIR/evidence/paper.pdf"
-    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence" --include-confirmed
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     [ -f "$pkg/included/001/evidence/nested/result.txt" ]
@@ -200,7 +200,7 @@ make_repo() {
 
 @test "an explicitly included gitignored file is force-staged" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    run bash "$SCRIPT" docs/target.md --include data/raw.csv
+    run bash "$SCRIPT" docs/target.md --include data/raw.csv --include-confirmed
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     [ ! -e "$pkg/context/data/raw.csv" ]
@@ -210,7 +210,7 @@ make_repo() {
 @test "an explicitly included binary file is staged byte-for-byte" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
     printf 'PDF\000\001\002binary\000content\n' > "$TEST_DIR/paper.pdf"
-    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/paper.pdf"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/paper.pdf" --include-confirmed
     [ "$status" -eq 0 ]
     local pkg; pkg="$(field package)"
     diff "$pkg/included/001/paper.pdf" "$TEST_DIR/paper.pdf"
@@ -221,7 +221,7 @@ make_repo() {
     printf 'first evidence\n' > "$TEST_DIR/first.md"
     printf 'second evidence\n' > "$TEST_DIR/second.md"
     run bash "$SCRIPT" docs/target.md \
-        --include "$TEST_DIR/first.md" --include "$TEST_DIR/second.md"
+        --include "$TEST_DIR/first.md" --include "$TEST_DIR/second.md" --include-confirmed
     [ "$status" -eq 0 ]
     [[ "$output" == *"include:  $TEST_DIR/first.md -> included/001/first.md"* ]]
     [[ "$output" == *"include:  $TEST_DIR/second.md -> included/002/second.md"* ]]
@@ -230,7 +230,7 @@ make_repo() {
 @test "prompt names staged evidence without disclosing its source path" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
     printf 'external evidence\n' > "$TEST_DIR/evidence.md"
-    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md" --include-confirmed
     [ "$status" -eq 0 ]
     grep -Fqx 'INCLUDED EVIDENCE: included/001/evidence.md' "$CODEX_STDIN_FILE"
     ! grep -Fq "$TEST_DIR/evidence.md" "$CODEX_STDIN_FILE"
@@ -429,4 +429,58 @@ TOML
     [[ "$output" == *"file its finding attributes it to"* ]]
     [[ "$output" == *"or context"* ]]
     [[ "$output" == *"grep -nF '<quoted phrase>' '<attributed file>'"* ]]
+}
+
+# ── Include disclosure gate ──
+#
+# --include stages a path from anywhere on the filesystem into a package that is
+# sent to an external model, deliberately escaping the gitignore boundary the
+# default staging enforces. Printing the path after the fact is a receipt, not a
+# control, so transmission is gated on explicit confirmation and the manifest
+# enumerates what actually goes.
+
+@test "includes abort before codex runs when confirmation is absent" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'evidence\n' > "$TEST_DIR/evidence.md"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md" < /dev/null
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--include-confirmed"* ]]
+    [ ! -f "$CODEX_ARGS_FILE" ]
+}
+
+@test "--include-confirmed permits the run to reach codex" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'evidence\n' > "$TEST_DIR/evidence.md"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence.md" \
+        --include-confirmed < /dev/null
+    [ "$status" -eq 0 ]
+    [ -f "$CODEX_ARGS_FILE" ]
+}
+
+@test "a directory include enumerates every staged file, not just its name" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    mkdir -p "$TEST_DIR/evidence/nested"
+    printf 'one\n' > "$TEST_DIR/evidence/first.txt"
+    printf 'two\n' > "$TEST_DIR/evidence/nested/second.txt"
+    run bash "$SCRIPT" docs/target.md --include "$TEST_DIR/evidence" \
+        --include-confirmed < /dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"included/001/evidence/first.txt"* ]]
+    [[ "$output" == *"included/001/evidence/nested/second.txt"* ]]
+    [[ "$output" == *"2 file"* ]]
+}
+
+@test "an unrecognised option is a hard error, never a focus note" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'evidence\n' > "$TEST_DIR/evidence.md"
+    run bash "$SCRIPT" docs/target.md --includ "$TEST_DIR/evidence.md"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"unrecognised option: --includ"* ]]
+}
+
+@test "a surplus positional is a hard error rather than a silent drop" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    run bash "$SCRIPT" docs/target.md "first note" "second note"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"unexpected argument: second note"* ]]
 }

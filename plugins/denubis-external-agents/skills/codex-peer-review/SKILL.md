@@ -35,9 +35,21 @@ Run OpenAI's `codex` as a single external critic over a target file, shaped by t
    ```
    The focus note is optional and is injected as a priority hint, subordinate to the anti-fabrication grounding rules — it sharpens the review without narrowing the target's scope or relaxing the verbatim-quote requirement. The script prints the package dir, the staged target path, the focus note, the resolved model, the review path, and a ready-made smoke-check command.
 
-4. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
+   Unrecognised options and surplus positionals are fatal rather than absorbed. A tolerant parser once turned a mistyped `--includ evidence.md` into a focus note reading `--includ` and dropped the evidence silently, so the operator believed a file had been sent that never was.
 
-5. **Present** the provenance-checked review as codex's voice (below).
+4. **Staging extra evidence — `--include <path>`, repeatable.** Force-stages a path the default surface excludes: a generated diff, a cited paper, a gitignored artefact. It is deliberately not bounded by the repository or by `.gitignore`, which is exactly why it is gated.
+
+   ```bash
+   … <target> "<focus note>" --include /path/to/evidence.md --include-confirmed
+   ```
+
+   Everything before transmission is local. The script stages into `/tmp`, prints a manifest enumerating **every file** each include actually stages (a directory include discloses its whole text tree, and a name is not a manifest), and then stops for a decision. At a terminal that is a `[y/N]` prompt. Non-interactively it aborts unless `--include-confirmed` is passed, so a model composing the command line cannot disclose files by omission — the flag is the decision, and it is recorded in the command line that carried it.
+
+   Printing alone was the earlier design, and it was a receipt rather than a control: by the time anyone read it the files were in flight, and the usual reader of that receipt is a model rather than the operator whose files are being sent.
+
+5. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
+
+6. **Present** the provenance-checked review as codex's voice (below).
 
 ## The provenance gate (non-negotiable)
 

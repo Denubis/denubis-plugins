@@ -31,11 +31,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUBRIC="$SCRIPT_DIR/review-method.md"       # bundled copy of critical-peer-review.md
 PROMPT_FILE="$SCRIPT_DIR/peer-review-smoke-prompt.md"
 
-usage='usage: codex-peer-review.sh <file-or-dir-to-review> ["one-line focus note"] [--include <path>]'
+usage='usage: codex-peer-review.sh <file-or-dir-to-review> ["one-line focus note"] [--include <path>]... [--include-confirmed]'
 target="${1:?$usage}"
 shift
 focus=""
+focus_set=0
 includes=()
+include_confirmed=0
+# Unrecognised arguments are fatal. A tolerant parser that took the first bare
+# token as the focus note and dropped the rest turned `--includ evidence.md`
+# into a focus note reading "--includ" and silently discarded the evidence, so
+# the operator believed a file had been sent that never was. For a flag whose
+# whole justification is that naming a path is a deliberate decision, silently
+# ignoring a named path is the opposite of the intent.
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --include)
@@ -43,8 +51,23 @@ while [ "$#" -gt 0 ]; do
       includes+=("$2")
       shift 2
       ;;
+    --include-confirmed)
+      include_confirmed=1
+      shift
+      ;;
+    --*)
+      echo "unrecognised option: $1" >&2
+      echo "$usage" >&2
+      exit 1
+      ;;
     *)
-      [ -n "$focus" ] || focus="$1"
+      [ "$focus_set" -eq 0 ] || {
+        echo "unexpected argument: $1" >&2
+        echo "$usage" >&2
+        exit 1
+      }
+      focus="$1"
+      focus_set=1
       shift
       ;;
   esac
@@ -168,9 +191,21 @@ out="$review_dir/$(basename "$target").$(date +%Y%m%d-%H%M%S).REVIEW.md"
 echo "package:  $work"
 echo "rubric:   REVIEW-METHOD.md"
 echo "target:   $target_in_ctx"
+# Enumerate what each include actually stages, not merely the name given. A
+# directory include discloses its whole text tree, and one printed line per
+# --include argument made a four-thousand-file include indistinguishable on
+# stdout from a three-file one. A name is a decision about a name; the manifest
+# is the disclosure.
+include_file_total=0
 for include_index in "${!include_sources[@]}"; do
   echo "include:  ${include_sources[$include_index]} -> ${include_destinations[$include_index]}"
+  while IFS= read -r staged_file; do
+    echo "          $staged_file"
+    include_file_total=$((include_file_total + 1))
+  done < <(cd "$work" && find "${include_destinations[$include_index]}" -type f | sort)
 done
+[ "${#include_sources[@]}" -eq 0 ] \
+  || echo "include:  $include_file_total file(s) staged outside the repository boundary"
 [ -n "$focus" ] && echo "focus:    $focus"
 # Printed so the reviewer can be attributed to the model that actually ran;
 # the skill's presentation step labels the review with this value.
@@ -180,6 +215,34 @@ if [ -n "$MODEL" ]; then
 else
   echo "model:    codex default (no top-level model key in $codex_home/config.toml)"
 fi
+# Disclosure gate. Everything above this line is local: staging writes into a
+# throwaway /tmp package and nothing has left the machine. `codex exec` below is
+# the transmission, so the decision belongs here, while it can still be refused.
+#
+# The default staging excludes gitignored files precisely because they hold raw
+# data and secrets; --include force-stages past that boundary from anywhere on
+# the filesystem. Printing the manifest afterwards records the disclosure rather
+# than authorising it, and the usual reader of that receipt is a model composing
+# the command line rather than the operator whose files are being sent.
+if [ "${#include_sources[@]}" -gt 0 ] && [ "$include_confirmed" -ne 1 ]; then
+  echo
+  echo "$include_file_total file(s) above sit outside the staged repository and will"
+  echo "be transmitted to an external model. Nothing has been sent yet."
+  if [ -t 0 ]; then
+    printf 'Send them? [y/N] '
+    read -r reply || reply=""
+    case "$reply" in
+      y | Y | yes | YES) ;;
+      *) echo "aborted — nothing was sent" >&2; exit 3 ;;
+    esac
+  else
+    echo "no terminal to confirm on. Re-run with --include-confirmed to proceed;" >&2
+    echo "that flag is the non-interactive disclosure decision and it is recorded" >&2
+    echo "in the command line that carried it." >&2
+    exit 3
+  fi
+fi
+
 echo "running codex (read-only)…"
 echo
 
