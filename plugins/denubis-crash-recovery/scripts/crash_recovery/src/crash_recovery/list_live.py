@@ -42,7 +42,6 @@ class LiveEntry:
     pid: int
     cwd: str
     started: int
-    argv: str
     boot_id_current: bool
 
 
@@ -70,7 +69,6 @@ def survey_live(run_dir: Path) -> tuple[LiveEntry, ...]:
                 pid=live.pid,
                 cwd=live.cwd,
                 started=live.started,
-                argv=live.argv,
                 boot_id_current=(live.boot_id == current_bid),
             )
         )

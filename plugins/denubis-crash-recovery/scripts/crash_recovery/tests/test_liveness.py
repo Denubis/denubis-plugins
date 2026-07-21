@@ -1,6 +1,6 @@
 """Tests for crash_recovery.liveness — parser, boot-id, pid-alive, enumeration.
 
-Covers parser-side of AC5.1 (four required keys), AC5.4 (per-PID enumeration),
+Covers parser-side of AC5.1 (three required keys), AC5.4 (per-PID enumeration),
 AC5.6 (boot-id readable for downstream comparison). The CA2 (2026-05-16) pin
 tests on ``pid_alive`` document the load-bearing contract that the function
 always returns a ``bool``, never ``None`` — propagation of ``OSError`` from
@@ -37,14 +37,13 @@ from fixtures.jsonl_builder import _pick_dead_pid, make_liveness_file
 # ---------------------------------------------------------------------------
 
 
-def test_read_liveness_parses_four_keys(tmp_path: Path) -> None:
-    """Well-formed file — all four required fields surface verbatim. (AC5.1)"""
+def test_read_liveness_parses_current_marker_without_argv(tmp_path: Path) -> None:
+    """A current marker parses without persisting process arguments. (AC5.1)"""
     path = make_liveness_file(
         tmp_path,
         pid=4242,
         cwd="/home/user/proj",
         started=1715151234,
-        argv="--resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b",
         boot_id="8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d",
     )
     liveness = read_liveness(path)
@@ -53,7 +52,7 @@ def test_read_liveness_parses_four_keys(tmp_path: Path) -> None:
     assert liveness.pid == 4242
     assert liveness.cwd == "/home/user/proj"
     assert liveness.started == 1715151234
-    assert liveness.argv == "--resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
+    assert liveness.argv is None
     assert liveness.boot_id == "8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d"
 
 
@@ -74,7 +73,7 @@ def test_read_liveness_rejects_non_numeric_filename(tmp_path: Path) -> None:
 
 
 def test_read_liveness_missing_key_raises(tmp_path: Path) -> None:
-    """Each of the four required keys must be present; first miss raises."""
+    """Each of the three required keys must be present; first miss raises."""
     path = tmp_path / "12345.live"
     # boot_id deliberately omitted.
     path.write_text("cwd=/tmp\nstarted=1\nargv=\n")
@@ -137,11 +136,11 @@ def test_read_liveness_parses_optional_session_id_and_start_time(
     assert liveness.start_time == 218236304
 
 
-def test_read_liveness_legacy_file_has_none_optional_fields(tmp_path: Path) -> None:
-    """A four-key legacy marker parses with session_id/start_time both None, no error.
-    """
-    path = make_liveness_file(tmp_path, pid=4242)
+def test_read_liveness_legacy_argv_remains_readable(tmp_path: Path) -> None:
+    """A legacy argv line remains readable solely as a correlation fallback."""
+    path = make_liveness_file(tmp_path, pid=4242, argv="--resume legacy-session")
     liveness = read_liveness(path)
+    assert liveness.argv == "--resume legacy-session"
     assert liveness.session_id is None
     assert liveness.start_time is None
 

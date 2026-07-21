@@ -130,7 +130,6 @@ fi
 {
     printf 'cwd=%s\n' "$PWD"
     printf 'started=%s\n' "$(date +%s)"
-    printf 'argv=%s\n' "$*"
     printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)"
     [ -n "$CR_SESSION_ID" ] && printf 'session_id=%s\n' "$CR_SESSION_ID"
     CR_START_TIME="$(_proc_starttime $$)"

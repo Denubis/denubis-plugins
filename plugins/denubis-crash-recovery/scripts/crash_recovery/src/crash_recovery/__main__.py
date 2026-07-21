@@ -558,7 +558,6 @@ def list_live(
                 "pid": e.pid,
                 "cwd": e.cwd,
                 "started": e.started,
-                "argv": e.argv,
                 "boot_id_current": e.boot_id_current,
             }
             for e in entries
@@ -568,11 +567,11 @@ def list_live(
     if not entries:
         typer.echo("No live sessions.")
         return
-    typer.echo(f"{'pid':>8} {'started':>11} {'boot_ok':>7} {'cwd':<40} argv")
+    typer.echo(f"{'pid':>8} {'started':>11} {'boot_ok':>7} cwd")
     for e in entries:
         typer.echo(
             f"{e.pid:>8} {e.started:>11} "
-            f"{'yes' if e.boot_id_current else 'NO':>7} {e.cwd:<40} {e.argv}"
+            f"{'yes' if e.boot_id_current else 'NO':>7} {e.cwd}"
         )
 
 

@@ -40,7 +40,7 @@ def _make_liveness(
     *,
     cwd: str,
     started: int,
-    argv: str = "",
+    argv: str | None = None,
     pid: int = 1234,
     session_id: str | None = None,
 ) -> Liveness:

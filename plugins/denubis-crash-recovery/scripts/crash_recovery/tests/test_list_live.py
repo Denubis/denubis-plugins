@@ -4,7 +4,7 @@ Covers the diagnostic ``crash-recovery list-live`` surface (Phase 6 Task 6):
 ``survey_live`` filters dead PIDs out of the liveness-file enumeration and
 marks ``boot_id_current`` based on the live kernel boot id. The CLI test
 pair exercises the plain-text and ``--json`` rendering paths via subprocess
-so argv parsing, typer wiring, and JSON serialisation are all in scope.
+so CLI parsing, typer wiring, and JSON serialisation are all in scope.
 """
 
 from __future__ import annotations
@@ -87,7 +87,9 @@ def test_list_live_marks_boot_id_mismatch(tmp_path: Path) -> None:
 
 
 def _run_cli(*args: str, run_dir: Path) -> subprocess.CompletedProcess[str]:
-    """Run ``python -m crash_recovery list-live <args>`` with the test run-dir injected.
+    """Run ``python -m crash_recovery list-live <args>``.
+
+    The test run directory is injected through the supported environment variable.
     """
     env = {**os.environ, "CRASH_RECOVERY_RUN_DIR": str(run_dir)}
     return subprocess.run(
@@ -115,7 +117,7 @@ def test_list_live_cli_plain_text(tmp_path: Path) -> None:
     assert "started" in result.stdout
     assert "boot_ok" in result.stdout
     assert "cwd" in result.stdout
-    assert "argv" in result.stdout
+    assert "argv" not in result.stdout
     assert str(pid) in result.stdout
 
 
@@ -134,7 +136,7 @@ def test_list_live_cli_json(tmp_path: Path) -> None:
         pid=pid,
         cwd="/tmp/list-live-json",
         started=1715151234,
-        argv="--resume abc",
+        argv="--resume private-legacy-value",
     )
 
     result = _run_cli("--json", run_dir=tmp_path)
@@ -143,9 +145,9 @@ def test_list_live_cli_json(tmp_path: Path) -> None:
     assert isinstance(payload, list)
     assert len(payload) == 1
     (entry,) = payload
-    assert set(entry.keys()) == {"pid", "cwd", "started", "argv", "boot_id_current"}
+    assert set(entry.keys()) == {"pid", "cwd", "started", "boot_id_current"}
     assert entry["pid"] == pid
     assert entry["cwd"] == "/tmp/list-live-json"
     assert entry["started"] == 1715151234
-    assert entry["argv"] == "--resume abc"
+    assert "private-legacy-value" not in result.stdout
     assert isinstance(entry["boot_id_current"], bool)
