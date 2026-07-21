@@ -15,10 +15,12 @@ For each sentence, ask: is its subject the **study**, or the **manuscript**? If 
 The recurring forms:
 
 - **Foreshadowing.** Previewing a hypothesis, result, or contribution before its section. State hypotheses in the present-study section, and let the introduction end on the gap.
-- **Defensive hedging.** Pre-empting a reviewer ("twelve students cannot generalise", "without a control group"). State the design, and let limitations live where limitations live.
+- **Defensive hedging.** Pre-empting a reviewer ("twelve students cannot generalise", "without a control group"). State the design, and let limitations live where limitations live. Epistemic hedging is different and stays: "suggests", "may", and "indicates" calibrate a claim to its evidence, and deleting one strengthens a claim the evidence may not support. Before cutting a hedge, decide which kind it is, and match the attribution verb to the evidence (demonstrates, indicates, suggests).
 - **Provenance housekeeping.** Sentences about the citations or the structure ("this section sets out", "building on the gap above", "reported through two lenses"). Make the substantive claim and let the relationship show itself.
 - **Journal-requirement framing.** Justifying a choice by the venue ("per journal policy"). The choice stands on its own grounds.
 - **Procedural narration.** "We computed", "we then ran", where the sentence adds nothing beyond the step.
+
+Where the project's register note attests a signposting convention (sequential markers such as "First / Second / Finally", or a "this paper presents" opener), the convention wins, and the subject test governs the sentences the note is silent on.
 
 A reviewer asking you to "signpost how this follows", "make the contribution explicit", or "address concern X" is asking for a clearer **claim**, not a sentence about the manuscript. Satisfy the request with substance. Open with the substantive link rather than a structural announcement, put the novel claim where contributions live, and let a small-N worry live in limitations as a stated design fact rather than a defensive aside in the body.
 
@@ -45,7 +47,7 @@ Cite a source for what it actually supports. Do not stretch a finding past what 
 
 Flow lives in how a sentence is built, not in the marks that hold it together. The register most academic venues reward, and the one this style defaults to, is the long connected sentence carried by subordinate clauses, with the relation between sentences and paragraphs made explicit by discourse connectives (*Despite this*, *Therefore*, *However*, *Additionally*). A glue mark is a sign the construction failed, not a tool to reach for.
 
-Punctuation hierarchy, to confirm or refine against the project's `.notes/` register:
+Punctuation hierarchy, one author's defaults, in force when the project's `.notes/` register names no values of its own (an attested project value wins):
 
 - **Em-dash (—): never.** Hard stop. Where one would go, the sentence wants rebuilding.
 - **Semicolon: exceptionally rare.** Reach for it only when there is genuinely no other way to say the phrase.
@@ -70,6 +72,7 @@ Do not over-correct into staccato. Breaking a sentence into a stack of short dec
 
 If you catch yourself reasoning any of these, you are about to reproduce the failure:
 
+- The project's register note attests the mark or pattern you are about to fix. The note wins. Check its stated target instead of this floor, and leave the prose alone.
 - The reviewer said "signpost" / "make explicit" / "clarify the connection", and you are about to write a sentence whose subject is the section. That is scar tissue. State the claim instead.
 - "I'll gloss the statistic later." Gloss it now. Later never comes.
 - You swapped an em-dash for a semicolon, colon, or comma pair and left the sentence otherwise intact. Laundering. The crammed structure is the problem, not the mark. Rebuild from the idea.
