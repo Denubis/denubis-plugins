@@ -1,7 +1,7 @@
 {
     "name": "denubis-external-agents",
-    "description": "Dispatch review tasks to external CLI models as a heterogeneous second voice. Currently: run OpenAI's codex (GPT-5.5) as a critical peer reviewer of a file or directory, with a mandatory provenance check so a confabulated review cannot pass as real. WIP.",
-    "version": "0.3.0",
+    "description": "Dispatch work to a mind that is not this session, as a heterogeneous second voice: external CLI models and other-model advisors alike. Run OpenAI's codex as a critical peer reviewer at whatever model your codex config selects, or spawn a different-model advisor in a pane that is structurally unable to implement. Both carry a mandatory provenance check so a confabulated review cannot pass as real. WIP.",
+    "version": "0.5.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"
