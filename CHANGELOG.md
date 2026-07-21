@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-external-agents] 0.6.0
+
+Review findings on 0.5.0, from a codex peer review and a Fable advisor consulted on the same diff. Both are recorded in PR #11.
+
+**New:**
+- `--include` now stops for an explicit decision before transmitting. The manifest enumerates every file each include actually stages, and a non-interactive run aborts unless `--include-confirmed` is passed. Printing the paths afterwards was a receipt, not a control: the files were already in flight, and the usual reader of that receipt is a model composing the command line rather than the operator whose files are being sent.
+- `advisor-send.sh` ships with the advisor skill. The spawn script previously told operators to drive the pane with `codex-send.sh`, which this plugin does not ship — it existed only in two unrelated project checkouts, so a marketplace install was handed an invocation that did not exist on the machine.
+
+**Changed:**
+- The advisor's documented default is now a dispatched background agent rather than a pane, so consultations return a completion notification instead of finishing silently. The Agent tool has no tool-restriction parameter, so the skill now states plainly that a dispatched advisor *can* write, that its writes are permission-prompted rather than blocked, and that "advises, never implements" is a brief it is asked to honour rather than a property the harness enforces. The pane variant remains for when the restriction must be real.
+- `EndConversation` is no longer denied to the pane advisor. An advisor that cannot end its own session is worse than one that can (operator ruling).
+- Tool-surface re-verification is now keyed to each consultation rather than to edits of the deny list. The second verification run found `EndConversation` already present in the advisor's schema while the deny list still named it: no local edit had occurred, and the harness had re-injected a deferred tool underneath a claim that was stale at ship time.
+- The advisor pane splits the caller's pane via `-t "$TMUX_PANE"`. Without it tmux split whatever window was active, so an advisor dispatched from a background session landed on top of unrelated work.
+- Unrecognised options and surplus positionals are fatal. A mistyped `--includ evidence.md` previously became a focus note reading `--includ` and dropped the evidence silently.
+- The reviewer's grounding rules now permit citing `./included/`. They asserted that only `./context/` existed, which contradicted the tree includes stage into, leaving a rule-following reviewer unable to cite the evidence it had been given.
+
+**Fixed:**
+- `tests/test_fable_cost_gate.py` scans every text file under `plugins/` rather than four named categories, and its detector matches the phrase "Fable advisor". It previously could not catch the breach its own docstring names as the canonical example, and saw neither auxiliary skill files nor plugin scripts. Both shapes were injected and watched fail before the widening. The module now also records the two shapes no lexical scan can reach: semantic paraphrase that names no token, and ambient model inheritance through session-model fan-out.
+
 ## [denubis-plan-and-execute] 2.37.0 / [denubis-crash-recovery] 1.2.0
 
 Liveness markers stop recording the user's command line, and correlation moves to the session id.
