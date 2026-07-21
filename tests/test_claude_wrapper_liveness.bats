@@ -519,6 +519,15 @@ EOF
   # wrapper's, and the marker lookup would miss. bats runs each test in its own
   # subshell, so this cd does not leak; the CLI calls below use absolute paths.
   cd "$WORK_CWD"
+  # 3>&- is load-bearing: DO NOT DELETE IT AS A STRAY.
+  # bats waits on its FD 3 formatter pipe, not on the test process. This stub
+  # sleeps 120s, and killing the wrapper below leaves that sleep orphaned as a
+  # grandchild holding an inherited FD 3, so bats sat for the full 120s after
+  # every test had already reported. Closing FD 3 on the launch keeps the
+  # orphan out of the pipe. Measured 137.29s -> 18.07s across the suite, 20/20
+  # throughout. The 120s margin itself is deliberate (see the comment at the
+  # sleep stub): the wrapper must outlive a scan reading /proc/<pid>/stat, and
+  # three cold `uv run` invocations can exceed a shorter sleep.
   CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" 3>&- &
   wrapper_pid=$!
   sleep 0.5  # let the wrapper write the marker
@@ -584,6 +593,15 @@ EOF
   # cd in the test body (not a subshell) so $! is the wrapper's own pid; see
   # the round-trip test for why a subshell would break the marker lookup.
   cd "$WORK_CWD"
+  # 3>&- is load-bearing: DO NOT DELETE IT AS A STRAY.
+  # bats waits on its FD 3 formatter pipe, not on the test process. This stub
+  # sleeps 120s, and killing the wrapper below leaves that sleep orphaned as a
+  # grandchild holding an inherited FD 3, so bats sat for the full 120s after
+  # every test had already reported. Closing FD 3 on the launch keeps the
+  # orphan out of the pipe. Measured 137.29s -> 18.07s across the suite, 20/20
+  # throughout. The 120s margin itself is deliberate (see the comment at the
+  # sleep stub): the wrapper must outlive a scan reading /proc/<pid>/stat, and
+  # three cold `uv run` invocations can exceed a shorter sleep.
   CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" 3>&- &
   wrapper_pid=$!
   sleep 0.5
