@@ -1,6 +1,6 @@
 ---
 name: consulting-a-fable-advisor
-description: Use when a human asks for a Fable advisor - spawns a different-model advisor in a tmux pane, structurally unable to implement, for judgement calls that mechanical checks cannot settle.
+description: Use when a human asks for a Fable advisor - dispatches a different-model advisor restricted to read-only tools, for judgement calls that mechanical checks cannot settle.
 user-invocable: true
 ---
 
@@ -34,22 +34,36 @@ After the implementer has drafted and the verifier has run its mechanical checks
 
 ## How to run
 
-**Default: dispatch it as a background agent** (operator preference, 2026-07-21). Use the Agent tool with `model: "fable"` and a read-oriented agent type, and brief it in the prompt exactly as below. The work returns as a completion notification, follow-ups go through `SendMessage`, and there is no pane to babysit.
+**Default: dispatch the `fable-advisor` agent** (operator ruling, 2026-07-25). Its definition carries `model: fable` with a `tools: Read, Grep, Glob` allowlist, and an allowlist denies what it omits, MCP tools included. So the restriction is real without a pane, the result returns as a completion notification, follow-ups go through `SendMessage` with its context intact, and it still appears as a tmux pane you can watch.
 
-What this costs, stated plainly: **the Agent tool has no tool-restriction parameter.** Agent types carry fixed tool sets, and the most restricted one available still has `Bash`. So a dispatched advisor *can* write to disk. Those writes are permission-prompted rather than silent, so the residual risk is alert fatigue on the operator's side, not unguarded modification. "Advises, never implements" is therefore a **brief it is asked to honour**, not a property the harness enforces. Do not describe it as enforced.
+The gate is unchanged. Dispatch only when the human has asked. If you think a consultation would help, say so and invite them to ask for one.
 
-### The pane variant, when the restriction must be real
+### Do not substitute a generic read-oriented agent
+
+The restriction lives in the agent *definition*, not in the Agent tool, which has no tool-restriction parameter. Dispatching a general-purpose type instead gives the advisor a surface it was never scoped for. Probed on 2026-07-25 with `Explore`, the most read-oriented type in the roster, running in the foreground: `AskUserQuestion`, `Bash`, `CronCreate`, `CronDelete`, `CronList`, `DesignSync`, `EndConversation`, `EnterPlanMode`, `EnterWorktree`, `ExitWorktree`, `ListMcpResourcesTool`, `Monitor`, `PushNotification`, `Read`, `ReadMcpResourceDirTool`, `ReadMcpResourceTool`, `RemoteTrigger`, `ReportFindings`, `ScheduleWakeup`, `SendMessage`, `Skill`, `TaskCreate`, `TaskGet`, `TaskList`, `TaskOutput`, `TaskStop`, `TaskUpdate`, `WebFetch`, `WebSearch`, `Workflow`, the MCP auth stubs, and context7.
+
+`Write` and `Edit` are absent, and a write attempt returns the same refusal string a correctly restricted pane gives, so absence of `Write` is not evidence the surface is safe. `Glob` and `Grep` are absent too, so the provenance greps below would have to route through `Bash`.
+
+What stays live is the problem. `Workflow` is present, and its agents inherit the session model, making one call both fan-out and Fable spend multiplication. `CronCreate`, `ScheduleWakeup` and `RemoteTrigger` are present, and they permit exactly the unattended runs the cost gate forbids in terms. The three generic MCP resource tools are present and still reach an attached server. The `fable-advisor` allowlist excludes all of them.
+
+**A definition resolves to different surfaces in foreground and background.** A background subagent keeps every MCP tool but only a fixed set of built-ins, so the same agent file yields different tools depending on how it was dispatched. The probe above ran in the foreground, which is why it is this wide.
+
+### The pane variant, for an advisor that outlives its session
+
+The one thing the agent cannot do is survive the session that dispatched it. When you want an advisor to persist across several of your own sessions over days, spawn it:
 
 ```bash
 bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh [cwd] [model]
 bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/advisor-send.sh <pane-id> -   # brief on stdin
 ```
 
-Use this when the advisor is reviewing something it could damage, and accept the extra handling in exchange for a surface that genuinely lacks `Write` and `Bash`. The spawn prints the pane id, the model, and the denied count; `advisor-send.sh` ships alongside it and handles bracketed paste and submit confirmation.
+Run it from inside tmux, since it splits the calling pane. It exits non-zero rather than substituting a model if Fable does not come up, and prints the pane id, the model, the denied count, and the verification reminder. Drive it through `advisor-send.sh` rather than typing into the pane, because that handles bracketed paste and submit confirmation.
 
-The advisor starts with a role brief appended to its system prompt and a **deny list of 36 tool names plus `--disable-slash-commands`**. What survives is `Glob`, `Grep`, `Read`, `ReportFindings`, and `EndConversation` — the last deliberately, since an advisor that cannot end its own session is worse than one that can (operator ruling, 2026-07-21).
+The pane advisor gets a role brief appended to its system prompt and a **deny list of 36 tool names plus `--disable-slash-commands`**, leaving `Glob`, `Grep`, `Read`, `ReportFindings`, and `EndConversation`. The last is deliberate, since an advisor that cannot end its own session is worse than one that can (operator ruling, 2026-07-21).
 
-**A pane advisor finishes silently.** Nothing notifies you, so arm a monitor when you dispatch one, or you will discover it concluded twenty minutes ago. This is the main practical reason the dispatched variant is the default.
+**A pane advisor finishes silently**, which the dispatched agent does not. Nothing notifies you, so arm a monitor when you spawn one. Monitor by pane id or by the `@fable_advisor` option the spawn sets. Do not key a monitor on the process name: this launch reports `claude`, and so does every other Claude session in the window, so the name matches all of them and identifies none.
+
+So on this path "advises, never implements" is a **brief it is asked to honour**, not a property the harness enforces, and its read-only use of `Bash` is its system prompt asking nicely. Do not describe either as enforced. Evidence: `docs/audits/2026-07-25-fable-dispatch-surface-probe.md`.
 
 **`--disallowed-tools` is the only flag that restricts.** `--allowed-tools` means "pre-approve these without prompting"; it hides nothing. Getting that backwards was tried, and the advisor spawned under the resulting "allowlist" wrote a file on its first attempt.
 
@@ -59,7 +73,7 @@ The deny list was derived from an advisor enumerating its own loaded schema, not
 
 The verification is one consultation: ask the advisor to enumerate its surface and attempt a write. That consultation *is* the test, and it has now caught four wrong mechanisms. A correct configuration answers a write attempt with `No such tool available: Write. Write exists but is not enabled in this context.`
 
-Two residuals are closed and worth knowing about, because both were found this way rather than by reading: generic MCP resource tools (`ListMcpResourcesTool` and siblings) are built-ins that do **not** match an `mcp__*` pattern and still reach an attached server, and a `PreToolUse` hook approver auto-approved a Bash call independently of any flag. Denying `Bash` closes the latter here, but the hook pipeline is a surface no command-line flag controls.
+Two residuals are closed on this path and worth knowing about, because both were found this way rather than by reading: generic MCP resource tools (`ListMcpResourcesTool` and siblings) are built-ins that do **not** match an `mcp__*` pattern and still reach an attached server, and a `PreToolUse` hook approver auto-approved a Bash call independently of any flag. Denying `Bash` closes the latter here, but the hook pipeline is a surface no command-line flag controls. Neither is closed on the dispatched path, where no deny list applies.
 
 **Give it paths, not summaries.** Name the diff, the task brief, and the verification notes, and tell it to read them itself. A summary launders your own reading into its input and wastes the second opinion.
 
