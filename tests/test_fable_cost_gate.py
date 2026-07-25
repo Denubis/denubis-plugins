@@ -58,6 +58,8 @@ FABLE_TOKENS = re.compile(
 
 # Files that must discuss the gate to define or implement it. Everything else
 # under plugins/ is scanned, because dispatch is not confined to SKILL.md.
+ADVISOR_AGENT = PLUGINS / "denubis-external-agents" / "agents" / "fable-advisor.md"
+
 EXEMPT_DIRS = (ADVISOR_DIR,)
 EXEMPT_FILES = (
     PLUGINS
@@ -65,6 +67,11 @@ EXEMPT_FILES = (
     / "skills"
     / "writing-claude-directives"
     / "model-tier-notes.md",
+    # The advisor agent names itself, exactly as the advisor skill does. It is
+    # exempt from the lexical scan and covered instead by the stricter
+    # test_fable_agent_definitions_carry_the_human_trigger_constraint, which
+    # asserts what it must contain rather than what it must not.
+    ADVISOR_AGENT,
 )
 
 
@@ -149,10 +156,18 @@ def test_no_agent_hook_or_command_dispatches_fable() -> None:
     Agent prompts are named in the gate explicitly. Hooks and commands fire
     without a human in the loop by construction, so a Fable reference in either
     is auto-dispatch regardless of intent.
+
+    The advisor agent is excluded because it names itself, exactly as the
+    advisor skill does in ``test_no_other_skill_references_the_fable_advisor``.
+    A definition cannot be forbidden from stating its own identity. It is
+    covered instead by
+    ``test_fable_agent_definitions_carry_the_human_trigger_constraint``, which
+    is stricter: it asserts what the file must contain rather than what it
+    must not.
     """
     offenders = []
     for path in [*_agent_files(), *_hook_and_command_files()]:
-        if not path.is_file():
+        if not path.is_file() or path == ADVISOR_AGENT:
             continue
         try:
             content = path.read_text(encoding="utf-8")
@@ -169,23 +184,64 @@ def test_no_agent_hook_or_command_dispatches_fable() -> None:
     )
 
 
-def test_no_agent_definition_declares_a_fable_model() -> None:
-    """No agent may declare a Fable-tier model in its frontmatter.
+def test_fable_agent_definitions_carry_the_human_trigger_constraint() -> None:
+    """A Fable-tier agent is allowed, but only with its constraints in-file.
 
-    An agent with ``model: fable`` is dispatchable by any skill that names it,
-    which routes around every other check here.
+    This was an outright prohibition until the operator ruling of 2026-07-25
+    (recorded in model-tier-notes.md's Cost gate section, which is the dated
+    note this gate's falsifier requires). The original reasoning still holds
+    and is why the prohibition became a conditional rather than disappearing:
+    an agent with ``model: fable`` is dispatchable by any skill that names it.
+
+    What replaced the prohibition is two checks, because the ruling moved the
+    restriction from "no such agent exists" to "the agent exists and is
+    constrained". A reader of the definition alone must learn both constraints,
+    for the same reason ``test_spawn_script_records_the_gate`` exists: the file
+    is consumed without its documentation.
+
+    The reference-level rule is unchanged and lives in
+    ``test_no_other_skill_references_the_fable_advisor``: nothing may name the
+    advisor as a step. That check is the mechanical half. The human-trigger
+    sentence asserted here is prose the dispatching model is asked to honour,
+    so it is the weaker half, and this test verifies only that it is present,
+    never that it is obeyed.
     """
-    offenders = []
-    for path in _agent_files():
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if re.match(r"^model:\s*(claude-)?fable", line.strip(), re.IGNORECASE):
-                offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+    missing_trigger = []
+    unrestricted_tools = []
 
-    assert not offenders, (
-        "Agent definitions may not declare a Fable-tier model:\n  "
-        + "\n  ".join(offenders)
+    for path in _agent_files():
+        text = path.read_text(encoding="utf-8")
+        declares_fable = any(
+            re.match(r"^model:\s*(claude-)?fable", line.strip(), re.IGNORECASE)
+            for line in text.splitlines()
+        )
+        if not declares_fable:
+            continue
+
+        rel = path.relative_to(REPO_ROOT)
+        if "human has asked" not in text:
+            missing_trigger.append(str(rel))
+
+        # A `tools:` allowlist denies what it omits, MCP tools included, so the
+        # absence of the field means the agent inherits a surface it was never
+        # scoped for. Bash is called out because it reaches the filesystem
+        # regardless of what Write/Edit are doing.
+        tools_line = next(
+            (l for l in text.splitlines() if l.strip().lower().startswith("tools:")),
+            None,
+        )
+        if tools_line is None or re.search(r"\b(Bash|Write|Edit)\b", tools_line):
+            unrestricted_tools.append(f"{rel}: {tools_line or '(no tools: field)'}")
+
+    assert not missing_trigger, (
+        "A Fable-tier agent must state in-file that it is dispatched only when "
+        "the human has asked for it (the literal phrase 'human has asked'); "
+        "the definition is read without its documentation:\n  "
+        + "\n  ".join(missing_trigger)
+    )
+    assert not unrestricted_tools, (
+        "A Fable-tier agent must carry a read-only 'tools:' allowlist, without "
+        "Bash, Write or Edit:\n  " + "\n  ".join(unrestricted_tools)
     )
 
 
