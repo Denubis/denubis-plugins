@@ -43,7 +43,9 @@ Run OpenAI's `codex` as a single external critic over a target file, shaped by t
    … <target> "<focus note>" --include /path/to/evidence.md --include-confirmed
    ```
 
-   Everything before transmission is local. The script stages into `/tmp`, prints a manifest enumerating **every file** each include actually stages (a directory include discloses its whole text tree, and a name is not a manifest), and then stops for a decision. At a terminal that is a `[y/N]` prompt. Non-interactively it aborts unless `--include-confirmed` is passed, so a model composing the command line cannot disclose files by omission — the flag is the decision, and it is recorded in the command line that carried it.
+   Everything before transmission is local. The script stages into `/tmp`, prints a manifest enumerating **every file** each include actually stages (a directory include discloses its whole text tree, and a name is not a manifest), and then stops for a decision. At a terminal that is a `[y/N]` prompt. Non-interactively it aborts unless `--include-confirmed` is passed.
+
+   **That flag is a speed bump, not a control** (operator ruling, 2026-07-25). What it stops is disclosure by omission, which is the accident case, and it leaves the decision recorded in the command line that carried it. What it cannot stop is a model that has decided to send, because the model composes that command line and can compose the flag along with it. A real control would be something the composing model cannot author: a TTY confirmation it cannot satisfy, or an allowlist file it has no write access to. Neither exists here, so do not present this as a gate.
 
    Printing alone was the earlier design, and it was a receipt rather than a control: by the time anyone read it the files were in flight, and the usual reader of that receipt is a model rather than the operator whose files are being sent.
 
