@@ -120,6 +120,15 @@ Give the findings and the evidence for them. Do not narrate your reasoning proce
 # normally a Claude Code session in a background window, the advisor landed on
 # top of unrelated work (observed 2026-07-21). $TMUX_PANE is set by tmux in
 # every pane, so it names the caller precisely.
+#
+# DO NOT "fix" this by prefixing `exec`. The command below is passed as MULTIPLE
+# arguments, which tmux execs directly, so the pane's process is `claude`. Only
+# the SINGLE-string form goes through the login shell. Measured 2026-07-25:
+# `split-window sleep 120` reports pane_current_command `sleep`, while
+# `split-window 'sleep 121'` reports `fish`. A sibling project hit the shell-
+# wrapping problem with a single-argument launch and fixed it with `exec`;
+# that finding does not transfer to this call shape, and adding `exec` here
+# would need the whole brief re-quoted for a shell for no gain.
 pane="$(tmux split-window -h -c "$cwd" -P -F '#{pane_id}' \
   ${TMUX_PANE:+-t "$TMUX_PANE"} \
   claude --model "$model" \
@@ -139,9 +148,17 @@ if ! tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx -- "$pane"; then
   exit 2
 fi
 
+# Label the pane so it is identifiable among the other Claude panes. Process
+# name alone does not discriminate: this launch reports `claude` (see the
+# multi-argument note in the header), and so does every other Claude session in
+# the window. A monitor keyed on the process name would match all of them.
+tmux set-option -p -t "$pane" @fable_advisor "$model" >/dev/null 2>&1 || true
+
 echo "pane:     $pane"
 echo "model:    $model"
 echo "cwd:      $cwd"
+echo "label:    @fable_advisor=$model  (find it again with:"
+echo "          tmux list-panes -a -F '#{pane_id} #{@fable_advisor}' | grep -v ' \$')"
 echo "denied:   ${#DENIED[@]} tools incl. Bash/Write/Edit/Workflow/Cron*/Skill"
 echo "VERIFY:   ask the advisor to enumerate its surface and attempt a write."
 echo "          Do this EVERY consultation, not only when the list changes:"
@@ -156,4 +173,6 @@ echo "  watch its transcript stop growing, or poll the pane title for idle."
 echo
 echo "READ ITS REPLY FROM ITS TRANSCRIPT, NOT THE PANE — the TUI redraws in"
 echo "place, so capture-pane returns the viewport, not what it said:"
-echo "  ls -t ~/.claude/projects/\$(pwd | sed 's#/#-#g')/*.jsonl | head -1"
+echo "  ls -t ~/.claude/projects/\$(pwd | sed 's#[/.]#-#g')/*.jsonl | head -1"
+echo "  (the slug maps BOTH '/' and '.' to '-', so a sed replacing only '/'"
+echo "   resolves to nothing for every path under a dotted dir like .worktrees)"
