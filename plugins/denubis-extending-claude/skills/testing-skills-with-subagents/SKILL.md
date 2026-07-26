@@ -58,13 +58,15 @@ The RED phase needs realistic baseline behaviour. A stronger model might avoid p
 
 ### GREEN Phase Model
 
-Run GREEN-phase tests one model tier below your expected production model. If you tested RED with Sonnet, test GREEN with Haiku. If you tested RED with Opus, test GREEN with Sonnet.
+Run GREEN-phase tests at the weakest sanctioned tier, which is Sonnet. If you tested RED with Opus, test GREEN with Sonnet. If you tested RED with Sonnet, test GREEN with Sonnet as well, and get the pressure from harder adversarial scenarios rather than from a weaker model.
 
-The weakest model tier that can follow the skill is the strongest test of whether the skill is clear. Haiku 4.5 follows detailed mechanical instructions well, but operator experience (2026-04-22) is that Haiku 4.5 is unsuitable for any task requiring judgement — this is the project's empirical position, overriding Anthropic's 2026-04 marketing framing of "more consistent instruction following for nuanced tasks" (that framing describes mechanical instruction-following, not evaluative or reflective judgement). If your skill's instructions are mechanical enough to keep Haiku 4.5 on-rails, the Sonnet and Opus tiers will follow them easily. If Haiku 4.5 can't follow the skill's mechanical core, your instructions aren't explicit enough.
+The weakest tier that can follow the skill is still the strongest test of whether the skill is clear, so this phase dropped to Haiku 4.5 until 2026-07-25. Two operator rulings closed that off. The first, on 2026-04-22, held that Haiku 4.5 is unsuitable for any task requiring judgement, which is the project's empirical position and overrides Anthropic's 2026-04 framing of "more consistent instruction following for nuanced tasks", since that framing describes mechanical instruction-following rather than evaluative judgement. The second, on 2026-07-25, made Sonnet the floor outright on the grounds that the hallucination rate below it is unacceptable.
+
+The cost is real and was accepted deliberately. A Haiku GREEN failure could no longer be told apart from a Haiku fabrication, so the extra diagnostic bite that a weaker tier bought was not worth what it cost in trustworthy signal. The falsifier for both rulings is Haiku 5 shipping plus a dated operator trial on it, so no vendor benchmark overturns them alone. If Sonnet cannot follow your skill's mechanical core, your instructions are not explicit enough.
 
 ### No Blaming the Model
 
-If the agent doesn't follow the skill, the skill is not clear enough. "Haiku is too weak for this" and "Sonnet didn't understand" are not valid conclusions — they are rationalizations for unclear instructions. If a model at your chosen test tier cannot follow the skill:
+If the agent doesn't follow the skill, the skill is not clear enough. "This tier is too weak for it" and "Sonnet didn't understand" are not valid conclusions — they are rationalizations for unclear instructions. If a model at your chosen test tier cannot follow the skill:
 
 1. The skill's instructions are ambiguous, incomplete, or rely on implicit knowledge
 2. The skill requires judgement the model tier cannot provide — which means the skill needs to replace that judgement with explicit rules
@@ -433,7 +435,7 @@ Test fails, you rerun, it passes. "Flaky" is not a diagnosis — it's a symptom.
 3. If you genuinely cannot resolve the inconsistency: refer it. Create an issue or offer the human a worktree + prompt for a separate session. **Never silently move on from inconsistent results.**
 
 **❌ Blaming the model tier**
-"Haiku can't handle this" is almost always "my instructions aren't clear enough for Haiku."
+"Sonnet can't handle this" is almost always "my instructions aren't clear enough for Sonnet."
 ✅ Fix: See "No Blaming the Model" above. The skill is always the problem first.
 
 ## Quick Reference (TDD Cycle)
@@ -442,7 +444,7 @@ Test fails, you rerun, it passes. "Flaky" is not a diagnosis — it's a symptom.
 |-----------|---------------|-------|------------------|
 | **RED** | Run scenario without skill | Production-level (default: Sonnet) | Agent fails, document rationalizations |
 | **Verify RED** | Capture exact wording | Same as RED | Verbatim documentation of failures |
-| **GREEN** | Write skill addressing failures | One tier down (default: Haiku) | Agent now complies with skill |
+| **GREEN** | Write skill addressing failures | Weakest sanctioned tier (Sonnet) | Agent now complies with skill |
 | **Verify GREEN** | Re-test scenarios | Same as GREEN | Agent follows rule under pressure |
 | **REFACTOR** | Close loopholes | Same as GREEN | Add counters for new rationalizations |
 | **Stay GREEN** | Re-verify | Same as GREEN | Agent still complies after refactoring |
