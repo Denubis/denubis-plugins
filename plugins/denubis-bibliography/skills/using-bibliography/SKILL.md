@@ -89,8 +89,7 @@ BBT, **not** per library copy), PDF path (+ exists), and `state`: `not-in-zotero
 Auto-render is ON by default (`--no-render` suppresses; `--force` re-renders;
 `--allow-mocr` escalates to GPU OCR).
 
-**Truthful by construction:** a wrong/constructed citekey returns an honest "No
-matches" rather than a guess; the same paper is listed once per library it lives
+**Truthful by construction:** the same paper is listed once per library it lives
 in; a PDF that can't be confirmed (unresolved library name / failed lookup) is
 `pdf-unknown`, never a false `no-pdf`. `resolve.py` searches **every** supplied
 key and unions the hits, so a query keyed on a co-author still resolves when
@@ -103,6 +102,19 @@ index is ASCII-folded); initials and arbitrary substrings still do not match. A
 genuine no-match prints what was searched and states plainly that, `item.search`
 being AND-fuzzy and first-author-only, **a no-match is not proof of absence** —
 retry with the first author's surname or a distinctive `--title` word.
+
+**Pass the citekey you have, not one you construct.** BBT appends a
+disambiguation suffix you cannot reliably guess (`chengGenerativeAIRequirements2026a`
+— the trailing `a`), and a fabricated key is the most common way a present paper
+gets misreported as absent. When the key you pass is close (missing suffix,
+truncation, typo), `resolve.py` prints the **real** citekey with its library and
+PDF status and exits `2` **without rendering** — re-run with the exact key it
+shows to render it. Disambiguation siblings of an exact match are flagged as
+possible duplicates so you can merge them in Zotero.
+
+**Exit codes:** `0` resolved (rendered/ready) · `1` genuinely absent or an error ·
+`2` near match(es) surfaced, no exact hit — re-run with the real key shown. A `2`
+means "wrong key, here is the right one", never "the paper is missing".
 
 **Known behaviour:** copies of one citekey across libraries share a single render
 dir `papers/<citekey>/`. The paper renders **once** — render state is per-citekey,
@@ -768,37 +780,40 @@ a naming convention.
 
 ## Refreshing the on-disk bib
 
-BBT's "Automatic Exports" feature writes the project bib on every change, but
-the debounce is opaque: the on-disk file can lag Zotero state by anything from
-seconds to many minutes after edits/syncs. BBT JSON-RPC exposes **no method**
-to force a configured auto-export to run on demand (verified empirically
-against `system.listMethods`, `autoexport.list`, `autoexport.run`, and the
-published method list at <https://retorque.re/zotero-better-bibtex/exporting/json-rpc/>
-on 2026-05-12 — only `autoexport.add` exists, for adding new auto-export
-configurations).
+BBT's "Automatic Exports" ("Keep updated") writes the project bib on every Zotero
+change, but the debounce is opaque: the file can lag Zotero state by seconds to
+minutes after edits/syncs. As of **zotero-api-plus 0.4.0** there is an on-demand
+trigger — `POST /api/plus/run-autoexport {"path": "<bib>"}` forces BBT's own
+registered auto-export for that exact path to run. It is **trigger-only**: a 200
+means it fired, not that the export succeeded (BBT swallows export failures —
+`status` always reaches `done`, `error` always `""`), so success is proven against
+the written file, never claimed by the response.
 
-**To force a fresh bib on disk without bouncing the user to the Zotero UI**,
-use BBT's HTTP pull-export endpoint:
+**Use `resolve.py --bib` — the only sanctioned refresh.** It triggers the
+registered export, then verifies the citekey landed in a WELL-FORMED bib (a real
+BibLaTeX parse via bibtexparser, not a grep that a truncated write could fool),
+with the wait/timeout living caller-side:
 
 ```bash
-curl -sS "http://localhost:23119/better-bibtex/library?/<libraryID>/library.biblatex" \
-     -o <project>/references.bib
+uv run resolve.py --citekey <key> --bib /abs/path/to/project/references.bib
 ```
 
-- `<libraryID>` is the numeric ID from `user.groups` (My Library = 1; group
-  libraries get higher IDs).
-- Output is byte-identical to BBT's auto-export — verified against
-  `2026-example-library-1` (libraryID = 27, 42 entries,
-  47 KB BibLaTeX) on 2026-05-12.
-- Alternative translator suffixes work too: `.bibtex` for classic BibTeX,
-  `.csljson` for CSL-JSON, etc. — same pattern.
+- Pass the **absolute** bib path you read from the project's own `bibliography:`
+  declaration — never a guessed filename.
+- `no-autoexport` (no "Keep updated" export registered for that path) → it
+  surfaces the setup gap and lists the paths BBT actually holds, rather than
+  polling forever. Fix the registration in Zotero (Export Collection → Keep
+  updated); do not paper over it.
+- Endpoint absent (Zotero without zotero-api-plus >= 0.4.0) → it tells you to
+  install/upgrade. There is **no faithful collection-scoped force-refresh without
+  it**, so set up the endpoint rather than improvising.
 
-The URL pattern is *not* documented in the JSON-RPC reference; it lives in
-BBT's CGI-style HTTP export server, which the JSON-RPC docs do not cover.
-
-Use this whenever you'd otherwise ask the user to open Zotero → Preferences
-→ Better BibTeX → Automatic Exports → "Reset" / "Force run". That UI roundtrip
-is never necessary for a bib refresh.
+**Do not hand-roll a refresh.** The library pull-export
+(`/better-bibtex/library?/<libraryID>/library.biblatex`) dumps the WHOLE library,
+not the project collection the bib targets, so it clobbers `references.bib` with
+wrong-scope content. And hand-rolling `item.export` + a diff to splice one entry in
+is the exact improvisation that left a bib in an uncertain state before a freeze —
+the failure this endpoint exists to remove.
 
 ## Bootstrap (when config or zettelkasten missing)
 
@@ -933,7 +948,9 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
 | Asserting "I rendered N papers" without showing the file paths | Verify by `ls ~/zettelkasten/papers/<citekey>/`. Don't claim success without checking. |
 | Treating research-agent suggestions as verified options | They're inputs, not conclusions. Verify with a real call before asserting capability. |
-| Bouncing the user to the Zotero UI to trigger a stale auto-export refresh | Use the HTTP pull-export URL: `curl "http://localhost:23119/better-bibtex/library?/<id>/library.biblatex" -o <path>`. See "Refreshing the on-disk bib" above. |
+| Bouncing the user to the Zotero UI to trigger a stale auto-export refresh | Force the registered export on demand: `resolve.py --citekey <key> --bib <abs path>` (POST /api/plus/run-autoexport, zotero-api-plus >= 0.4.0), which triggers then verifies. See "Refreshing the on-disk bib" above. |
+| Hand-rolling `item.export` + a diff to splice one new citekey into a project bib | That improvisation left a bib in an uncertain state before a freeze — the failure this endpoint exists to remove. Use `resolve.py --citekey <key> --bib <abs path>`: it triggers the registered "Keep updated" export (BBT's own bytes) then verifies the citekey is present in a well-formed bib. Never construct or patch bib entries by hand. |
+| Refreshing a project bib with the library pull-export (`/better-bibtex/library?/<id>/library.biblatex`) | That dumps the WHOLE library, not the project collection the bib targets, so it clobbers `references.bib` with wrong-scope content. Use `resolve.py --bib` (forces the registered collection export); if the endpoint is absent, install/upgrade zotero-api-plus to >= 0.4.0 rather than pulling the whole library. |
 | Searching for an item that lives in multiple libraries and assuming the first `item.search` hit is the canonical copy | The same paper can exist in My Library AND a group library as separate Zotero items with the same cite key. Always pass the explicit `library_id` to `item.attachments` / `item.export` for the library you actually want. |
 | Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so the surname-search step has nothing to query and lookup fails. Bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
 | Verifying a quote with `blockquote.py` and giving up at the first NO MATCH | Try adjusted substrings before flagging unverified: strip Unicode apostrophes, drop fragments that fall inside an HTML-rendered table cell, check whether the "quote" is actually a paraphrase of source text. The real text is usually present — match logic is brittle. |
@@ -1180,3 +1197,27 @@ discovery):
   space/substring guards, and diacritic folding on author and title. All six papers
   verified resolving live via natural queries (co-author and accented-surname
   included).
+
+**2026-06-24 addenda** (on-demand bib refresh — run-autoexport endpoint + consumer):
+
+- **zotero-api-plus 0.4.0 adds `POST /api/plus/run-autoexport`**, the on-demand
+  trigger stock BBT never exposed (only `autoexport.add` exists over JSON-RPC). It
+  forces BBT's own registered "Keep updated" auto-export for a given output path to
+  run. It is trigger-only — it makes no success claim, because BBT swallows export
+  failures (`status` always reaches `done`, `error` always `""`). Confirmed live
+  against BBT 9.0.31.
+- **`resolve.py --bib <abs path> --citekey <key>`** is the sanctioned
+  trigger-plus-verify path: it triggers the registered export, then verifies the
+  citekey landed in a WELL-FORMED bib using a real BibLaTeX parse (bibtexparser v2
+  `failed_blocks`, not a grep a truncated write could fool), with the wait/timeout
+  caller-side. On `no-autoexport` it surfaces the setup gap and lists the registered
+  paths; when the endpoint is absent it directs you to install/upgrade rather than
+  doing a wrong-scope library pull.
+- The previous guidance (force a refresh with the library pull-export, or that no
+  force-run exists) is retired: a library pull dumps the whole library, not the
+  project collection, and clobbers `references.bib` with wrong-scope content.
+- New unit tests in `tests/test_bibliography_resolve.py` cover the parser validity
+  check (well-formed + citekey-present, truncation caught, substring-not-an-entry),
+  the HTTP-response classifier (triggered / no-autoexport / endpoint-absent /
+  bbt-*), and the `--bib`/`--citekey` argument validation. The `--bib` shell flow
+  was verified live.

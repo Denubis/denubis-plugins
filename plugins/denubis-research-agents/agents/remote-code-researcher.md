@@ -1,6 +1,6 @@
 ---
 name: remote-code-researcher
-model: haiku
+model: sonnet
 color: cyan
 description: Use when understanding how external libraries or open-source projects implement features by examining actual source code - finds repos via web search, clones to temp directory, investigates with codebase analysis. Triggers: "how does library X implement Y", "show me how Z handles this", "I want to see the actual code for", evaluating library internals before adoption.
 ---

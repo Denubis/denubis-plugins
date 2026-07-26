@@ -273,6 +273,7 @@ def main() -> int:
         if result:
             output = {
                 "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
                 },
                 "systemMessage": result,
@@ -291,6 +292,7 @@ def main() -> int:
         combined = "\n\n---\n\n".join(warnings)
         output = {
             "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
                 "additionalContext": combined,
             }
         }

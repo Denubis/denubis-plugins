@@ -11,7 +11,7 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 - **Command**: a slash-command markdown file under `plugins/<name>/commands/<name>.md`. The user types `/<name>` to invoke; the command body is loaded directly into the model's context.
 - **Hook**: a Python or shell script under `plugins/<name>/hooks/` declared in a `hooks.json` config. Triggered by Claude Code on lifecycle events. Returns a JSON decision on stdout.
 - **Hook events** seen in this marketplace: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`. Matchers (where used) include `Bash`, `Write|Edit`, and the SessionStart variants `startup|resume|clear|compact`.
-- **Auto-discovery dispatcher**: the `denubis-hook-pretooluse-dispatcher` plugin scans enabled marketplace plugins for `hooks/pretooluse-bash.sh` and a `~/.claude/hooks/pretooluse-bash.d/` drop directory, sorts by priority comment, and runs each with the original stdin. Used by `denubis-hook-gh-fork-guard` and `denubis-hook-rtk-rewrite` (which have empty `hooks.json` files of their own).
+- **Auto-discovery dispatcher**: the `denubis-hook-pretooluse-dispatcher` plugin scans enabled marketplace plugins for `hooks/pretooluse-bash.sh` and a `~/.claude/hooks/pretooluse-bash.d/` drop directory, sorts by priority comment, and runs each with the original stdin. Used by `denubis-hook-gh-fork-guard` (which has an empty `hooks.json` of its own).
 
 ## Runtime Tools
 
@@ -50,9 +50,8 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 ## Behaviour Surfaces
 
 - **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Used heavily by `denubis-hook-skill-reinforcement` (`UserPromptSubmit`), `denubis-basic-agents` and `denubis-plan-and-execute` session-start hooks, and `denubis-hook-claudemd-reminder`.
-- **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Used by `denubis-hook-gh-fork-guard`, the `code-quality-guard` hook in `denubis-plan-and-execute`, and the `denubis-hook-rtk-rewrite` rewriter (which always emits `allow` but with an `updatedInput`).
-- **`updatedInput`**: a hook return value that rewrites the tool input before it is executed. Used by `denubis-hook-rtk-rewrite` to swap a command for its `rtk` equivalent.
-- **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. Used by `denubis-hook-shortcut-detection`.
+- **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Used by `denubis-hook-gh-fork-guard` and the `code-quality-guard` hook in `denubis-plan-and-execute`.
+- **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. No shipped plugin currently emits it.
 - **MCP server**: an external tool provider connected to Claude Code via the Model Context Protocol. The marketplace consumes MCP (Gmail/Calendar/Drive, `context7`, `ast-grep`) but does not host servers.
 
 ## Repository Conventions
@@ -80,7 +79,6 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 | LFS | (git) Large File Storage | Referenced by `using-git-worktrees` |
 | MCP | Model Context Protocol | External tool protocol for Claude Code |
 | OSC 11 | Operating System Command 11 | ANSI escape sequence used by `denubis-hook-branch-bg` to set terminal background |
-| RTK | Rust Token Killer | The user's token-saving CLI proxy that `denubis-hook-rtk-rewrite` rewrites commands to |
 | TDD | Test-Driven Development | Red-green-refactor discipline applied to features |
 | UAT | User Acceptance Testing | Manual verification phase |
 | WAL | Write-Ahead Logging | SQLite concurrency mode planned for crash-recovery's source-of-truth database (`docs/design-plans/2026-05-08-crash-recovery.md`, `86cdfab`) |

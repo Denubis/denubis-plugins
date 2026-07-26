@@ -9,7 +9,7 @@ User types, their goals, access patterns, and constraints.
 **Goals:**
 - Use Claude Code productively across long-running sessions in multiple projects.
 - Maintain disciplined workflows (brainstorm → design → plan → execute) without losing process to fatigue or context drift.
-- Catch behavioural drift in Claude before it ships bad work — via hooks (`shortcut-detection`, `code-quality-guard`, `gh-fork-guard`), code-review loops, and proleptic-challenge passes.
+- Catch behavioural drift in Claude before it ships bad work — via hooks (`code-quality-guard`, `gh-fork-guard`), code-review loops, and proleptic-challenge passes.
 - Re-use disciplined knowledge across sessions and machines by keeping markdown skills, agents, and CLAUDE.md files as the durable artefact set.
 
 **Access patterns:**
@@ -18,12 +18,12 @@ User types, their goals, access patterns, and constraints.
 - Drops slash commands (`/commit`, `/getting-started`, `/setup`, `/starting-a-design-plan`, `/starting-an-implementation-plan`, `/executing-an-implementation-plan`, `/maintain-architecture`, `/flesh-it-out`, `/how-to-customize`) for repeatable workflows.
 - Reads and edits skill markdown directly when refining workflows.
 - Works against forks of GitHub repos — the `gh-fork-guard` hook denies `gh` calls targeting any repo other than the configured fork.
-- Uses `uv` for Python tooling, `git` everywhere, `gh` for GitHub work, `rtk` for token-saving wrappers (the `rtk-rewrite` hook handles this transparently).
+- Uses `uv` for Python tooling, `git` everywhere, and `gh` for GitHub work.
 
 **Constraints:**
 - Local-only operation — no remote sync of plugin state beyond git.
 - Linux desktop assumed by some components: `/proc` access (used by `branch-bg` for TTY discovery), fish shell, ghostty terminal (referenced in `branch-bg`'s keywords).
-- Limited attention budget — relies on hooks (`skill-reinforcement`, `claudemd-reminder`, `shortcut-detection`) to enforce process rather than memory.
+- Limited attention budget — relies on hooks (`skill-reinforcement`, `claudemd-reminder`) to enforce process rather than memory.
 
 **Key scenarios:**
 1. **Starting a new feature.** Invokes `/starting-a-design-plan`. Claude runs `denubis-plan-and-execute`'s brainstorming, clarification, write, and proleptic-challenge skills, dispatching `denubis-research-agents:codebase-investigator` for codebase reality checks. A design plan lands in `docs/design-plans/`.

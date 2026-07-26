@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-      "version": "2.35.3",
+      "version": "2.39.0",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -33,7 +33,7 @@
     {
       "name": "denubis-basic-agents",
       "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "source": "./plugins/denubis-basic-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -55,7 +55,7 @@
     {
       "name": "denubis-extending-claude",
       "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, maintaining CLAUDE.md, and syncing with upstream",
-      "version": "1.8.0",
+      "version": "1.10.0",
       "source": "./plugins/denubis-extending-claude",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -80,7 +80,7 @@
     {
       "name": "denubis-hook-claudemd-reminder",
       "description": "PostToolUse hook that reminds to invoke project-claude-librarian before committing when git status or git log reveals changes that may warrant CLAUDE.md updates.",
-      "version": "1.1.3",
+      "version": "1.1.4",
       "source": "./plugins/denubis-hook-claudemd-reminder",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -91,20 +91,6 @@
         "hooks",
         "documentation",
         "claude-md"
-      ]
-    },
-    {
-      "name": "denubis-hook-shortcut-detection",
-      "description": "Stop hook that detects shortcut phrases and blocks with E-STOP for user go/no-go decision.",
-      "version": "2.0.4",
-      "source": "./plugins/denubis-hook-shortcut-detection",
-      "author": {
-        "name": "Brian Ballsun-Stanton",
-        "github": "denubis"
-      },
-      "license": "CC-BY-SA-4.0",
-      "keywords": [
-        "hooks"
       ]
     },
     {
@@ -125,7 +111,7 @@
     {
       "name": "denubis-hook-gh-fork-guard",
       "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork. Auto-discovered by the pretooluse-bash dispatcher.",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "source": "./plugins/denubis-hook-gh-fork-guard",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -141,7 +127,7 @@
     {
       "name": "denubis-hook-pretooluse-dispatcher",
       "description": "PreToolUse:Bash dispatcher with auto-discovery from marketplace plugins and drop directory. Runs hooks sequentially and merges outputs.",
-      "version": "1.1.1",
+      "version": "1.1.3",
       "source": "./plugins/denubis-hook-pretooluse-dispatcher",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -157,7 +143,7 @@
     {
       "name": "denubis-hook-branch-bg",
       "description": "SessionStart hook that sets terminal background colour based on git repo (hue) and branch (hue/lightness/saturation offsets) via OSC 11. Uses git-common-dir so worktrees share a colour family.",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "source": "./plugins/denubis-hook-branch-bg",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -173,8 +159,8 @@
     },
     {
       "name": "denubis-bibliography",
-      "description": "Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations; annotate cited passages back into the Zotero PDF as highlights. WIP — documents only the workflow proven end-to-end so far.",
-      "version": "0.9.0",
+      "description": "Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations; annotate cited passages back into the Zotero PDF as highlights. WIP \u2014 documents only the workflow proven end-to-end so far.",
+      "version": "0.12.0",
       "source": "./plugins/denubis-bibliography",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -209,7 +195,7 @@
     },
     {
       "name": "denubis-token-estimator",
-      "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens (origin-deduplicated, main thread vs subagent fan-out) and human-authored input words (machine wrappers stripped), per project, rolled up from the directory via a .token-estimator mapper, optionally by month. WIP — methodology established and reproducible; external audit pending.",
+      "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens (origin-deduplicated, main thread vs subagent fan-out) and human-authored input words (machine wrappers stripped), per project, rolled up from the directory via a .token-estimator mapper, optionally by month. WIP \u2014 methodology established and reproducible; external audit pending.",
       "version": "0.1.0",
       "source": "./plugins/denubis-token-estimator",
       "author": {

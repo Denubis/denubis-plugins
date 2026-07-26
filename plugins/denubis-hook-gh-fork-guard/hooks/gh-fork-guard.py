@@ -146,6 +146,7 @@ def deny(reason: str) -> dict:
     """Build a deny response."""
     return {
         "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
             "systemMessage": reason,
         }
@@ -226,11 +227,12 @@ def main():
         if len(tokens) >= 2 and tokens[1] in REPO_SUBCOMMANDS:
             output = {
                 "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
                     "additionalContext": (
                         f"FORK POLICY: This gh command will use the default repo. "
                         f"Verify that `gh repo set-default` points to {ALLOWED_REPO}. "
                         f"You may ONLY interact with {ALLOWED_REPO}, never upstream."
-                    )
+                    ),
                 }
             }
             print(json.dumps(output))

@@ -347,3 +347,33 @@ HOOK
     [ "$status" -eq 0 ]
     [[ "$output" == *"(none)"* ]]
 }
+
+@test "drop dir: context-only hook output still carries hookEventName" {
+    cat > "$DISPATCHER_DROP_DIR/30-context" <<'HOOK'
+#!/usr/bin/env bash
+cat > /dev/null
+echo '{"hookSpecificOutput":{"additionalContext":"advisory only"}}'
+HOOK
+    chmod +x "$DISPATCHER_DROP_DIR/30-context"
+
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    [ "$status" -eq 0 ]
+    event=$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')
+    [ "$event" = "PreToolUse" ]
+    ctx=$(echo "$output" | jq -r '.hookSpecificOutput.additionalContext')
+    [ "$ctx" = "advisory only" ]
+}
+
+@test "drop dir: deny passthrough carries hookEventName" {
+    cat > "$DISPATCHER_DROP_DIR/10-deny" <<'HOOK'
+#!/usr/bin/env bash
+cat > /dev/null
+echo '{"hookSpecificOutput":{"permissionDecision":"deny"},"systemMessage":"blocked by test"}'
+HOOK
+    chmod +x "$DISPATCHER_DROP_DIR/10-deny"
+
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    [ "$status" -eq 0 ]
+    event=$(echo "$output" | jq -r '.hookSpecificOutput.hookEventName')
+    [ "$event" = "PreToolUse" ]
+}

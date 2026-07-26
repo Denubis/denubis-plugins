@@ -11,7 +11,7 @@ user-invocable: true
 This fork (denubis-plugins) diverged from upstream (ed3d-plugins) with:
 - Renamed plugins: `ed3d-*` → `denubis-*`
 - Different philosophy: Opus for implementation, halt-on-failure, block on all severities
-- Additional plugins: shortcut-detection hook, transcript archiving
+- Additional plugins: transcript archiving
 - Removed plugins: house-style, playwright (wrong ecosystem)
 
 When the user asks to sync, do it. This skill documents how.

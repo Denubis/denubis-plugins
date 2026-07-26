@@ -54,7 +54,7 @@ The cross-reference audit currently lives as an embedded Python script in `phase
    - `PostToolUse` on `Edit` / `Write` when the touched path matches `**/SKILL.md`, `docs/**/*.md`, or known plan/design directories — run the audit, surface FAILs as `additionalContext`.
    - `Stop` — run the full audit at session end; emit `decision: "block"` with `reason` if there are unresolved FAILs in the working tree.
    - Optional pre-commit-style via `PreToolUse` on `Bash` when the command is `git commit …` — block commits that would ship broken references.
-   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the existing `shortcut-detector.py` Stop hook's surfacing pattern.)
+   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the `code-quality-guard.py` hook's deny/warn surfacing pattern.)
 
 **Why deferred from skill-skills upstream sync:**
 
@@ -317,6 +317,8 @@ Two independent paths:
    - Current review's M2 revision must reference this issue and prescribe the workaround pattern (one-term-per-query, executor unions results, avoid apostrophes by using alternative spellings).
    - Any future plan or skill invoking cc-search-chats documents the fragility and example-safe queries.
 
+**Operator direction (2026-06-11, Phase 3 gate):** prioritise path 1. The union-in-Python workaround has now been re-implemented at least twice (the 2026-04-19 thread audit and Phase 3's `red_search.py`), and the restructured testing-skills-with-subagents protocol documents the constraints again. Improving the tool beats reinventing the workaround in each consumer. Upstream fix scope should also cover the worktree project-path round-trip lossiness recorded in `phase_03_red_evidence.md` (encode/decode of `-` in project directory names is not invertible).
+
 **Related:**
 
 - `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/critical-peer-review-2026-04-18.md` M2 finding
@@ -357,6 +359,55 @@ Interaction with existing auto-memory: complementary, not redundant. Auto-memory
 - `plugins/denubis-extending-claude/skills/maintaining-project-context/SKILL.md`
 - `plugins/denubis-plan-and-execute/skills/finishing-a-development-branch/SKILL.md`
 - ISSUE-10 (cc-search-chats FTS5 fragility — must be resolved or worked around before this skill is reliable)
+
+---
+
+### ISSUE-12: Add a "can it do it by default?" pre-check to skill-authoring guidance
+
+- **Status:** open
+- **Opened:** 2026-07-05 (idea captured 2026-06-21 in `note20260621`)
+- **Origin:** Operator note `note20260621`, prompted by the Microsoft devblog "Stop overloading your skills" (https://devblogs.microsoft.com/blog/stop-overloading-your-skills). Given a home during the 2026-07-05 skill-skills-upstream-sync resume session.
+
+**Description:**
+
+Before authoring a skill, check whether the base model can already do the task by default. Skills that re-encode default capability are overload — they spend context and discovery budget for no behavioural gain. The captured heuristic is **"can it do it by default?"**: if yes, don't write the skill, or write only the thin part the default misses. The MS post is cited as the source of the framing but has not been read or verified in-session; confirm its actual argument before leaning on it.
+
+This is a candidate pre-flight gate for the skill-authoring skills (`writing-skills`, `writing-claude-directives`), sitting alongside the existing obra form-taxonomy guidance.
+
+**Proposed approach:**
+
+Small. Likely a short addition to `writing-skills` (cross-referenced from `writing-claude-directives`) framing the default-capability check as a pre-authoring question. Could fold into the Phase-4-queued obra form-guidance import — both edit the same skill-authoring surface — rather than land standalone. Read the MS post and evidence-grade its heuristics before importing any specific wording.
+
+**Related:**
+
+- `plugins/denubis-extending-claude/skills/writing-skills/SKILL.md`
+- `plugins/denubis-extending-claude/skills/writing-claude-directives/SKILL.md`
+- Phase-4-queued import work item in `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_04_true_up_sweep.md` (2026-07-05 dated append) — possible fold target
+- https://devblogs.microsoft.com/blog/stop-overloading-your-skills
+
+---
+
+### ISSUE-13: Denubis-native worked example to replace obra's CLAUDE_MD_TESTING as primary imitation target
+
+- **Status:** open
+- **Opened:** 2026-07-10 (intent first recorded 2026-07-05 in the example file's Denubis note)
+- **Origin:** Fable-pass skill-3 review of `writing-skills` (finding Minor 2). The promissory sentence "a denubis-native worked example … is queued to replace this" was scar tissue in `examples/CLAUDE_MD_TESTING.md`; the intent moves here with its state.
+
+**Description:**
+
+`writing-skills/examples/CLAUDE_MD_TESTING.md` is the plugin's only worked example of pressure-testing documentation. It is obra-authored (upstream commit `6fd4507`, imported 2026-06-11), and its scenarios were invented by the campaign's own author — which the denubis checklist forbids for RED baselines (the conversation-precedent protocol in `testing-skills-with-subagents`: source the RED baseline from an independent session). The file models variant-testing mechanics well but models RED-baseline sourcing wrongly; its in-file doctrinal caveat says imitate the mechanics, source scenarios independently.
+
+State at capture (2026-07-10): no denubis-native replacement exists or is drafted. The raw material the original intent named — "real campaign evidence" — now exists in-repo: the skill-skills branch's RED/GREEN records are independently-sourced pressure evidence from actual campaigns (`phase_02_red_evidence.md`, `phase_03_red_evidence.md`, `phase_05_announce_trigger_red_evidence.md` in `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`).
+
+**Proposed approach:**
+
+Assemble a worked example from one recorded campaign — the 2026-07-09 announce-and-temper trigger test is a complete two-round RED story with transcript evidence. Author it through writing-skills' own workflow (scope-check first). Decide at authoring time whether the obra file stays as a secondary mechanics reference or is deleted on replacement.
+
+**Related:**
+
+- `plugins/denubis-extending-claude/skills/writing-skills/examples/CLAUDE_MD_TESTING.md`
+- `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md` (conversation-precedent protocol)
+- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05_announce_trigger_red_evidence.md`
 
 ---
 

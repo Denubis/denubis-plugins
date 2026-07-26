@@ -7,6 +7,7 @@ seeds the AC2.1 / AC2.2 subcommand-listing test that grows phase-by-phase.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 
@@ -35,6 +36,20 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+# Typer renders CLI errors through Rich. When colour is forced (``FORCE_COLOR``
+# in the environment, as CI and the Claude Code harness set), Rich colourises
+# the ``--help`` hint and emits the two hyphens as separate SGR spans, so the
+# captured bytes read ``-\x1b[...m-help`` and a literal ``"--help"`` substring
+# check fails even though the rendered text is correct. Strip SGR codes before
+# substring assertions so they test the rendered text, not its ANSI styling.
+_ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI SGR (colour) escape sequences from ``text``."""
+    return _ANSI_SGR_RE.sub("", text)
+
+
 class TestHelp:
     def test_help_exits_zero(self) -> None:
         """``crash-recovery --help`` prints help and exits 0."""
@@ -59,5 +74,5 @@ class TestUnknownSubcommand:
         """``crash-recovery wibble`` exits non-zero with a ``--help`` hint."""
         result = _run_cli("wibble")
         assert result.returncode != 0, (result.stdout, result.stderr)
-        combined = result.stdout + result.stderr
+        combined = _strip_ansi(result.stdout + result.stderr)
         assert "--help" in combined, combined

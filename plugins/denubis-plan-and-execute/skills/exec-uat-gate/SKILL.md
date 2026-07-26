@@ -35,7 +35,7 @@ Invoke the UAT gate:
 
 ### Step 1: Locate Falsification Tests
 
-Find the Popper falsification tests from `uat-requirements.md` in the implementation plan directory. These contain the persisted human-judgment entries generated during planning, using the format:
+Find the Popper falsification tests (falsification: Popper, K.R. 1959. *The Logic of Scientific Discovery*. Hutchinson) from `uat-requirements.md` in the implementation plan directory. These contain the persisted human-judgment entries generated during planning, using the format:
 
 ```
 **This decision assumes:** [assumption]
@@ -49,7 +49,7 @@ Find the Popper falsification tests from `uat-requirements.md` in the implementa
 - For design work: Phase 3 of starting-a-design-plan
 - For features: Requirements from the original request
 
-If `uat-requirements.md` doesn't exist or has no entries for this phase, construct falsification tests from the acceptance criteria. Apply the **Carnap quality rubric** — every entry must have:
+If `uat-requirements.md` doesn't exist or has no entries for this phase, construct falsification tests from the acceptance criteria. Apply the **Carnap quality rubric** (after Carnap, R. 1936. "Testability and Meaning." *Philosophy of Science* 3(4): 419–471 — a claim earns meaning through specified, observable test conditions) — every entry must have:
 
 1. **What the human does** — an action pursuing the design objective, not inspection
 2. **What they're judging** — a subjective quality only a human can evaluate

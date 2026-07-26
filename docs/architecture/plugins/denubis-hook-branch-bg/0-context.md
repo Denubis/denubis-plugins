@@ -50,13 +50,14 @@ Registered in `plugins/denubis-hook-branch-bg/hooks/hooks.json` (`22d2148`):
 
 - **Event:** `SessionStart`
 - **Matcher:** `startup|resume|clear|compact`
-- **Command:** `uv run python "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"`
+- **Command:** `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"`
 - **Timeout:** 5 seconds
 - **suppressOutput:** `true`
+- **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
 ## Cross-References
 
 - **Plugin manifest:** `plugins/denubis-hook-branch-bg/hooks/.claude-plugin/plugin.json` (`22d2148`), version 0.2.3.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **Related architecture docs:** `../../README.md` (index), `../../glossary.md`, `../../constraints.md`.
-- **Sibling hook plugins** (peer entities under Claude Code's hook system, not consumers of this plugin's output): `denubis-hook-claudemd-reminder`, `denubis-hook-shortcut-detection`, `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`, `denubis-hook-rtk-rewrite`, `denubis-hook-skill-reinforcement`.
+- **Sibling hook plugins** (peer entities under Claude Code's hook system, not consumers of this plugin's output): `denubis-hook-claudemd-reminder`, `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`, `denubis-hook-skill-reinforcement`.

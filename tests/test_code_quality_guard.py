@@ -342,3 +342,26 @@ class TestMainIntegration:
             timeout=10,
         )
         assert result.returncode == 0
+
+
+class TestOutputContract:
+    """Every emitted hookSpecificOutput must carry hookEventName."""
+
+    def test_deny_output_carries_hook_event_name(self):
+        payload = json.dumps(
+            {
+                "tool_input": {
+                    "file_path": "tests/e2e/test_login.py",
+                    "new_string": 'await page.evaluate("x")',
+                }
+            }
+        ).encode()
+        result = subprocess.run(
+            [sys.executable, str(_HOOK_PATH)],
+            input=payload,
+            capture_output=True,
+            timeout=10,
+        )
+        assert result.returncode == 2
+        out = json.loads(result.stdout.decode())
+        assert out["hookSpecificOutput"]["hookEventName"] == "PreToolUse"

@@ -1,5 +1,145 @@
 # Changelog
 
+## [denubis-extending-claude] 1.10.0 / [denubis-research-agents] 1.3.0 / [denubis-basic-agents] 2.1.0 / [denubis-plan-and-execute] 2.39.0
+
+Sonnet 5 becomes the model floor across the suite.
+
+**Changed:**
+- Operator ruling 2026-07-25 makes Sonnet the floor rather than merely barring Haiku from judgement work, on the grounds that the hallucination rate below it is unacceptable. It extends the 2026-04-22 position rather than replacing it, so both falsifiers stand, and both are overturned only by Haiku 5 shipping plus a dated operator trial.
+- `internet-researcher`, `codebase-investigator`, `combined-researcher` and `remote-code-researcher` move from haiku to sonnet. They were the last agents in the suite still on haiku, so the suite had been contradicting the April position since April. Research is the sharpest case, because judging whether a source is credible is judgement work rather than mechanical retrieval.
+- `testing-skills-with-subagents` runs its GREEN phase at the weakest sanctioned tier instead of one tier below production, which collapses once the floor and the default are the same tier. Pressure now comes from harder adversarial scenarios. The lost diagnostic bite is recorded rather than glossed.
+- `haiku-general-purpose` stays callable, because removing it would foreclose a decision that is not ripe, but it no longer advertises research or summarisation. Dispatching it needs a positive justification naming a bounded mechanical task.
+- `creating-an-agent` defaults a new agent definition to sonnet or opus.
+- `exec-session-naming` and `design-clarify` dispatch `sonnet-general-purpose` in place of `haiku-general-purpose`. A 2026-07-26 amendment extends the floor to live dispatch sites with no carve-out for cosmetic work, and `design-clarify` was investigating remote datastores rather than running a bounded mechanical task. Prose in both names the subagent by role rather than by tier, so the next retiering needs no prose sweep.
+- The version skips 2.37.0 and 2.38.0, which are claimed by PR #11 and by concurrent uncommitted work respectively.
+
+## [denubis-plan-and-execute] 2.36.4
+
+**Fixed:**
+- The workflow statusline now targets `tmux rename-window` at its own `$TMUX_PANE`. Previously, an untargeted rename could name whichever Byobu window was active and then suppress correction through the pane-specific 24-hour cache.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.3 / [denubis-hook-gh-fork-guard] 1.2.2 / [denubis-plan-and-execute] 2.36.3
+
+Every emitted `hookSpecificOutput` now carries the required `hookEventName`.
+
+**Fixed:**
+- Claude Code validates `hookSpecificOutput.hookEventName` on every hook response, not only permission decisions. The dispatcher's `build_output` stamped it only on the decision branch, so context-only annotations (the common case) were rejected with "missing required field hookEventName"; the deny passthrough forwarded sub-hook output verbatim with the same hole. Both now stamp the field. `gh-fork-guard` (deny + advisory) and `code-quality-guard` (deny + warn) stamp it at source as well. Regression tests in all three suites, including dispatcher bats cases for context-only and deny-passthrough output.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.2
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `hooks.json` launches the dispatcher with `uv run --no-project --no-config`. A malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) previously wedged `uv` in settings discovery before the hook ran; because this dispatcher gates every `Bash` call, that wedge was self-blocking during a merge. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
+
+## [denubis-plan-and-execute] 2.36.2
+
+Both `uv`-launched hooks made independent of the caller's working directory.
+
+**Fixed:**
+- `session-start.py` and `code-quality-guard.py` launch with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs. `update-live-marker.py` was already immune (deliberate bare `python3`) and is unchanged.
+
+## [denubis-hook-claudemd-reminder] 1.1.4
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `git-command-reminder.py` launches with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs.
+
+## [denubis-hook-branch-bg] 0.2.5
+
+Hook launcher made independent of the caller's working directory.
+
+**Fixed:**
+- `branch-bg.py` launches with `uv run --no-project --no-config`, so a malformed `pyproject.toml` in the caller's cwd (e.g. git conflict markers mid-merge) can no longer wedge `uv` in settings discovery before the hook runs.
+
+## [denubis-extending-claude] 1.9.1
+
+Fable-pass review fixes across the skill-authoring triad: scar-tissue removal, announce cadence, and checklist tracking discipline.
+
+**Changed:**
+- `epistemic-humility`: announce-and-temper fires once per session when the skill loads, not at every presentation.
+- `writing-skills`: checklist preamble mandates TaskCreate with a durable on-disk checklist mirror; intro sub-skill order aligned with the Iron Law workflow; skip-testing counter restored; SKILL.md template frontmatter gains `user-invocable`; consolidation scar scrubbed from the worked example (ISSUE-13).
+- `maintaining-project-context`: stale Called-by step pointers corrected.
+
+**Fixed:**
+- `testing-skills-with-subagents`: scar-tissue removal — unresolvable design-plan pointer cut, consolidation narration replaced with plain cross-references.
+
+## [denubis-plan-and-execute] 2.36.1
+
+Small release: exec-session-naming becomes user-invocable.
+
+**Changed:**
+- `exec-session-naming`: user-invocable, so `/exec-session-naming` can be called directly at session start.
+
+## [denubis-plan-and-execute] 2.36.0
+
+impl-plan-write gains UAT-collation discipline and non-determinism self-audits; small fixes ride along in proleptic-challenger, exec-refactoring-rubric, design-write, exec-uat-gate, and systematic-debugging.
+
+**New:**
+- `impl-plan-write`: per-phase non-determinism self-audit (step 6.5), a Finalization existence gate on `uat-requirements.md` with a UAT Requirements Collation audit, mandated What's-automatable / What's-NOT-automatable template lines with worked examples, a mixed-signal SPLIT exception, a disclosed-oracle check, and an angle-bracket placeholder convention for illustrative paths.
+
+**Changed:**
+- `impl-plan-write`: Test/UAT phases reordered before Finalization; the collation stamp is an honest attestation of what was audited; UAT write-path reconciled (per-phase append vs collation stamp).
+- `proleptic-challenger` agent: counterarguments must name the claim they argue against.
+- `exec-refactoring-rubric`: References section citing the sources actually consulted; Popper, Carnap, and Fowler cited at first use.
+
+## [denubis-extending-claude] 1.9.0
+
+Upstream-sync overhaul of the skill-authoring chain: a new epistemic-humility rubric skill, writing-skills rebuilt as an orchestrator, and major reworks of testing-skills-with-subagents and writing-claude-directives.
+
+**New:**
+- `epistemic-humility` skill: four-screen rubric (Scope, Observability, Process, Failure-pattern) with paragraph-level source citations and a self-application walk-through. Presenting results, conclusions, or findings now falls in scope: the skill requires an explicit announcement and language tempered to the evidence.
+- `writing-claude-directives`: `model-tier-notes.md` behavioural notes for the 2026-06 model tier (Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5), with supersession history in a sibling log file.
+- `writing-skills`: obra/superpowers imports pinned at `6fd4507` — `anthropic-best-practices.md` (verbatim), the `render-graphs.js` authoring tool, and an `examples/CLAUDE_MD_TESTING.md` worked example — plus a README covering their dependencies.
+
+**Changed:**
+- `writing-skills` rewritten as a thin orchestrator sequencing epistemic-humility (scope check), testing-skills-with-subagents (RED baseline before authoring), and writing-claude-directives (phrasing). Deployment now requires explicit human acceptance, and editing an existing skill re-enters the sequence scoped to the change.
+- `testing-skills-with-subagents`: conversation-precedent protocol requiring independently sourced RED baselines, letter-vs-spirit distinction promoted to foundational guidance, hardened RED-baseline gate, AskUserQuestion fallbacks.
+- `writing-claude-directives`: restructured for the current model tier, rubric callback into epistemic-humility, plan-workflow vocabulary scrubbed from shipped guidance, supersession narratives moved out of SKILL.md.
+
+## [denubis-hook-shortcut-detection] removed
+
+Retired the plugin. Its `shortcut-detector.py` Stop hook is deleted, the marketplace entry and README references are gone, and the dedicated `tests/test_shortcut_detector.py` is removed.
+
+**Why:** an audit of chat history found 50 genuine firings across Sonnet and Opus sessions and zero true positives. The hook greps the last assistant message for narration connectives (`easier to`, `directly rather than`, `simpler approach`, `for simplicity`), which saturate ordinary explanation. Its two most common triggers were the model choosing the more rigorous path (`directly rather than guess`) and a plain comparative (`easier to diagnose`). A Stop hook reading prose cannot tell a mention of a phrase from its use, nor a change of code approach from a tooling workaround, so precision was zero. It also fired on this very investigation for quoting a trigger phrase.
+
+**Removed:**
+- `plugins/denubis-hook-shortcut-detection/` (the Stop hook, `hooks.json`, manifest)
+- `tests/test_shortcut_detector.py`
+- The `denubis-hook-shortcut-detection` entry in `.claude-plugin/marketplace.json` and its three README references
+
+## [denubis-bibliography] 0.12.0
+
+`resolve.py` near matches now carry a distinct exit code, and SKILL.md directs the caller to use the real key the resolver returns rather than construct one.
+
+**New:**
+- Exit code `2` for a citekey query with no exact hit but near matches surfaced (missing suffix / truncation / typo), distinct from `1` (genuinely absent or an error). A caller can branch on "wrong key, here is the right one" and re-run with the real key. Documented in the module docstring (`--help`) and SKILL.md.
+
+**Changed:**
+- SKILL.md front-door guidance gains "pass the citekey you have, not one you construct" — BBT's disambiguation suffix cannot be reliably guessed, and a fabricated key is the most common way a present paper is misreported as absent — plus the 0/1/2 exit-code table. The stale "a constructed citekey returns an honest No matches" line is retired: a near key now returns the real paper without rendering.
+
+## [denubis-bibliography] 0.11.0
+
+Citekey resolution is now near-match aware: a query that misses the exact key (a missing BBT disambiguation suffix, a truncation, or a typo) surfaces the real paper instead of reporting "no matches", and never renders on a near match.
+
+**Fixed:**
+- A citekey query whose key lacked BBT's trailing disambiguation suffix (`chengGenerativeAIRequirements2026` for the stored `…2026a`) was surfaced by BBT's prefix search but then discarded by the exact-equality filter, so `resolve.py` reported "no matches" — repeatedly misread as "the paper has no PDF". The exact filter no longer silently drops the near hit.
+
+**New:**
+- Near-match resolution for citekey queries: `classify_citekey` / `rank_citekey_candidates` grade each BBT hit as exact / variant (a disambiguation sibling) / prefix / fuzzy (difflib similarity, tunable threshold). With no exact hit, the nearest paper(s) are RETURNED with their real citekey, library, and PDF status but NEVER rendered — the caller re-runs with the exact key. Base-variant siblings of an exact match are listed as possible duplicates with their library, so duplicates can be merged in Zotero. Recall is widened for the citekey path (base key + author surname) so a mid-string typo still surfaces the neighbourhood. 17 new unit tests; the shell path verified live against Zotero + BBT.
+
+## [denubis-bibliography] 0.10.0
+
+On-demand project-bib refresh: `resolve.py --bib` triggers a paper's registered BBT auto-export and verifies the citekey lands in a well-formed bib, retiring the hand-rolled `item.export` + diff splice and the wrong-scope library pull.
+
+**New:**
+- `resolve.py --bib <abs path> --citekey <key>` makes a resolved paper citeable in a project bib. It forces the registered "Keep updated" export via `POST /api/plus/run-autoexport` (zotero-api-plus >= 0.4.0), then verifies the citekey is present in a WELL-FORMED bib using a real BibLaTeX parse (bibtexparser v2 `failed_blocks`, not a grep a truncated write could fool), with the wait/timeout caller-side. On `no-autoexport` it surfaces the setup gap and lists the registered paths; when the endpoint is absent it directs the user to install/upgrade rather than doing a wrong-scope library pull. Trigger-only by design — success is proven against the written file, never the endpoint response.
+- Adds a `bibtexparser>=2.0.0b9` dependency (the v2 `failed_blocks` API; v2 is the only line that detects malformed/truncated blocks). 16 unit tests cover the new pure core (`check_bib`, `classify_autoexport_response`, `bib_arg_error`, `explain_autoexport_failure`); the `--bib` shell flow was verified live against BBT 9.0.31.
+
+**Changed:**
+- SKILL.md "Refreshing the on-disk bib" now documents the trigger-plus-verify endpoint; the prior guidance (force a refresh with the library pull-export, or that no force-run exists) is retired as wrong-scope/incorrect. Common-mistakes gains rows naming the hand-rolled `item.export` + diff splice and the wrong-scope library pull, both pointing at `resolve.py --bib`.
+
 ## [denubis-external-agents] 0.3.0
 
 The codex-peer-review skill now takes a one-line focus note and tells Claude to lean on the runner's staging instead of hand-building context for the reviewer.

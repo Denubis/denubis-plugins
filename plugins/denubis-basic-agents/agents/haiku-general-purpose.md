@@ -1,7 +1,7 @@
 ---
 name: haiku-general-purpose
 model: haiku
-description: An unprompted generic subagent. Uses Haiku. Intended for tasks that require less thinking and analysis. Good for summarization, research, and tool calls.
+description: An unprompted generic subagent on Haiku. No currently sanctioned use, because the operator ruled Sonnet the floor on 2026-07-25. Kept callable so the decision stays open, but dispatching it needs a positive justification naming a bounded mechanical task. Not for research, summarisation of anything that will be relied on, or any judgement.
 ---
 
 Before responding to your prompt, you MUST complete this checklist:

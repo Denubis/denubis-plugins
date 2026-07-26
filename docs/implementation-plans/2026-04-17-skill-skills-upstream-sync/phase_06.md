@@ -1,6 +1,8 @@
 # Skill-Skills Upstream Sync — Phase 6: Harden `impl-plan-write` Against UAT Smuggling (Cross-Plugin)
 
-**⚠️ EXECUTION ORDER (L3 revision):** Despite sorting lexically AFTER `phase_05.md`, this phase executes **BEFORE** Phase 5. Phase 5 is the terminal coherent-set commit phase; Phase 6's cross-plugin changes (denubis-plan-and-execute impl-plan-write hardening) must land first so Phase 5's version bump + marketplace + CHANGELOG sync can capture them. Execution order: `phase_01 → phase_02 → phase_02_5 → phase_03 → phase_04 → phase_06 → phase_05`.
+**⚠️ EXECUTION ORDER (L3 revision):** Despite sorting lexically AFTER `phase_05.md`, this phase executes **BEFORE** Phase 5. Phase 5 is the terminal coherent-set commit phase; Phase 6's cross-plugin changes (denubis-plan-and-execute impl-plan-write hardening) must land first so Phase 5's version bump + marketplace + CHANGELOG sync can capture them. Execution order: `phase_01 → phase_02 → phase_02_5 → phase_02_6 → phase_03 → phase_04 → phase_06 → phase_05`.
+
+**2026-06-10 Amendment:** Line anchors in this file (e.g. SKILL.md 728–734, 1285) were verified against `impl-plan-write` at 1,337 lines; main's copy is now 1,348. Re-verify every anchor after the step-0 main merge before editing — the "exact boundaries determined at execution time" rule applies to all edit points, not just smell-assessor targets. Sequencing rule: this phase lands BEFORE the 2026-06-10 audit campaign's planned impl-plan-write restructure (`docs/audits/2026-06-10-skill-audit-campaign.md` tier 5), which would otherwise re-invalidate these anchors.
 
 **Goal:** Close the rubric-vs-gate gap in `denubis-plan-and-execute:impl-plan-write`. The three anti-smuggling tests (Decomposition / Reduction / Disagreement) documented at SKILL.md lines 728-734 are rubric-as-text without forcing function — a planner can emit UAT entries whose falsification is actually automatable, and nothing blocks them. Phase 6 converts the rubric into a gate via (a) template change mandating `**What's automatable:**` / `**What's NOT automatable:**` lines before every UAT entry's falsification template, (b) three-lens-table amendment making "no UAT entry" first-class, (c) per-phase ND rejection gate firing before user approval, (d) Finalization existence gate on `uat-requirements.md`, (e) one-time collation audit via dedicated Sonnet subagent at the `## UAT Requirements Collation` section (SKILL.md line 1285), and (f) retroactive audit of this plan's accumulated entries.
 
@@ -89,7 +91,7 @@ Amended text:
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 assert 'Zero UAT entries is a first-class valid outcome' in content, 'three-lens table amendment missing'
@@ -101,7 +103,7 @@ print('three-lens table amendment verified')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "refactor(impl-plan-write): amend three-lens table — 'no UAT entry' is first-class
 
@@ -187,10 +189,10 @@ Scope summary: **DR1 and DR3 get the amendment; DR2 and DR4 do not.**
 
 **Step 2: Add worked example immediately after the DR templates**
 
-Append a new subsection `#### Worked Examples — smuggled entry, genuine entry, zero-UAT phase`:
+Append a new subsection `### Worked Examples — smuggled entry, genuine entry, zero-UAT phase`:
 
 ```markdown
-#### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
+### Worked Examples — smuggled entry, genuine entry, zero-UAT phase
 
 **Example 1: Smuggled entry (REJECT)**
 
@@ -234,7 +236,7 @@ A preparatory-refactor phase whose Done-when is "tests stay green after restruct
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.1: template lines present
@@ -275,7 +277,7 @@ print('Task 2 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): mandate What's-automatable/What's-NOT-automatable template lines + worked examples
 
@@ -313,7 +315,7 @@ Between the current step 6 ("Present to user") and step 7 ("Use AskUserQuestion"
 ```markdown
 6.5. **Pre-presentation self-audit — apply the three anti-smuggling tests before AskUserQuestion**
 
-This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in Task 4 (UAT Requirements Collation section, SKILL.md line 1285), which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit at Task 4 is what actually prevents smuggled entries from reaching `uat-requirements.md`.
+This is a pre-presentation self-audit, NOT the structural anti-smuggling gate. The structural gate is the collation audit in the UAT Requirements Collation section, which dispatches a dedicated subagent to run every entry through the three tests independently of the planner. Step 6.5 is planner-side hygiene that surfaces obvious smuggling BEFORE the user approval in step 7 — making the conversation better. The user CAN still approve a smuggled entry; the collation audit is what actually prevents smuggled entries from reaching `uat-requirements.md`.
 
 Before presenting the DR set to the user for approval (step 7), run each proposed UAT entry (entries with `**What's automatable:**` and `**What's NOT automatable:**` lines) through the three anti-smuggling tests:
 
@@ -328,7 +330,7 @@ Before presenting the DR set to the user for approval (step 7), run each propose
 - If an entry fails the Disagreement test → either rewrite the "It's wrong if" clause to describe something genuinely subjective, or re-route to test-requirements.md.
 - If all entries fail → **zero UAT entries is the correct output for this phase** (this is the first-class output from AC6.7).
 
-**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in Task 4, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; Task 4 is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
+**Why this is a self-audit, not a structural gate (M6 revision):** The user in step 7 CAN approve a smuggled entry if presented with one — the planner-side self-audit does not structurally prevent reaching the user. The structural gate is the collation audit in the UAT Requirements Collation section, which runs an independent subagent over every entry in the final `uat-requirements.md` before writing. Step 6.5 improves the conversation; the collation audit is the backstop. Present self-audited entries to the user honestly (including any that were self-flagged and re-routed), so step 7's approval is informed.
 
 **Self-audit log:** Record pass/fail for each proposed entry in a brief comment (in-memory; does not need to be persisted). If re-routing to test-requirements, note the target test name.
 ```
@@ -341,7 +343,7 @@ Verify the new step 6.5 inserts cleanly between step 6 and step 7 without breaki
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.6: per-phase ND pre-presentation self-audit present (M6 revision: reframed from "gate" to "self-audit" — the structural gate is Task 4 collation audit)
@@ -363,7 +365,7 @@ print('Task 3 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): per-phase ND pre-presentation self-audit (step 6.5)
 
@@ -397,14 +399,14 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md"
 
 **Step 1: Amend Finalization task — add uat-requirements.md existence gate**
 
-Within the Finalization section, add a new Step 4 (after existing Step 3 "Complete finalization"):
+Within the Finalization section, add an existence gate for `uat-requirements.md`. **Placement correction (code review, 2026-07-06):** the gate must fold INTO Step 3 as a precondition that fires BEFORE "Mark the Finalization task as completed" — NOT as a separate Step 4 *after* Step 3's completion line, which would leave the anti-silent-skip gate itself silently skippable. The gate body is shown below as a `### Step 4` block for illustration; in the shipped skill it lives inside Step 3, before the completion line:
 
 ```markdown
 ### Step 4: Existence gate — verify `uat-requirements.md` exists at PLAN_DIR
 
 Finalization cannot complete until `uat-requirements.md` exists at `[PLAN_DIR]/uat-requirements.md`. If the file is missing:
 - Halt Finalization
-- Dispatch the UAT Requirements Collation section (SKILL.md line 1285) now — do not proceed without it
+- Dispatch the UAT Requirements Collation section now — do not proceed without it
 - If the collation produces zero entries (all decisions routed to test-requirements per AC6.7), still write the file in its minimal form:
   ```
   # UAT Requirements — [Plan Name]
@@ -447,14 +449,14 @@ Only after all entries either pass OR have human-acknowledged overrides does `ua
 
 **Why a Sonnet subagent, not critical-peer-review:** The three-test check is narrow. critical-peer-review has a broader scope (evidence-grading, internal inconsistency) and would do more than needed. A Sonnet agent with the three-test rubric as its sole prompt is cheaper and more focused.
 
-**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This Task 4 collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
+**Why a collation audit when step 6.5 self-audit already runs (M6 revision):** Step 6.5 is planner-side pre-presentation self-audit — hygienic but NOT structural (the user can still approve a smuggled entry presented to them). This UAT Requirements Collation audit IS the structural gate: the **Second defensive layer**, where an independent subagent runs every entry in the final `uat-requirements.md` through the three tests before the file is written, catching anything the self-audit missed, anything added outside the design-decisions-mode flow, anything from earlier sessions that pre-date the self-audit, and anything the user approved at step 7 that shouldn't have been. The two layers together close the rubric-vs-gate gap identified as the core finding from the 497-min parallel-session audit.
 ```
 
 **Step 3: Verify edits**
 
 Run:
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync && python3 -c "
 with open('plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md') as f:
     content = f.read()
 # AC6.8: Finalization existence gate
@@ -472,7 +474,7 @@ print('Task 4 structural checks passed')
 **Step 4: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): Finalization existence gate on uat-requirements.md + UAT Requirements Collation audit
 
@@ -578,7 +580,7 @@ Commit the uat-requirements.md edits separately.
 **Step 4: Commit audit file + any remediation edits**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 # First commit: audit file
 git add docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/uat-audit-2026-04-17.md
 git commit -m "docs(phase-06): retroactive UAT audit for skill-skills upstream sync plan
@@ -641,7 +643,7 @@ Insert a brief note near the top of `impl-plan-write/SKILL.md` (e.g., near the "
 **Step 2: Verify no illustrative path-form backticks remain**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 # Hunt for any remaining backticked illustrative paths that would match
 # the path-form regex. Expect zero hits after the rewrites above land.
 python3 -c "
@@ -666,7 +668,7 @@ Expected: `PASS: N path-form references remain; none are illustrative src/ or te
 **Step 3: Commit**
 
 ```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
+cd /home/brian/people/Brian/brian-ed3d-plugins/.worktrees/skill-skills-upstream-sync
 git add plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md
 git commit -m "feat(impl-plan-write): angle-bracket placeholder convention for illustrative paths
 
@@ -701,7 +703,7 @@ Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (AC5.4 support)
 - [ ] Three-lens table amended in impl-plan-write/SKILL.md; "no UAT entry" framed as first-class output (Task 1)
 - [ ] DR templates mandate `**What's automatable:**` / `**What's NOT automatable:**` lines; three worked examples present (smuggled REJECT, genuine ACCEPT, zero-UAT phase) (Task 2)
 - [ ] Step 6.5 per-phase ND pre-presentation self-audit inserted before AskUserQuestion step 7, with reference to Task 4 collation audit as the structural backstop (Task 3; M6 revision)
-- [ ] Finalization Step 4 existence gate on uat-requirements.md present; UAT Collation gains Sonnet-subagent audit step (Task 4)
+- [ ] Finalization existence gate on uat-requirements.md present (folded into Step 3 as a pre-completion precondition); UAT Collation gains Sonnet-subagent audit step (Task 4)
 - [ ] `uat-audit-2026-04-17.md` exists with per-entry findings; any FAIL entries remediated in `uat-requirements.md` with provenance comments (Task 5)
 - [ ] Illustrative `` `src/...` `` and `` `tests/...` `` inline paths in `impl-plan-write/SKILL.md` rewritten to angle-bracket placeholder form (`` `<src>/...` ``, `` `<tests>/...` ``); convention note added (Task 6 — H1 revision 2026-04-19 support for Phase 5 audit)
 - [ ] Commits land (6+ — one per Task 1-4 plus audit file; Task 5 may produce a second commit for remediations; Task 6 adds one commit)

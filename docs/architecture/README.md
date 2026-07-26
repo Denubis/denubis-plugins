@@ -9,8 +9,6 @@ Hook plugins:
 - [`denubis-hook-claudemd-reminder/0-context.md`](plugins/denubis-hook-claudemd-reminder/0-context.md) — `PostToolUse:Bash`: reminds to update CLAUDE.md after `git status`/`git log`.
 - [`denubis-hook-gh-fork-guard/0-context.md`](plugins/denubis-hook-gh-fork-guard/0-context.md) — `PreToolUse:Bash` (via dispatcher): blocks `gh` against non-fork repos.
 - [`denubis-hook-pretooluse-dispatcher/0-context.md`](plugins/denubis-hook-pretooluse-dispatcher/0-context.md) — `PreToolUse:Bash`: discovers and runs sibling `pretooluse-bash.sh` hooks, merges outputs.
-- [`denubis-hook-rtk-rewrite/0-context.md`](plugins/denubis-hook-rtk-rewrite/0-context.md) — `PreToolUse:Bash` (via dispatcher): rewrites CLI calls to `rtk` equivalents.
-- [`denubis-hook-shortcut-detection/0-context.md`](plugins/denubis-hook-shortcut-detection/0-context.md) — `Stop`: scans transcript for shortcut phrases and blocks with E-STOP.
 - [`denubis-hook-skill-reinforcement/0-context.md`](plugins/denubis-hook-skill-reinforcement/0-context.md) — `UserPromptSubmit`: reminds the model to invoke applicable skills.
 
 Agent-and-skill plugins:

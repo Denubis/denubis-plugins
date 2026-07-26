@@ -57,13 +57,14 @@ Registered in `plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json` (`dd
 
 - **Event:** `PreToolUse`
 - **Matcher:** `Bash`
-- **Command:** `uv run python "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.py"`
+- **Command:** `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse-bash-dispatcher.py"`
 - **Timeout:** 15 seconds
+- **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs — and because this dispatcher gates every `Bash` call, that wedge is self-blocking during a merge. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
 ## Cross-References
 
 - **Plugin manifest:** `plugins/denubis-hook-pretooluse-dispatcher/hooks/.claude-plugin/plugin.json` (`a9b22d8`), version 1.1.0.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **README:** `plugins/denubis-hook-pretooluse-dispatcher/README.md`.
-- **Sub-hooks discovered today (in this marketplace, both with empty `hooks.json` and a `pretooluse-bash.sh` wrapper):** `denubis-hook-gh-fork-guard` (priority 10), `denubis-hook-rtk-rewrite` (priority 50).
+- **Sub-hook discovered today (in this marketplace, with an empty `hooks.json` and a `pretooluse-bash.sh` wrapper):** `denubis-hook-gh-fork-guard` (priority 10).
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

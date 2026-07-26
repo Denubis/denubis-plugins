@@ -173,9 +173,13 @@ What the agent should NOT do:
 
 | Model | Use For |
 |-------|---------|
-| haiku | Simple tasks, fast iteration, high volume |
-| sonnet | Balanced capability/cost, most tasks |
+| haiku | Nothing currently sanctioned. Needs a positive justification naming a bounded mechanical task. |
+| sonnet | The floor, and the default. Balanced capability and cost, most tasks. |
 | opus | Complex reasoning, critical decisions, code review |
+
+Default a new agent definition to `sonnet` or `opus`. The operator ruled Sonnet the floor on
+2026-07-25 on the grounds that the hallucination rate below it is unacceptable, and its
+falsifier is Haiku 5 shipping plus a dated operator trial rather than any vendor benchmark.
 
 Specify in frontmatter:
 ```yaml

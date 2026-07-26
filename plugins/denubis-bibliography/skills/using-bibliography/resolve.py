@@ -15,21 +15,28 @@ For each match it reports the libraries AND collections the paper is in, whether
 a PDF is attached and on disk, and whether it has been rendered — and renders it
 when it hasn't. An optional library constraint narrows the search.
 
+Exit codes: 0 the paper resolved (rendered or ready); 1 genuinely absent or an
+error; 2 no exact citekey match but NEAR matches were surfaced — re-run with the
+real key shown (a near match is never rendered).
+
 Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 """
 
 # /// script
 # requires-python = ">=3.14"  # uses PEP 758 parenthesis-less `except` (3.14+)
-# dependencies = ["httpx"]
+# dependencies = ["httpx", "bibtexparser>=2.0.0b9"]  # v2 (beta) for failed_blocks
 # ///
 
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
+import logging
 import re
 import subprocess
 import sys
+import time
 import tomllib
 import unicodedata
 from dataclasses import dataclass
@@ -42,8 +49,16 @@ from pathlib import Path
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
+# zotero-api-plus >= 0.4.0 forces a registered BBT auto-export to run on demand.
+RUN_AUTOEXPORT_ENDPOINT = "http://localhost:23119/api/plus/run-autoexport"
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 RENDER_SCRIPT = Path(__file__).resolve().parent / "render.py"
+
+# bibtexparser logs each malformed/truncated block to its own logger. During
+# polling we deliberately read mid-write (briefly truncated) files, so silence
+# that expected noise process-wide, once. getLogger works whether or not
+# bibtexparser is importable, so this stays safe without the PEP 723 deps.
+logging.getLogger("bibtexparser").setLevel(logging.CRITICAL)
 
 # Regex for auto-classifying a bare positional QUERY argument.
 _CITEKEY_RE = re.compile(r"^[a-z]+[A-Z]\w+\d{4}")
@@ -76,6 +91,97 @@ def select_citekey_matches(hits: list[dict], citekey: str) -> list[dict]:
     (My Library + a group), so this returns every exact-match hit, not just one.
     """
     return [h for h in hits if h.get("citation-key") == citekey]
+
+
+# Trailing disambiguator: BBT breaks a citekey collision by appending a/b/...
+# after the 4-digit year (chengGenerativeAIRequirements2026a).
+_DISAMBIGUATOR_RE = re.compile(r"([0-9]{4})[a-z]+$")
+# Leading author component: lowercase surname, possibly hyphenated, before the
+# first capitalised title word (malsiner-walliModel... -> "malsiner-walli").
+_CITEKEY_AUTHOR_RE = re.compile(r"^[a-z]+(?:-[a-z]+)*")
+_CITEKEY_KIND_RANK = {"exact": 0, "variant": 1, "prefix": 2, "fuzzy": 3}
+
+
+def citekey_base(ck: str) -> str:
+    """The citekey without BBT's trailing disambiguation suffix.
+
+    BBT appends a/b/... after the year to break a citekey collision, so
+    'chengGenerativeAIRequirements2026' (what a human types) and '...2026a' (what
+    BBT stored) share a base. A key with no 4-digit year is returned unchanged.
+    """
+    return _DISAMBIGUATOR_RE.sub(r"\1", ck)
+
+
+def citekey_author(ck: str) -> str:
+    """The leading author component of a BBT citekey (lowercase, may be hyphenated).
+
+    Used to widen search recall: a mid-string typo in the title portion of a
+    citekey still surfaces the neighbourhood when we also search the surname.
+    """
+    m = _CITEKEY_AUTHOR_RE.match(ck)
+    return m.group(0) if m else ""
+
+
+def classify_citekey(
+    query: str, candidate: str, *, fuzzy_threshold: float = 0.85
+) -> tuple[str, float]:
+    """Classify a candidate citekey against the query. Returns (kind, score).
+
+    kind, in decreasing confidence:
+      exact   - byte-identical (1.0); the ONLY render-eligible kind.
+      variant - same base, differing only by disambiguation suffix (…2026 vs
+                …2026a, or sibling …a vs …b): the missing-suffix bug and the
+                duplicate signal.
+      prefix  - one key is a prefix of the other (a query truncated before year).
+      fuzzy   - difflib similarity of the bases ≥ fuzzy_threshold (a typo).
+      none    - below threshold; not a candidate.
+    """
+    if query == candidate:
+        return ("exact", 1.0)
+    qb, cb = citekey_base(query), citekey_base(candidate)
+    if qb == cb:
+        return ("variant", 0.98)
+    if candidate.startswith(query) or query.startswith(candidate):
+        return ("prefix", 0.95)
+    ratio = difflib.SequenceMatcher(None, qb, cb).ratio()
+    if ratio >= fuzzy_threshold:
+        return ("fuzzy", ratio)
+    return ("none", ratio)
+
+
+@dataclass(frozen=True)
+class ScoredHit:
+    """A BBT item.search hit tagged with how its citekey matched the query."""
+
+    hit: dict
+    kind: str
+    score: float
+
+
+def _candidate_sort_key(s: ScoredHit) -> tuple[int, float, str]:
+    """Kind confidence, then score descending, then citekey for stable output."""
+    return (_CITEKEY_KIND_RANK[s.kind], -s.score, s.hit.get("citation-key") or "")
+
+
+def rank_citekey_candidates(
+    hits: list[dict], query: str, *, fuzzy_threshold: float = 0.85
+) -> list[ScoredHit]:
+    """Classify every hit's citekey against query, drop non-candidates, rank them.
+
+    Ordered by kind confidence (exact, variant, prefix, fuzzy), then score
+    descending, then citekey for stable output. This is the near-match layer the
+    shell RETURNS without rendering; only kind == 'exact' is render-eligible, so a
+    near match hands back the real citekey for the caller to re-run against.
+    """
+    scored: list[ScoredHit] = []
+    for h in hits:
+        kind, score = classify_citekey(
+            query, h.get("citation-key") or "", fuzzy_threshold=fuzzy_threshold
+        )
+        if kind != "none":
+            scored.append(ScoredHit(hit=h, kind=kind, score=score))
+    scored.sort(key=_candidate_sort_key)
+    return scored
 
 
 def search_tokens(
@@ -243,6 +349,173 @@ def normalize_bbt_hit(hit: dict) -> Paper:
         library=hit.get("library", "") or "",
         library_id=None,
         collection_keys=(),
+    )
+
+
+# --- make-citeable consumer: pure core ---------------------------------------
+
+
+@dataclass(frozen=True)
+class BibCheck:
+    """Whether one citekey is safely citeable in a bib's text.
+
+    well_formed: the whole file parsed with ZERO failed blocks. bibtexparser v2
+      collects malformed/truncated/duplicate blocks in `failed_blocks` rather than
+      raising, so a partial write that truncates an entry surfaces here.
+    citekey_present: an entry whose key is EXACTLY citekey exists. Keyed on the
+      parsed entry key, so the citekey appearing inside a field value (a grep
+      false-positive) does not count.
+    citeable: both hold — the only state in which the paper is safely citeable.
+    """
+
+    well_formed: bool
+    citekey_present: bool
+    failed_count: int
+    entry_count: int
+
+    @property
+    def citeable(self) -> bool:
+        return self.well_formed and self.citekey_present
+
+
+def check_bib(bib_text: str, citekey: str) -> BibCheck:
+    """Parse a bib's text and report whether `citekey` is citeable in it.
+
+    A grep is necessary but not sufficient: a truncated write can contain the
+    citekey string yet be broken BibLaTeX. So we require the file to parse with no
+    failed blocks AND the citekey to resolve to a real entry. bibtexparser is
+    imported lazily so the module stays importable without the PEP 723 deps (the
+    httpx idiom); its per-failed-block logging is silenced at module load (a
+    briefly truncated mid-write file during polling is expected, not news).
+    """
+    import bibtexparser  # noqa: PLC0415
+
+    library = bibtexparser.parse_string(bib_text)
+    entry_keys = {e.key for e in library.entries}
+    return BibCheck(
+        well_formed=not library.failed_blocks,
+        citekey_present=citekey in entry_keys,
+        failed_count=len(library.failed_blocks),
+        entry_count=len(library.entries),
+    )
+
+
+@dataclass(frozen=True)
+class AutoexportOutcome:
+    """Semantic reading of a /api/plus/run-autoexport HTTP response.
+
+    kind is one of: triggered | no-autoexport | bbt-unavailable | bbt-starting |
+    endpoint-absent | error.
+    """
+
+    kind: str
+    registered_paths: tuple[str, ...] = ()
+    detail: str = ""
+
+
+def classify_autoexport_response(status_code: int, body_text: str) -> AutoexportOutcome:
+    """Map the endpoint's (status, body) to a semantic outcome.
+
+    The two 404s never collide: a path-bearing request that finds no registered
+    export returns JSON `{"status": "no-autoexport", ...}`, while an unregistered
+    route returns Zotero's generic plain-text 'No endpoint found'. We tell them
+    apart by parsing the body as a JSON object carrying a `status`.
+    """
+    body = (body_text or "").strip()
+    try:
+        obj = json.loads(body)
+    except ValueError:
+        obj = None
+    parsed = obj if isinstance(obj, dict) else None
+    status = parsed.get("status") if parsed else None
+
+    if status_code == 200 and status == "triggered":
+        return AutoexportOutcome(kind="triggered", detail=body)
+    if status == "no-autoexport":
+        paths = parsed.get("registeredPaths") or [] if parsed else []
+        return AutoexportOutcome(
+            kind="no-autoexport",
+            registered_paths=tuple(str(p) for p in paths),
+            detail=body,
+        )
+    if status == "bbt-unavailable":
+        return AutoexportOutcome(kind="bbt-unavailable", detail=body)
+    if status == "bbt-starting":
+        return AutoexportOutcome(kind="bbt-starting", detail=body)
+    if status_code == 404:
+        # A 404 without our JSON status means the route is not registered.
+        return AutoexportOutcome(kind="endpoint-absent", detail=body)
+    return AutoexportOutcome(kind="error", detail=body)
+
+
+def bib_arg_error(bib: str | None, citekey: str | None) -> str | None:
+    """Validate the --bib/--citekey pair for make-citeable mode (None = ok).
+
+    The bib path must be ABSOLUTE — the caller supplies the exact path from the
+    project's `bibliography:` declaration, never a guessed or relative name. A
+    citekey is required: make-citeable verifies one specific key, never inferred.
+    """
+    if not bib or not bib.strip():
+        return "Error: --bib requires an absolute path to the project bib file."
+    if not Path(bib).is_absolute():
+        return f"Error: --bib must be an absolute path, got {bib!r}."
+    if not citekey or not citekey.strip():
+        return "Error: --bib requires --citekey (the exact key to make citeable)."
+    return None
+
+
+def explain_autoexport_failure(outcome: AutoexportOutcome, bib_path: Path) -> str:
+    """The human-facing message for a non-`triggered` run-autoexport outcome.
+
+    endpoint-absent directs the user to install/upgrade the plugin — there is no
+    faithful collection-scoped force-refresh without it, and a library pull-export
+    would clobber the project bib with whole-library content. no-autoexport
+    surfaces the setup gap and lists the paths BBT actually holds.
+    """
+    if outcome.kind == "endpoint-absent":
+        return (
+            "  the run-autoexport endpoint is not installed (HTTP 404, no route).\n"
+            "  Install/upgrade zotero-api-plus to >= 0.4.0 (it adds\n"
+            "  POST /api/plus/run-autoexport), then retry. There is no faithful\n"
+            "  collection-scoped force-refresh without it — a library pull-export\n"
+            "  would clobber this project bib with whole-library content."
+        )
+    if outcome.kind == "no-autoexport":
+        lines = [
+            "  no registered 'Keep updated' auto-export targets this bib path.",
+            "  Set one up in Zotero (Export Collection -> Keep updated) pointing at",
+            f"  {bib_path}. Polling will never succeed until it exists.",
+        ]
+        lines += [f"    registered: {p}" for p in outcome.registered_paths]
+        return "\n".join(lines)
+    if outcome.kind == "bbt-unavailable":
+        return "  Better BibTeX is not installed in this Zotero."
+    if outcome.kind == "bbt-starting":
+        return "  Better BibTeX is still starting; retry shortly."
+    return f"  unexpected run-autoexport response: {outcome.detail[:200]}"
+
+
+def _timeout_message(
+    last: BibCheck | None, bib_path: Path, citekey: str, poll_timeout: float
+) -> str:
+    """Explain a verification timeout from the last bib check seen.
+
+    poll_timeout is quoted only in the citekey-absent branch: there the elapsed
+    wait is the salient fact ("it didn't show up in time"). For "never appeared"
+    and "malformed" the file/parse problem is what matters, not the duration, so
+    it is deliberately omitted.
+    """
+    if last is None:
+        return f"  timed out: bib never appeared at {bib_path}."
+    if not last.well_formed:
+        return (
+            f"  timed out: bib still has {last.failed_count} malformed block(s) — "
+            "the write may be mid-flight or the export failed."
+        )
+    return (
+        f"  timed out: {citekey} did not appear after {poll_timeout:.0f}s. "
+        "Either the export is still running, or the paper sits in a different "
+        "collection than this bib exports."
     )
 
 
@@ -512,6 +785,146 @@ def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False)
     return "failed"
 
 
+def post_run_autoexport(bib_path: str, timeout: float = 30.0) -> tuple[int, str] | None:
+    """POST the bib path to the run-autoexport endpoint; return (status, body).
+
+    Returns None when the endpoint is unreachable (an httpx transport error —
+    connect failure or timeout); any OTHER error propagates rather than being
+    mislabelled as unreachable, so a real bug surfaces. The endpoint forces BBT's
+    own registered auto-export for this path to run. Trigger-only: a 200 means it
+    fired, NOT that the export succeeded — the caller proves success against the
+    written file (check_bib).
+    """
+    import httpx  # noqa: PLC0415
+
+    try:
+        r = httpx.post(
+            RUN_AUTOEXPORT_ENDPOINT, json={"path": bib_path}, timeout=timeout
+        )
+    except httpx.TransportError:
+        return None
+    return r.status_code, r.text
+
+
+def _read_bib_text(bib_path: Path) -> str | None:
+    """Read the bib file's text; None if it does not exist yet."""
+    try:
+        return bib_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+
+
+def _trigger_autoexport(
+    bib_path: Path, *, starting_retries: int = 3, retry_delay: float = 2.0
+) -> AutoexportOutcome | None:
+    """POST the trigger, retrying briefly while BBT reports it is still starting.
+
+    Returns the classified outcome, or None when the endpoint is unreachable
+    (post_run_autoexport returns None on an httpx transport error). `bbt-starting`
+    is the one outcome BBT expects the caller to retry (the spec), so we re-POST a
+    few times — handles the common cold-start-after-launch case.
+    """
+    attempt = 0
+    while True:
+        result = post_run_autoexport(str(bib_path))
+        if result is None:
+            return None
+        outcome = classify_autoexport_response(*result)
+        if outcome.kind != "bbt-starting" or attempt >= starting_retries:
+            return outcome
+        attempt += 1
+        print(
+            f"  Better BibTeX is still starting; retry {attempt}/{starting_retries} "
+            f"in {retry_delay:.0f}s ...",
+            flush=True,
+        )
+        time.sleep(retry_delay)
+
+
+def _poll_until_citeable(
+    bib_path: Path, citekey: str, poll_timeout: float, poll_interval: float
+) -> BibCheck | None:
+    """Poll the bib until `citekey` is citeable or the timeout elapses.
+
+    Returns the last BibCheck seen (None if the bib never appeared). The wait
+    lives here, caller-side: the endpoint only triggers, the written file is the
+    truth.
+    """
+    deadline = time.monotonic() + poll_timeout
+    last: BibCheck | None = None
+    while True:
+        text = _read_bib_text(bib_path)
+        if text is not None:
+            last = check_bib(text, citekey)
+            if last.citeable:
+                return last
+        if time.monotonic() >= deadline:
+            return last
+        time.sleep(poll_interval)
+
+
+def ensure_citeable(
+    bib_path: Path,
+    citekey: str,
+    *,
+    poll_timeout: float = 30.0,
+    poll_interval: float = 1.0,
+) -> int:
+    """Force `citekey` to be citeable in `bib_path`, then verify it landed.
+
+    Trigger-then-verify: the endpoint only fires BBT's registered auto-export, so
+    the truth is the written file, checked with the parser (check_bib), never the
+    endpoint's response. Returns 0 iff the citekey ends up present in a well-formed
+    bib, non-zero otherwise. The branchy parts (failure messaging, the poll loop)
+    live in pure/extracted helpers so this stays a thin orchestrator.
+    """
+    print(f"\n=== make citeable: {citekey} ===", flush=True)
+    print(f"  bib: {bib_path}", flush=True)
+
+    # Pre-check: the configured auto-export may already have written it on its own
+    # debounce, in which case no trigger is needed.
+    pre_text = _read_bib_text(bib_path)
+    if pre_text is None:
+        print("  bib not on disk yet.", flush=True)
+    else:
+        pre = check_bib(pre_text, citekey)
+        if pre.citeable:
+            print("  already citeable: present in a well-formed bib.", flush=True)
+            return 0
+        if not pre.well_formed:
+            print(
+                f"  bib currently has {pre.failed_count} malformed block(s); "
+                "a fresh export should replace it.",
+                flush=True,
+            )
+
+    # Trigger the registered auto-export (retrying briefly while BBT is starting).
+    outcome = _trigger_autoexport(bib_path)
+    if outcome is None:
+        print(
+            "  could not reach the run-autoexport endpoint (connection failed).\n"
+            "  Is Zotero running with zotero-api-plus >= 0.4.0?",
+            flush=True,
+        )
+        return 1
+    if outcome.kind != "triggered":
+        print(explain_autoexport_failure(outcome, bib_path), flush=True)
+        return 1
+
+    # Triggered: poll the written file for the citekey in a well-formed bib.
+    print("  triggered; verifying the written bib ...", flush=True)
+    last = _poll_until_citeable(bib_path, citekey, poll_timeout, poll_interval)
+    if last is not None and last.citeable:
+        print(
+            f"  citeable: {citekey} is present in a well-formed bib "
+            f"({last.entry_count} entries).",
+            flush=True,
+        )
+        return 0
+    print(_timeout_message(last, bib_path, citekey, poll_timeout), flush=True)
+    return 1
+
+
 def print_no_match(
     tokens: list[str], *, doi: str | None, search_errors: list[str]
 ) -> None:
@@ -589,6 +1002,65 @@ def print_match(info: dict, state: str) -> None:
         print(f"  render dir: {info['out_dir']}", flush=True)
 
 
+def report_near_matches(
+    near: list[ScoredHit],
+    library_map: dict[str, int],
+    papers_dir: Path,
+    *,
+    requested: str,
+) -> None:
+    """Report near citekey matches for a query that had NO exact hit.
+
+    These are returned, never rendered: BBT held the paper under a slightly
+    different key (a missing disambiguation suffix, a truncation, a typo), so we
+    surface the real key, its library, and its PDF/render state, and let the
+    caller re-run resolve with the exact key. Each candidate is enriched for its
+    live PDF status, then printed with the same block as an exact match.
+    """
+    print(
+        f"\nNo exact citekey match for {requested!r}. "
+        "Nearest paper(s) in Zotero — NOT rendered:",
+        flush=True,
+    )
+    for cand in near:
+        paper = normalize_bbt_hit(cand.hit)
+        info = enrich_paper(paper, library_map)
+        info = check_rendered(info, papers_dir)
+        state = classify_state(
+            found=True,
+            has_pdf=info["pdf_status"] == "present",
+            pdf_exists=info["pdf_exists"],
+            rendered=info["rendered"],
+        )
+        if info["pdf_status"] == "unknown":
+            state = "pdf-unknown"
+        print(f"\n  near match: {cand.kind} (score {cand.score:.2f})", flush=True)
+        print_match(info, state)
+    print(
+        "\n  Re-run resolve with the exact citekey shown above to render it "
+        "(near matches are never auto-rendered).",
+        flush=True,
+    )
+
+
+def print_duplicate_note(near: list[ScoredHit]) -> None:
+    """List base-variant siblings of an exact match as possible duplicates.
+
+    A citekey that resolved exactly can still have disambiguation siblings (…a,
+    …b) sitting in Zotero — the trace of a duplicate. Surface where they live so
+    the human can merge them; we never touch Zotero. Only the `variant` kind
+    counts: a fuzzy or prefix near-match is not a duplicate of this paper.
+    """
+    variants = [c for c in near if c.kind == "variant"]
+    if not variants:
+        return
+    print("\n  possible duplicate(s) of this citekey in Zotero:", flush=True)
+    for c in variants:
+        lib = c.hit.get("library") or "(unknown library)"
+        print(f"    {c.hit.get('citation-key')}  in {lib}", flush=True)
+    print("    merge these in Zotero if they are the same paper.", flush=True)
+
+
 # main() is the CLI orchestrator (parse → search → filter → enrich → render); the
 # shell has no unit tests, so it is not split here — that is a separate refactor.
 def main() -> int:  # noqa: PLR0912, PLR0915
@@ -644,6 +1116,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "config.toml."
         ),
     )
+    parser.add_argument(
+        "--bib",
+        help=(
+            "Make --citekey citeable in this project bib: force its registered BBT "
+            "auto-export to run (POST /api/plus/run-autoexport, zotero-api-plus "
+            ">= 0.4.0), then verify the citekey lands in a well-formed bib. Pass "
+            "the ABSOLUTE path you read from the project's bibliography: "
+            "declaration, never a guessed filename. Requires --citekey."
+        ),
+    )
     args = parser.parse_args()
 
     # --- Classify the bare positional query (if given) -----------------------
@@ -672,6 +1154,12 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "(--year/--date alone cannot drive a Zotero search.)"
         )
 
+    # --- Validate the make-citeable pair early (before going live) -----------
+    if args.bib is not None:
+        bib_err = bib_arg_error(args.bib, args.citekey)
+        if bib_err:
+            parser.error(bib_err)
+
     # --- Go live -------------------------------------------------------------
     cfg = load_config()
     papers_dir = cfg["zettelkasten_root"] / "papers"
@@ -689,6 +1177,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     # bug that reported present papers as absent.
     papers: list[Paper]
     tokens: list[str]
+    near: list[ScoredHit] = []
     search_errors: list[str] = []
     if args.doi:
         # BBT can't search the DOI field — use the Crossref-surname fallback.
@@ -701,6 +1190,13 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             freeterm=freeterm,
             title=args.title,
         )
+        # Widen recall for citekey near-matching: BBT prefix-matches the base key
+        # (surfacing disambiguation siblings) and the author surname reaches a
+        # typo'd key's neighbourhood. rank_citekey_candidates filters precision back.
+        if args.citekey:
+            for extra in (citekey_base(args.citekey), citekey_author(args.citekey)):
+                if extra and extra not in tokens:
+                    tokens.append(extra)
         seen: set[tuple[str, str]] = set()
         raw_hits: list[dict] = []
         for tok in tokens:
@@ -719,8 +1215,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 seen.add(dedup)
                 raw_hits.append(h)
 
-        # A citekey query keeps only exact matches (search is fuzzy near-miss).
+        # A citekey query: exact matches are render-eligible (the unchanged happy
+        # path via select_citekey_matches). The NEAR matches (variant/prefix/fuzzy)
+        # are surfaced without rendering when no exact hit exists, and flagged as
+        # possible duplicates when one does.
         if args.citekey:
+            near = [
+                c
+                for c in rank_citekey_candidates(raw_hits, args.citekey)
+                if c.kind != "exact"
+            ]
             raw_hits = select_citekey_matches(raw_hits, args.citekey)
 
         papers = [normalize_bbt_hit(h) for h in raw_hits]
@@ -745,7 +1249,29 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         papers = [p for p in papers if p.library.lower() == lib_lower]
 
     if not papers:
+        if near:
+            # Found under a near key (missing suffix / truncation / typo): surface
+            # the real key WITHOUT rendering (the no-render-on-near rule), so the
+            # caller re-runs with the exact key.
+            report_near_matches(near, library_map, papers_dir, requested=args.citekey)
+            if args.bib:
+                print(
+                    "\n  cannot make citeable: no EXACT citekey match, so the "
+                    "registered export cannot target it.\n"
+                    "  Re-run --bib with the exact citekey shown above.",
+                    flush=True,
+                )
+            # Distinct from no-match (1): the paper IS here under a near key, so a
+            # caller can branch on 2 to re-run with the real key printed above.
+            return 2
         print_no_match(tokens, doi=args.doi, search_errors=search_errors)
+        if args.bib:
+            print(
+                "\n  cannot make citeable: the paper did not resolve in Zotero, so a\n"
+                "  registered export will not include it. Get it into the exported\n"
+                "  collection first, then retry --bib.",
+                flush=True,
+            )
         return 1
 
     # --- Enrich, classify, optionally render ---------------------------------
@@ -791,7 +1317,20 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
         print_match(info, state)
 
-    return 1 if render_errors else 0
+    # An exact match can still have disambiguation siblings — surface them so the
+    # human can merge the duplicate in Zotero (we never touch Zotero).
+    if args.citekey and near:
+        print_duplicate_note(near)
+
+    # --- Make citeable (trigger the registered export + verify the bib) ------
+    # Runs only after the paper resolved in Zotero (above): a registered export
+    # writes what BBT holds, so the paper must already be in the exported
+    # collection. The citekey is the validated --bib companion (bib_arg_error).
+    cite_failed = False
+    if args.bib:
+        cite_failed = ensure_citeable(Path(args.bib), args.citekey) != 0
+
+    return 1 if (render_errors or cite_failed) else 0
 
 
 if __name__ == "__main__":
