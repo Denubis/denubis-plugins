@@ -181,4 +181,4 @@ To rename this Claude session too: /rename <slug>
 
 - **Fallbacks.** When path, branch, phase, or subagent output is missing or malformed, components drop out cleanly. The slug is never empty: `<p3>:<verb>` is always available (verb falls back to the fixed canonical verb or the first token of the invoking skill name).
 - **No generic verbs.** The subagent prompt explicitly bans `code`, `coding`, `writing`, `stuff`. If you find it still emitting generic slots, tighten the ban list.
-- **Tier.** This dispatched Haiku until 2026-07-25, when the operator ruled Sonnet the floor with no carve-out for cosmetic work.
+- **Tier.** This dispatched Haiku until the 2026-07-25 Sonnet floor ruling, which was extended on 2026-07-26 to reach live dispatch sites with no carve-out for cosmetic work. Both are recorded in `.notes/feedback_haiku-no-judgement.md`.

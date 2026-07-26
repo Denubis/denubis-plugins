@@ -10,7 +10,7 @@ Sonnet 5 becomes the model floor across the suite.
 - `testing-skills-with-subagents` runs its GREEN phase at the weakest sanctioned tier instead of one tier below production, which collapses once the floor and the default are the same tier. Pressure now comes from harder adversarial scenarios. The lost diagnostic bite is recorded rather than glossed.
 - `haiku-general-purpose` stays callable, because removing it would foreclose a decision that is not ripe, but it no longer advertises research or summarisation. Dispatching it needs a positive justification naming a bounded mechanical task.
 - `creating-an-agent` defaults a new agent definition to sonnet or opus.
-- `exec-session-naming` and `design-clarify` dispatch `sonnet-general-purpose` in place of `haiku-general-purpose`. The operator ruled no carve-out for cosmetic work, and `design-clarify` was investigating remote datastores rather than running a bounded mechanical task. Prose in both names the subagent by role rather than by tier, so the next retiering needs no prose sweep.
+- `exec-session-naming` and `design-clarify` dispatch `sonnet-general-purpose` in place of `haiku-general-purpose`. A 2026-07-26 amendment extends the floor to live dispatch sites with no carve-out for cosmetic work, and `design-clarify` was investigating remote datastores rather than running a bounded mechanical task. Prose in both names the subagent by role rather than by tier, so the next retiering needs no prose sweep.
 - The version skips 2.37.0 and 2.38.0, which are claimed by PR #11 and by concurrent uncommitted work respectively.
 
 ## [denubis-plan-and-execute] 2.36.4

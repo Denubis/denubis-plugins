@@ -230,7 +230,7 @@ The template adapts Anthropic's sample overengineering prompt — the negative f
 
 ## Model-Specific Notes
 
-Per-model behavioural specifics (effort levels, steerability, instruction-following characteristics, extended-thinking budgets) live in [`model-tier-notes.md`](model-tier-notes.md) as a supporting file so they can be refreshed without touching this orchestrator. Consult that file when a directive's target model matters — e.g. choosing effort level, calibrating aggressive-language dial-back, or deciding whether to route judgement-heavy work away from the Haiku tier.
+Per-model behavioural specifics (effort levels, steerability, instruction-following characteristics, extended-thinking budgets) live in [`model-tier-notes.md`](model-tier-notes.md) as a supporting file so they can be refreshed without touching this orchestrator. Consult that file when a directive's target model matters — e.g. choosing effort level, calibrating aggressive-language dial-back, or checking a dispatch against the Sonnet model floor.
 
 ## Naming (for Skills)
 
