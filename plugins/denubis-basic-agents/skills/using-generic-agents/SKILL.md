@@ -13,9 +13,15 @@ Use these when you need a general-purpose executor without domain-specific defau
 
 | Agent | Model | Best For |
 |-------|-------|----------|
-| `haiku-general-purpose` | Haiku | Tool-heavy search, summarisation, and compilation. High-volume parallel work where prompts are detailed and decisions are few. |
+| `haiku-general-purpose` | Haiku | **No currently sanctioned use.** Kept callable because removing it would foreclose a decision that is not ripe. Dispatching it needs a positive justification naming a bounded mechanical task. |
 | `sonnet-general-purpose` | Sonnet | Default for most work. Code review, debugging, implementation, structured analysis. Near Opus-level on software engineering tasks at 1/5 the cost. |
 | `opus-general-purpose` | Opus | Deep scientific reasoning, sustained multi-step analysis, high-stakes architectural decisions. When the task needs genuine depth, not just breadth. |
+
+**Model floor (operator ruling, 2026-07-25).** Sonnet is the floor for almost everything,
+because the hallucination rate below it is unacceptable. Default a new dispatch to
+`sonnet-general-purpose`, and reach for `opus-general-purpose` when the task needs depth.
+The falsifier is Haiku 5 shipping plus a dated operator trial on it, so no vendor benchmark
+or announcement overturns this on its own.
 
 ### Domain Agents (Opinionated)
 
@@ -30,7 +36,7 @@ Use these when you want pre-baked defaults for specific workflows.
 
 These are heuristics, not absolute truths. Override based on task requirements.
 
-**Haiku:** Excels at following specific, detailed instructions with tool calls. Best for search-compile-summarise workflows where the prompt does the thinking. Don't ask it to make judgement calls or debug root causes.
+**Haiku:** Follows specific, detailed instructions with tool calls, but its output cannot be trusted without independent verification, so the cost of checking it usually exceeds what the cheaper tier saves. Never for judgement calls or root-cause debugging, and since 2026-07-25 not for research either. See the model floor above.
 
 **Sonnet 4.6:** The daily driver. Near-parity with Opus on SWE-bench (79.6% vs 80.8%). Handles code review, implementation, debugging, and structured analysis well. **Caveat:** can be more verbose than Opus — may use significantly more tokens on complex tasks, partially offsetting the 5x price advantage. Guard against over-explanation when you just need execution.
 
@@ -51,4 +57,4 @@ These are heuristics, not absolute truths. Override based on task requirements.
 **Use generic agents when:**
 - Task is outside Python/academic domains
 - You want full control over agent behavior
-- Running high-volume parallel operations (use Haiku)
+- Running high-volume parallel operations
