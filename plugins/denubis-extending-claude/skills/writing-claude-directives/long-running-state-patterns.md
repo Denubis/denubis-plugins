@@ -1,6 +1,6 @@
 # Long-Running State Patterns
 
-_Model tiers here are generic (Opus / Sonnet / Haiku); current versions, IDs, and per-model specifics live in [`model-tier-notes.md`](model-tier-notes.md), the single source of truth. The patterns below are model-independent._
+_Tiers here follow this project's model floor, so they are Opus and Sonnet only. Current versions, IDs, and per-model specifics live in [`model-tier-notes.md`](model-tier-notes.md), the single source of truth. The patterns themselves are model-independent, but the tier assignments below are not._
 
 Patterns for managing Claude agents across extended multi-context-window workflows. This is optional reference content for when you need to design long-running agent systems.
 
@@ -118,7 +118,7 @@ Orchestrator (Opus tier)
 ├── No implementation work
 └── Context reserved for coordination
 
-Subagents (Sonnet / Haiku tier)
+Subagents (Sonnet tier)
 ├── Focused expertise
 ├── Own context window
 ├── Returns condensed results
@@ -131,11 +131,10 @@ Subagents (Sonnet / Haiku tier)
 
 | Tier | Use For | Relative cost |
 |------|---------|---------------|
-| Opus | Orchestration, complex planning | Highest |
-| Sonnet | Focused implementation | Mid |
-| Haiku | Simple tasks | Lowest |
+| Opus | Orchestration, complex planning | Higher |
+| Sonnet | Focused implementation, and the floor for everything else | Lower |
 
-The Haiku tier makes multi-agent orchestration economically viable. Current versions and IDs for each tier: see [`model-tier-notes.md`](model-tier-notes.md).
+Sonnet is the cheapest sanctioned tier, so it carries the fan-out that makes multi-agent orchestration economically viable. Haiku is cheaper again and is not available for this, because an operator ruling on 2026-07-25 made Sonnet the floor on the grounds that output needing independent verification costs more to check than the cheaper tier saves (`.notes/feedback_haiku-no-judgement.md`). Current versions and IDs for each tier: see [`model-tier-notes.md`](model-tier-notes.md).
 
 ## Test-Driven Long-Horizon Tasks
 
