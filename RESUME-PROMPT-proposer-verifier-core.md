@@ -1,12 +1,21 @@
-# Proposer/verifier core — resume (2026-07-06)
+# Proposer/verifier core — reference (2026-07-06, trimmed 2026-07-27)
 
-Worktree: **impl-plan-decision-discipline** (this branch). NOT main. Do not work on main.
+Worktree: **impl-plan-decision-discipline** (this branch).
 
-This resume SUPERSEDES the 2026-06-25 version of this file (which said "build Step 0,
-verifier first"). Step 0 is dead — see Dead, below.
+> **STATUS: reference, not current truth.** Current truth is
+> `docs/design-plans/2026-07-27-planner-rebuild-rulings.md`. Where that record and this
+> file disagree, it wins.
+>
+> Trimmed on 2026-07-27. The PARKED block was removed because the wait it described ended
+> when `skill-skills-upstream-sync` merged on 2026-07-10, and this branch merged `main` at
+> `447d633`. The build-versus-cut fork was removed from Open decisions because Brian
+> settled it toward the full rebuild. What remains below is still live: the Dead list, the
+> Contested fork, the verified-against-source facts, and the ADR checklist.
 
-**THIS resume is the current truth for the decisions; where it and any older doc
-disagree, this wins.** Read it first. `.notes/project_proposer-verifier-decisions.md`
+This file superseded the 2026-06-25 version (which said "build Step 0, verifier first").
+Step 0 is dead — see Dead, below.
+
+`.notes/project_proposer-verifier-decisions.md`
 (dated 2026-06-29, human-ratified — do not edit it without Brian) is still useful for
 the *reasoning*, but it PRE-DATES this thread's kills and is stale on three points:
 its "Multiple-k" item and its "Home: a new plan-and-execute v2 plugin, grown from the
@@ -15,36 +24,17 @@ open, not a committed v2 build), and its calling the quote-grep a "hardened …
 provenance gate" is the exact mechanism-overclaim this thread disproved (see
 Verified-facts). Trust this resume over those three lines.
 
-## PARKED — read this first
+## PARK — RELEASED, resolved 2026-07-27
 
-**Do not add MORE cuts to `impl-plan-write` yet, and do not try to reconcile the
-existing one yet.** The `.worktrees/skill-skills-upstream-sync` branch is mid-rebuild
-of the SAME file in the opposite direction — it is *growing* it (hardening), at
-phase-06 ("impl+hardening done, resume at coherence review"). At the 2026-07-06
-snapshot: their file ~1467 lines, this branch 1329, main 1348 — numbers drift as they
-commit, so re-measure rather than trust these. This branch already carries a −44 cut
-(commit `e138cc0`, see Verified-facts below), so a collision with their +174 is
-already latent; the task is to reconcile ONE cut when they land, not to pile on more.
+The park is over and nothing here needs acting on. `skill-skills-upstream-sync` merged to
+`main` on 2026-07-10, its probe returns MERGED, and this branch merged `main` at `447d633`
+on 2026-07-27, closing a 201-commit gap.
 
-**Park condition:** wait until `skill-skills-upstream-sync`'s work is **in main**, then
-reconcile this branch's existing cut against that finished result. Check by testing
-whether main CONTAINS their work, not whether a branch label survives (a squash-merge
-or a post-merge branch deletion both leave `--merged` empty and would read as "still
-parked" forever):
-
-```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
-git fetch -q 2>/dev/null
-# Probe for a distinctive marker their rebuild introduced (adjust the pattern to a
-# phrase you confirm is in their shipped impl-plan-write, e.g. from commit fe13d35):
-git show main:plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md \
-  | grep -q "disclosed-oracle" && echo "MERGED — reconcile now" || echo "NOT in main — still parked"
-git -C .worktrees/skill-skills-upstream-sync log --oneline -3 2>/dev/null || echo "(sync worktree gone — check main directly)"
-```
-
-Open question for when it lands: their `impl-plan-write` hardening may itself be more
-of the scar we want gone. Glance at their finished result before reconciling — "wait,
-then strip" could mean stripping work they just finished. Brian's call.
+The `e138cc0` collision it warned about resolved in this branch's favour. The three-filter
+decision gate, zero-decisions-as-normal, the plain-language DR1 and the rewritten
+AskUserQuestion summary all auto-merged intact. Two edits were dropped to `main`'s side,
+the "Where I lean" line and the collapsed DR2-DR4 example run, and the codex critique had
+already flagged the first as M2.
 
 ## What this is
 
@@ -125,11 +115,9 @@ a place is still open. "No scoring gate" ≠ "no mechanism of any kind.")
 
 1. **The Contested fork** (above): pure-discipline vs a tiny mechanical home (the
    anti-fabrication gate mechanised + a human-triggered dispatch). Unresolved; Brian's.
-2. **The build-vs-cut fork.** Did this project aim at the wrong half — debating what to
-   BUILD when the charter was to CUT `impl-plan-write`'s scar? Honest read: not purely
-   wrong — you can't cut scar until you know the replacement, and the loop got
-   clarified — but the only concrete strip so far is commit `e138cc0`, and further
-   cutting is parked behind the other branch (see PARKED / Verified-facts).
+2. ~~**The build-vs-cut fork.**~~ **SETTLED 2026-07-27** toward the full rebuild. Brian:
+   *"let us treat the entire core of this as in-scope."* See
+   `docs/design-plans/2026-07-27-planner-rebuild-rulings.md`.
 3. **Two design gaps this thread exposed** (record only — do NOT reopen as a design
    round; noted so they aren't rediscovered from scratch): the loop has no way for a
    proposer to hold a correct position when the operator pushes back (twice the
@@ -137,25 +125,19 @@ a place is still open. "No scoring gate" ≠ "no mechanism of any kind.")
    assumes a fixed human criterion, but Brian was defining and checking the goal at
    once and the criterion moved mid-thread (gate: in-scope → out).
 
-## First action next session
+## First action — DONE 2026-07-27
 
-`cd` into this worktree. Run the PARKED check (above). 
-- If their work is **NOT in main**: the `impl-plan-write` cut stays parked. Do only
-  non-colliding work. Do NOT open a new design-process round — this thread's lesson is
-  that design-process-about-the-design was itself the ornament.
-- If their work **IS in main**: bring Brian the build-vs-cut fork (Open #2), and — only
-  if he wants to proceed — the Contested fork (Open #1), since whether the strip lands
-  in a pure-discipline or tiny-mechanical world changes what "strip" even means. Glance
-  at their finished `impl-plan-write` before reconciling this branch's `e138cc0` cut.
+Both the park check and the fork it gated are resolved. The standing guardrail survives
+and still binds: **do not open a new design-process round**, because this thread's lesson
+is that design-process-about-the-design was itself the ornament.
 
-Either way: **commit these three files first** (see below) — right now they are
-untracked dirty state.
+The live task list is in `docs/design-plans/2026-07-27-planner-rebuild-rulings.md`.
 
-## Persistence (done — record is committed)
+## Persistence
 
 This resume and the two design-doc banners were committed 2026-07-06 (`a28b061`,
-`ea7334e`), so the decisions survive a worktree cleanup. `.notes/` stays uncommitted
-per its convention; its durability is the human's, not git's. Nothing pushed.
+`ea7334e`) and pushed 2026-07-25, so the decisions survive a worktree cleanup. `.notes/`
+stays uncommitted per its convention; its durability is the human's, not git's.
 
 ## ADRs — NOT written yet (checklist for when the forks close)
 

@@ -1,5 +1,21 @@
 # Responsibility matrix and rebalance spec: the plan / execute / review edifice
 
+> **STATUS 2026-07-27: reference. The matrix still governs; three of its answers do not.**
+> Current truth is `docs/design-plans/2026-07-27-planner-rebuild-rulings.md`.
+>
+> What changed. The **plan index** row and the residual risk about its size bound are
+> superseded: the artefact is now a **predicted DFD** owned by `impl-plan-write`, against
+> which `architecture-update`'s observed DFD is reconciled, with load-bearing divergences
+> registered as ADRs. The **genuine-fork discovery** row's "heuristic gate, batched" target
+> stands, but the mode split it replaces is being deleted outright rather than reduced. The
+> **residual question** about whether run / read / ask lives inline or in a shared sub-skill
+> is answered: the anti-smuggling apparatus becomes a loadable sub-skill and applies
+> universally.
+>
+> What still governs, unchanged: one owner per concern, the one-branch-not-separable
+> constraint, and the keystone that `impl-plan-write` **keeps** ownership of
+> `test-requirements.md` and `uat-requirements.md`.
+
 **Status:** Authoritative spec, 2026-06-24. Supersedes `2026-06-24-impl-plan-write-rebalance.md` (the proposal) and folds in its codex review (test/UAT ownership retained, pre-flight over a lightweight index, a plan-conflict verdict, terminal-review contracts, `using-bibliography` scoped). The current-state ("is") column is grounded in a four-investigator read of the actual skill files; cited line numbers were grep-confirmed against the files in this branch. The target-state ("should") column is design judgment, not yet implemented.
 
 **Scope:** `impl-plan-write`, `executing-an-implementation-plan`, `requesting-code-review` + `agents/code-reviewer.md`, `exec-coherence-review` + `agents/coherence-reviewer.md`, `critical-peer-review`, `proleptic-challenger`, and the research path (`internet-researcher`, `using-bibliography`).
