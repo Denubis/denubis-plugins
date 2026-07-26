@@ -1,7 +1,7 @@
 {
   "name": "denubis-extending-claude",
   "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "github": "denubis"

@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-extending-claude] 1.10.0 / [denubis-research-agents] 1.3.0 / [denubis-basic-agents] 2.1.0
+
+Sonnet 5 becomes the model floor across the suite.
+
+**Changed:**
+- Operator ruling 2026-07-25 makes Sonnet the floor rather than merely barring Haiku from judgement work, on the grounds that the hallucination rate below it is unacceptable. It extends the 2026-04-22 position rather than replacing it, so both falsifiers stand, and both are overturned only by Haiku 5 shipping plus a dated operator trial.
+- `internet-researcher`, `codebase-investigator`, `combined-researcher` and `remote-code-researcher` move from haiku to sonnet. They were the last agents in the suite still on haiku, so the suite had been contradicting the April position since April. Research is the sharpest case, because judging whether a source is credible is judgement work rather than mechanical retrieval.
+- `testing-skills-with-subagents` runs its GREEN phase at the weakest sanctioned tier instead of one tier below production, which collapses once the floor and the default are the same tier. Pressure now comes from harder adversarial scenarios. The lost diagnostic bite is recorded rather than glossed.
+- `haiku-general-purpose` stays callable, because removing it would foreclose a decision that is not ripe, but it no longer advertises research or summarisation. Dispatching it needs a positive justification naming a bounded mechanical task.
+- `creating-an-agent` defaults a new agent definition to sonnet or opus.
+
 ## [denubis-plan-and-execute] 2.36.4
 
 **Fixed:**

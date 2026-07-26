@@ -33,7 +33,7 @@
     {
       "name": "denubis-basic-agents",
       "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "source": "./plugins/denubis-basic-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -55,7 +55,7 @@
     {
       "name": "denubis-extending-claude",
       "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, maintaining CLAUDE.md, and syncing with upstream",
-      "version": "1.9.1",
+      "version": "1.10.0",
       "source": "./plugins/denubis-extending-claude",
       "author": {
         "name": "Brian Ballsun-Stanton",
