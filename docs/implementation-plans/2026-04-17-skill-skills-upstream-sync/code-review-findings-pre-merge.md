@@ -1,76 +1,162 @@
 # Code Review Findings — pre-merge
 
-# Code Review: Sonnet-5 Model Floor Propagation
+# Code Review: Sonnet-5 Model Floor Propagation (Re-Review After Fix Cycle)
 
-## Status: CHANGES REQUIRED
+## Status: APPROVED
 
-**Critical: 2 | Important: 3 | Minor: 2**
+**Critical: 0 | Important: 0 | Minor: 0**
 
 ## Verification
 ```
 Tests: uv run pytest -q → 1131 passed
-Tests (scoped): uv run pytest tests/test_model_tier_freshness.py tests/test_marketplace_sync.py -q → 30 passed
-Lint: not run — no lint findings requested and diff is prose/config-only (no Python touched except uv.lock metadata)
+Lint: uv run ruff check . → ruff binary not found in this environment; no Python files
+       are touched by this diff (fix cycle is markdown/JSON/lock only), so this is
+       non-blocking. Confirmed via `git diff --name-only` that no *.py file appears
+       in c25c1ad..5b66e0e.
 ```
-`test_model_tier_freshness.py` is a genuine mechanical gate (checks `last-verified` frontmatter, per-URL `(verified YYYY-MM-DD)` markers, bans bare `N.x` era-claims, requires model-name anchors near "current models" phrases) — not a tautology, and it passed against the new `model-tier-notes.md` content.
 
-## Plan Alignment
-(No implementation plan exists; the requirement is the operator ruling in `.notes/feedback_haiku-no-judgement.md`.)
+Scope note: verified against the whole branch (`c25c1ad5371fc80e6d0e3bf9ff8432f94a908e76..5b66e0e`,
+30 files changed), not only the three fix commits (`cd839f8`, `412857f`, `5b66e0e`), per the
+caller's instruction that several fixes edit files first touched earlier in the branch.
 
-- ✓ Four `denubis-research-agents` agents (`codebase-investigator`, `combined-researcher`, `internet-researcher`, `remote-code-researcher`) moved `haiku` → `sonnet`. Verified these were the *only* remaining `model: haiku` agents besides `haiku-general-purpose` at BASE_SHA (`git grep` at `c25c1ad`), matching the CHANGELOG's "last agents in the suite still on haiku" claim.
-- ✓ `haiku-general-purpose` kept callable, description rewritten to drop research/summarisation.
-- ✓ `exec-session-naming` and `design-clarify` dispatch `sonnet-general-purpose`.
-- ✓ `testing-skills-with-subagents` GREEN phase moved off "one tier below production."
-- ✓ Doctrine recorded in `model-tier-notes.md`, synced in `using-research-agents`, `using-generic-agents`, `creating-an-agent`.
-- ✓ Version bumps and marketplace/CHANGELOG sync — all four `plugin.json` versions match `marketplace.json` and the new CHANGELOG heading exactly; the 2.37.0/2.38.0 skip is explained and matches the known-deliberate exception.
-- ~ **Deviated (problematic):** the claim "the operator ruled no carve-out for cosmetic work" (repeated in a shipped skill file and the CHANGELOG) has no traceable source in the authoritative note. See Critical finding below.
+## Prior Findings Verification
 
-## Issues
+### Critical
 
-### Critical (count: 2)
+**C1 — unsourced operator attribution ("no carve-out for cosmetic work").**
+**Resolved.** `.notes/feedback_haiku-no-judgement.md` (main repo root, gitignored, read directly)
+now carries a dated "Amendment 2026-07-26" paragraph: *"Asked whether the floor governed only
+agent definitions ... or also the skills that dispatch Haiku at runtime, Brian ruled both move
+to Sonnet, with no carve-outs. Three sites were settled by it"* — naming `exec-session-naming`,
+`design-clarify`, and `testing-skills-with-subagents` explicitly, and recording the argument on
+which the carve-out was declined (a Haiku GREEN failure can't be told apart from a Haiku
+fabrication). The two shipped citations now point at this amendment and get the dates right:
+- `plugins/denubis-plan-and-execute/skills/exec-session-naming/SKILL.md:183` (commit `cd839f8`):
+  *"This dispatched Haiku until the 2026-07-25 Sonnet floor ruling, which was extended on
+  2026-07-26 to reach live dispatch sites with no carve-out for cosmetic work. Both are recorded
+  in `.notes/feedback_haiku-no-judgement.md`."* — matches the note's two separate dates exactly
+  (floor 2026-07-25, carve-out 2026-07-26).
+- `CHANGELOG.md:13` (commit `cd839f8`): *"A 2026-07-26 amendment extends the floor to live
+  dispatch sites with no carve-out for cosmetic work"* — same correction, date now separated
+  from the 2026-07-25 floor ruling stated two lines above it.
+Also checked `testing-skills-with-subagents/SKILL.md:63` for the same class of claim: it now
+attributes "Three operator rulings" with three distinct dates (2026-04-22, 2026-07-25,
+2026-07-26), each matching a dated paragraph in the note. No unsourced attribution remains.
 
-- **Issue**: An operator-ruling claim is shipped into durable doctrine with no traceable source. `exec-session-naming/SKILL.md` and `CHANGELOG.md` both state "the operator ruled ... no carve-out for cosmetic work," attributing a specific scope decision to the operator. The designated authority, `.notes/feedback_haiku-no-judgement.md`, contains only the general 2026-07-25 quote ("haiku is unacceptable for internet research... unacceptable for most things... sonnet 5 the floor for almost everything... hallucination rate is unacceptable") and never mentions carve-outs, cosmetic work, or dispatch-site scope at all. I also checked every other file touched by this diff, plus the in-diff audit docs (`docs/audits/2026-07-02-*.md`) and the untracked `RESUME-2026-07-25.md` sitting in the worktree, for any record of this — none exists. This is exactly the failure mode Priority Focus #2 was commissioned to catch: a paraphrase of a dated ruling that goes beyond what the note actually says, now baked into a shipped skill file that a future session will treat as settled fact it can't re-verify.
-  - **Location**: `plugins/denubis-plan-and-execute/skills/exec-session-naming/SKILL.md:184`; `CHANGELOG.md:13`
-  - **Fix**: Either (a) get the operator to state the cosmetic-work/dispatch-site scope explicitly and add a dated addendum to `.notes/feedback_haiku-no-judgement.md` recording it verbatim, the same way the 2026-07-25 escalation was recorded, then cite that addendum from both locations — or (b) rewrite both sentences to own the inference as the author's own reasoning ("we read 'almost everything' as reaching cosmetic dispatch sites like slug generation; the operator has not separately ruled on this") rather than asserting it as a distinct operator ruling.
+**C2 — `long-running-state-patterns.md` contradicted the floor one directory from where it was declared.**
+**Resolved.** Commit `412857f` rewrote the header disclaimer, the ASCII orchestration diagram,
+the tier table, and the "economically viable" sentence:
+- Header (line 3): *"Tiers here follow this project's model floor, so they are Opus and Sonnet
+  only ... the tier assignments below are not [model-independent]"* — closes the loophole the
+  prior review identified (the old disclaimer scoped only to version numbers).
+- Diagram (line 121): `Subagents (Sonnet / Haiku tier)` → `Subagents (Sonnet tier)`.
+- Table (lines 134-136): the `Haiku | Simple tasks | Lowest` row is deleted outright, not just
+  reworded.
+- Economics sentence (line 137): *"Sonnet is the cheapest sanctioned tier, so it carries the
+  fan-out ... Haiku is cheaper again and is not available for this, because an operator ruling
+  on 2026-07-25 made Sonnet the floor"* — replaces the old "The Haiku tier makes multi-agent
+  orchestration economically viable" claim and cites the note.
+`grep -n -i haiku` on the file now returns exactly one line (the economics sentence explaining
+why Haiku is *excluded*), confirming no residual prescriptive Haiku guidance survives.
 
-- **Issue**: `long-running-state-patterns.md`, a live reference file in the same skill directory as the just-edited `model-tier-notes.md`, still tells directive authors to dispatch Haiku for cost reasons — the exact contradiction this review was commissioned to hunt for, sitting one file away from the fix. It says "Subagents (Sonnet / Haiku tier)," lists `Haiku | Simple tasks | Lowest [cost]` in a model-selection table, and states "The Haiku tier makes multi-agent orchestration economically viable." The file's own header disclaimer ("current versions, IDs, and per-model specifics live in model-tier-notes.md") does not cover this — the disclaimer is about version numbers, but the sentence being contradicted is prescriptive dispatch advice, not a version number. This diff edited three sibling skills' model-tier guidance (`using-generic-agents`, `creating-an-agent`, `testing-skills-with-subagents`) but missed this one, despite it living in `writing-claude-directives/` itself, the very skill whose `model-tier-notes.md` got the floor doctrine added.
-  - **Location**: `plugins/denubis-extending-claude/skills/writing-claude-directives/long-running-state-patterns.md:121,136,138`
-  - **Fix**: Update the model-selection table and the "economically viable" sentence to reflect Sonnet as the floor, consistent with the other three skills edited in this diff. At minimum, add a floor pointer matching the pattern used in `using-generic-agents/SKILL.md`.
+### Important
 
-### Important (count: 3)
+**I1 — "the cost is real and was accepted deliberately" overclaimed operator deliberation.**
+**Resolved.** Commit `cd839f8` drops "and was accepted deliberately." The replacement text
+(`testing-skills-with-subagents/SKILL.md:65`) states the argument itself — *"A Haiku GREEN
+failure could no longer be told apart from a Haiku fabrication, so the extra diagnostic bite
+that a weaker tier bought was not worth what it cost in trustworthy signal"* — and attributes
+its source correctly: *"That argument is the one on which the carve-out was declined, and it is
+recorded in `.notes/feedback_haiku-no-judgement.md` rather than inferred here."* This is exactly
+the fix the prior review prescribed (state the argument, cite the record, stop asserting
+operator deliberation the record doesn't evidence).
 
-- **Issue**: `testing-skills-with-subagents/SKILL.md` asserts operator-level deliberation over a tradeoff the note gives no evidence the operator considered. "The cost is real and was accepted deliberately" frames the loss of GREEN-phase tier-differentiation (the specific diagnostic value of testing one tier below production) as something the operator weighed and accepted. The note's actual 2026-07-25 statement is a general hallucination-rate ruling; nothing indicates the operator was informed of, or ruled on, this skill's specific testing-methodology tradeoff. This reads as the author's own editorial judgement dressed in the operator's authority.
-  - **Location**: `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md:65`
-  - **Fix**: Rephrase to attribute the acceptance to the author/maintainer applying the ruling's consequence, not to the operator directly — e.g., "This diff accepts that cost as a consequence of the floor ruling" rather than "was accepted deliberately."
+**I2 — `docs/architecture/plugins/denubis-research-agents/0-context.md` stale (all four agents listed as haiku, stale commit citation).**
+**Resolved.** Commit `5b66e0e` updates the Model column to `sonnet` for all four agents and
+repoints each per-claim commit citation from `5bfcd99` to `ebfc608`. Verified `ebfc608` by
+`git show`: it is exactly `feat(research-agents): move all four research agents to sonnet`,
+touching all four agent files' `model:` frontmatter plus `using-research-agents/SKILL.md` — the
+citation is accurate, not just plausible-looking. The doc also gained a summary line: *"All four
+ran on `haiku` until 2026-07-25, when an operator ruling made Sonnet the floor"* with a
+`.notes/` citation.
 
-- **Issue**: `docs/architecture/plugins/denubis-research-agents/0-context.md` is a living architecture doc (the kind `architecture-update`/`maintaining-project-context` exist to keep synced) that cites a specific commit hash (`5bfcd99`) as the source of truth for each agent's frontmatter model, and states all four research agents are `haiku`. This diff changed all four to `sonnet` without touching this doc, so the doc now contradicts the code it describes, on the exact question this review exists to police.
-  - **Location**: `docs/architecture/plugins/denubis-research-agents/0-context.md:54-57`
-  - **Fix**: Update the "Model" column to `sonnet` and refresh the commit-hash citation to a commit in this change.
+**I3 — `docs/architecture/plugins/denubis-basic-agents/0-context.md` purpose text drifted from the new frontmatter description.**
+**Resolved.** Commit `5b66e0e` rewrites the purpose cell to track the new
+`haiku-general-purpose.md` description almost verbatim ("no currently sanctioned use," "kept
+callable," "positive justification naming a bounded mechanical task") and repoints the commit
+citation from `3918fe9` to `3e28e44`. Verified `3e28e44` by `git show`: it is
+`fix(basic-agents): stop advertising a tier with no sanctioned use` and does edit
+`haiku-general-purpose.md`'s description to the text the architecture doc now paraphrases — the
+citation is accurate.
 
-- **Issue**: `docs/architecture/plugins/denubis-basic-agents/0-context.md` describes `haiku-general-purpose`'s purpose as "tool-heavy, low-judgement work," which the same diff's new agent-file description directly contradicts ("No currently sanctioned use... Not for research, summarisation of anything that will be relied on, or any judgement"). The model tier is correctly unchanged (deliberate), but the purpose text drifted.
-  - **Location**: `docs/architecture/plugins/denubis-basic-agents/0-context.md:50`
-  - **Fix**: Update the purpose cell to match the new frontmatter description, or note explicitly that the architecture doc's purpose text is pending a decision.
+### Minor
 
-### Minor (count: 2)
+**m1 — `writing-claude-directives/SKILL.md:233` pre-escalation framing ("route away from Haiku").**
+**Resolved.** Commit `cd839f8` changes "deciding whether to route judgement-heavy work away from
+the Haiku tier" to "checking a dispatch against the Sonnet model floor," which reflects the
+blanket-floor doctrine rather than the superseded judgement-only framing.
 
-- **Issue**: `writing-claude-directives/SKILL.md` still frames the model-tier consultation trigger as "deciding whether to route judgement-heavy work away from the Haiku tier" — pre-escalation framing (judgement-heavy work only) that undersells the new blanket floor. Not a live dispatch instruction, so low risk, but inconsistent with the doctrine this same diff wrote into `model-tier-notes.md` one directory down.
-  - **Location**: `plugins/denubis-extending-claude/skills/writing-claude-directives/SKILL.md:233`
-  - **Fix**: Reword to reference the floor generally, not just judgement-heavy work.
+**m2 — `anthropic-best-practices.md` still references Haiku (FYI only, not counted as a finding previously).**
+**No change made, and this is correct.** `git diff` confirms this file is untouched by the fix
+cycle. I agree with leaving it alone: its frontmatter declares it verbatim-imported content from
+`obra/superpowers` with a source-repo/source-commit/imported-date provenance contract, and
+editing vendor-attributed text to match local doctrine would falsify that provenance without
+actually changing what the upstream project says. This was correctly logged as "no action
+required" in the prior review and remains so.
 
-- **Issue**: `writing-skills/anthropic-best-practices.md` (explicitly imported verbatim from `obra/superpowers`, per its own frontmatter and preface) still tells authors to test skills "with Haiku" and includes "Tested with Haiku, Sonnet, and Opus" as a checklist item. This is out of scope by the file's own declared status (vendor reference, not denubis doctrine — same category as the `creating-a-plugin` known exception), so I am not counting it as a finding, but flagging it for awareness since a careless read of the checklist could reintroduce a Haiku dispatch.
-  - **Location**: `plugins/denubis-extending-claude/skills/writing-skills/anthropic-best-practices.md:153,1147`
-  - **Fix**: No action required under current conventions; mentioned for visibility only.
+## New Issues (Priority Sweep)
+
+Per the caller's instruction, I widened the search past `plugins/**/*.md` and
+`docs/architecture/**/*.md` — the two locations the author's own greps evidently covered (per
+the `5b66e0e` commit message: *"The earlier sweep missed these because it was scoped to
+plugins/**/*.md and never looked at docs/"*) — into file types and directories a markdown-scoped
+sweep would skip:
+
+- **Hooks** (`plugins/*/hooks/*.py`): `git grep -il haiku` across all `.py` files in the repo
+  returns only `tests/test_model_tier_freshness.py`. No hook references Haiku dispatch.
+- **Scripts, JSON, TOML, YAML, shell**: `git grep -il haiku -- '*.py' '*.json' '*.sh' '*.toml'
+  '*.yaml' '*.yml' '*.js' '*.ts'` returns only the same test file. No JSON config (including
+  `hooks.json` in five plugins, all four `plugin.json` files, and `marketplace.json`) references
+  a model tier by name at all — model selection lives entirely in agent frontmatter and
+  skill prose, both already covered by the doctrine sync.
+- **Test fixtures**: `tests/test_model_tier_freshness.py` mentions Haiku twice, both as sample
+  text for a regex-anchor test (`MODEL_NAME_PATTERN` matching "Sonnet 4.6, Haiku 4.5" style
+  strings) — this is fixture data exercising the freshness-checker itself, not a dispatch site
+  or a doctrine claim. Not a finding.
+- **READMEs**: `README.md` and `docs/architecture/README.md` both list "haiku/sonnet/opus
+  general-purpose" as the three agents this plugin provides — a factual enumeration of files
+  that exist (all three files still exist; `haiku-general-purpose` is the documented kept-callable
+  exception), not a dispatch recommendation or a currency claim. Not a finding.
+- **Directories outside `plugins/` and `docs/architecture/`**: checked `docs/audits/2026-07-02-*.md`
+  (two files, newly added earlier in the branch) and the three `RESUME-PROMPT-fable*.md` files.
+  The audit docs mention Haiku only inside dated 2026-07-02 findings tables describing the
+  pre-floor state — correctly frozen historical snapshots, same category as the `docs/design-plans/`
+  exemption the caller flagged as deliberate. `docs/design-plans/2026-03-21-statusline-v2.md` and
+  `docs/implementation-plans/2026-04-17-.../phase_02*.md` likewise reference Haiku only in
+  dated historical description of decisions already made at the time — not live doctrine, not
+  touched by this diff, not in scope. The three RESUME-PROMPT files contain no Haiku references
+  at all.
+- **JSON validity**: all four `plugin.json` files and `marketplace.json` parse as valid JSON
+  after the version bumps (checked with `python3 -m json.load`).
+- **Version/marketplace sync**: all four bumped versions (`2.1.0`, `1.3.0`, `1.10.0`, `2.39.0`)
+  match between each plugin's `plugin.json` and `marketplace.json` exactly. The 2.37.0/2.38.0
+  skip is the caller's known-deliberate exception.
+- **New-citation spot check**: grepped every remaining "operator ruled / operator ruling /
+  operator statement" claim added or touched by this diff (7 locations across
+  `CHANGELOG.md`, `haiku-general-purpose.md`, `using-generic-agents/SKILL.md`,
+  `creating-an-agent/SKILL.md`, `testing-skills-with-subagents/SKILL.md`,
+  `model-tier-notes.md`, `using-research-agents/SKILL.md`). All seven cite the 2026-07-25 floor
+  date, which matches the note's "Escalated 2026-07-25" paragraph verbatim-adjacent language
+  ("haiku is unacceptable for internet research ... sonnet 5 the floor for almost everything").
+  None of these seven independently asserts the 2026-07-26 carve-out without a citation — the two
+  live-dispatch-site files that do state the carve-out (`exec-session-naming`,
+  `testing-skills-with-subagents`) both cite `.notes/feedback_haiku-no-judgement.md` by path, per
+  C1's fix. No recurrence of the unsourced-attribution defect class.
+
+**Result: zero new issues.** The fix cycle's own stated blind spot (markdown-only sweep scope)
+is exactly what this pass targeted, and it did not reproduce in non-markdown surfaces.
 
 ## Consolidation Opportunities
-None visible in the diff — the doctrine-sync edits are appropriately distributed (one clause per file) rather than duplicated.
+None visible in the diff.
 
-## Additional Sweep Notes (Priority Focus #1, #3, #4 — no findings beyond the above)
-
-- **Residual `model: haiku` in agent frontmatter**: swept all `plugins/**/agents/*.md` — only `haiku-general-purpose.md` remains, which is the documented known exception.
-- **`creating-a-plugin/SKILL.md`**: still lists `haiku` as an allowed `model` value — confirmed this is the platform's accepted-values list per the known exception, not a recommendation.
-- **`model-tier-notes-log.md`**: mentions Haiku 4.5 only inside dated, already-superseded historical entries (the advisor-pairing convergence log) — correctly framed as history, not live guidance.
-- **Priority #3 (testing-skills-with-subagents coherence)**: verified the GREEN-phase rewrite is internally consistent. GREEN is now pinned to "weakest sanctioned tier" (Sonnet) independent of RED's tier, and the lost weaker-tier signal is explicitly redirected to "harder adversarial scenarios" — a mechanism ("pressure scenarios") already fully specified elsewhere in the same file (lines 100, 122-263, 399-412), not a dangling reference. Grepped every other skill that references `testing-skills-with-subagents` (`writing-skills/SKILL.md`, `epistemic-humility/SKILL.md`, `writing-claude-directives/SKILL.md`, `systematic-debugging/CREATION-LOG.md`, `writing-skills/examples/CLAUDE_MD_TESTING.md`) — none hard-codes the retired "one tier below" framing or a specific Haiku GREEN-phase claim, so none is stranded. No remaining "one tier below/down" phrase exists anywhere in `plugins/` (confirmed by grep).
-- **Priority #4 (false propagation in the Fable cost gate)**: diffed `model-tier-notes.md` with `--unified=0` to isolate exact changed lines. Exactly three hunks changed, all identical in kind: "Automated work routes to Haiku/Sonnet/Opus" → "Automated work routes to Sonnet/Opus (Haiku was dropped from this list by the 2026-07-25 floor ruling...)". The adjacent advisor-pairing paragraph, which records the deliberately-conflicting platform-API-vs-Claude-Code-docs sources and the Sonnet-as-advisor prohibition, was not touched at all. No corruption of that record.
-- **uv.lock**: diff is metadata only (`exclude-newer` / `exclude-newer-span` bump), no dependency changes.
-
-## Decision: BLOCKED - CHANGES REQUIRED
+## Decision: APPROVED FOR MERGE
