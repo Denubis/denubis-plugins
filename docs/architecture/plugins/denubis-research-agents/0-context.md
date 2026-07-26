@@ -51,10 +51,12 @@ flowchart LR
 
 | Agent | Model | Purpose (frontmatter) |
 |-------|-------|-----------------------|
-| `codebase-investigator` | haiku | Investigate the current codebase to find existing patterns, verify assumptions, ground plans in reality (`codebase-investigator.md`, `5bfcd99`). |
-| `internet-researcher` | haiku | Internet-based research: current API docs, library patterns, external knowledge (`internet-researcher.md`, `5bfcd99`). |
-| `combined-researcher` | haiku | Both local and internet research synthesised into one answer (`combined-researcher.md`, `5bfcd99`). |
-| `remote-code-researcher` | haiku | Examine library internals by cloning external repos to a temp directory and reading actual source code (`remote-code-researcher.md`, `5bfcd99`). |
+| `codebase-investigator` | sonnet | Investigate the current codebase to find existing patterns, verify assumptions, ground plans in reality (`codebase-investigator.md`, `ebfc608`). |
+| `internet-researcher` | sonnet | Internet-based research: current API docs, library patterns, external knowledge (`internet-researcher.md`, `ebfc608`). |
+| `combined-researcher` | sonnet | Both local and internet research synthesised into one answer (`combined-researcher.md`, `ebfc608`). |
+| `remote-code-researcher` | sonnet | Examine library internals by cloning external repos to a temp directory and reading actual source code (`remote-code-researcher.md`, `ebfc608`). |
+
+All four ran on `haiku` until 2026-07-25, when an operator ruling made Sonnet the floor. Research is the sharpest case for that floor, because judging source credibility is judgement work rather than mechanical retrieval (`.notes/feedback_haiku-no-judgement.md`).
 
 ### Skills (`plugins/denubis-research-agents/skills/`)
 

@@ -47,7 +47,7 @@ flowchart LR
 
 | Agent | Model | Purpose (frontmatter) |
 |-------|-------|-----------------------|
-| `haiku-general-purpose` | haiku | Unprompted generic subagent for tool-heavy, low-judgement work (`haiku-general-purpose.md`, `3918fe9`). |
+| `haiku-general-purpose` | haiku | Unprompted generic subagent with no currently sanctioned use. Kept callable so the decision stays open, but the 2026-07-25 floor ruling leaves it zero dispatch sites, and dispatching it needs a positive justification naming a bounded mechanical task (`haiku-general-purpose.md`, `3e28e44`). |
 | `sonnet-general-purpose` | sonnet | Unprompted generic subagent for attention-to-detail work (`sonnet-general-purpose.md`, `3918fe9`). |
 | `opus-general-purpose` | opus | Unprompted generic subagent for deep reasoning, complex analysis, nuanced judgement (`opus-general-purpose.md`, `3918fe9`). |
 | `python-developer` | sonnet | Python 3.14+ developer defaults: type hints, dataclasses/Pydantic, pytest, pathlib, modern idioms (`python-developer.md`, `e947de8`). |
