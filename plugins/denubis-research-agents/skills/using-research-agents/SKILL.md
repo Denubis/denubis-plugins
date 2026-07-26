@@ -10,10 +10,16 @@ user-invocable: false
 
 | Agent | Model | Use When |
 |-------|-------|----------|
-| `internet-researcher` | Haiku | Need current API docs, library comparisons, community consensus. External info only |
-| `codebase-investigator` | Haiku | Need to understand existing code, verify assumptions, find patterns. Local info only |
-| `combined-researcher` | Haiku | Need both external and local info together (e.g. "do we use Stripe? what's the current API?") |
-| `remote-code-researcher` | Haiku | Need to read actual source code of external libraries. Clones repos to temp dir |
+| `internet-researcher` | Sonnet | Need current API docs, library comparisons, community consensus. External info only |
+| `codebase-investigator` | Sonnet | Need to understand existing code, verify assumptions, find patterns. Local info only |
+| `combined-researcher` | Sonnet | Need both external and local info together (e.g. "do we use Stripe? what's the current API?") |
+| `remote-code-researcher` | Sonnet | Need to read actual source code of external libraries. Clones repos to temp dir |
+
+All four ran on Haiku until 2026-07-25, when the operator ruled Sonnet the floor. Research is
+the sharpest case for that floor, because judging whether a source is credible and whether a
+page says what it appears to say is judgement work rather than mechanical retrieval. A Haiku
+research pass returned real arXiv identifiers and real titles alongside fabricated author
+lists, which is the failure this floor exists to prevent.
 
 **Decision flow:**
 
