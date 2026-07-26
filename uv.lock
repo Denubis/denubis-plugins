@@ -3,8 +3,8 @@ revision = 3
 requires-python = ">=3.14"
 
 [options]
-exclude-newer = "2026-06-28T23:38:18.237005517Z"
-exclude-newer-span = "P1W"
+exclude-newer = "2026-07-11T07:53:45.502951321Z"
+exclude-newer-span = "P14D"
 
 [manifest]
 members = [
