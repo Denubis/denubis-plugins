@@ -34,7 +34,7 @@ Automatically renames the tmux window to `Cl:<location>`. Skipped when unchanged
 
 ### Session Naming
 
-The `exec-session-naming` skill (invoked by design plan, implementation plan, execution, and debugging skills) spawns a Haiku subagent to generate a domain-specific slug, renames the tmux window to `Cl:<slug>`, writes a lock file to prevent statusline from overwriting the name, and prompts the user with `/rename <slug>`.
+The `exec-session-naming` skill (invoked by design plan, implementation plan, execution, and debugging skills) spawns a Sonnet subagent to generate a domain-specific slug, renames the tmux window to `Cl:<slug>`, writes a lock file to prevent statusline from overwriting the name, and prompts the user with `/rename <slug>`.
 
 ## Setup
 

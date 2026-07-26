@@ -67,7 +67,7 @@ If the branch name matches `^(\d+)[-_]`, capture the digits as the issue number.
 
 Take the current phase number from the invoking skill's context (the orchestrator passes it as an argument: `{phase}`). If no phase is tracked or known, phase = none.
 
-### Verb-noun (via Haiku subagent)
+### Verb-noun (via Sonnet subagent)
 
 The slot is always a `<verb>-<noun>` pair. Generic single verbs (e.g. `coding`, `writing`) carry no information — every session involves coding or writing. The noun gives the slot meaning.
 
@@ -79,17 +79,17 @@ The slot is always a `<verb>-<noun>` pair. Generic single verbs (e.g. `coding`, 
 | `starting-an-implementation-plan` | `plan` (fixed) |
 | `executing-an-implementation-plan` | `exec` (fixed) |
 | `systematic-debugging` | `debug` (fixed) |
-| anything else | Haiku picks the verb from the user's prompts |
+| anything else | the subagent picks the verb from the user's prompts |
 
-**Noun rule:** Haiku always picks the noun from the user's prompts.
+**Noun rule:** the subagent always picks the noun from the user's prompts.
 
-**Haiku input:** the full conversation from the start of the session up to the moment `exec-session-naming` is invoked — prompts, clarifications, chosen direction. Clarifications often reshape the real topic, so the later context matters as much as the first message.
+**Subagent input:** the full conversation from the start of the session up to the moment `exec-session-naming` is invoked — prompts, clarifications, chosen direction. Clarifications often reshape the real topic, so the later context matters as much as the first message.
 
 **Substitute the gathered values, then invoke:**
 
 ```
 <invoke name="Task">
-<parameter name="subagent_type">denubis-basic-agents:haiku-general-purpose</parameter>
+<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
 <parameter name="description">Pick verb-noun slot for session slug</parameter>
 <parameter name="prompt">
 Produce a compact slot label for a tmux window name summarising this Claude Code session.
@@ -129,7 +129,7 @@ phase_part  = f":P{phase}" if phase else ""
 slug        = f"{person_part}{p3}:{slot}{issue_part}{phase_part}"
 ```
 
-Worked example for `/media/brian/.../people/Adela/melica/.worktrees/19-tag-ontology-design` on branch `19-tag-ontology-design`, invoked by `starting-a-design-plan` at phase 2, with `$USER=brian`, Haiku returns `design-ontology`:
+Worked example for `/media/brian/.../people/Adela/melica/.worktrees/19-tag-ontology-design` on branch `19-tag-ontology-design`, invoked by `starting-a-design-plan` at phase 2, with `$USER=brian`, the subagent returns `design-ontology`:
 
 - Person = `Adela` (≠ brian → kept)
 - p3 = `mel`
@@ -138,7 +138,7 @@ Worked example for `/media/brian/.../people/Adela/melica/.worktrees/19-tag-ontol
 - phase = `2`
 - slug = `Adela/mel:design-ontology:#19:P2`
 
-Second worked example for this repo (`/home/brian/people/Brian/brian-ed3d-plugins`), branch `revise-exec-session-naming`, invoked by `writing-skills` (non-canonical), no phase, Haiku returns `redo-session`:
+Second worked example for this repo (`/home/brian/people/Brian/brian-ed3d-plugins`), branch `revise-exec-session-naming`, invoked by `writing-skills` (non-canonical), no phase, the subagent returns `redo-session`:
 
 - Person = `Brian` → equals user `brian` → dropped
 - Project = `brian-ed3d-plugins` → strip `brian-` → `ed3d-plugins` → p3 = `ed3`
@@ -179,5 +179,6 @@ To rename this Claude session too: /rename <slug>
 
 ## Notes
 
-- **Fallbacks.** When path, branch, phase, or Haiku output is missing or malformed, components drop out cleanly. The slug is never empty: `<p3>:<verb>` is always available (verb falls back to the fixed canonical verb or the first token of the invoking skill name).
-- **No generic verbs.** The Haiku prompt explicitly bans `code`, `coding`, `writing`, `stuff`. If you find Haiku still emitting generic slots, tighten the ban list.
+- **Fallbacks.** When path, branch, phase, or subagent output is missing or malformed, components drop out cleanly. The slug is never empty: `<p3>:<verb>` is always available (verb falls back to the fixed canonical verb or the first token of the invoking skill name).
+- **No generic verbs.** The subagent prompt explicitly bans `code`, `coding`, `writing`, `stuff`. If you find it still emitting generic slots, tighten the ban list.
+- **Tier.** This dispatched Haiku until 2026-07-25, when the operator ruled Sonnet the floor with no carve-out for cosmetic work.
