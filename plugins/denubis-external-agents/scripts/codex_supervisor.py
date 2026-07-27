@@ -268,6 +268,27 @@ def _ready_observation(title: str, content: str) -> Observation:
     return _action_observation(kind, message)
 
 
+def _approval_is_pending(recent_content: str) -> bool:
+    """Report whether approval text is still awaiting an answer.
+
+    Codex leaves answered approval text in the scrollback, so the words alone cannot
+    say whether it is waiting. A bullet opens an assistant message, per
+    `_assistant_message`, so a bullet after the last approval marker means Codex
+    answered and moved on. Nothing after it means the prompt is still on screen.
+    """
+    prompts = list(
+        re.finditer(
+            r"would you like to run|press enter to confirm",
+            recent_content,
+            re.IGNORECASE,
+        )
+    )
+    if not prompts:
+        return False
+    after_last_prompt = recent_content[prompts[-1].end() :]
+    return not re.search(r"^\s*•(?:\s|$)", after_last_prompt, re.MULTILINE)
+
+
 def classify_snapshot(title: str, content: str) -> Observation:
     """Classify a bounded TUI snapshot, defaulting unknown states to busy."""
     if re.search(r"action required", title, re.IGNORECASE):
@@ -281,19 +302,23 @@ def classify_snapshot(title: str, content: str) -> Observation:
     ):
         return Observation(ObservationKind.BUSY)
 
-    if re.search(r"\bready\b", title, re.IGNORECASE):
-        return _ready_observation(title, content)
-
     recent_content = "\n".join(content.splitlines()[-12:])
-    if re.search(
-        r"would you like to run|press enter to confirm",
-        recent_content,
-        re.IGNORECASE,
-    ):
+    # A pending approval is checked before the title, because Codex's steady-state
+    # title is "Ready" and it keeps saying Ready while drawing an approval prompt.
+    # Returning on the title first reported those as DONE, telling the supervisor
+    # Codex had finished at the moment it was blocked on them (observed 2026-07-27).
+    # Only a *pending* approval may pre-empt the title: answered approval text stays
+    # in the scrollback, and treating that as pending would report a finished pane as
+    # waiting. The busy branch above still wins outright, since a spinner means Codex
+    # is mid-turn and anything below it may be stale.
+    if _approval_is_pending(recent_content):
         return _action_observation(
             ObservationKind.APPROVAL,
             _approval_material(recent_content),
         )
+
+    if re.search(r"\bready\b", title, re.IGNORECASE):
+        return _ready_observation(title, content)
 
     if fatal := _fatal_observation(f"{title}\n{recent_content}"):
         return fatal
