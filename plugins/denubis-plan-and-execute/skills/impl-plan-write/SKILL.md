@@ -49,22 +49,7 @@ Tell the user:
 
 **If already implementing phases 9+:** The user should provide the previous implementation plan as context when scoping the next batch.
 
-### 2. Review Mode Selection
-
-**After scope validation, ask how to handle phase reviews:**
-
-Use AskUserQuestion:
-```
-Question: "How would you like to review the implementation plan phases?"
-Options:
-  - "Write all phases to disk, I'll review afterwards"
-  - "Review each phase interactively before writing"
-  - "Review design decisions per phase (three-lens analysis)"
-```
-
-**Track this choice - it affects the per-phase workflow below.**
-
-### 3. Codebase Verification
+### 2. Codebase Verification
 
 **You MUST verify current codebase state before EACH AND EVERY PHASE. Use `codebase-investigator` to prove out your hypotheses and to ensure that current state aligns with what you want to write out.**
 
@@ -118,7 +103,7 @@ Review investigator findings and note any differences from design assumptions.
 
 **If codebase state differs from design assumptions:** Document the difference and adjust the implementation plan accordingly.
 
-### 4. External Dependency Research
+### 3. External Dependency Research
 
 **When phases involve external libraries or dependencies, research them before writing tasks.**
 
@@ -409,8 +394,6 @@ When tasks form a logical subcomponent (e.g., types → implementation → tests
 
 ## Phase-by-Phase Implementation
 
-**Workflow depends on review mode selected above.**
-
 **Step 0: Create granular task tracker with dependencies**
 
 After verifying scope (≤8 phases), use TaskCreate to create granular sub-tasks for EACH phase. This structure survives context compaction.
@@ -509,173 +492,11 @@ Use TaskUpdate to mark each sub-task as in_progress when starting, completed whe
 
 ---
 
-### If user chose "Review each phase interactively before writing":
+### Per-phase workflow
 
-**Workflow for EACH phase (using granular task tracking):**
+**Separate WHAT (decisions needing human judgement) from HOW (implementation details for subagents).** You surface genuine decisions with lens analysis for approval. The implementation tasks get written to disk after approval, and the lens analysis is ephemeral and does not appear in the phase file.
 
-1. **Task NA: Read design phase**
-   - Mark task NA as in_progress
-   - Extract the `<!-- START_PHASE_N -->` section from design plan
-   - Mark task NA as completed
-
-2. **Task NB: Verify codebase state**
-   - Mark task NB as in_progress
-   - Dispatch codebase-investigator with design assumptions for this phase
-   - Review investigator findings for discrepancies
-   - **Activate relevant skills** based on findings (if not already active):
-     - Python code? Activate coding-python-idioms/coding-effectively skills
-     - Database work? Activate howto-develop-with-postgres skill
-     - Match skills to the technologies this phase involves
-   - **Structural readiness check (for phases modifying existing files):**
-     If this phase modifies existing files (not just creating new ones), add to the investigator query:
-     "The upcoming phase will modify these existing files: [list]. Assess their structural readiness:
-     - Are there mixed concerns that should be separated before the phase changes arrive?
-     - Are there hardcoded assumptions that need generalising?
-     - Are there missing seams (no clear extension points for the new functionality)?
-     - Would the phase's changes be significantly easier if any structural prep work was done first?"
-     **If the investigator reports impediments:** Surface them to the planner. The planner should consider inserting a "preparatory-refactor" phase before this phase. Use AskUserQuestion:
-     Question: "Codebase investigation found structural impediments in files Phase [N] will modify: [summary]. Insert a preparatory-refactor phase before Phase [N]?"
-     Options: "Yes — insert preparatory-refactor phase" | "No — proceed without (implementation may be harder)"
-     **If the user approves:** Insert a preparatory-refactor phase with goal referencing the upcoming phase, Phase Type: preparatory-refactor, and tasks empty (the refactoring pipeline determines what to do at execution time based on smell assessment). Number as Phase [N-1.5] or renumber subsequent phases.
-     **If the phase only creates new files:** Skip the structural readiness check entirely.
-   - Mark task NB as completed
-
-3. **Task NC: Research external dependencies** (if phase involves them)
-   - Mark task NC as in_progress
-   - Dispatch internet-researcher for docs/standards/API patterns
-   - Escalate to remote-code-researcher if docs are insufficient
-   - Document findings for inclusion in phase output
-   - Mark task NC as completed
-   - (Skip if no external deps - still mark completed with note "N/A")
-
-4. **Write implementation tasks** for this phase (in memory, not to file):
-   - Identify which ACs this phase covers based on design phase's scope
-   - Include the "Acceptance Criteria Coverage" section with literal AC copies
-   - Write tasks that implement and test each listed AC case
-
-5. **Present to user** - Output the complete phase plan in your message text:
-
-```markdown
-**Phase [N]: [Phase Name]**
-
-**Codebase verification findings:**
-- ✓ Design assumption confirmed: [what matched]
-- ✗ Design assumption incorrect: [what design said] - ACTUALLY: [reality]
-- + Found additional: [unexpected things discovered]
-- ✓ Dependency confirmed: [library@version]
-
-**External dependency findings:** (if applicable)
-- ✓ [Library] API: [what docs/source revealed]
-- ✓ Standard: [spec reference and key details]
-- ✗ Design assumption incorrect: [what design said] - ACTUALLY: [reality per docs/source]
-- 📖 Source: [Official docs | RFC spec | Source code @ commit]
-
-**Implementation tasks based on actual codebase state and external research:**
-
-### Task 1: [Component Name]
-
-**Files:**
-- Create: `<src>/services/auth.py`
-- Modify: `<src>/services/existing.py:123-145`
-- Test: `<tests>/services/test_auth.py`
-
-**Step 1: Write the failing test**
-[Complete code example]
-
-**Step 2: Run test to verify it fails**
-[Exact command — find test command in CLAUDE.md]
-
-**Step 3: Write minimal implementation**
-[Complete code example]
-
-**Step 4: Run test to verify it passes**
-[Exact command and expected output]
-
-**Step 5: Commit**
-[Exact git commands]
-
-[Continue for all tasks in this phase...]
-```
-
-6. **Use AskUserQuestion:**
-
-**The question MUST summarise what's being approved.** Don't just say "Approved?" — state the key deliverables of this phase in the question text so the human knows what they're signing off on.
-
-Example question: "Phase 2 creates `<src>/auth/middleware.py` and `<src>/auth/tokens.py`, adds JWT validation with refresh flow, and covers AC2.1-AC2.3. 3 tasks, 2 new files, 1 modified."
-
-**Options:**
-- "Approved - proceed to next phase"
-- "Needs revision - [describe changes]"
-- "Other"
-
-7. **Task ND: Write phase file (if approved)**
-   - Mark task ND as in_progress
-   - Write to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
-   - Phase file contains ONLY the implementation tasks (no verification findings)
-   - Mark task ND as completed, continue to next phase
-
-8. **If needs revision:** Revise based on feedback, present again (do NOT mark ND as in_progress until approved)
-
----
-
-### If user chose "Write all phases to disk, I'll review afterwards":
-
-**Workflow for EACH phase (using granular task tracking):**
-
-1. **Task NA: Read design phase**
-   - Mark task NA as in_progress
-   - Extract the `<!-- START_PHASE_N -->` section from design plan
-   - Mark task NA as completed
-
-2. **Task NB: Verify codebase state**
-   - Mark task NB as in_progress
-   - Dispatch codebase-investigator with design assumptions for this phase
-   - Review investigator findings for discrepancies
-   - **Activate relevant skills** based on findings (if not already active):
-     - Python code? Activate coding-python-idioms/coding-effectively skills
-     - Database work? Activate howto-develop-with-postgres skill
-     - Match skills to the technologies this phase involves
-   - **Structural readiness check (for phases modifying existing files):**
-     If this phase modifies existing files (not just creating new ones), add to the investigator query:
-     "The upcoming phase will modify these existing files: [list]. Assess their structural readiness:
-     - Are there mixed concerns that should be separated before the phase changes arrive?
-     - Are there hardcoded assumptions that need generalising?
-     - Are there missing seams (no clear extension points for the new functionality)?
-     - Would the phase's changes be significantly easier if any structural prep work was done first?"
-     **If the investigator reports impediments:** Surface them to the planner. The planner should consider inserting a "preparatory-refactor" phase before this phase. Use AskUserQuestion:
-     Question: "Codebase investigation found structural impediments in files Phase [N] will modify: [summary]. Insert a preparatory-refactor phase before Phase [N]?"
-     Options: "Yes — insert preparatory-refactor phase" | "No — proceed without (implementation may be harder)"
-     **If the user approves:** Insert a preparatory-refactor phase with goal referencing the upcoming phase, Phase Type: preparatory-refactor, and tasks empty (the refactoring pipeline determines what to do at execution time based on smell assessment). Number as Phase [N-1.5] or renumber subsequent phases.
-     **If the phase only creates new files:** Skip the structural readiness check entirely.
-   - Mark task NB as completed
-
-3. **Task NC: Research external dependencies** (if phase involves them)
-   - Mark task NC as in_progress
-   - Dispatch internet-researcher for docs/standards/API patterns
-   - Escalate to remote-code-researcher if docs are insufficient
-   - Document findings for inclusion in phase output
-   - Mark task NC as completed
-   - (Skip if no external deps - still mark completed with note "N/A")
-
-4. **Task ND: Write phase file**
-   - Mark task ND as in_progress
-   - Identify which ACs this phase covers based on design phase's scope
-   - Include the "Acceptance Criteria Coverage" section with literal AC copies from design
-   - Write implementation tasks that implement and test each listed AC case
-   - Write directly to disk at `docs/implementation-plans/YYYY-MM-DD-<feature-name>/phase_##.md`
-   - Mark task ND as completed, continue to next phase
-
-**Do NOT emit phase content to the user before writing.** This conserves tokens.
-
-**After ALL phases are written:**
-
-Announce: "All [N] phase files written to `docs/implementation-plans/YYYY-MM-DD-<feature-name>/`. Let me know if any phases need revision."
-
----
-
-### If user chose "Review design decisions per phase (three-lens analysis)":
-
-**This mode separates WHAT (design decisions for human judgement) from HOW (implementation details for subagents).** You present design decisions with philosophical lens analysis for approval. The implementation tasks get written to disk after approval — the lens analysis is ephemeral and does not appear in the phase file.
+There is one route. Do not offer the human a choice of review style, and do not write phases to disk unreviewed to save tokens: the decisions that reach a human are chosen by the filters in step 5, not by a mode selected up front.
 
 **Three lenses applied to each design decision:**
 
@@ -1084,7 +905,7 @@ These are violations of the skill requirements:
 | "User can figure out if file exists during execution" | Your job is exact instructions. No ambiguity. |
 | "Testing Phase 3 will fail but that's OK because it'll be fixed in Phase 4" | All phases must compile and pass tests before they conclude. |
 | "Phase validation slows me down" | Going off track wastes far more time. Validate each phase. |
-| "I'll batch all phases then validate at end" | Valid if user chose batch mode. Otherwise validate incrementally. |
+| "I'll batch all phases then validate at end" | No. Validate incrementally. There is no mode that defers it. |
 | "I'll just ask for approval, user can see the plan" | Output complete plan in message BEFORE AskUserQuestion. User must see it. |
 | "Plan looks complete enough to ask" | Show ALL tasks with ALL steps and code. Then ask. |
 | "This plan has 12 phases but they're small" | Limit is 8 phases. No exceptions. Refuse and redirect. |
@@ -1113,11 +934,12 @@ These are violations of the skill requirements:
 | "More tests = better coverage" | Wrong tests = noise. Test the ACs, nothing more. |
 | "Phase doesn't have ACs but I'll add some tests anyway" | No. Explicitly state "Verifies: None" for infrastructure phases. Don't invent work. |
 | "Acceptance Criteria are clear, don't need test requirements" | Test requirements map criteria to specific tests. Execution needs this mapping. |
-| "I'll skip test requirements, user chose batch mode" | Batch mode skips interactive approval. Test requirements are still generated and written. |
+| "I'll skip test requirements, the user seemed in a hurry" | No. Test requirements are always generated and written. |
 | "Test requirements task is optional" | No. It's a tracked task with dependencies. Must complete before execution handoff. |
 | "All decisions in this phase are PROGRESSIVE" | Unlikely. Most decisions are routine. PROGRESSIVE requires citing a specific downstream phase that gets simpler. Omit Lakatos for routine choices. |
 | "Lakatos doesn't apply to any decisions here" | Possible for simple phases. But if you're adding workarounds, shims, or code that a later phase will undo — that's degeneration. Flag it. |
-| "Design decisions mode but I'll show implementation tasks too" | No. Show decisions and lens analysis only. Implementation tasks go to disk for subagents, not to the human. |
+| "I'll show the implementation tasks to the human too" | No. Show decisions and lens analysis only. Implementation tasks go to disk for subagents, not to the human. |
+| "The human would probably rather just review the phases himself" | That is the mode selection this skill deliberately removed. Surface decisions, not a choice of review style. |
 | "This decision has no perspective worth naming" | Most routine decisions don't. But vendor lock-in, data residency, accessibility, security, and cost distribution always have invisible costs. Include Haraway when someone bears a cost the decision-maker doesn't see. |
 
 **All of these mean: STOP. Follow the requirements exactly.**
@@ -1169,7 +991,6 @@ Which approach should I take?
 
 **Before starting:**
 - [ ] Count phases - refuse if >8
-- [ ] Ask user for review mode (batch vs interactive vs design decisions)
 - [ ] Capture absolute paths: DESIGN_PATH and PLAN_DIR
 - [ ] Read Acceptance Criteria section from design plan
 - [ ] Create granular task list with TaskCreate (NA, NB, NC, ND per phase + Test Requirements + UAT Requirements + Finalization)
@@ -1181,8 +1002,8 @@ Which approach should I take?
 - [ ] **Task NB:** Mark in_progress, dispatch codebase-investigator, review findings, mark completed
 - [ ] **Task NC:** Mark in_progress, research external deps if needed (or mark completed with "N/A"), mark completed
 - [ ] Write complete tasks with exact paths and code based on investigator and research findings
-- [ ] **If interactive mode:** Output complete phase plan, use AskUserQuestion for approval
-- [ ] **If design decisions mode:** Identify decisions, apply lenses (Popper always, Lakatos only when interesting, Haraway only when someone bears invisible cost), present for approval
+- [ ] Find the genuine decisions using step 5's three filters. Zero is the normal outcome
+- [ ] Apply lenses to any survivors (Popper always, Lakatos only when interesting, Haraway only when someone bears invisible cost), present for approval
 - [ ] **Task ND:** Mark in_progress, write to absolute path in task description, mark completed
 
 **For each task in the plan:**
@@ -1196,11 +1017,12 @@ Which approach should I take?
 **Test Requirements + UAT Requirements (after all phase ND tasks completed):**
 - [ ] Mark Test Requirements task as in_progress
 - [ ] Dispatch Opus subagent to generate test requirements from Acceptance Criteria
-- [ ] **If interactive mode:** Present to user, use AskUserQuestion for approval
-- [ ] **If batch mode:** Write directly without asking
+- [ ] Present to user, use AskUserQuestion for approval
 - [ ] Write test-requirements.md to PLAN_DIR
 - [ ] Mark Test Requirements task as completed
-- [ ] Collate uat-requirements.md from phase decisions (design decisions mode) or construct from ACs (other modes)
+- [ ] Collate uat-requirements.md from the entries phases accumulated, plus any acceptance criterion needing human judgement that no phase decision covered
+- [ ] Dispatch the collation audit subagent — it scores every entry independently of the planner
+- [ ] Resolve any FAIL or SPLIT with the human before writing
 - [ ] Write uat-requirements.md to PLAN_DIR (first line = collation-audit stamp)
 - [ ] Mark UAT Requirements task as completed
 - [ ] Proceed to Finalization
@@ -1364,17 +1186,16 @@ Read the design at [DESIGN_PATH] and implementation phases in [PLAN_DIR].
 Generate test-requirements.md mapping each acceptance criterion to automated tests:
 - Criterion, test type (unit/integration/e2e), expected test file path
 
-Human-judgment verification is tracked separately in uat-requirements.md (generated during phase planning, not here). Every acceptance criterion must map to either an automated test in test-requirements.md or a human-judgment entry in uat-requirements.md. Flag any AC that appears in neither.
+Human-judgment verification is tracked separately, in uat-requirements.md, which the UAT Requirements Collation step writes AFTER this one. Do not read it or assume it exists. Instead, list every acceptance criterion you did NOT map to an automated test, with a one-line reason. Collation consumes that list and must account for each entry.
 </parameter>
 </invoke>
 ```
 
-**Step 2: Handle based on review mode**
+**Step 2: Present for approval**
 
-- **Interactive mode or design decisions mode:** Present to user, AskUserQuestion for approval. This is the LAST interactive item.
-- **Batch mode:** Write directly, announce completion.
+Present to the user and use AskUserQuestion. If AskUserQuestion is unavailable, ask inline and wait for an answer before writing.
 
-**If user requests revisions in interactive mode:**
+**If the user requests revisions:**
 
 1. **Create a task for EACH revision** (survives compaction):
    ```
@@ -1400,11 +1221,15 @@ Write to `[PLAN_DIR]/test-requirements.md`. Mark task completed. Proceed to UAT 
 
 Mark in_progress after Test Requirements completes.
 
-UAT requirements collect all human-judgment Popper entries generated during phase planning (design decisions mode) or constructed from acceptance criteria (other modes). The `exec-uat-gate` skill reads this file during execution.
+UAT requirements collect every human-judgment Popper entry the plan produced. The `exec-uat-gate` skill reads this file during execution.
 
-**For design decisions mode:** UAT entries were already appended to `uat-requirements.md` per-phase during step 8 (Task ND), unstamped. The collation audit below reads that accumulated file, scores every entry, and re-writes it with the provenance stamp.
+There is one generation route, and it has two inputs.
 
-**For interactive and batch modes:** Review each phase for acceptance criteria that require human judgment (using the Carnap quality rubric). Construct falsification entries for any that qualify.
+**Input 1, the accumulated entries.** Phases appended their human-judgment falsification entries to `uat-requirements.md` during step 8 (Task ND), unstamped. Read that accumulated file.
+
+**Input 2, the acceptance criteria no decision covered.** Take the list of unmapped acceptance criteria that Test Requirements Generation produced. For each, judge with the Carnap quality rubric whether it needs human judgement, and construct a falsification entry for any that does. An AC that needs neither an automated test nor a UAT entry must be named with its reason, not silently dropped.
+
+Both inputs then go through the same collation audit below, which scores every entry and re-writes the file with the provenance stamp. **A phase that produced zero entries is normal, and a plan that produces zero entries is valid** — see the minimal form at the end of this section.
 
 **Format:**
 
