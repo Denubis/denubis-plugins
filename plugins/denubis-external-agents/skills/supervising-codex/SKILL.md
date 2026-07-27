@@ -183,9 +183,10 @@ run low.**
   2026-07-28). A clear starts from a known-empty state, whereas a compaction leaves behind
   a summary whose fidelity nothing checks.
 
-The judgement about what a compaction should preserve is still worth having, and
-`consulting-a-fable-advisor` has it. Deliver it the way the tool accepts: the slash command
-first, then a fresh self-contained prompt.
+The judgement about what a compaction should preserve is still worth having. Deliver it
+the way the tool actually accepts, which is the slash command first and then a fresh
+self-contained prompt restating what matters, rather than a brief asking codex to do the
+preserving itself.
 
 Send it as two calls, typing before submitting, because the composer opens an autocomplete
 list on `/`:
