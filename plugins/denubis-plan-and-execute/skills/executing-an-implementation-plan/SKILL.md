@@ -815,6 +815,13 @@ Code review → Proleptic → Coherence review → Measure → Assess → [Gate]
 
 Construct a resume prompt the user can paste after `/clear`. It must be self-contained — after `/clear`, the model has zero prior context.
 
+**Write it to a file when the user asks for one, and never commit it.** An overnight resume
+file is a good way to carry state across a break, so `RESUME*.md` is gitignored to make
+writing one easy and staging one deliberate. Do not `git add -f` it: a resume prompt names
+a phase, a worktree, and a context that all expire, so committed it outlives every fact it
+asserts. Five reached `main` this way before the gate existed. Implementation plans are the
+durable counterpart and stay tracked.
+
 ```
 Phase N complete and committed. Context is heavy from subagent output and review cycles.
 
