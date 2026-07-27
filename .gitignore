@@ -4,3 +4,7 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Resume prompts are session scaffolding: fine on disk, never committed.
+# They name a phase, a worktree, and a context that all expire.
+RESUME*.md
