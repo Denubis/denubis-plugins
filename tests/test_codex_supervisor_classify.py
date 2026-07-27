@@ -26,9 +26,12 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from types import ModuleType
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 _MODULE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -57,7 +60,7 @@ def watch() -> ModuleType:
     spec = importlib.util.spec_from_file_location("codex_supervisor", _MODULE_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    # Registered before exec so dataclasses can resolve __module__ during class creation.
+    # Registered before exec so dataclasses resolve __module__ during class creation.
     sys.modules["codex_supervisor"] = module
     spec.loader.exec_module(module)
     return module
