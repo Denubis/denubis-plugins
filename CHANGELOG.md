@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-external-agents] 0.7.0
+
+Gives the codex supervision monitor a home in the plugin, with the skill that drives it.
+
+**New:**
+- `supervising-codex` ports the practice from the field repo it grew in and generalises it for a plugin that runs in someone else's project. Three roles that never merge: codex drafts, Claude supervises, the human rules. It carries the numbered-prompt loop, the pane-resolution guards, the verification pass, and the supervisor-asserted-context discipline that says everything the supervisor stages is a claim for the doer to doubt.
+- `scripts/codex_supervisor.py` is the one tool for the job: it resolves, spawns, sends, tails, reports status, relays Codex lifecycle hooks, and runs the watch loop that emits only `NEEDS APPROVAL`, `QUESTION`, `DONE` and `CRASH`. No verb takes a pane ID, because tmux renumbers windows and a stale coordinate types into another project's session.
+- Context hygiene, which no upstream copy had. `/clear` between prompts as the default cadence and `/compact` only when the next prompt follows straight on, both sent as the actual slash command in two `send-keys` calls. A prose brief asking codex to compress itself is a task, so codex reads files to answer it and the meter goes down: observed 2026-07-28 moving 21% to 18% while codex reported "Context compressed as specified" and nothing had been compacted.
+- The skill states two requirements on the consuming project and says to stop rather than improvise if either is missing: an untracked `codex-prompts/` as the file-exchange surface, and an ADR register for anything ruled along the way.
+
+**Fixed:**
+- `classify_snapshot` returned on a `Ready` pane title before examining the body for approval text. Codex's steady-state title *is* `Ready`, so an approval drawn under it classified as `DONE`, telling the supervisor codex had finished at the moment it was blocked. Reproduced live against a pane that had sat unattended for 57 minutes. The repair cannot simply read the body first, because answered approval text stays in the scrollback; pending is distinguished by whether an assistant bullet appears after the last approval marker.
+
+**Known gap:**
+- The monitor announces each actionable event once and never repeats. An approval you miss is not raised again, so silence is ambiguous rather than reassuring. Re-notification is a design change that the current acceptance criteria actively forbid, and it is not made here.
+
 ## [denubis-extending-claude] 1.10.0 / [denubis-research-agents] 1.3.0 / [denubis-basic-agents] 2.1.0 / [denubis-plan-and-execute] 2.39.0
 
 Sonnet 5 becomes the model floor across the suite.
