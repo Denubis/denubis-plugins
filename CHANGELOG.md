@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-plan-and-execute] 2.40.0
+
+`impl-plan-write` has one route instead of three.
+
+**Changed:**
+- The review-mode question is gone. The skill no longer asks whether to write phases to disk unreviewed, review each phase interactively, or review design decisions per phase. It does the last of those, always. Operator ruling: the three modes reduce to "the correct way", where only what needs human judgement is surfaced. Which decisions reach a human is now decided by the three filters (restatement, invented alternative, obvious default), not by a mode chosen before any planning has happened.
+- `test-requirements.md` and `uat-requirements.md` now have one unconditional generation route each. UAT collation takes two inputs: the entries phases accumulated during planning, and any acceptance criterion needing human judgement that no phase decision covered. Both go through the same independent collation audit. Zero entries remains a first-class valid outcome.
+- The Requirements Checklist now covers the collation audit, the FAIL/SPLIT human resolution, and the stamp. It previously went straight from collate to write, omitting the structural gate a compacted session relies on.
+
+**Fixed:**
+- Batch mode carried a mandatory `AskUserQuestion` for preparatory-refactor insertion while also being told to write directly without asking. Both instructions are gone with the mode.
+- The Test Requirements subagent was told human-judgment verification is "generated during phase planning, not here" and instructed to flag any acceptance criterion appearing in neither file. In two of three modes `uat-requirements.md` did not exist yet, and collation is blocked by Test Requirements, so the instruction could not be executed. It now emits the unmapped-AC list that collation consumes.
+- The `uat-requirements.md` format template mandated `DR[X]` identifiers that two of the three modes never assigned. The surviving route assigns them.
+
+**Removed:**
+- 175 lines. The per-phase investigation preamble was triplicated byte-for-byte across the three modes; two copies went with their branches.
+
 ## [denubis-extending-claude] 1.10.0 / [denubis-research-agents] 1.3.0 / [denubis-basic-agents] 2.1.0 / [denubis-plan-and-execute] 2.39.0
 
 Sonnet 5 becomes the model floor across the suite.
