@@ -27,6 +27,26 @@ def tmux_env(monkeypatch, tmp_path):
 
 
 class TestMaybeRename:
+    def test_registered_owner_flag_skips_only_legacy_title_writer(
+        self, tmux_env, monkeypatch
+    ):
+        """Registered ownership disables this legacy rename side effect."""
+        monkeypatch.setenv(
+            "TMUX_AGENT_ATTENTION_RUN_ID",
+            "00000000-0000-0000-0000-000000000601",
+        )
+        monkeypatch.setenv("TMUX_AGENT_ATTENTION_OWNS_WINDOW_TITLE", "1")
+
+        with (
+            mock.patch("workflow_statusline.tmux.subprocess") as mock_sub,
+            mock.patch("workflow_statusline.tmux.cache") as mock_cache,
+        ):
+            tmux.maybe_rename("testrepo")
+
+        mock_sub.run.assert_not_called()
+        mock_cache.read_if_fresh.assert_not_called()
+        mock_cache.write.assert_not_called()
+
     def test_renames_window_when_no_cache_or_lock(self, tmux_env):
         """AC4.1: TMUX set, no lock, no cache -> targets the exact tmux pane."""
         pane_id, _cache_file, _lock_file = tmux_env

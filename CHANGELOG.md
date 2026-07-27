@@ -13,6 +13,63 @@ Sonnet 5 becomes the model floor across the suite.
 - `exec-session-naming` and `design-clarify` dispatch `sonnet-general-purpose` in place of `haiku-general-purpose`. A 2026-07-26 amendment extends the floor to live dispatch sites with no carve-out for cosmetic work, and `design-clarify` was investigating remote datastores rather than running a bounded mechanical task. Prose in both names the subagent by role rather than by tier, so the next retiering needs no prose sweep.
 - The version skips 2.37.0 and 2.38.0, which are claimed by PR #11 and by concurrent uncommitted work respectively.
 
+## [denubis-external-agents] 0.6.0
+
+Review findings on 0.5.0, from a codex peer review and a Fable advisor consulted on the same diff. Both are recorded in PR #11.
+
+**New:**
+- `--include` now stops for an explicit decision before transmitting. The manifest enumerates every file each include actually stages, and a non-interactive run aborts unless `--include-confirmed` is passed. Printing the paths afterwards was a receipt, not a control: the files were already in flight, and the usual reader of that receipt is a model composing the command line rather than the operator whose files are being sent.
+- `advisor-send.sh` ships with the advisor skill. The spawn script previously told operators to drive the pane with `codex-send.sh`, which this plugin does not ship — it existed only in two unrelated project checkouts, so a marketplace install was handed an invocation that did not exist on the machine.
+
+**Changed:**
+- The advisor's documented default is now a dispatched background agent rather than a pane, so consultations return a completion notification instead of finishing silently. The Agent tool has no tool-restriction parameter, so the skill now states plainly that a dispatched advisor *can* write, that its writes are permission-prompted rather than blocked, and that "advises, never implements" is a brief it is asked to honour rather than a property the harness enforces. The pane variant remains for when the restriction must be real.
+- `EndConversation` is no longer denied to the pane advisor. An advisor that cannot end its own session is worse than one that can (operator ruling).
+- Tool-surface re-verification is now keyed to each consultation rather than to edits of the deny list. The second verification run found `EndConversation` already present in the advisor's schema while the deny list still named it: no local edit had occurred, and the harness had re-injected a deferred tool underneath a claim that was stale at ship time.
+- The advisor pane splits the caller's pane via `-t "$TMUX_PANE"`. Without it tmux split whatever window was active, so an advisor dispatched from a background session landed on top of unrelated work.
+- Unrecognised options and surplus positionals are fatal. A mistyped `--includ evidence.md` previously became a focus note reading `--includ` and dropped the evidence silently.
+- The reviewer's grounding rules now permit citing `./included/`. They asserted that only `./context/` existed, which contradicted the tree includes stage into, leaving a rule-following reviewer unable to cite the evidence it had been given.
+
+**Fixed:**
+- `tests/test_fable_cost_gate.py` scans every text file under `plugins/` rather than four named categories, and its detector matches the phrase "Fable advisor". It previously could not catch the breach its own docstring names as the canonical example, and saw neither auxiliary skill files nor plugin scripts. Both shapes were injected and watched fail before the widening. The module now also records the two shapes no lexical scan can reach: semantic paraphrase that names no token, and ambient model inheritance through session-model fan-out.
+
+## [denubis-plan-and-execute] 2.37.0 / [denubis-crash-recovery] 1.2.0
+
+Liveness markers stop recording the user's command line, and correlation moves to the session id.
+
+**Changed:**
+- `claude-wrapper.sh` no longer writes `argv=` into the liveness marker. A resumed session's command line carries prompt text, and the marker is a plaintext file on disk that triage reads, so the prompt was being persisted where it did not need to be.
+- `crash-recovery` correlates on `session_id` first, which the wrapper already stamps. The `--resume <uuid>` argv parse is demoted to an optional legacy path so markers written by older wrappers still resolve, and the mtime-window fallback is unchanged behind both.
+- `liveness.argv` is now optional, and neither `list-live` nor the CLI table displays it.
+
+## [denubis-external-agents] 0.5.0
+
+Adds a human-invocable different-model advisor, and lets a review be given evidence the default staging excludes.
+
+**New:**
+- `consulting-a-fable-advisor` spawns an advisor in a tmux pane on a different model, briefed to advise and prevented from implementing by a 37-name `--disallowed-tools` list plus `--disable-slash-commands`. The surviving surface is `Glob`, `Grep`, `Read`, and `ReportFindings`; a write attempt returns `No such tool available: Write. Write exists but is not enabled in this context.` The list was derived from an advisor enumerating its own loaded schema rather than written from memory, and it is re-verified the same way whenever it changes, because a name-based deny list fails open on every rename and addition. Note that `--allowed-tools` pre-approves rather than restricts, and does not hide anything.
+- The advisor's brief instructs it to doubt supervisor assertions and make reality prove them. Only material marked as a human ruling is frozen; a supervisor's claim is a thing to falsify, because supervisor searches routinely stop one level short.
+- The advisor is human-invocable only, per the Fable cost gate. `tests/test_fable_cost_gate.py` enforces that mechanically: no other skill may reference it, no agent, hook, or command may dispatch it, and no agent may declare a Fable-tier model. Prose guarding a cost gate is a silent failure mode, and the breach would otherwise surface on the bill rather than in review.
+- Fable-tier access is intermittent, so an unavailable advisor exits non-zero rather than substituting a fallback. Choosing Opus 4.8 instead is the operator's decision, and the consultation is then labelled as the fallback model.
+- `codex-peer-review.sh` takes a repeatable `--include <path>`, force-staged the way the target already is, so a run can be given cited papers, a generated diff, or a named artefact the default surface excludes. Included paths may sit outside the repository and every one is printed, since each is a disclosure decision.
+
+**Changed:**
+- The reviewer prompt accepts a directory target: it enumerates the directory's files, reads every reviewable text file, and treats that set as the target. A directory review now opens with a target-set manifest marking each file read or skipped, so silent partial coverage is visible rather than invisible.
+- The provenance gate is described as establishing provenance and nothing further. A review that passes it is *provenance-checked*, never *verified*: a quote can be verbatim while the claim built on it is false, its severity inflated, or the finding a false positive against a design the reviewer could not see.
+
+**Fixed:**
+- A directory target inside a git repository crashed the runner (`cp` without `-r`).
+- A directory target then staged binaries, bypassing the text-only filter every other path honours, silently widening the disclosure surface. Bulk inclusion now honours the filter; an explicitly named single file may still be a binary, because naming it is deliberate.
+
+## [denubis-external-agents] 0.4.0
+
+The peer reviewer no longer pins a model version. It follows whatever codex is set to, so new releases need no edit here.
+
+**Changed:**
+- `codex-peer-review.sh` reads the top-level `model` key from `$CODEX_HOME/config.toml` (defaulting to `~/.codex`) and passes it through as `-m`. Parsing stops at the first `[section]` header, so a profile's model is never mistaken for the default. With no key, or no config file, `-m` is omitted and codex picks its own default.
+- The run now prints the resolved model on a `model:` line, and the skill's presentation step labels the review with that reported value instead of a fixed model name.
+- `--ignore-user-config` is retained. The reviewer stays clear of the operator's MCP servers, hooks, and instructions, and the model is the single setting allowed through that isolation.
+- Plugin and marketplace descriptions no longer name a model version.
+
 ## [denubis-plan-and-execute] 2.36.4
 
 **Fixed:**

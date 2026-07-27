@@ -11,6 +11,12 @@ from workflow_statusline import cache
 
 def maybe_rename(name: str) -> None:
     """Rename tmux window to 'Cl:<name>' if name changed and no lock file."""
+    if (
+        os.environ.get("TMUX_AGENT_ATTENTION_RUN_ID")
+        and os.environ.get("TMUX_AGENT_ATTENTION_OWNS_WINDOW_TITLE") == "1"
+    ):
+        return
+
     if "TMUX" not in os.environ:
         return
 

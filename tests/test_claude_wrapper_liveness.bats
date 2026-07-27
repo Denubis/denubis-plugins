@@ -19,7 +19,7 @@ teardown() {
   rm -rf "$CR_TEST_DIR"
 }
 
-@test "AC5.1 — wrapper writes liveness file with four required keys at startup" {
+@test "AC5.1 — wrapper writes privacy-minimized liveness metadata at startup" {
   # Stub claude that sleeps so we can inspect the liveness file mid-run.
   cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -27,15 +27,23 @@ sleep 2
 exit 0
 EOF
   chmod +x "$CR_TEST_DIR/sleep-claude.sh"
-  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --print "test" &
+  private_prompt="TMUX_ATTENTION_PRIVATE_PROMPT_SENTINEL"
+  session_id="db0cc58f-dc30-4195-a64a-4f25a5c19d6b"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" \
+    --resume "$session_id" "$private_prompt" &
   wrapper_pid=$!
   sleep 0.5  # let the wrapper write the liveness file
   live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
   [ -f "$live_file" ]
   grep -q "^cwd=" "$live_file"
   grep -q "^started=" "$live_file"
-  grep -q "^argv=" "$live_file"
   grep -q "^boot_id=" "$live_file"
+  grep -q "^session_id=$session_id\$" "$live_file"
+  grep -qE "^start_time=[0-9]+\$" "$live_file"
+  run grep -q "^argv=" "$live_file"
+  [ "$status" -ne 0 ]
+  run grep -q "$private_prompt" "$live_file"
+  [ "$status" -ne 0 ]
   # boot_id value matches the system's current boot_id
   expected_boot_id=$(cat /proc/sys/kernel/random/boot_id)
   grep -q "^boot_id=$expected_boot_id\$" "$live_file"
@@ -163,18 +171,23 @@ EOF
   [ "$(ls -1 "$CRASH_RECOVERY_RUN_DIR"/*.live 2>/dev/null | wc -l)" -eq 0 ]
 }
 
-@test "wrapper records user-supplied argv verbatim in the liveness file" {
+@test "wrapper never records user-supplied argv in the liveness file" {
   cat > "$CR_TEST_DIR/sleep-claude.sh" <<'EOF'
 #!/usr/bin/env bash
 sleep 2
 exit 0
 EOF
   chmod +x "$CR_TEST_DIR/sleep-claude.sh"
-  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b &
+  private_prompt="TMUX_ATTENTION_PRIVATE_PROMPT_SENTINEL"
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" \
+    --resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b "$private_prompt" &
   wrapper_pid=$!
   sleep 0.5
   live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
-  grep -q "argv=.*--resume db0cc58f-dc30-4195-a64a-4f25a5c19d6b" "$live_file"
+  run grep -q "^argv=" "$live_file"
+  [ "$status" -ne 0 ]
+  run grep -q "$private_prompt" "$live_file"
+  [ "$status" -ne 0 ]
   wait "$wrapper_pid"
 }
 
@@ -196,7 +209,8 @@ EOF
   #   1. Run the wrapper to clean completion so AC5.2 lifecycle is observed
   #      (file written, then removed on exit 0).
   #   2. Synthesise a post-crash liveness file by hand, using the exact
-  #      key=value format the wrapper writes (cwd / started / argv / boot_id),
+  #      privacy-minimized key=value format the wrapper writes
+  #      (cwd / started / boot_id / session_id),
   #      a dead PID in the filename, and the current kernel boot_id.
   #   3. Build a matching JSONL under projects_root with a TOOL_USE_NO_RESULT
   #      tail so the classifier returns hard_crash via the dead-pid rule.
@@ -213,8 +227,8 @@ EOF
   # Dead PID: large number unlikely to be in use; bats teardown will not
   # collide because the file is under the per-test CR_TEST_DIR.
   DEAD_PID=999999
-  printf 'cwd=%s\nstarted=%s\nargv=--resume %s\nboot_id=%s\n' \
-    "$CRASHED_CWD" "$STARTED" "$CRASHED_UUID" "$BOOT_ID" \
+  printf 'cwd=%s\nstarted=%s\nboot_id=%s\nsession_id=%s\n' \
+    "$CRASHED_CWD" "$STARTED" "$BOOT_ID" "$CRASHED_UUID" \
     > "$CRASH_RECOVERY_RUN_DIR/$DEAD_PID.live"
 
   # Matching JSONL with cwd header + tool_use-no-result tail.
@@ -497,7 +511,7 @@ EOF
   [ "$status" -eq 0 ]
 
   # Launch the REAL wrapper from WORK_CWD with --resume <uuid>. The wrapper
-  # stamps session_id=<uuid>, argv=--resume <uuid>, and start_time from its
+  # stamps session_id=<uuid> and start_time from its
   # own /proc via bash _proc_starttime, then writes the marker via atomic mv.
   # cd in the test body (NOT a subshell) so $! is the wrapper's own pid — the
   # marker filename is <wrapper_pid>.live ($$ inside the wrapper). A
@@ -505,7 +519,16 @@ EOF
   # wrapper's, and the marker lookup would miss. bats runs each test in its own
   # subshell, so this cd does not leak; the CLI calls below use absolute paths.
   cd "$WORK_CWD"
-  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" &
+  # 3>&- is load-bearing: DO NOT DELETE IT AS A STRAY.
+  # bats waits on its FD 3 formatter pipe, not on the test process. This stub
+  # sleeps 120s, and killing the wrapper below leaves that sleep orphaned as a
+  # grandchild holding an inherited FD 3, so bats sat for the full 120s after
+  # every test had already reported. Closing FD 3 on the launch keeps the
+  # orphan out of the pipe. Measured 137.29s -> 18.07s across the suite, 20/20
+  # throughout. The 120s margin itself is deliberate (see the comment at the
+  # sleep stub): the wrapper must outlive a scan reading /proc/<pid>/stat, and
+  # three cold `uv run` invocations can exceed a shorter sleep.
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" 3>&- &
   wrapper_pid=$!
   sleep 0.5  # let the wrapper write the marker
   live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"
@@ -570,7 +593,16 @@ EOF
   # cd in the test body (not a subshell) so $! is the wrapper's own pid; see
   # the round-trip test for why a subshell would break the marker lookup.
   cd "$WORK_CWD"
-  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" &
+  # 3>&- is load-bearing: DO NOT DELETE IT AS A STRAY.
+  # bats waits on its FD 3 formatter pipe, not on the test process. This stub
+  # sleeps 120s, and killing the wrapper below leaves that sleep orphaned as a
+  # grandchild holding an inherited FD 3, so bats sat for the full 120s after
+  # every test had already reported. Closing FD 3 on the launch keeps the
+  # orphan out of the pipe. Measured 137.29s -> 18.07s across the suite, 20/20
+  # throughout. The 120s margin itself is deliberate (see the comment at the
+  # sleep stub): the wrapper must outlive a scan reading /proc/<pid>/stat, and
+  # three cold `uv run` invocations can exceed a shorter sleep.
+  CLAUDE_REAL_BINARY="$CR_TEST_DIR/sleep-claude.sh" "$WRAPPER" --resume "$SEAM_UUID" 3>&- &
   wrapper_pid=$!
   sleep 0.5
   live_file="$CRASH_RECOVERY_RUN_DIR/$wrapper_pid.live"

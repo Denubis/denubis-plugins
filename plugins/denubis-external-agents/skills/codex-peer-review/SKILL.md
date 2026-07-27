@@ -1,6 +1,6 @@
 ---
 name: codex-peer-review
-description: Use when you want an external critical peer review of a file or directory from OpenAI's codex (GPT-5.5), with its quotes verified against the source before presenting.
+description: Use when you want an external critical peer review of a file or directory from OpenAI's codex, with its quotes verified against the source before presenting.
 user-invocable: true
 ---
 
@@ -8,9 +8,9 @@ user-invocable: true
 
 ## Overview
 
-Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, shaped by the `critical-peer-review` rubric. The script stages the target's git repo **minus gitignored files and binaries**, so codex can check the target's cross-references (cited code, run logs) within the repo without raw data, secrets, or PDFs in its working tree. **Context stops at the repo**: references that point outside it — cited papers, external datasets — are flagged `[unverified]`, not chased across repos. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
+Run OpenAI's `codex` as a single external critic over a target file, shaped by the `critical-peer-review` rubric. The model is never pinned here: the script reads the top-level `model` key from your `$CODEX_HOME/config.toml` and passes it through, so the reviewer tracks whatever you have codex set to and moves with new releases without an edit. It prints the model it resolved, which is what the presentation step labels the review with. The script stages the target's git repo **minus gitignored files and binaries**, so codex can check the target's cross-references (cited code, run logs) within the repo without raw data, secrets, or PDFs in its working tree. **Context stops at the repo**: references that point outside it — cited papers, external datasets — are flagged `[unverified]`, not chased across repos. It is a **second voice**, not Claude's own — present its output source-tagged, do not adopt or merge it.
 
-**Provenance is the spine of this skill.** Codex will sometimes produce a fluent, correctly-formatted review — GRADE matrix, severity tiers, even a faked "Verification" section — of a document it never actually read. A codex review is a *claim*, not a result, until its quotes are checked against the real target. The skill is built to catch that.
+**Provenance is the spine of this skill.** Codex will sometimes produce a fluent, correctly-formatted review — GRADE matrix, severity tiers, even a faked "Verification" section — of a document it never actually read. A codex review is a *claim*, not a result, until its quotes are checked against the real target. The skill is built to catch that. Checking them makes it a *grounded* claim; whether the claims are correct is the human's judgement, not something the check settles.
 
 ## When to use
 
@@ -33,15 +33,29 @@ Run OpenAI's `codex` (GPT-5.5) as a single external critic over a target file, s
    ```bash
    bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target> "<one-line focus note>"
    ```
-   The focus note is optional and is injected as a priority hint, subordinate to the anti-fabrication grounding rules — it sharpens the review without narrowing the target's scope or relaxing the verbatim-quote requirement. The script prints the package dir, the staged target path, the focus note, the review path, and a ready-made smoke-check command.
+   The focus note is optional and is injected as a priority hint, subordinate to the anti-fabrication grounding rules — it sharpens the review without narrowing the target's scope or relaxing the verbatim-quote requirement. The script prints the package dir, the staged target path, the focus note, the resolved model, the review path, and a ready-made smoke-check command.
 
-4. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
+   Unrecognised options and surplus positionals are fatal rather than absorbed. A tolerant parser once turned a mistyped `--includ evidence.md` into a focus note reading `--includ` and dropped the evidence silently, so the operator believed a file had been sent that never was.
 
-5. **Present** the verified review as codex's voice (below).
+4. **Staging extra evidence — `--include <path>`, repeatable.** Force-stages a path the default surface excludes: a generated diff, a cited paper, a gitignored artefact. It is deliberately not bounded by the repository or by `.gitignore`, which is exactly why it is gated.
+
+   ```bash
+   … <target> "<focus note>" --include /path/to/evidence.md --include-confirmed
+   ```
+
+   Everything before transmission is local. The script stages into `/tmp`, prints a manifest enumerating **every file** each include actually stages (a directory include discloses its whole text tree, and a name is not a manifest), and then stops for a decision. At a terminal that is a `[y/N]` prompt. Non-interactively it aborts unless `--include-confirmed` is passed, so a model composing the command line cannot disclose files by omission — the flag is the decision, and it is recorded in the command line that carried it.
+
+   Printing alone was the earlier design, and it was a receipt rather than a control: by the time anyone read it the files were in flight, and the usual reader of that receipt is a model rather than the operator whose files are being sent.
+
+5. **Provenance gate — MANDATORY, before believing or presenting anything.** See below. Do not skip it, even when the review looks impeccable. *Especially* when it looks impeccable.
+
+6. **Present** the provenance-checked review as codex's voice (below).
 
 ## The provenance gate (non-negotiable)
 
 A codex review enters the conversation only after its quotes are confirmed to exist in the real files it cites.
+
+**What the gate does and does not establish.** It answers one question: did codex read the real files? That is provenance, and nothing more. A quote can exist verbatim while the claim built on it is false, the severity attached to it is inflated, or the finding is a false positive against a design decision codex could not see. Those remain codex's claims, to be weighed by the human, and no grep can settle them. So a review that passes this gate is *provenance-checked*, never *verified*.
 
 - Take 2–3 verbatim quoted phrases from codex's findings (especially the High-severity ones) and `grep -F` each against the file codex attributes it to — the target, or a context file it cites:
   ```bash
@@ -53,7 +67,7 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 
 ## Presenting
 
-- Label it clearly as **codex / GPT-5.5's review**, not Claude's. It is a second opinion for the human to weigh.
+- Label it clearly as codex's review, not Claude's, naming the model the script reported on its `model:` line (**codex / `<model>`'s review**). Read that value off the run rather than assuming one, since it follows the operator's config and changes when they change it. It is a second opinion for the human to weigh.
 - Present it as-is after the provenance gate. Do not silently merge it with your own views, dedup it, re-rank its findings by what you think is "genuine," or append your own verdict on top. If you have your own take, give it separately and labelled as yours.
 
 ## Quick reference

@@ -256,29 +256,30 @@ def make_liveness_file(
     pid: int,
     cwd: str = "/tmp/test",
     started: int = 1715151234,
-    argv: str = "",
+    argv: str | None = None,
     boot_id: str = "8b2f4a3d-6c0e-4f1a-9d2b-7e3c5a8b1c4d",
     session_id: str | None = None,
     start_time: int | None = None,
 ) -> Path:
     """Write a ``<pid>.live`` file under ``run_dir``; return the path.
 
-    Mirrors the format the wrapper patch writes: one ``key=value`` line per
-    field, UTF-8, newline-terminated. ``argv`` may be empty (no resume flag in
-    the parent invocation) and may contain ``=`` signs.
+    Mirrors the privacy-minimized format the wrapper writes: one ``key=value``
+    line per field, UTF-8, newline-terminated. ``argv`` is emitted only when
+    supplied to build a legacy marker; it may contain ``=`` signs.
 
     ``session_id`` and ``start_time`` are the optional Phase 2 additive keys.
     Each line is written ONLY when its value is provided, so callers that omit
-    them get a four-key legacy file (keeping pre-Phase-2 fixtures unchanged).
+    them get a current marker without legacy argv.
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / f"{pid}.live"
     lines = [
         f"cwd={cwd}\n",
         f"started={started}\n",
-        f"argv={argv}\n",
         f"boot_id={boot_id}\n",
     ]
+    if argv is not None:
+        lines.append(f"argv={argv}\n")
     if session_id is not None:
         lines.append(f"session_id={session_id}\n")
     if start_time is not None:
@@ -361,7 +362,7 @@ class FixtureSession:
     JSONL written immediately after.
 
     ``start_time`` is the optional Phase 2 ``start_time=`` marker key. Left
-    ``None`` (the default) the marker stays four-key legacy and
+    ``None`` (the default) the marker omits the optional start time and
     ``pid_alive_checked`` falls back to bare ``kill -0``. Set it to a
     deliberately wrong value to drive the PID-reuse-rejection path (a marker
     whose stored start_time no longer matches ``/proc/<pid>/stat``).

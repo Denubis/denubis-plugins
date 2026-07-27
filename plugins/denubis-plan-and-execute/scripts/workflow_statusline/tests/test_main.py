@@ -408,6 +408,33 @@ class TestLine2NoRateLimits:
 # Tmux integration — maybe_rename called after render
 # ---------------------------------------------------------------------------
 class TestTmuxIntegration:
+    def test_registered_title_owner_still_renders_without_legacy_rename(
+        self,
+    ) -> None:
+        """Ownership suppresses rename without suppressing statusline output."""
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "TMUX": "/tmp/tmux-1000/default,12345,0",
+                    "TMUX_PANE": "%42",
+                    "TMUX_AGENT_ATTENTION_RUN_ID": (
+                        "00000000-0000-0000-0000-000000000601"
+                    ),
+                    "TMUX_AGENT_ATTENTION_OWNS_WINDOW_TITLE": "1",
+                },
+            ),
+            mock.patch("workflow_statusline.tmux.subprocess") as mock_subprocess,
+            mock.patch("workflow_statusline.tmux.cache") as mock_tmux_cache,
+        ):
+            lines = _run_main(_base_payload())
+
+        assert len(lines) == 2
+        assert "testrepo" in _strip_ansi(lines[0])
+        mock_subprocess.run.assert_not_called()
+        mock_tmux_cache.read_if_fresh.assert_not_called()
+        mock_tmux_cache.write.assert_not_called()
+
     def test_tmux_rename_called_with_location_display(self) -> None:
         """main() should call maybe_rename(location.display) after printing."""
         payload = _base_payload()

@@ -1,14 +1,17 @@
 """Correlate a liveness record to candidate session UUIDs.
 
 The Phase 3 correlator decides which JSONL session a recovered liveness file
-points at. Two strategies, in order:
+points at. Three strategies, in order:
 
-1. **Argv direct match** — if ``liveness.argv`` contains ``--resume <uuid>``
+1. **Session direct match** — if ``liveness.session_id`` identifies an
+   existing JSONL in the project directory, return ``DIRECT_MATCH``.
+
+2. **Legacy argv direct match** — if optional ``liveness.argv`` contains
+   ``--resume <uuid>``
    AND ``<uuid>.jsonl`` exists in the project directory whose JSONLs declare
-   ``liveness.cwd``, return ``DIRECT_MATCH``. This is the high-confidence
-   path; the wrapper invocation explicitly named the session.
+   ``liveness.cwd``, return ``DIRECT_MATCH``.
 
-2. **mtime-window fallback** — enumerate JSONLs in the project directory,
+3. **mtime-window fallback** — enumerate JSONLs in the project directory,
    filter to those whose filesystem mtime *and* first-entry timestamp are
    ≥ ``liveness.started`` (with a 60-second clock-skew grace), and report
    ``MTIME_MATCH`` (one survivor), ``AMBIGUOUS`` (multiple), or ``NO_MATCH``
@@ -151,7 +154,7 @@ def _project_dir_for_cwd(projects_root: Path, cwd: str) -> Path | None:
     return None
 
 
-def _extract_resume_uuid(argv: str) -> str | None:
+def _extract_resume_uuid(argv: str | None) -> str | None:
     """Return the UUID following ``--resume`` in ``argv``, or ``None``.
 
     Uses :func:`shlex.split` (not regex) so the parser tolerates shell-quoted
@@ -160,6 +163,8 @@ def _extract_resume_uuid(argv: str) -> str | None:
     :data:`_UUID_RE` match guards against accepting a non-UUID token that
     happened to sit immediately after ``--resume``.
     """
+    if argv is None:
+        return None
     try:
         tokens = shlex.split(argv)
     except ValueError:
@@ -260,11 +265,12 @@ def correlate(
 
     Strategy:
 
-    1. Try argv direct match: parse ``--resume <uuid>`` out of
-       ``liveness.argv`` and confirm ``<uuid>.jsonl`` exists in the project
-       directory for ``liveness.cwd``.
-    2. If the project directory doesn't exist, return ``NO_MATCH``.
-    3. Otherwise enumerate JSONLs in the project directory whose mtime is
+    1. Try the direct ``session_id`` match and confirm the JSONL exists in the
+       project directory for ``liveness.cwd``.
+    2. Try the optional legacy argv fallback: parse ``--resume <uuid>`` out of
+       ``liveness.argv`` and confirm its JSONL exists.
+    3. If the project directory doesn't exist, return ``NO_MATCH``.
+    4. Otherwise enumerate JSONLs in the project directory whose mtime is
        ≥ ``liveness.started`` AND whose first-entry timestamp lies in the
        tight window ``[started - grace, started + _TIGHT_WINDOW_SECONDS]``.
        Report ``MTIME_MATCH`` (one), ``AMBIGUOUS`` (multiple), or
@@ -300,7 +306,6 @@ def correlate(
     poison downstream classification. See
     ``test_correlate_argv_uuid_but_no_project_dir_is_no_match``.
     """
-    resume_uuid = _extract_resume_uuid(liveness.argv)
     project_dir = _project_dir_for_cwd(projects_root, liveness.cwd)
 
     # 0. Exact session_id match (Phase 2). Highest confidence: the wrapper
@@ -315,7 +320,8 @@ def correlate(
         # session_id present but unusable (bad shape or JSONL gone) — fall
         # through to the --resume / mtime paths rather than fabricate a match.
 
-    # 1. Argv direct match.
+    # 1. Optional legacy argv direct match.
+    resume_uuid = _extract_resume_uuid(liveness.argv)
     if resume_uuid is not None and project_dir is not None:
         jsonl_path = project_dir / f"{resume_uuid}.jsonl"
         if jsonl_path.exists():

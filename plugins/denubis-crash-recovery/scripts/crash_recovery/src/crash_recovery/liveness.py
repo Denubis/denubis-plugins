@@ -1,15 +1,15 @@
 """Liveness file parsing and process-liveness primitives.
 
 A liveness file lives at ``~/.claude/run/<pid>.live`` and is written by the
-patched ``claude-wrapper.sh`` at wrapper startup. The four required keys
-(``cwd``, ``started``, ``argv``, ``boot_id``) capture everything Phase 4's
-scan needs to decide whether a still-on-disk JSONL session is live, crashed,
-or already concluded.
+patched ``claude-wrapper.sh`` at wrapper startup. The three required keys
+(``cwd``, ``started``, ``boot_id``) capture the privacy-minimized metadata
+Phase 4's scan needs. ``argv`` is read only from legacy markers.
 
 The module is split between four responsibilities:
 
 * :class:`Liveness` + :func:`read_liveness` — parse the file into a frozen
-  dataclass with one PID, one boot_id, one cwd, one argv string. (AC5.1)
+  dataclass with one PID, one boot_id, one cwd, and optional legacy argv.
+  (AC5.1)
 * :func:`current_boot_id` — read the kernel-supplied boot id so the scan
   can detect across-reboot casualties (AC5.6 read side).
 * :func:`pid_alive` — non-destructive process probe via ``os.kill(pid, 0)``.
@@ -46,7 +46,7 @@ class Liveness:
     pid: int
     cwd: str
     started: int
-    argv: str
+    argv: str | None
     boot_id: str
     session_id: str | None = None
     start_time: int | None = None
@@ -54,7 +54,7 @@ class Liveness:
 
 # Required keys are listed in canonical order so the "first missing key"
 # error message is deterministic across runs (helpful for test pinning).
-_REQUIRED_KEYS: tuple[str, ...] = ("cwd", "started", "argv", "boot_id")
+_REQUIRED_KEYS: tuple[str, ...] = ("cwd", "started", "boot_id")
 
 
 def read_liveness(path: Path) -> Liveness:
@@ -64,9 +64,9 @@ def read_liveness(path: Path) -> Liveness:
 
     * ``path.stem`` must be all-digit. The PID is extracted from the filename
       so the parser cannot be fooled by an in-file ``pid=`` line.
-    * Each line is split on the **first** ``=`` so argv values may contain
-      further ``=`` signs (e.g. ``--extra=value=with=signs``).
-    * All four required keys must be present; the first missing key raises.
+    * Each line is split on the **first** ``=`` so legacy argv values may
+      contain further ``=`` signs (e.g. ``--extra=value=with=signs``).
+    * All three required keys must be present; the first missing key raises.
     * Unknown keys are tolerated so Phase 8 can add fields without breaking
       forward-compatibility.
     * ``started`` is coerced to ``int`` (a wrapped ``ValueError`` is raised
@@ -97,10 +97,10 @@ def read_liveness(path: Path) -> Liveness:
     except ValueError as exc:
         raise ValueError(f"liveness 'started' is not an int: {path}") from exc
 
-    # Optional Phase 2 keys. They are NOT in _REQUIRED_KEYS: a legacy
-    # four-key marker must parse cleanly (both fields None). start_time uses a
-    # tolerant parse — a non-integer value yields None rather than raising, so
-    # an odd/legacy file never breaks enumeration of the other markers.
+    # Optional additive keys. They are NOT in _REQUIRED_KEYS: both current
+    # privacy-minimized markers and legacy markers must parse cleanly.
+    # start_time uses a tolerant parse — a non-integer value yields None rather
+    # than raising, so an odd/legacy file never breaks marker enumeration.
     session_id = parsed.get("session_id")
     start_time: int | None = None
     if "start_time" in parsed:
@@ -114,7 +114,7 @@ def read_liveness(path: Path) -> Liveness:
         pid=pid,
         cwd=parsed["cwd"],
         started=started,
-        argv=parsed["argv"],
+        argv=parsed.get("argv"),
         boot_id=parsed["boot_id"].lower(),
         session_id=session_id,
         start_time=start_time,
