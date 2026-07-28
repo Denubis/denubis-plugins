@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-external-agents] 0.9.1
+
+**Fixed:**
+- `advisor-send.sh` refuses to drive a pane that is not an agent pane in the caller's own window. It previously asked only whether the pane existed *somewhere*, and `list-panes -a` is every pane in every session, so a stale or mistyped id passed the check and typed the message into whatever pane now holds that id. Pane ids are reused as panes close, which is the same hazard `codex_supervisor.py` avoids by resolving the pane itself rather than accepting one.
+- There is deliberately no fallback. An earlier draft degraded to the old existence check with a warning on the grounds that this was no worse than before, but "no worse than before" means a stale id still types into somebody else's window, which is the defect. A guard with a documented bypass is a suggestion.
+
+**New:**
+- `scripts/tmux-send-guard` ships with the plugin, so a marketplace install carries its own copy and there is no machine where the guard can be missing. It scopes to the caller's window and requires the pane to be running claude, codex or agy2, walking process descendants because a Claude pane reports its foreground command as `bash`.
+
 ## [denubis-external-agents] 0.9.0
 
 The codex hook relay becomes global, because per-project wiring left new directories unsupervised.

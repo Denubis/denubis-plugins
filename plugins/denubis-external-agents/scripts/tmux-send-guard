@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Refuse to drive a tmux pane that is not an agent pane in the caller's window.
+#
+# The send scripts (codex-send.sh, advisor-send.sh) take a pane id and paste
+# into it. codex-send.sh checked nothing at all; advisor-send.sh checked only
+# that the pane existed *somewhere*, using `list-panes -a`, which is every pane
+# in every session. So a stale or mistyped id could type a message into an
+# unrelated pane, and `codex_supervisor.py` was the only caller that scoped
+# properly.
+#
+# Rather than write the same check into eight copies of two scripts across four
+# repositories -- which is how codex-send.sh ended up with no check while its
+# own descendant grew one -- the check lives here once. claude-sync copies
+# ~/.claude/bin/* verbatim between machines, so it travels with the rest.
+#
+# Policy, set by Brian 2026-07-28:
+#   "they should only be able to send keys right now to claude, codex, and agy2
+#    in a pane in the same window."
+#
+# Usage:  tmux-send-guard <pane-id>
+#   exit 0  the pane is an agent pane in the caller's window
+#   exit 1  refused, with the reason on stderr
+#   exit 2  called wrongly
+#
+# In a send script:
+#   tmux-send-guard "$pane" || exit 1
+#
+# Note on identifying the program. `pane_current_command` is enough for Codex,
+# which is why the supervisor only ever needed that, but it is NOT enough for
+# Claude: a Claude pane runs fish -> fish -> claude-wrapper.sh -> claude, and
+# tmux reports its current command as `bash`. So the check walks the pane's
+# process descendants.
+
+set -u
+
+readonly MAX_DEPTH=8
+
+die() { printf 'tmux-send-guard: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+target="${1:-}"
+[ -n "$target" ] || die "usage: tmux-send-guard <pane-id>" 2
+
+command -v tmux >/dev/null 2>&1 || die "tmux is not on PATH"
+
+# --- the caller must itself be in a tmux pane, or there is no "same window" ---
+caller="${TMUX_PANE:-}"
+[ -n "$caller" ] || die "not running inside tmux, so there is no window to scope to"
+
+caller_window="$(tmux display-message -p -t "$caller" '#{window_id}' 2>/dev/null)" \
+  || die "could not resolve the calling pane $caller"
+[ -n "$caller_window" ] || die "could not resolve the window of calling pane $caller"
+
+target_window="$(tmux display-message -p -t "$target" '#{window_id}' 2>/dev/null)" \
+  || die "no such pane: $target"
+[ -n "$target_window" ] || die "no such pane: $target"
+
+if [ "$target_window" != "$caller_window" ]; then
+  die "pane $target is in window $target_window, not the caller's window $caller_window"
+fi
+
+# --- and it must be running an agent ---
+target_pid="$(tmux display-message -p -t "$target" '#{pane_pid}' 2>/dev/null)"
+[ -n "$target_pid" ] || die "could not resolve the process for pane $target"
+
+# Fast path: Codex is its own foreground process, so tmux can see it.
+current="$(tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null)"
+case "${current##*/}" in
+  codex | agy2 ) exit 0 ;;
+esac
+
+# Slow path: walk the descendants. Claude sits several levels down behind a
+# wrapper script and two shells.
+# Match on the executable, not on the whole command line. Matching the whole
+# string looked right and was not: `/home/brian/.local/bin/claude --foo` ends
+# in its flags, so a `*/claude` pattern never fires, while a pane merely
+# mentioning the word claude in an argument would wrongly pass.
+matches_agent() {
+  local args="$1" exe base
+  exe="${args%% *}"
+  base="${exe##*/}"
+  case "$base" in
+    claude | codex | agy2 ) return 0 ;;
+  esac
+  # A Claude release launched by version path: .../claude/versions/2.1.220
+  case "$exe" in
+    */claude/versions/* ) return 0 ;;
+  esac
+  # Codex installed as a node package keeps its own name only in the arguments.
+  case "$args" in
+    *@openai/codex* ) return 0 ;;
+  esac
+  return 1
+}
+
+walk() {
+  local pid="$1" depth="$2" child args
+  [ "$depth" -gt "$MAX_DEPTH" ] && return 1
+  args="$(ps -o args= -p "$pid" 2>/dev/null)" || return 1
+  if [ -n "$args" ] && matches_agent "$args"; then
+    return 0
+  fi
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    if walk "$child" $((depth + 1)); then
+      return 0
+    fi
+  done
+  return 1
+}
+
+if walk "$target_pid" 0; then
+  exit 0
+fi
+
+die "pane $target is in the right window but is not running claude, codex or agy2 (foreground: ${current:-unknown})"

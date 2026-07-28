@@ -27,10 +27,40 @@ msg="$*"
 [ "$msg" = "-" ] && msg="$(cat)"
 [ -n "$msg" ] || { echo "empty message" >&2; exit 2; }
 
-tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx -- "$pane" || {
-  echo "no such pane: $pane" >&2
+# Refuse to drive a pane that is not an agent pane in the caller's window.
+#
+# The check this replaced only asked whether the pane existed *somewhere*,
+# using `list-panes -a`, which is every pane in every session. A stale or
+# mistyped id therefore passed it and typed the message into whatever pane now
+# holds that id. `tmux-send-guard` additionally requires the pane to be in the
+# caller's own window and to be running claude, codex or agy2 (walking the
+# pane's process descendants, because a Claude pane reports its foreground
+# command as `bash`).
+#
+# The guard ships beside this script, so a marketplace install carries its own
+# copy and there is no machine where it can be missing. `~/.claude/bin` is
+# checked first because claude-sync carries a copy there for send scripts that
+# live outside this plugin, and one guard on the machine beats two that drift.
+#
+# There is deliberately no fallback. An earlier draft degraded to the old
+# existence check with a warning, reasoning that this was no worse than before;
+# but "no worse than before" here means a stale id still types into somebody
+# else's window, which is the whole defect. A guard with a documented bypass is
+# a suggestion. If it cannot run, neither should the send.
+_guard=""
+for _candidate in \
+  "$HOME/.claude/bin/tmux-send-guard" \
+  "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../scripts/tmux-send-guard" \
+  "$(command -v tmux-send-guard 2>/dev/null)"
+do
+  [ -n "$_candidate" ] && [ -x "$_candidate" ] && { _guard="$_candidate"; break; }
+done
+
+[ -n "$_guard" ] || {
+  echo "advisor-send: tmux-send-guard not found; refusing to send unguarded" >&2
   exit 1
 }
+"$_guard" "$pane" || exit 1
 
 printf '%s' "$msg" | tmux load-buffer -b advisor-send - || exit 1
 tmux paste-buffer -b advisor-send -t "$pane" -p -d || exit 1
