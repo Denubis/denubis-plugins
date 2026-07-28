@@ -19,7 +19,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -32,6 +32,11 @@ MAX_HOOK_BYTES = 1_048_576
 MAX_DATAGRAM_BYTES = 4096
 TMUX_PANE_FORMAT = "#{pane_id}\t#{pane_current_command}\t#{pane_pid}"
 PROMPT_MARKER = "\N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK}"
+# A pending action is raised again after two minutes, then five, then every ten.
+# Announcing once was deliberate, because a stationary screen is re-observed every poll
+# and an ungated repeat trains the reader to ignore it. A clock is the repair; removing
+# the guard is not. Operator ruling 2026-07-28, after a pane sat blocked for 57 minutes.
+REMINDER_BACKOFF_SECONDS = (120.0, 300.0, 600.0)
 SUBMIT_ATTEMPTS = 3
 SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
@@ -78,6 +83,19 @@ class Observation:
     detail: str | None = None
     correlation_key: str | None = None
     scoped: bool = False
+    # Set only on a re-raise, so a reminder can say how long the pane has been waiting.
+    # Never transported: serialize_observation whitelists four fields and not this one.
+    waited_seconds: float | None = None
+
+
+@dataclass(frozen=True)
+class Reminder:
+    """A pending action and when to raise it again."""
+
+    action: Observation
+    armed_at: float
+    due_at: float
+    step: int = 0
 
 
 @dataclass(frozen=True)
@@ -88,6 +106,7 @@ class MonitorState:
     emitted_keys: frozenset[str] = frozenset()
     last_correlation_key: str | None = None
     last_action_scoped: bool = False
+    reminder: Reminder | None = None
 
 
 @dataclass(frozen=True)
@@ -335,6 +354,12 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
                 emitted_keys=state.emitted_keys,
                 last_correlation_key=state.last_correlation_key,
                 last_action_scoped=state.last_action_scoped,
+                # Busy means Codex is mid-turn, so nothing is waiting on the human and
+                # a pending reminder would nag about a prompt already answered. Dropping
+                # it cannot lose a live approval: classify_snapshot matches pending
+                # approval text before falling through to busy, so a pane genuinely
+                # waiting classifies as APPROVAL on every poll and re-arms.
+                reminder=None,
             ),
             None,
         )
@@ -359,6 +384,7 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
             emitted_keys=emitted_keys,
             last_correlation_key=correlation_key,
             last_action_scoped=True,
+            reminder=state.reminder,
         )
         return Transition(next_state, None if matched_snapshot else observation)
 
@@ -369,6 +395,7 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
         emitted_keys=state.emitted_keys,
         last_correlation_key=correlation_key,
         last_action_scoped=False,
+        reminder=state.reminder,
     )
     return Transition(next_state, observation)
 
@@ -712,6 +739,50 @@ class HookReceiver:
             self._lock_file = None
 
 
+def arm_reminder(
+    state: MonitorState,
+    action: Observation,
+    now: float,
+) -> MonitorState:
+    """Schedule an emitted action to be raised again, unless it is terminal."""
+    if action.kind in {ObservationKind.CRASH, ObservationKind.BUSY}:
+        return replace(state, reminder=None)
+    return replace(
+        state,
+        reminder=Reminder(
+            action=action,
+            armed_at=now,
+            due_at=now + REMINDER_BACKOFF_SECONDS[0],
+        ),
+    )
+
+
+def due_reminder(
+    state: MonitorState,
+    now: float,
+) -> tuple[MonitorState, Observation | None]:
+    """Raise the pending action again once its interval has elapsed."""
+    reminder = state.reminder
+    if reminder is None or now < reminder.due_at:
+        return state, None
+    step = min(reminder.step + 1, len(REMINDER_BACKOFF_SECONDS) - 1)
+    rearmed = Reminder(
+        action=reminder.action,
+        armed_at=reminder.armed_at,
+        due_at=now + REMINDER_BACKOFF_SECONDS[step],
+        step=step,
+    )
+    raised = replace(reminder.action, waited_seconds=now - reminder.armed_at)
+    return replace(state, reminder=rearmed), raised
+
+
+def _humanise_wait(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    return f"{minutes // 60}h{minutes % 60:02d}m"
+
+
 def _emit(pane_id: str, action: Observation) -> None:
     labels = {
         ObservationKind.APPROVAL: "NEEDS APPROVAL",
@@ -719,24 +790,32 @@ def _emit(pane_id: str, action: Observation) -> None:
         ObservationKind.DONE: "DONE",
         ObservationKind.CRASH: "CRASH",
     }
-    label = labels[action.kind]
-    detail = f": {action.detail}" if action.detail else ""
-    print(f"codex {pane_id} — {label}{detail}", flush=True)
+    parts = []
+    if action.detail:
+        parts.append(action.detail)
+    if action.kind is ObservationKind.DONE:
+        # A finished pane is not an all-clear. It is the moment to decide what happens
+        # to its context, and the moment the numbered-prompt loop expects a clear.
+        parts.append("compact, clear, or quit?")
+    if action.waited_seconds is not None:
+        parts.append(f"still waiting {_humanise_wait(action.waited_seconds)}")
+    detail = f": {' | '.join(parts)}" if parts else ""
+    print(f"codex {pane_id} — {labels[action.kind]}{detail}", flush=True)
 
 
 def _apply_observation(
     state: MonitorState,
     observation: Observation,
     pane_id: str,
+    now: float,
 ) -> tuple[MonitorState, bool]:
     transition = advance(state, observation)
     if transition.action is None:
         return transition.state, False
     _emit(pane_id, transition.action)
-    return (
-        transition.state,
-        transition.action.kind is ObservationKind.CRASH,
-    )
+    if transition.action.kind is ObservationKind.CRASH:
+        return transition.state, True
+    return arm_reminder(transition.state, transition.action, now), False
 
 
 def _try_discover(caller_pane: str) -> PaneRef | None:
@@ -784,9 +863,16 @@ def run_monitor(
                         state,
                         snapshot,
                         target.pane_id,
+                        time.monotonic(),
                     )
                     if crashed:
                         return 1
+
+                # Raise anything still pending before blocking on the next event, so a
+                # quiet pane reports itself rather than reading as "nothing wrong".
+                state, reminder = due_reminder(state, time.monotonic())
+                if reminder is not None:
+                    _emit(target.pane_id, reminder)
 
                 hook_observation = receiver.receive(poll_seconds)
                 if hook_observation is not None:
@@ -794,6 +880,7 @@ def run_monitor(
                         state,
                         hook_observation,
                         target.pane_id,
+                        time.monotonic(),
                     )
                     if crashed:
                         return 1
