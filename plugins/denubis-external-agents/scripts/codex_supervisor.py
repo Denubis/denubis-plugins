@@ -375,6 +375,11 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
         if key in state.emitted_keys:
             return Transition(state, None)
         emitted_keys = state.emitted_keys | {key}
+        # One action reaches the monitor twice, once as a hook and once as rendered
+        # pane text, and they carry compatible correlation keys precisely so this can
+        # tell them apart. A scoped hook event matching the correlation key an
+        # unscoped pane snapshot already reported is the same action seen a second
+        # way, so it updates state and stays silent rather than double-emitting.
         matched_snapshot = (
             correlation_key == state.last_correlation_key
             and not state.last_action_scoped
@@ -541,6 +546,11 @@ def _hook_action(
     payload: Mapping[str, object],
 ) -> Observation:
     correlation_key = _action_key(kind, material)
+    # The occurrence key digests session, turn and tool-call identity on top of the
+    # correlation key, so the identical action in a later turn still emits. Keying on
+    # the command alone would announce `pytest` once and then never again, however
+    # many turns later Codex asks to run it a second time. The scope fields are
+    # identities rather than content, so this costs no disclosure.
     scope = {
         field: value
         for field in ("session_id", "turn_id", "tool_use_id", "tool_call_id")
@@ -689,6 +699,11 @@ class HookReceiver:
         self._lock_file: BinaryIO | None = None
 
     def __enter__(self) -> Self:
+        # The lock is advisory and per-pane, and it exists so one monitor cannot
+        # replace another monitor's socket. Binding unlinks the path first, so without
+        # it a second monitor would silently steal the relay from the first, which
+        # would then sit reading a socket nothing writes to. Recorded here because the
+        # only written account of it lived in a superseded design plan.
         self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         lock_file = self._lock_path.open("a+b")
         try:
