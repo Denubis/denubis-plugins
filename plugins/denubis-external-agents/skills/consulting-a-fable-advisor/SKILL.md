@@ -77,17 +77,19 @@ Falling back to Opus 4.8 is the operator's call, taken knowingly, and the consul
 
 The advisor pane persists between questions, and it will usually sit unused for a long stretch. **When it has been idle long enough to emit its recap, take that as the cue to compress it**, because the recap means it is between jobs and the next consultation is not imminent.
 
-Compress it deliberately rather than generically. Name what to keep:
+**The judgement rides on the slash command, not on a chat message.** `/compact` takes preservation instructions as its argument, the way `executing-an-implementation-plan` already suggests them at a phase boundary, so the keep/drop list belongs there. A message *asking* the advisor to compress its own context is a task: it reads files to answer you, and the context gets heavier rather than lighter.
+
+Compact it deliberately rather than generically. Name what to keep:
 
 - the numbered rulings in force, verbatim;
 - the findings it has already delivered, as pointers to where they are recorded rather than as restated text;
 - the repo facts it established for itself, with their `file:line` pins.
 
-And name what to drop: the file contents it read, the paths it explored getting there, and any reasoning superseded by a later ruling. Fable-tier sessions stay cheap when their context is pointers rather than payload, so a directed compress is worth more than letting it auto-compact on its own terms.
+And name what to drop: the file contents it read, the paths it explored getting there, and any reasoning superseded by a later ruling. Fable-tier sessions stay cheap when their context is pointers rather than payload, so a directed compact is worth more than letting it auto-compact on its own terms.
 
 Reach for `/clear` only when the next consultation is genuinely unrelated to everything before it. Clearing discards precisely the material that is expensive to rebuild: the rulings and the repo facts the session established for itself.
 
-This is not advisor-specific. Any persistent external session consulted intermittently — a codex pane included — wants the same treatment on the same cue.
+**This does not carry across to a codex pane, and assuming it did cost a session.** Codex is a different tool, its `/compact` is not known to accept an argument, and a prose brief sent in place of the slash command is read as work: on 2026-07-28 a carefully written keep/drop brief moved a codex pane's meter from 21% to 18% and ended with codex reporting "Context compressed as specified" while nothing had been compacted. A codex pane is also cleared between prompts as a matter of course rather than compacted on an idle cue, because its numbered prompt files are written to be self-contained. `supervising-codex` carries that practice.
 
 ## Handling the output
 
@@ -111,3 +113,5 @@ The same discipline as `codex-peer-review`, for the same reason: a fluent review
 | Saying a dispatched advisor "cannot implement" | It can; the Agent tool has no restriction flag. Its writes are prompted, not blocked. Say that. |
 | Spawning a pane and walking away | It finishes silently. Arm a monitor, or dispatch it as an agent instead. |
 | Re-verifying the tool surface only when the deny list changes | The surface moves upstream with no local edit. Verify every consultation. |
+| Asking a session to compress its own context in prose | That is a task, so it reads files and the context grows. Put the keep/drop list in `/compact`'s argument. |
+| Sending a codex pane the same keep/drop brief | Codex is not Claude Code. Clear it between prompts; see `supervising-codex`. |
