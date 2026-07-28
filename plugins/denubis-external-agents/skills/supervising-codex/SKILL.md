@@ -298,14 +298,24 @@ The reminder lapses as soon as Codex is busy, since a spinner means nothing is w
 you. That cannot lose a live approval: a pane genuinely waiting classifies as `APPROVAL`
 on every poll and re-arms the schedule.
 
-Project-local lifecycle hooks in `<project>/.codex/hooks.json` wake the monitor immediately
-for activity, permission requests, and turn stops. A ready-made file ships beside this
-skill at `hooks/project-codex-hooks.json`, and `hooks/README.md` covers installing it, the
-`hooks = true` feature flag it needs, and why it points at the `marketplaces/` checkout
-rather than the version-pinned plugin cache. Review and trust it with `/hooks` in Codex,
-then restart an already-running Codex session, because the file is read at startup. Until
-the hooks are trusted and loaded, the same command keeps working through conservative tmux
-inspection on its poll deadline.
+Lifecycle hooks wake the monitor immediately for activity, permission requests, and turn
+stops. They are installed **globally**, once per machine, rather than per project:
+
+```sh
+uv run "${CLAUDE_PLUGIN_ROOT}/skills/supervising-codex/hooks/install-codex-hooks.py"
+```
+
+A project-local `.codex/hooks.json` only wakes the monitor in directories somebody set up
+in advance, which leaves a Codex started in a fresh directory unsupervised exactly when
+nobody was thinking about supervision. The relay is project-local in its upstream home
+only because the script it called lived in the project, and that is no longer true.
+
+The installer merges rather than overwrites, is safe to re-run, and repairs a relay left
+pointing at a script that has moved. `hooks/README.md` covers the `hooks = true` feature
+flag it needs and which copy of the plugin to run it from. Trust the result with `/hooks`
+in Codex, then restart any running Codex session, because hooks are read at startup. Until
+they are trusted and loaded, the monitor keeps working through conservative tmux inspection
+on its poll deadline.
 
 The hook relay sends only event kinds, scope flags, and opaque digests; it does not
 transport prompts, commands, tool results, transcripts, or assistant messages. It is also

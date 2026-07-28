@@ -1,73 +1,80 @@
 # Codex hook wiring
 
-Two separate files, two separate homes. Recorded here so a new machine can be brought up
-without rediscovering them, since `claude-sync` covers `~/.claude` and nothing covers
-`~/.codex`.
-
-Codex runs a hook `command` through a shell, so `$HOME` and `$(…)` expand. Captured
-2026-07-28 from a working machine.
-
-## `project-codex-hooks.json` → `<project>/.codex/hooks.json`
-
-Wakes the supervision monitor immediately instead of leaving it on its poll deadline.
-Five events, each with `timeout: 5`: `SessionStart`, `UserPromptSubmit`,
-`PermissionRequest`, `PostToolUse`, `Stop`.
-
-Install, then trust it with `/hooks` inside Codex, then **restart any already-running Codex
-session** in that project, because the hook file is read at startup.
+The supervision relay is **global**, in `~/.codex/hooks.json`. Install it once per
+machine:
 
 ```sh
-mkdir -p .codex
-cp "$HOME/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-external-agents/skills/supervising-codex/hooks/project-codex-hooks.json" .codex/hooks.json
+uv run "${CLAUDE_PLUGIN_ROOT}/skills/supervising-codex/hooks/install-codex-hooks.py"
 ```
 
-**Why that script path and not the versioned one.** The plugin cache is version-pinned
-(`~/.claude/plugins/cache/denubis-plugins/denubis-external-agents/0.7.0/…`) and the
-directory is replaced on every release, so a hook pinned there breaks at the next version
-bump. The `marketplaces/` checkout is a git clone that updates in place, so the path
-survives.
+Then run `/hooks` in Codex to trust the new entries, and restart any running Codex
+session, because Codex reads its hooks at startup.
 
-**The relay is privacy-bounded by construction.** It sends event kinds, scope flags and
-opaque digests. It does not transport prompts, commands, tool results, transcripts, or
-assistant messages. `tests/test_codex_supervisor.py` pins that with a generative property
-test over arbitrary text.
+## Why global rather than per-project
 
-**It is safe to leave installed when nothing is watching.** With no monitor listening the
-hook is a silent no-op and exits 0. Verified 2026-07-28: a `Stop` payload piped to `--hook`
-with no listener returned 0 and printed nothing.
+A project-local `.codex/hooks.json` only wakes the monitor in directories somebody set
+up in advance. That leaves a Codex started in a fresh directory unsupervised precisely
+when nobody was thinking about supervision, which is the case that needs supervision
+most.
 
-## `global-codex-hooks.json` → `~/.codex/hooks.json`
+The relay was project-local upstream for a reason that no longer applies: the script it
+called lived in the project. That script now sits at a stable path in the installed
+plugin, so nothing project-shaped is left to justify per-project wiring.
 
-Machine-level, one hook: a desktop notification on `Stop`. Requires
-`session-runner/bin/notify-agent.sh`, which is the operator's own tool and is not shipped
-here. Drop the hook if that repo is absent.
+**Leaving it wired everywhere is cheap and safe.** The relay addresses a per-pane socket
+derived from its inherited `$TMUX_PANE`, so it only ever reaches the monitor watching
+that exact pane, and with no monitor listening it prints nothing and exits 0. Verified
+2026-07-28 by piping a `Stop` payload through the exact installed command string with
+nothing listening. The cost is one short-lived process per hook event, bounded by the
+five-second timeout.
 
-`~/.codex/config.toml` must also carry `hooks = true` under `[features]`, or none of this
+## What the installer does
+
+Five events, each at `timeout: 5`: `SessionStart`, `UserPromptSubmit`,
+`PermissionRequest`, `PostToolUse`, `Stop`.
+
+It **merges**. It edits a file it does not own, which may hold hooks other tools wrote,
+so it preserves everything it did not write and backs the file up before touching it.
+On this machine it sits alongside a `Stop` hook firing a desktop notification.
+
+It is **idempotent**, and it **repairs a stale path**. The relay names an absolute
+path, so moving or reinstalling the plugin leaves a command that still looks like the
+relay but points at a script that is gone. The installer rewrites those rather than
+seeing the marker and skipping, because presence and correctness are different
+questions. `tests/test_codex_hooks_installer.py` pins all three behaviours.
+
+**Which copy it points at is decided by where you run it from**, since it resolves the
+supervisor relative to its own location. Prefer the managed checkout under
+`~/.claude/plugins/marketplaces/`, not a development checkout: a working tree
+mid-edit can carry a syntax error, and a global hook pointing at it breaks Codex hooks
+machine-wide. Re-run the installer after moving anything.
+
+## Privacy
+
+The relay sends event kinds, scope flags and opaque digests. It does not transport
+prompts, commands, tool results, transcripts, or assistant messages.
+`tests/test_codex_supervisor.py` pins that with a generative property test over
+arbitrary text.
+
+## Prior machine state, recorded 2026-07-28
+
+`~/.codex/hooks.json` previously held one hook, a `Stop` firing
+`session-runner/bin/notify-agent.sh`, which is the operator's own tool and is not
+shipped here. Drop that entry if the tool is absent.
+
+`~/.codex/config.toml` must carry `hooks = true` under `[features]`, or none of this
 fires.
 
-### What was removed on 2026-07-20, and is deliberately not restored
+### Deliberately not restored
 
-The global file previously wired four events to `tmux-agent-status`. The backup lives at
-`~/.codex/hooks.json.pre-state-glyph-disable-20260720`, and its name records the intent:
-the glyph was switched off on purpose. Kept here so a rebuild does not silently resurrect
-it, and so a future session can tell "deliberately disabled" from "lost".
-
-```json
-"SessionStart":     "bash ~/.config/tmux/plugins/tmux-agent-status/hooks/codex-hook.sh SessionStart",
-"UserPromptSubmit": "bash ~/.config/tmux/plugins/tmux-agent-status/hooks/codex-hook.sh UserPromptSubmit",
-"PreToolUse":       "bash ~/.config/tmux/plugins/tmux-agent-status/hooks/codex-hook.sh PreToolUse",   // matcher: Bash
-"Stop":             "bash ~/.config/tmux/plugins/tmux-agent-status/hooks/codex-hook.sh Stop"
-```
+Until 2026-07-20 the global file also wired four events to `tmux-agent-status`. The
+backup at `~/.codex/hooks.json.pre-state-glyph-disable-20260720` records what was there,
+and its name records the intent: the glyph was switched off on purpose. Noted so a
+rebuild can tell "deliberately disabled" from "lost".
 
 ### Stale trust state, unresolved
 
-`~/.codex/config.toml` still holds `[hooks.state]` entries for five slots in the global
-file — `pre_tool_use:0:0`, `session_start:0:0`, `stop:0:0`, `stop:0:1`,
-`user_prompt_submit:0:0` — while the file now contains one hook. `stop:0:0` was
-`codex-hook.sh` when trusted and is `notify-agent.sh` now: same slot, different command,
-and `stop:0:0` and `stop:0:1` carry an identical `trusted_hash`, which the file alone does
-not explain.
-
-Whether Codex re-prompts for trust on a hash mismatch or silently declines to run the hook
-is **not established**. Confirm with `/hooks` in a live pane before assuming the surviving
-notification still fires on a fresh machine.
+`config.toml` holds `[hooks.state]` entries naming slots that no longer match the file,
+including a `stop:0:0` whose command changed since it was trusted. Whether Codex
+re-prompts on a hash mismatch or silently declines to run the hook is **not
+established**. Confirm with `/hooks` rather than assuming.
