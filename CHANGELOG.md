@@ -1,5 +1,10 @@
 # Changelog
 
+## [denubis-external-agents] 0.8.1
+
+**New:**
+- `supervising-codex` checks the weekly quota before dispatching. Codex meters a weekly allowance, and the pane title carries only a percentage, which alone cannot say whether the burn is on track: half left on day two is a problem and the same figure on day six is fine. `/status` reports the reset date the title omits, so the check is the slash command read against the calendar, sent as two `send-keys` calls and gated on the pane not holding an approval, then read back with `--tail`. Run at spinup and every few clears, since one long drafting phase moves the figure a long way.
+
 ## [denubis-external-agents] 0.8.0
 
 The monitor stops going quiet on you, and ships the hook wiring it always assumed.

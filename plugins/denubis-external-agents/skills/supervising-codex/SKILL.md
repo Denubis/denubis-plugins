@@ -161,6 +161,40 @@ minutes after the pane read `Ready`. `DONE` starts a file-settling check; it doe
 that the output bytes have settled. Verify a draft only once its size and mtime remain
 stable, or the pass burns on a half-written file and pins line numbers that then move.
 
+## Checking the quota before you dispatch
+
+Codex meters a weekly allowance. The pane title carries a percentage, and a percentage on
+its own cannot say whether you are on track: half the allowance left on day two is a
+problem, and the same figure on day six is fine. What settles it is the reset date, which
+`/status` reports and the title does not.
+
+Send it the way every slash command goes in, as two calls with a capture between them,
+because the composer opens an autocomplete list on `/`:
+
+```sh
+tmux send-keys -t %NNN -l '/status'
+```
+
+```sh
+tmux send-keys -t %NNN Enter
+```
+
+**Check the pane first.** A slash command typed into a pane holding an approval answers
+that approval. Read `--status` or `--tail` and confirm the pane is `Ready` with an empty
+composer before sending, exactly as for a prompt. This is checkable rather than a matter
+of care: a pending approval classifies as `APPROVAL`.
+
+Then read the panel back:
+
+```sh
+codex_supervisor.py --tail 20
+```
+
+Compare what remains against how much of the week remains. If the burn is running ahead of
+the calendar, hand codex a smaller phase, split the work, or wait for the reset. Run the
+check when a pane first comes up, and again every few clears, since a long drafting phase
+can move the figure a long way in one turn.
+
 ## Context hygiene: clear between prompts
 
 **Compacting the pane is `/compact`, and nothing else is. Clearing it is `/clear`.** Type
@@ -402,6 +436,7 @@ in frozen snapshots are load-bearing; never edit them.
 | Situation | Action |
 |---|---|
 | Starting a codex session | `codex_supervisor.py --spawn --label <name>` |
+| Checking weekly headroom | `/status` as two `send-keys` calls, then `--tail 20` |
 | Watching it | `codex_supervisor.py` under the background Monitor tool |
 | Checking what a pane holds | `codex_supervisor.py --tail` |
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
