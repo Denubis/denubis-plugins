@@ -25,6 +25,23 @@ reality prove it." Doubt runs in every direction, and the supervisor's staged co
 the least-checked thing in the loop precisely because it arrives labelled as verified. See
 *Supervisor-asserted context*.
 
+## Division of labour
+
+**Anything beyond a single trivial edit routes through codex** (Brian, 2026-07-19). The
+reason is budget rather than role purity: the supervising model's usage is the scarce
+resource and codex's is separate. Multi-file changes, edit batches, revision passes and
+anything substantive are codex tasks. The supervisor may still make a one-off trivial
+edit directly, a comment or a docstring line, when a dispatch would cost more than it
+saves.
+
+Supervision artefacts are always the supervisor's to edit: `codex-prompts/`, findings
+documents, and plan documents. Handing codex its own prompt to revise loses the boundary
+the whole arrangement depends on.
+
+This is the same concern the weekly quota check answers from the other side. Routing work
+to codex protects the supervisor's budget, and codex has a budget too, so check its
+headroom before handing it a long phase.
+
 ## What the consuming project must provide
 
 This skill supervises codex **in someone else's repo**. Two things must exist there before
@@ -119,6 +136,21 @@ None of them takes a pane ID. Each resolves the pane itself, for the reasons und
 3. **Claude verifies the output against the repo** before any of it lands in tracked
    documentation (see *Verification pass*).
 4. **The human validates.** Rulings from that discussion go into the next prompt, numbered.
+
+## Codex does not commit
+
+**Ruled by Brian, 2026-07-19.** Every git command codex issues needs a per-dialog
+approval, so letting it stage and commit traps the supervisor in an approval loop. Worse,
+keypress approvals race the dialogs, so "approved" on screen is not evidence that anything
+ran.
+
+Prompts therefore tell codex to **edit and verify only**. The supervisor stages and commits
+from outside the pane, split by concern, after verifying.
+
+**Ground truth for what landed is `git log` and `git status`, never the pane scrollback.**
+A pane showing a successful commit is showing a rendering, and the two come apart exactly
+when an approval was raced. Verify a push at the remote with `git ls-remote` rather than
+trusting an exit code, for the same reason.
 
 ## Staging context: redact before you stage
 

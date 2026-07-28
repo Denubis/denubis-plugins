@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-external-agents] 0.10.0
+
+Two operator rulings rescued from hand-rolled copies of the skill before those copies are retired.
+
+**New:**
+- **Codex does not commit** (Brian, 2026-07-19). Every git command codex issues needs a per-dialog approval, so letting it stage and commit traps the supervisor in an approval loop, and keypress approvals race those dialogs, so "approved" on screen is not evidence anything ran. Prompts tell codex to edit and verify only; the supervisor commits from outside the pane. Ground truth for what landed is `git log` and `git status`, never the scrollback, and a push is verified at the remote with `git ls-remote` rather than by an exit code.
+- **Division of labour** (Brian, 2026-07-19). Anything beyond a single trivial edit routes through codex, for budget rather than role purity: the supervising model's usage is the scarce resource and codex's is separate. Supervision artefacts stay the supervisor's to edit.
+
+**Note:** a third section unique to those copies was deliberately not ported. It prescribed compressing a codex pane with a prose keep/drop brief, which 0.8.0 recorded as falsified: the brief is read as work and the context meter goes down.
+
 ## [denubis-external-agents] 0.9.1
 
 **Fixed:**
