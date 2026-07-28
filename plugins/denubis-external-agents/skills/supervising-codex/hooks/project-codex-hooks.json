@@ -1,5 +1,5 @@
 {
-  "description": "Wake the same-window Codex supervision monitor. Copy to <project>/.codex/hooks.json and trust with /hooks in Codex.",
+  "description": "Wake the same-window Codex supervision monitor. Trust with /hooks in Codex after installing or changing this file, then restart any running Codex session.",
   "hooks": {
     "SessionStart": [
       {

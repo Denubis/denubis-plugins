@@ -1,5 +1,10 @@
 # Changelog
 
+## [denubis-external-agents] 0.8.2
+
+**Fixed:**
+- The shipped `.codex/hooks.json` template told the reader to copy it to `.codex/hooks.json`, which reads as nonsense once it is that file. It now says what is still true in place: trust with `/hooks` and restart any running session.
+
 ## [denubis-external-agents] 0.8.1
 
 **New:**
