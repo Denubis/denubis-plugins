@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-external-agents] 0.9.0
+
+The codex hook relay becomes global, because per-project wiring left new directories unsupervised.
+
+**Changed:**
+- The relay installs into `~/.codex/hooks.json` once per machine rather than into each project's `.codex/hooks.json`. A project-local hook only wakes the monitor in directories somebody set up in advance, which leaves a Codex started in a fresh directory unsupervised exactly when nobody was thinking about supervision. The relay was project-local upstream only because the script it called lived in the project, and that stopped being true when the script moved into this plugin.
+
+**New:**
+- `skills/supervising-codex/hooks/install-codex-hooks.py` merges the five relayed events into the user's global hooks. It preserves hooks it did not write, since it edits a machine-level file other tools also configure; it backs up before writing; it is idempotent; and it repairs a relay left pointing at a script that has moved, because the command names an absolute path and a check that only asked "is a relay present?" would leave every hook on the machine invoking something that is gone.
+
+**Removed:**
+- `hooks/project-codex-hooks.json` and `hooks/global-codex-hooks.json`, superseded by the installer.
+
 ## [denubis-external-agents] 0.8.2
 
 **Fixed:**
