@@ -254,13 +254,19 @@ taking an ID.
 miss is not raised again, so the emission is a prompt to look, not a queue that waits for
 you. Treat prolonged silence as ambiguous rather than reassuring, and read `--tail`.
 
-Project-local lifecycle hooks in `.codex/hooks.json` wake the monitor immediately for
-activity, permission requests, and turn stops. Review and trust them with `/hooks` in
-Codex, then restart an already-running Codex session after the hook file changes. Until the
-hooks are trusted and loaded, the same command continues to work through conservative tmux
-inspection on its poll deadline. The hook relay sends only event kinds, scope flags, and
-opaque digests; it does not transport prompts, commands, tool results, transcripts, or
-assistant messages.
+Project-local lifecycle hooks in `<project>/.codex/hooks.json` wake the monitor immediately
+for activity, permission requests, and turn stops. A ready-made file ships beside this
+skill at `hooks/project-codex-hooks.json`, and `hooks/README.md` covers installing it, the
+`hooks = true` feature flag it needs, and why it points at the `marketplaces/` checkout
+rather than the version-pinned plugin cache. Review and trust it with `/hooks` in Codex,
+then restart an already-running Codex session, because the file is read at startup. Until
+the hooks are trusted and loaded, the same command keeps working through conservative tmux
+inspection on its poll deadline.
+
+The hook relay sends only event kinds, scope flags, and opaque digests; it does not
+transport prompts, commands, tool results, transcripts, or assistant messages. It is also
+safe to leave installed when nothing is watching, since a hook that finds no listener is a
+silent no-op and exits 0.
 
 The crash signal proves that the pane or foreground Codex process disappeared, was
 replaced, or reached a recognized terminal error outside a busy title. Error-looking tool
@@ -268,12 +274,18 @@ output remains silent while Codex is working. The monitor cannot distinguish a l
 slow live subprocess from a hung one without a task-specific deadline or heartbeat.
 
 **Do not go hunting for a second event source.** These hooks are the event source. A
-desktop notifier that fires `notify-send` and exits leaves nothing to tail; a filesystem
-watcher needs `inotify-tools` installed and something that actually writes a file; and a
-promising-looking local project may turn out to be built but deliberately not wired to any
-live Claude, Codex, or tmux configuration. Verified 2026-07-23 on the field host, where
-each of those candidates was checked and none served. Check what a candidate actually
-writes before building on it.
+desktop notifier that fires `notify-send` and exits leaves nothing to tail, and a
+filesystem watcher needs `inotify-tools` installed plus something that actually writes a
+file.
+
+A candidate can also have been wired once and switched off since, which is the case that
+misleads hardest, because the code is present, executable, and does nothing. The field
+host's global `~/.codex/hooks.json` drove a tmux status glyph on four events until
+2026-07-20, when it was deliberately cut back to a single desktop notification; the script
+it called is still on disk and still executable. A survey on 07-23 therefore found nothing
+live, and the same survey three days earlier would have found plenty. So check what a
+candidate writes **now**, and check when its configuration last changed, because "the
+script exists" and "the script runs" are different claims.
 
 ## Verification pass
 
