@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-external-agents] 0.8.0
+
+The monitor stops going quiet on you, and ships the hook wiring it always assumed.
+
+**New:**
+- A pending action is raised again on a backoff: two minutes, then five, then every ten, with the repeat saying how long the pane has been waiting. Announcing once was deliberate, since a stationary screen is re-observed every poll and an ungated repeat trains the reader to ignore it, so the repair is a clock rather than a removed guard. `CRASH` is exempt, being terminal. The reminder lapses while Codex is busy, which cannot lose a live approval because a waiting pane classifies as `APPROVAL` on every poll and re-arms.
+- `DONE` now asks whether to compact, clear, or quit. A finished pane is waiting on a decision about its context rather than reporting an all-clear, and that is the moment the numbered-prompt loop expects a clear.
+- `skills/supervising-codex/hooks/` ships the wiring itself: a five-event `.codex/hooks.json` for a supervised project, the machine-level `~/.codex/hooks.json`, and a README covering the `hooks = true` flag, the trust step, and why the hook points at the `marketplaces/` git checkout rather than the version-pinned plugin cache, which is replaced on every release and would break the wiring at each bump. Recorded because `claude-sync` covers `~/.claude` and nothing covers `~/.codex`, so this was otherwise rediscovered per machine. The relay is safe to leave installed unwatched: with no listener the hook is a silent no-op returning 0.
+
+**Fixed:**
+- The 0.7.0 changelog entry claimed a known gap that this release closes, and briefly carried a bullet for the hook templates that shipped after it. Both corrected here rather than by editing a published entry.
+
 ## [denubis-external-agents] 0.7.0
 
 Gives the codex supervision monitor a home in the plugin, with the skill that drives it.
@@ -9,13 +21,9 @@ Gives the codex supervision monitor a home in the plugin, with the skill that dr
 - `scripts/codex_supervisor.py` is the one tool for the job: it resolves, spawns, sends, tails, reports status, relays Codex lifecycle hooks, and runs the watch loop that emits only `NEEDS APPROVAL`, `QUESTION`, `DONE` and `CRASH`. No verb takes a pane ID, because tmux renumbers windows and a stale coordinate types into another project's session.
 - Context hygiene, which no upstream copy had. `/clear` between prompts as the default cadence and `/compact` only when the next prompt follows straight on, both sent as the actual slash command in two `send-keys` calls. A prose brief asking codex to compress itself is a task, so codex reads files to answer it and the meter goes down: observed 2026-07-28 moving 21% to 18% while codex reported "Context compressed as specified" and nothing had been compacted.
 - The skill states two requirements on the consuming project and says to stop rather than improvise if either is missing: an untracked `codex-prompts/` as the file-exchange surface, and an ADR register for anything ruled along the way.
-- `skills/supervising-codex/hooks/` ships the wiring itself: a five-event `.codex/hooks.json` for a supervised project, the machine-level `~/.codex/hooks.json`, and a README covering the `hooks = true` flag, the trust step, and why the hook points at the `marketplaces/` git checkout rather than the version-pinned plugin cache, which is replaced on every release and would break the wiring at each bump. Recorded because `claude-sync` covers `~/.claude` and nothing covers `~/.codex`, so this was otherwise rediscovered per machine. The relay is safe to leave installed unwatched: with no listener the hook is a silent no-op returning 0.
 
 **Fixed:**
 - `classify_snapshot` returned on a `Ready` pane title before examining the body for approval text. Codex's steady-state title *is* `Ready`, so an approval drawn under it classified as `DONE`, telling the supervisor codex had finished at the moment it was blocked. Reproduced live against a pane that had sat unattended for 57 minutes. The repair cannot simply read the body first, because answered approval text stays in the scrollback; pending is distinguished by whether an assistant bullet appears after the last approval marker.
-
-**Known gap:**
-- The monitor announces each actionable event once and never repeats. An approval you miss is not raised again, so silence is ambiguous rather than reassuring. Re-notification is a design change that the current acceptance criteria actively forbid, and it is not made here.
 
 ## [denubis-extending-claude] 1.10.0 / [denubis-research-agents] 1.3.0 / [denubis-basic-agents] 2.1.0 / [denubis-plan-and-execute] 2.39.0
 

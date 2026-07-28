@@ -250,9 +250,19 @@ Each line includes the joined Codex pane ID. Run `codex_supervisor.py --tail` to
 the joined pane's non-blank tail before acting; it resolves the pane itself rather than
 taking an ID.
 
-**It announces each actionable event once and does not repeat itself.** An approval you
-miss is not raised again, so the emission is a prompt to look, not a queue that waits for
-you. Treat prolonged silence as ambiguous rather than reassuring, and read `--tail`.
+**Anything still pending is raised again on a backoff**, at two minutes, then five, then
+every ten, with the repeat saying how long the pane has been waiting. The monitor used to
+announce once and go quiet, which meant a line missed was a line gone; a pane sat blocked
+for 57 minutes that way on 2026-07-27. A `CRASH` is not repeated, because it is terminal
+and nothing can be done to the pane in response.
+
+`DONE` is raised again like anything else, because a finished pane is waiting on a
+decision rather than reporting an all-clear. Its line asks whether to compact, clear, or
+quit, which is the choice the numbered-prompt loop expects at exactly that moment.
+
+The reminder lapses as soon as Codex is busy, since a spinner means nothing is waiting on
+you. That cannot lose a live approval: a pane genuinely waiting classifies as `APPROVAL`
+on every poll and re-arms the schedule.
 
 Project-local lifecycle hooks in `<project>/.codex/hooks.json` wake the monitor immediately
 for activity, permission requests, and turn stops. A ready-made file ships beside this
@@ -417,4 +427,6 @@ in frozen snapshots are load-bearing; never edit them.
   Assign the concern to its owner instead.
 - "I asked codex to compress its context." That is a task, not a compaction. Type the
   slash command.
-- "The monitor has been quiet, so nothing needs me." It announces once. Quiet is ambiguous.
+- "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.
+  Clear or compact the pane before the next prompt, or the context you did not reset
+  becomes the context the next task inherits.
