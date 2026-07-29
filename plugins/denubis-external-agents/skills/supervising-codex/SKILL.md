@@ -71,9 +71,33 @@ Every command below is this script:
 uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/scripts/codex_supervisor.py"
 ```
 
-Written as `codex_supervisor.py …` from here on, for readability. If
-`${CLAUDE_PLUGIN_ROOT}` is not set in your shell, resolve it to this plugin's installed
-directory, the `scripts/codex_supervisor.py` under `denubis-external-agents`.
+Written as `codex_supervisor.py …` from here on, for readability.
+
+`${CLAUDE_PLUGIN_ROOT}` is set when Claude Code invokes a plugin component, and unset in a
+plain shell. When it is unset, resolve the path rather than guessing at one:
+
+```sh
+# In a checkout of this repo, from any subdirectory:
+"$(git rev-parse --show-toplevel)/plugins/denubis-external-agents/scripts/codex_supervisor.py"
+
+# From the marketplace install (stable path, no version component):
+~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-external-agents/scripts/codex_supervisor.py
+```
+
+The repo form goes through `git rev-parse` because a bare relative path resolves only at the
+repository root and fails one directory below it.
+
+If neither path is present, list every match rather than taking the first. `~/.claude/plugins/cache/`
+holds one copy per installed version, and `find … | head -1` was observed returning a
+different file on two consecutive runs, so it can hand you a stale version silently:
+
+```sh
+find ~/.claude/plugins -name codex_supervisor.py -path '*denubis-external-agents*'
+```
+
+There is no shell wrapper for this tool: the Python file is the whole interface. **This plugin
+ships no `codex-watch.sh` and none is planned.** That filename comes from the google-live repo,
+so looking for one here sends you hunting for a file this plugin has never contained.
 
 The verbs, read from the parser rather than from memory:
 

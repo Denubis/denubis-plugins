@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-external-agents] 0.10.1
+
+A documentation fix in `supervising-codex`, after an agent went hunting for a script this plugin has never contained.
+
+**Fixed:**
+- `supervising-codex` gave the supervisor's location as `"${CLAUDE_PLUGIN_ROOT}/scripts/codex_supervisor.py"`, with only a prose fallback for when that variable is unset, which it is in any plain shell. It now gives two resolutions that work: a `git rev-parse --show-toplevel` form valid from any subdirectory of a checkout, and the marketplace install path, which carries no version component and so stays stable across releases.
+- The listing fallback no longer pipes `find` through `head -1`. `~/.claude/plugins/cache/` holds one copy per installed version, and `head -1` was observed returning a different file on two consecutive runs, so it could hand over a stale version without saying so.
+- The same section now states that the tool has no shell wrapper and that this plugin ships no `codex-watch.sh`. Looking for that shim here, on the strength of a note describing the google-live repo, is what produced a false report that the skill pointed at a missing script.
+
 ## [denubis-external-agents] 0.10.0
 
 Two operator rulings rescued from hand-rolled copies of the skill before those copies are retired.
