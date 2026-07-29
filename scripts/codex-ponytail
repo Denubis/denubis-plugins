@@ -34,6 +34,8 @@ PONYTAIL_URL="${CODEX_PONYTAIL_URL:-https://github.com/DietrichGebert/ponytail.g
 PONYTAIL_SHA="${CODEX_PONYTAIL_SHA:-16f29800fd2681bdf24f3eb4ccffe38be3baec6b}"
 
 DRY_RUN=false
+PONYTAIL_STAGING=""
+PONYTAIL_OLD_MOVED=false
 
 die() { printf 'codex-ponytail: %s\n' "$1" >&2; exit 1; }
 
@@ -63,9 +65,38 @@ safe_rm() {
     rm -rf -- "$target"
 }
 
+ponytail_cache_valid() {
+    local head state
+    [ -d "$VENDOR/.git" ] || return 1
+    head=$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null) || return 1
+    [ "$head" = "$PONYTAIL_SHA" ] || return 1
+    state=$(git -C "$VENDOR" status --porcelain=v1 --untracked-files=all \
+        --ignored=matching 2>/dev/null) || return 1
+    [ -z "$state" ]
+}
+
+cleanup_ponytail_swap() {
+    local status=$?
+    trap - EXIT HUP INT TERM
+
+    if [ -n "$PONYTAIL_STAGING" ] && [ -d "$PONYTAIL_STAGING" ]; then
+        if $PONYTAIL_OLD_MOVED \
+           && [ ! -e "$VENDOR" ] \
+           && [ ! -L "$VENDOR" ] \
+           && [ -e "$PONYTAIL_STAGING/old" ]; then
+            if ! mv -- "$PONYTAIL_STAGING/old" "$VENDOR"; then
+                printf 'codex-ponytail: could not restore previous cache; recover it from %s\n' \
+                    "$PONYTAIL_STAGING/old" >&2
+                exit "$status"
+            fi
+        fi
+        safe_rm "$PONYTAIL_STAGING"
+    fi
+    exit "$status"
+}
+
 ensure_ponytail() {
-    if [ -d "$VENDOR/.git" ] \
-       && [ "$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null)" = "$PONYTAIL_SHA" ]; then
+    if ponytail_cache_valid; then
         return 0
     fi
     printf 'fetching ponytail at %s\n' "${PONYTAIL_SHA:0:12}" >&2
@@ -76,19 +107,47 @@ ensure_ponytail() {
     fi
 
     mkdir -p "$CACHE"
-    local staging
-    staging=$(mktemp -d "$CACHE/.staging.XXXXXX")
-    if ! git clone --quiet "$PONYTAIL_URL" "$staging/new" \
-       || ! git -C "$staging/new" checkout --quiet --detach "$PONYTAIL_SHA"; then
-        safe_rm "$staging"
+    command -v flock >/dev/null 2>&1 \
+        || die "flock is required to update the ponytail cache safely"
+    local lock_fd
+    exec {lock_fd}>"$CACHE/.lock"
+    flock -x "$lock_fd"
+
+    # Another launcher, including claude-ponytail against this same shared cache,
+    # may have populated it while this one waited on the lock.
+    if ponytail_cache_valid; then
+        exec {lock_fd}>&-
+        return 0
+    fi
+
+    PONYTAIL_STAGING=$(mktemp -d "$CACHE/.staging.XXXXXX")
+    PONYTAIL_OLD_MOVED=false
+    trap cleanup_ponytail_swap EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    # Fetch into staging and swap only once the pinned commit is checked out, so a
+    # failed or interrupted fetch leaves an existing good clone untouched. Deleting
+    # first and cloning second, the original ordering, meant a dropped network
+    # connection cost you a working clone.
+    if ! git clone --quiet "$PONYTAIL_URL" "$PONYTAIL_STAGING/new" \
+       || ! git -C "$PONYTAIL_STAGING/new" checkout --quiet --detach "$PONYTAIL_SHA"; then
         die "could not fetch ponytail ${PONYTAIL_SHA:0:12} from $PONYTAIL_URL (existing clone left intact)"
     fi
 
-    if [ -e "$VENDOR" ]; then
-        mv "$VENDOR" "$staging/old"
+    if [ -e "$VENDOR" ] || [ -L "$VENDOR" ]; then
+        # Set this before the move, not after, so the EXIT trap also covers a signal
+        # arriving in the narrow interval immediately after the move succeeds.
+        PONYTAIL_OLD_MOVED=true
+        mv -- "$VENDOR" "$PONYTAIL_STAGING/old"
     fi
-    mv "$staging/new" "$VENDOR"
-    safe_rm "$staging"
+    mv -- "$PONYTAIL_STAGING/new" "$VENDOR"
+    safe_rm "$PONYTAIL_STAGING"
+    PONYTAIL_STAGING=""
+    PONYTAIL_OLD_MOVED=false
+    trap - EXIT HUP INT TERM
+    exec {lock_fd}>&-
 }
 
 lfs_guard() {
@@ -102,11 +161,23 @@ lfs_guard() {
     done
 }
 
+resolved_common_dir() {
+    local at="$1" common
+    common=$(git -C "$at" rev-parse --git-common-dir 2>/dev/null) || return 1
+    case "$common" in /*) ;; *) common="$at/$common" ;; esac
+    (cd "$common" 2>/dev/null && pwd -P)
+}
+
 is_worktree_root() {
-    local wt="$1" git_root physical_root
+    local wt="$1" root="$2"
+    local git_root physical_git_root physical_root actual_common expected_common
     git_root=$(git -C "$wt" rev-parse --show-toplevel 2>/dev/null) || return 1
+    physical_git_root=$(cd "$git_root" 2>/dev/null && pwd -P) || return 1
     physical_root=$(cd "$wt" && pwd -P) || return 1
-    [ "$git_root" = "$physical_root" ]
+    [ "$physical_git_root" = "$physical_root" ] || return 1
+    actual_common=$(resolved_common_dir "$wt") || return 1
+    expected_common=$(resolved_common_dir "$root") || return 1
+    [ "$actual_common" = "$expected_common" ]
 }
 
 require_worktrees_ignored() {
@@ -128,8 +199,10 @@ main() {
     local name="$1" base="${2:-HEAD}"
     local root wt cmd actual_branch skill_file
 
-    git check-ref-format --branch "$name" >/dev/null 2>&1 \
-        || die "invalid worktree name '$name': must also be a valid git branch name"
+    if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
+       || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
+        die "invalid worktree name '$name': must also be a valid literal git branch name"
+    fi
 
     root=$(main_checkout)
     require_worktrees_ignored "$root"
@@ -142,7 +215,7 @@ main() {
 
     wt="$root/.worktrees/$name"
     if [ -d "$wt" ]; then
-        is_worktree_root "$wt" \
+        is_worktree_root "$wt" "$root" \
             || die "existing path is not a registered git worktree: $wt"
         actual_branch=$(git -C "$wt" branch --show-current)
         [ "$actual_branch" = "$name" ] \
