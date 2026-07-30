@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-external-agents] 0.11.0
+
+Codex approvals stop being a keypress treadmill for the human, from both ends: fewer dialogs are raised, and the ones that are raised can be answered in one call.
+
+**New:**
+- `codex_supervisor.py --approve` answers a pending approval dialog. It refuses unless a dialog is genuinely pending, selects the plain `Yes` by the number printed beside it rather than assuming a position, prints the command it approved, and confirms the screen cleared before reporting success. A dialog whose only affirmative is `Yes, and don't ask again` is refused and left for the human, because a standing grant changes the posture of the whole session.
+- `supervising-codex` gains a *Who answers an approval* section. The human answers supervisor approvals, meaning rulings and scope calls; Codex's per-command sandbox dialogs belong to whoever is driving Codex.
+
+**Changed:**
+- `--spawn` now passes `-s workspace-write -a on-request`. Containment comes from the sandbox rather than from a dialog per command, so a verification pass of probes and pytest runs no longer raises one approval per command. The skill records the trade against `-a untrusted`, which drives the same decision from an allowlist and asks far more often.
+- The rule against sending into a pane holding an approval now says what it was always about, sending a *prompt or slash command* blind. Its quick-reference row, which compressed to "send nothing; the human answers it", was read as assigning every dialog to the human and became two rows that cannot be quoted into that reading.
+
 ## [denubis-external-agents] 0.10.1
 
 A documentation fix in `supervising-codex`, after an agent went hunting for a script this plugin has never contained.
