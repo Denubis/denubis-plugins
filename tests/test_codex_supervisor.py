@@ -376,7 +376,10 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
             "-P",
             "-F",
             "#{pane_id}",
-            "exec codex -c check_for_update_on_startup=false",
+            (
+                "exec codex -c check_for_update_on_startup=false "
+                "-s workspace-write -a on-request"
+            ),
         ),
         (
             "tmux",
@@ -388,6 +391,46 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
             "postgres-schema-53",
         ),
     ]
+
+
+def test_spawn_contains_codex_rather_than_asking_per_command(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Containment is the sandbox, not a dialog for every command.
+
+    A pane spawned with neither `-s` nor `-a` inherits whatever the config or the
+    built-in default gives, and a verification pass of probes and pytest runs then
+    raises one dialog per command. The sandbox is what actually bounds the damage,
+    so it is set explicitly and codex is left to escalate only when it needs to
+    leave the workspace.
+    """
+    calls: list[tuple[str, ...]] = []
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        if argv[-1] == "#{pane_current_path}":
+            return "/worktrees/postgres-schema-53\n"
+        if argv[:2] == ("tmux", "split-window"):
+            return "%10\n"
+        return ""
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+
+    watch.spawn_pane()
+
+    spawned = next(argv[-1] for argv in calls if argv[:2] == ("tmux", "split-window"))
+    assert "-s workspace-write" in spawned, (
+        f"spawn must bound writes to the workspace; got {spawned!r}"
+    )
+    assert "-a on-request" in spawned, (
+        f"spawn must let codex escalate rather than ask per command; got {spawned!r}"
+    )
 
 
 def test_spawn_sets_explicit_pane_label(
@@ -921,5 +964,3 @@ def test_hook_sender_wakes_matching_pane_receiver(
             runtime_dir=tmp_path,
         )
         assert receiver.receive(0.1) == expected
-
-

@@ -40,7 +40,13 @@ REMINDER_BACKOFF_SECONDS = (120.0, 300.0, 600.0)
 SUBMIT_ATTEMPTS = 3
 SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
-CODEX_SPAWN_COMMAND = "exec codex -c check_for_update_on_startup=false"
+CODEX_SPAWN_COMMAND = (
+    # Containment is the sandbox rather than a dialog per command: `workspace-write`
+    # bounds writes to the working tree, and `on-request` leaves codex to escalate
+    # only when it needs to leave it. Spawning with neither raised one dialog for
+    # every probe in a verification pass, which is the loop this pairing removes.
+    "exec codex -c check_for_update_on_startup=false -s workspace-write -a on-request"
+)
 CODEX_LABEL_OPTION = "@codex_label"
 CODEX_PING_INSTRUCTION = (
     "If anything is unclear, ambiguous, or contradictory, stop and ask one "
@@ -306,6 +312,40 @@ def _approval_is_pending(recent_content: str) -> bool:
         return False
     after_last_prompt = recent_content[prompts[-1].end() :]
     return not re.search(r"^\s*•(?:\s|$)", after_last_prompt, re.MULTILINE)
+
+
+def _approval_options(content: str) -> list[tuple[str, str]]:
+    """Read the numbered choices from the last option list Codex drew.
+
+    Two options are required before a line counts, so a stray numbered line in
+    the command being approved is never mistaken for the dialog itself.
+    """
+    for line in reversed(content.splitlines()):
+        matches = list(re.finditer(r"(\d+)\.\s*(.+?)(?=\s{2,}\d+\.|\s*$)", line))
+        if len(matches) >= 2:
+            return [(match[1], match[2].strip()) for match in matches]
+    return []
+
+
+def approval_choice(content: str) -> str:
+    """Return the key that selects the plain affirmative on a pending approval.
+
+    Selection reads the number printed beside `Yes` rather than assuming a
+    position, so a reordered list cannot answer the wrong option. Only a bare
+    `Yes` qualifies: an option offering to stop asking grants standing
+    permission for everything matching, which changes the session's posture and
+    is the human's to give.
+    """
+    if not _approval_is_pending(content):
+        raise MonitorError("no pending approval on the joined pane")
+    options = _approval_options(content)
+    for number, label in options:
+        if label.casefold() == "yes":
+            return number
+    rendered = "   ".join(f"{number}. {label}" for number, label in options)
+    raise MonitorError(
+        f"no plain 'Yes' option, so this one is yours to answer: {rendered}"
+    )
 
 
 def classify_snapshot(title: str, content: str) -> Observation:
@@ -1123,6 +1163,31 @@ def send_message(pane_id: str, message: str) -> str:
     )
 
 
+def approve_pending() -> str:
+    """Answer the joined pane's pending approval with one keypress.
+
+    A dialog is a select list rather than the composer, so this needs neither
+    the literal-then-Enter split nor the `Ready` preflight that `send_message`
+    runs; the guard is `approval_choice` refusing anything that is not a live
+    dialog. The cleared screen is then confirmed, because a keypress can race
+    the dialog and "approved" on screen is not evidence that anything ran.
+    """
+    pane_id = joined_pane()
+    content = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+    choice = approval_choice(content)
+    command = _approval_material(content)
+    run_command(("tmux", "send-keys", "-t", pane_id, choice))
+    for _ in range(SUBMIT_POLLS):
+        time.sleep(SUBMIT_POLL_SECONDS)
+        if not _approval_is_pending(
+            run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+        ):
+            return f"approved on {pane_id}: {command}"
+    raise MonitorError(
+        f"key {choice!r} did not clear the dialog on {pane_id}; inspect with --tail"
+    )
+
+
 def send_prompt(prompt_file: str) -> str:
     """Send the standard ping for a numbered prompt file.
 
@@ -1162,6 +1227,8 @@ def run_verb(args: argparse.Namespace) -> int | None:
     elif args.message is not None:
         text = sys.stdin.read() if args.message == "-" else args.message
         print(send_message(joined_pane(), text))
+    elif args.approve:
+        print(approve_pending())
     else:
         return None
     return 0
@@ -1186,6 +1253,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--label",
         metavar="NAME",
         help="label a spawned pane (default: working-directory name)",
+    )
+    action.add_argument(
+        "--approve",
+        action="store_true",
+        help="answer a pending approval with one keypress",
     )
     action.add_argument("--send", metavar="PROMPT_FILE", help="send one prompt file")
     action.add_argument(

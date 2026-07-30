@@ -207,15 +207,34 @@ the uniquely resolved pane contains the expected prior exchange. The guards exis
 - **Type literally, verify, then submit separately**, so a stray key name is never
   interpreted and a partial paste is never executed.
 
-**Never send into a pane holding a pending approval.** Any keystroke, a slash command
-included, answers the prompt that is on screen. This is now checkable rather than a
-matter of remembering: the monitor classifies a pending approval as `APPROVAL`, so read
-`--status` or `--tail` and confirm before sending.
+**Never send a prompt or a slash command into a pane holding a pending approval.** Any
+keystroke answers the dialog that is on screen, so a `/clear` typed blind approves
+whatever was waiting. This is checkable rather than a matter of remembering: the monitor
+classifies a pending approval as `APPROVAL`, so read `--status` or `--tail` and confirm
+before sending.
 
 **Codex revises after it first reports done.** A stage-2 output grew by 393 bytes two
 minutes after the pane read `Ready`. `DONE` starts a file-settling check; it does not prove
 that the output bytes have settled. Verify a draft only once its size and mtime remain
 stable, or the pass burns on a half-written file and pins line numbers that then move.
+
+## Who answers an approval
+
+The rule above is about sending blind. Answering a dialog you have read is a different
+act, and it belongs to whoever is driving codex.
+
+**The human answers supervisor approvals**, meaning the rulings, scope calls and design
+decisions that surface in Claude's own pane. **Codex's per-command sandbox dialogs belong
+to the driver.** When the human has said this session may drive codex, Claude answers
+those with `codex_supervisor.py --approve` rather than handing back each keypress. A pass
+made of probes and pytest runs generates one dialog per command, so routing every one to
+the human is the approval loop that *Codex does not commit* was ruled to prevent.
+
+The verb refuses unless a dialog is genuinely pending, selects the plain `Yes` by the
+number printed beside it, prints the command it approved, and confirms the screen
+cleared before reporting success. A dialog whose only affirmative is `Yes, and don't ask
+again` is refused and goes to the human, because a standing grant changes the posture of
+the whole session.
 
 ## Checking the quota before you dispatch
 
@@ -235,10 +254,9 @@ tmux send-keys -t %NNN -l '/status'
 tmux send-keys -t %NNN Enter
 ```
 
-**Check the pane first.** A slash command typed into a pane holding an approval answers
-that approval. Read `--status` or `--tail` and confirm the pane is `Ready` with an empty
-composer before sending, exactly as for a prompt. This is checkable rather than a matter
-of care: a pending approval classifies as `APPROVAL`.
+**Check the pane first**, exactly as for a prompt: a slash command typed into a pane
+holding an approval answers that approval. Clear the dialog with `--approve` first, then
+send.
 
 Then read the panel back:
 
@@ -308,14 +326,28 @@ is stored as the pane-local tmux user option `@codex_label`; inspect it with
 `--spawn`). It deliberately does not use `#{pane_title}`, because Codex writes its live
 status there and the monitor's status reading depends on that status line.
 
-The spawn command is `exec codex -c check_for_update_on_startup=false`. tmux gives that
-command to the configured login shell, which resolves `codex` through `PATH`; `exec` then
-replaces the shell instead of leaving it as the pane process. This is load-bearing: the
-monitor accepts a pane only when `pane_current_command=codex`, so a shell left running as
-the pane process makes the new pane undiscoverable. The `-c` override uses Codex's
-documented configuration key to suppress the startup update check; the official
+The spawn command is `exec codex -c check_for_update_on_startup=false -s workspace-write
+-a on-request`. tmux gives that command to the configured login shell, which resolves
+`codex` through `PATH`, and `exec` then replaces the shell instead of leaving it as the
+pane process. This is load-bearing: the monitor accepts a pane only when
+`pane_current_command=codex`, so a shell left running as the pane process makes the new
+pane undiscoverable. The `-c` override uses Codex's documented configuration key to
+suppress the startup update check; the official
 [Configuration Reference](https://learn.chatgpt.com/docs/config-file/config-reference)
 documents `check_for_update_on_startup` and its default of `true`.
+
+**The sandbox is what bounds the damage, not the dialog count.** `-s workspace-write`
+confines writes to the working tree, so a pass of probes and pytest runs needs no
+per-command permission to do its job, and `-a on-request` leaves Codex to escalate only
+when it wants to step outside that. Spawning with neither, as this skill did until
+2026-07-30, inherits whatever `~/.codex/config.toml` or the built-in default supplies,
+and a single verification pass then raised one dialog per command.
+
+The trade is worth naming. `on-request` lets Codex decide when to ask, which is a model's
+judgement rather than a policy, where `-a untrusted` would drive the same decision from an
+allowlist and ask far more often. The sandbox is the containment either way, and the
+allowlist buys its extra caution in dialogs. Pass `-a untrusted` by hand for a pane whose
+work you have reason to distrust.
 
 When Claude and Codex are joined as panes in one tmux window, start the monitor from
 Claude's pane under the background Monitor tool:
@@ -508,7 +540,8 @@ in frozen snapshots are load-bearing; never edit them.
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
 | Between prompts | `/clear` as two `send-keys` calls, capture between |
 | Directly-following prompt | `/compact` instead |
-| Pane shows a pending approval | send nothing; the human answers it |
+| Codex asks to run a command | `codex_supervisor.py --approve` |
+| The approval wants a ruling, not a keypress | that one is the human's |
 | Codex reports done | wait for size and mtime to settle, then verify |
 
 ## Red flags
