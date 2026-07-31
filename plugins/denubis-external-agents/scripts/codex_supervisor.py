@@ -185,6 +185,11 @@ class TopologyTracker:
 
 
 _BULLET = re.compile(r"^\s*•(?:\s|$)")
+# The dialog's own furniture, which a wrapped command must never be joined to.
+_DIALOG_CHROME = re.compile(
+    r"^(?:would you like to|press enter to confirm|environment:|reason:|esc to cancel)",
+    re.IGNORECASE,
+)
 _STATUS_BULLET = re.compile(r"^(?:working|thinking|waiting)\b", re.IGNORECASE)
 
 
@@ -207,11 +212,26 @@ def _action_key(kind: ObservationKind, material: str) -> str:
 
 
 def _command_line(lines: list[str]) -> str | None:
-    """Return the last `$` line in a slice, without its prompt."""
-    for line in reversed(lines):
-        stripped = line.strip()
+    """Return the last `$` command in a slice, rejoined across any wrap.
+
+    Codex wraps a command too long for the pane, so reading the `$` line alone
+    names a command nobody approved, cut at whatever column the pane happens to
+    be. The remainder runs to the blank line or the option list below it.
+    """
+    for index in range(len(lines) - 1, -1, -1):
+        stripped = lines[index].strip()
         if stripped.startswith("$ ") and len(stripped) > 2:
-            return stripped[2:]
+            parts = [stripped[2:]]
+            for line in lines[index + 1 :]:
+                following = line.strip()
+                if (
+                    not following
+                    or _is_option_line(line)
+                    or _DIALOG_CHROME.match(following)
+                ):
+                    break
+                parts.append(following)
+            return " ".join(parts)
     return None
 
 
@@ -370,6 +390,7 @@ def _approval_is_pending(recent_content: str) -> bool:
 
 _OPTION = re.compile(r"(\d+)\.\s*(.+?)(?=\s{2,}\d+\.|\s*$)")
 _OPTION_LINE_LEAD = re.compile(rf"^[\s>{PROMPT_MARKER}]+")
+_OPTION_START = re.compile(rf"^[\s>{PROMPT_MARKER}]*(\d+)\.")
 _OPTION_KEY = re.compile(r"\(([A-Za-z]+)\)\s*$")
 _AFFIRMATIVE = re.compile(r"yes\b", re.IGNORECASE)
 _STANDING_GRANT = re.compile(
@@ -378,38 +399,73 @@ _STANDING_GRANT = re.compile(
 )
 
 
+def _option_column(line: str) -> int | None:
+    """Return the column a choice number starts at, past any cursor marker."""
+    match = _OPTION_START.match(line)
+    return match.start(1) if match else None
+
+
 def _is_option_line(line: str) -> bool:
-    """Report whether a line opens with a choice number, past any cursor marker."""
-    return bool(_OPTION.match(_OPTION_LINE_LEAD.sub("", line)))
+    return _option_column(line) is not None
+
+
+def _is_continuation(line: str, column: int) -> bool:
+    """Report whether a line is the wrapped remainder of the option above it.
+
+    Codex indents what it wraps past the column its numbers start at, which is
+    what tells a continuation from the reason block sitting above the list.
+    """
+    return bool(line.strip()) and len(line) - len(line.lstrip()) > column
 
 
 def _approval_options(content: str) -> list[tuple[str, str]]:
     """Read the numbered choices from the last option list Codex drew.
 
     Codex draws the list either as one line carrying every option or as one
-    option per line, so the block is collected by walking back from the foot of
-    the pane through consecutive lines that open with a number, past the cursor
-    marker where the selected line carries one. Requiring at least two options
-    that count up from one keeps a numbered line inside the command being
-    approved, or a version string sitting in the scrollback, from being read as
-    the dialog.
+    option per line, and wraps any option too long for the pane onto a further
+    indented line. That remainder is not itself numbered, so a block read as a
+    run of numbered lines ends at the first wrap and loses every option above
+    it, which is how a three-option dialog came back as no options at all. The
+    block is instead bounded from the last numbered line outwards, taking in
+    both numbered lines and the continuations belonging to them. Requiring at
+    least two options that count up from one keeps a numbered line inside the
+    command being approved from being read as the dialog.
     """
-    block: list[tuple[str, str]] = []
-    for line in reversed(content.splitlines()):
-        body = _OPTION_LINE_LEAD.sub("", line)
-        matches = (
-            [(match[1], match[2].strip()) for match in _OPTION.finditer(body)]
-            if _OPTION.match(body)
-            else []
-        )
-        if matches:
-            block[:0] = matches
-        elif block:
-            break
-    counted = [number for number, _ in block]
-    if len(block) < 2 or counted != [str(n) for n in range(1, len(block) + 1)]:
+    lines = content.splitlines()
+    columns = {
+        index: column
+        for index, line in enumerate(lines)
+        if (column := _option_column(line)) is not None
+    }
+    if not columns:
         return []
-    return block
+
+    last = max(columns)
+    end = last
+    while end + 1 < len(lines) and _is_continuation(lines[end + 1], columns[last]):
+        end += 1
+    start, column, index = last, columns[last], last - 1
+    while index >= 0:
+        if index in columns:
+            start, column = index, columns[index]
+        elif not _is_continuation(lines[index], column):
+            break
+        index -= 1
+
+    collected: list[list[str]] = []
+    for index in range(start, end + 1):
+        if index in columns:
+            body = _OPTION_LINE_LEAD.sub("", lines[index])
+            collected.extend(
+                [match[1], match[2].strip()] for match in _OPTION.finditer(body)
+            )
+        elif collected:
+            collected[-1][1] = f"{collected[-1][1]} {lines[index].strip()}"
+
+    counted = [number for number, _ in collected]
+    if len(collected) < 2 or counted != [str(n) for n in range(1, len(collected) + 1)]:
+        return []
+    return [(number, label) for number, label in collected]
 
 
 def approval_choice(content: str) -> str:

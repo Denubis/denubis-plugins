@@ -93,6 +93,31 @@ _ANSWERED_THREE_OPTION = "\n".join(
     [*_STANDING_GRANT_OFFERED, "", "• Working (1m 34s • esc to interrupt)"]
 )
 
+# Captured from the pane on 2026-07-31, where the parser found no options at all and
+# the refusal rendered an empty list. Codex wraps a long option and a long command, and
+# blank lines are absent because this came back through `--tail`, which drops them.
+_WRAPPED_DIALOG = [
+    "• Running /usr/bin/bash -lc 'set -o pipefail; scripts/ci-local.sh 2>&1 | tee /",
+    "  │ tmp/53-ci-local-output.txt'",
+    "  Would you like to run the following command?",
+    "  Environment: local",
+    "  Reason: Allow the required full local gate to access rootless Podman, Docker",
+    "  Compose, Git metadata, and its normal runtime paths while capturing output?",
+    "  $ /usr/bin/bash -lc 'set -o pipefail; scripts/ci-local.sh 2>&1 | tee",
+    "  /tmp/53-ci-local-output.txt'",
+    f"{_CURSOR} 1. Yes, proceed (y)",
+    "  2. Yes, and don't ask again for commands that start with `set -o pipefail;"
+    " scripts/ci-",
+    "     local.sh 2>&1 | tee /tmp/53-ci-local-output.txt` (p)",
+    "  3. No, and tell Codex what to do differently (esc)",
+    "  Press enter to confirm or esc to cancel",
+]
+
+_WRAPPED_COMMAND = (
+    "/usr/bin/bash -lc 'set -o pipefail; scripts/ci-local.sh 2>&1 | tee"
+    " /tmp/53-ci-local-output.txt'"
+)
+
 _REPLIED_THREE_OPTION = "\n".join(
     [
         *_STANDING_GRANT_OFFERED,
@@ -261,6 +286,47 @@ def test_an_approval_carrying_no_command_names_its_question(watch: ModuleType) -
     assert watch._approval_material(body) == (
         "Would you like to apply the patch to src/main.py?"
     )
+
+
+def test_a_wrapped_option_does_not_hide_the_whole_list(watch: ModuleType) -> None:
+    """A long standing grant wraps, and the remainder is not a numbered line.
+
+    Walking the block from the foot of the pane, that remainder used to end the run
+    after a single option, which failed the two-option guard and returned nothing,
+    so the refusal rendered an empty list. Codex commands are long, so this is the
+    ordinary case rather than an edge of one.
+    """
+    assert watch.approval_choice("\n".join(_WRAPPED_DIALOG)) == "y"
+
+
+def test_a_wrapped_option_keeps_its_standing_grant_visible(watch: ModuleType) -> None:
+    """The grant's wording spans two lines, and it must be read as one label."""
+    options = watch._approval_options("\n".join(_WRAPPED_DIALOG))
+    labels = dict(options)
+    assert set(labels) == {"1", "2", "3"}, labels
+    assert labels["2"].endswith("(p)"), (
+        f"a grant cut off at the wrap could read as narrow; got {labels['2']!r}"
+    )
+
+
+def test_a_wrapped_command_is_named_whole(watch: ModuleType) -> None:
+    """Truncating at the wrap would name a command that was never approved."""
+    assert watch._approval_material("\n".join(_WRAPPED_DIALOG)) == _WRAPPED_COMMAND
+
+
+def test_the_wrapped_dialog_reads_the_same_with_its_blank_lines(
+    watch: ModuleType,
+) -> None:
+    """`--approve` captures raw, keeping the blank lines that `--tail` drops."""
+    spaced: list[str] = []
+    for line in _WRAPPED_DIALOG:
+        if line.startswith(("  Would you", "  Environment", "  $", f"{_CURSOR} 1.")):
+            spaced.append("")
+        spaced.append(line)
+    spaced.append("")
+    body = "\n".join(spaced)
+    assert watch.approval_choice(body) == "y"
+    assert watch._approval_material(body) == _WRAPPED_COMMAND
 
 
 def _fake_tmux(
