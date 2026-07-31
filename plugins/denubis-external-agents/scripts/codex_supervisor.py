@@ -314,38 +314,78 @@ def _approval_is_pending(recent_content: str) -> bool:
     return not re.search(r"^\s*•(?:\s|$)", after_last_prompt, re.MULTILINE)
 
 
+_OPTION = re.compile(r"(\d+)\.\s*(.+?)(?=\s{2,}\d+\.|\s*$)")
+_OPTION_LINE_LEAD = re.compile(rf"^[\s>{PROMPT_MARKER}]+")
+_OPTION_KEY = re.compile(r"\(([A-Za-z]+)\)\s*$")
+_AFFIRMATIVE = re.compile(r"yes\b", re.IGNORECASE)
+_STANDING_GRANT = re.compile(
+    r"ask again|don'?t ask|do not ask|always|approve all|every time|no longer ask",
+    re.IGNORECASE,
+)
+
+
 def _approval_options(content: str) -> list[tuple[str, str]]:
     """Read the numbered choices from the last option list Codex drew.
 
-    Two options are required before a line counts, so a stray numbered line in
-    the command being approved is never mistaken for the dialog itself.
+    Codex draws the list either as one line carrying every option or as one
+    option per line, so the block is collected by walking back from the foot of
+    the pane through consecutive lines that open with a number, past the cursor
+    marker where the selected line carries one. Requiring at least two options
+    that count up from one keeps a numbered line inside the command being
+    approved, or a version string sitting in the scrollback, from being read as
+    the dialog.
     """
+    block: list[tuple[str, str]] = []
     for line in reversed(content.splitlines()):
-        matches = list(re.finditer(r"(\d+)\.\s*(.+?)(?=\s{2,}\d+\.|\s*$)", line))
-        if len(matches) >= 2:
-            return [(match[1], match[2].strip()) for match in matches]
-    return []
+        body = _OPTION_LINE_LEAD.sub("", line)
+        matches = (
+            [(match[1], match[2].strip()) for match in _OPTION.finditer(body)]
+            if _OPTION.match(body)
+            else []
+        )
+        if matches:
+            block[:0] = matches
+        elif block:
+            break
+    counted = [number for number, _ in block]
+    if len(block) < 2 or counted != [str(n) for n in range(1, len(block) + 1)]:
+        return []
+    return block
 
 
 def approval_choice(content: str) -> str:
-    """Return the key that selects the plain affirmative on a pending approval.
+    """Return the key answering a pending approval for the command on screen alone.
 
-    Selection reads the number printed beside `Yes` rather than assuming a
-    position, so a reordered list cannot answer the wrong option. Only a bare
-    `Yes` qualifies: an option offering to stop asking grants standing
-    permission for everything matching, which changes the session's posture and
-    is the human's to give.
+    The older dialog offers `Yes` and `No`, and the commoner one sits a standing
+    grant between the two, so selection reads each option's own label rather than
+    assuming a position and takes the affirmative that grants nothing beyond this
+    command. An option offering to stop asking grants standing permission for
+    everything matching, which changes the session's posture and is the human's
+    to give. Where two affirmatives both read as narrow, the choice is refused,
+    which is what keeps a standing grant worded in some unrecognised way from
+    being pressed on the strength of the likelier reading. The key returned is
+    the one the label advertises wherever Codex prints one, falling back to the
+    option's list number.
     """
     if not _approval_is_pending(content):
         raise MonitorError("no pending approval on the joined pane")
     options = _approval_options(content)
-    for number, label in options:
-        if label.casefold() == "yes":
-            return number
-    rendered = "   ".join(f"{number}. {label}" for number, label in options)
-    raise MonitorError(
-        f"no plain 'Yes' option, so this one is yours to answer: {rendered}"
+    narrow = [
+        (number, label)
+        for number, label in options
+        if _AFFIRMATIVE.match(label) and not _STANDING_GRANT.search(label)
+    ]
+    if len(narrow) == 1:
+        number, label = narrow[0]
+        advertised = _OPTION_KEY.search(label)
+        return advertised[1] if advertised else number
+    complaint = (
+        "no affirmative granting only this command"
+        if not narrow
+        else f"{len(narrow)} affirmatives, none of them clearly the narrow one"
     )
+    rendered = "   ".join(f"{number}. {label}" for number, label in options)
+    raise MonitorError(f"{complaint}, so this one is yours to answer: {rendered}")
 
 
 def classify_snapshot(title: str, content: str) -> Observation:

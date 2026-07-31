@@ -13,14 +13,19 @@ of me? Two properties make it safe to automate.
 It refuses unless an approval is actually pending, so the verb cannot press a key into
 a composer or into scrollback holding an answered dialog.
 
-It selects by reading the option's own number rather than assuming a position, and it
-refuses when no plain `Yes` is on offer. A `Yes, and don't ask again` grants standing
-permission for everything matching, which changes the security posture of the session
-and belongs to the human, so a dialog offering only that must stop rather than be
-guessed at.
+It selects by reading the option's own label rather than assuming a position, and it
+answers only the affirmative that grants nothing beyond the command on screen. A
+`Yes, and don't ask again` grants standing permission for everything matching, which
+changes the security posture of the session and belongs to the human. Where two
+affirmatives survive that reading, the ambiguity is itself the refusal, so a wording
+that slips the standing-grant vocabulary stops rather than being guessed at.
 
-The dialog body below is the shape Codex draws, taken from the attested fixture in
-`test_codex_supervisor_classify.py`, which was captured from a live pane.
+Codex draws two dialog shapes. The older one offers `Yes` and `No` on a single line.
+The commoner one puts each option on its own line, sits a standing grant between the
+two, and prints in each label the key that selects it. Both fixtures below were
+captured from live panes, the first by way of the attested fixture in
+`test_codex_supervisor_classify.py` and the second from pane %12 on 2026-07-31, where
+sending `y` was observed to answer the dialog and clear it.
 """
 
 from __future__ import annotations
@@ -61,6 +66,31 @@ _ANSWERED_APPROVAL = "\n".join(
         "",
         "• Ran the suite; 40 passed.",
     ]
+)
+
+_CURSOR = "\N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK}"
+
+_STANDING_GRANT_OFFERED = [
+    "  Would you like to run the following command?",
+    "",
+    "  Environment: local",
+    "",
+    "  Reason: Allow Git to write rebase metadata and update the local",
+    "  pr/scaffold-stacked-base branch in this dedicated worktree?",
+    "",
+    "  $ git rebase origin/main",
+    "",
+    f"{_CURSOR} 1. Yes, proceed (y)",
+    "  2. Yes, and don't ask again for commands that start with `git rebase` (p)",
+    "  3. No, and tell Codex what to do differently (esc)",
+    "",
+    "  Press enter to confirm or esc to cancel",
+]
+
+_PENDING_THREE_OPTION = "\n".join(_STANDING_GRANT_OFFERED)
+
+_ANSWERED_THREE_OPTION = "\n".join(
+    [*_STANDING_GRANT_OFFERED, "", "• Working (1m 34s • esc to interrupt)"]
 )
 
 
@@ -116,6 +146,65 @@ def test_refuses_a_standing_grant_and_reports_what_it_saw(watch: ModuleType) -> 
     )
 
 
+def test_the_commoner_dialog_answers_with_the_key_printed_in_its_label(
+    watch: ModuleType,
+) -> None:
+    """A three-option dialog is answered by the key its proceed-once option advertises.
+
+    The expectation is the key observed to work against pane %12, not a value read
+    back out of the parser: sending `y` there answered the dialog and cleared it.
+    """
+    assert watch.approval_choice(_PENDING_THREE_OPTION) == "y"
+
+
+def test_the_standing_grant_is_passed_over_wherever_it_sits(watch: ModuleType) -> None:
+    """Reordering the list must not walk the choice onto the blanket grant."""
+    body = "\n".join(
+        [
+            "  Would you like to run the following command?",
+            "",
+            "  $ git rebase origin/main",
+            "",
+            f"{_CURSOR} 1. Yes, and don't ask again for commands that start with"
+            " `git rebase` (p)",
+            "  2. Yes, proceed (y)",
+            "  3. No, and tell Codex what to do differently (esc)",
+            "",
+            "  Press enter to confirm or esc to cancel",
+        ]
+    )
+    assert watch.approval_choice(body) == "y"
+
+
+def test_two_narrow_affirmatives_are_refused_rather_than_guessed_between(
+    watch: ModuleType,
+) -> None:
+    """Ambiguity is the backstop for a standing grant worded in some new way.
+
+    This dialog is constructed rather than captured. Its job is to pin the property
+    that survives a vocabulary miss: where the reading cannot single out one
+    affirmative, the verb stops instead of picking the likelier one.
+    """
+    body = "\n".join(
+        [
+            "  Would you like to run the following command?",
+            "",
+            "  $ git rebase origin/main",
+            "",
+            f"{_CURSOR} 1. Yes, proceed (y)",
+            "  2. Yes, and approve anything like it from here on (a)",
+            "  3. No, and tell Codex what to do differently (esc)",
+            "",
+            "  Press enter to confirm or esc to cancel",
+        ]
+    )
+    with pytest.raises(watch.MonitorError) as excinfo:
+        watch.approval_choice(body)
+    assert "approve anything like it" in str(excinfo.value), (
+        "refusing without showing the options leaves the supervisor unable to act"
+    )
+
+
 def _fake_tmux(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -156,6 +245,28 @@ def test_approving_sends_one_key_and_reports_the_command(
         f"a dialog answer is a single key into a select list; sent {keypresses}"
     )
     assert "eald-test pytest -q" in result
+
+
+def test_approving_the_commoner_dialog_sends_the_key_it_advertises(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The whole path, parser through keypress, lands on proceed-once and nothing else.
+
+    What the result names is deliberately not asserted here. `_approval_material`
+    reads a fixed window around the last marker and misses the `$` line on a dialog
+    this tall, which is a defect of its own rather than one this test should pin.
+    """
+    calls = _fake_tmux(
+        watch, monkeypatch, [_PENDING_THREE_OPTION, _ANSWERED_THREE_OPTION]
+    )
+
+    watch.approve_pending()
+
+    keypresses = [argv for argv in calls if "send-keys" in argv]
+    assert keypresses == [("tmux", "send-keys", "-t", "%237", "y")], (
+        f"`p` would grant every future `git rebase`; sent {keypresses}"
+    )
 
 
 def test_a_dialog_that_did_not_clear_is_not_reported_as_approved(
