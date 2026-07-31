@@ -1,5 +1,13 @@
 # Changelog
 
+## [denubis-external-agents] 0.11.3
+
+Codex wraps a long option and a long command, and 0.11.2 could read neither. Since Codex commands are routinely long, this was the ordinary dialog rather than an unusual one.
+
+**Fixed:**
+- `_approval_options` reads an option whose label wraps. Codex indents the remainder past the column its numbers start at, and that remainder is not itself a numbered line, so a block read as a run of numbered lines ended at the first wrap and lost every option above it. A three-option dialog came back as no options at all, and the refusal rendered an empty list. The block is now bounded outwards from the last numbered line, taking in the continuations belonging to each option, which also keeps a standing grant from being read as narrow because its `don't ask again` fell on the far side of a wrap.
+- `_approval_material` rejoins a command across its wrap instead of naming it as far as the pane was wide. The join stops at a blank line, at the option list, or at the dialog's own furniture, so a `Press enter to confirm` below the command is not read as part of it.
+
 ## [denubis-external-agents] 0.11.2
 
 One `--approve` call now covers the whole round trip, from the command being asked about to what Codex did once it ran.
