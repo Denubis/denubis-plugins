@@ -207,6 +207,22 @@ the uniquely resolved pane contains the expected prior exchange. The guards exis
 - **Type literally, verify, then submit separately**, so a stray key name is never
   interpreted and a partial paste is never executed.
 
+**A paste too long for the composer is drawn as `[Pasted Content N chars]`.** The full
+text is there, and the placeholder is how codex draws it rather than evidence of a
+truncated or mangled paste. Observed on a live pane on 2026-07-31, where 1584 characters
+rendered as one cyan placeholder. So nothing needs splitting into shorter sends and the
+composer needs no clearing. What does follow is that the message's own text is never on
+screen at all, and its absence therefore cannot be read as a composer that accepted and
+cleared. `--send` and `--message` confirm a submission by the pane going `Working` or the
+composer emptying, and they raise rather than return when neither happens within three
+Enter attempts.
+
+**Re-capture after Enter and confirm the pane moved to `Working`.** Seeing the text in the
+composer before Enter is not evidence that it submitted, because an Enter after a large
+paste has been seen to leave the content sitting there unsent, for reasons nobody has
+established. The check costs one call and catches the failure whatever its mechanism turns
+out to be. Clearing a composer is `C-a` then `C-k`, and `C-u` does not do it.
+
 **Never send a prompt or a slash command into a pane holding a pending approval.** Any
 keystroke answers the dialog that is on screen, so a `/clear` typed blind approves
 whatever was waiting. This is checkable rather than a matter of remembering: the monitor
