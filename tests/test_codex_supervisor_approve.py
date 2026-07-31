@@ -93,6 +93,17 @@ _ANSWERED_THREE_OPTION = "\n".join(
     [*_STANDING_GRANT_OFFERED, "", "• Working (1m 34s • esc to interrupt)"]
 )
 
+_REPLIED_THREE_OPTION = "\n".join(
+    [
+        *_STANDING_GRANT_OFFERED,
+        "",
+        "• Working (2m 04s • esc to interrupt)",
+        "",
+        "• Ran git rebase origin/main",
+        "  └ Successfully rebased and updated refs/heads/pr/scaffold-stacked-base.",
+    ]
+)
+
 
 @pytest.fixture(scope="module")
 def watch() -> ModuleType:
@@ -205,6 +216,53 @@ def test_two_narrow_affirmatives_are_refused_rather_than_guessed_between(
     )
 
 
+def test_the_taller_dialog_names_its_command_and_nothing_else(
+    watch: ModuleType,
+) -> None:
+    """What was approved is the command, not the slab of text drawn around it."""
+    assert watch._approval_material(_PENDING_THREE_OPTION) == "git rebase origin/main"
+
+
+def test_the_older_dialog_still_names_its_command(watch: ModuleType) -> None:
+    """The command sits above the question here and below it on the taller dialog."""
+    assert watch._approval_material(_PENDING_APPROVAL) == (
+        "podman run --rm -v /tmp/evidence:/out:Z eald-test pytest -q"
+    )
+
+
+def test_a_command_from_the_turn_before_is_not_the_one_named(watch: ModuleType) -> None:
+    """A bullet closes the previous turn, so its command cannot be read as this one."""
+    body = "\n".join(
+        [
+            "  $ git status --porcelain",
+            "• Ran git status --porcelain",
+            "",
+            "  Would you like to run the following command?",
+            "",
+            "  $ git rebase origin/main",
+            "",
+            f"{_CURSOR} 1. Yes, proceed (y)",
+            "  2. No, and tell Codex what to do differently (esc)",
+        ]
+    )
+    assert watch._approval_material(body) == "git rebase origin/main"
+
+
+def test_an_approval_carrying_no_command_names_its_question(watch: ModuleType) -> None:
+    """Not every dialog is about a shell command, so the question is the fallback."""
+    body = "\n".join(
+        [
+            "  Would you like to apply the patch to src/main.py?",
+            "",
+            f"{_CURSOR} 1. Yes, proceed (y)",
+            "  2. No, and tell Codex what to do differently (esc)",
+        ]
+    )
+    assert watch._approval_material(body) == (
+        "Would you like to apply the patch to src/main.py?"
+    )
+
+
 def _fake_tmux(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -267,6 +325,42 @@ def test_approving_the_commoner_dialog_sends_the_key_it_advertises(
     assert keypresses == [("tmux", "send-keys", "-t", "%237", "y")], (
         f"`p` would grant every future `git rebase`; sent {keypresses}"
     )
+
+
+def test_the_answer_carries_the_first_thing_codex_did_next(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Approving reports back what Codex went on to do, not just that a key landed.
+
+    A keypress that clears a dialog says nothing about the outcome, and the outcome
+    is the whole reason for approving, so the verb waits for Codex to say something
+    and carries the first thing it says.
+    """
+    _fake_tmux(watch, monkeypatch, [_PENDING_THREE_OPTION, _REPLIED_THREE_OPTION])
+
+    result = watch.approve_pending()
+
+    assert result.startswith("approved on %237: git rebase origin/main"), result
+    assert "Successfully rebased" in result, (
+        f"the outcome is what the supervisor needs; got {result!r}"
+    )
+    assert "esc to interrupt" not in result, (
+        "the working spinner is a status line, not a thing Codex did"
+    )
+
+
+def test_a_codex_that_has_not_spoken_yet_is_reported_as_working(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Waiting is bounded, and a silent pane is said to be silent, not guessed at."""
+    _fake_tmux(watch, monkeypatch, [_PENDING_THREE_OPTION, _ANSWERED_THREE_OPTION])
+
+    result = watch.approve_pending()
+
+    assert result.startswith("approved on %237: git rebase origin/main"), result
+    assert "still working" in result, result
 
 
 def test_a_dialog_that_did_not_clear_is_not_reported_as_approved(

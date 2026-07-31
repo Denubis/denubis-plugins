@@ -40,6 +40,8 @@ REMINDER_BACKOFF_SECONDS = (120.0, 300.0, 600.0)
 SUBMIT_ATTEMPTS = 3
 SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
+# How long an approval waits for Codex to say what it did before reporting silence.
+RESPONSE_POLLS = 30
 CODEX_SPAWN_COMMAND = (
     # Containment is the sandbox rather than a dialog per command: `workspace-write`
     # bounds writes to the working tree, and `on-request` leaves codex to escalate
@@ -182,6 +184,10 @@ class TopologyTracker:
         )
 
 
+_BULLET = re.compile(r"^\s*•(?:\s|$)")
+_STATUS_BULLET = re.compile(r"^(?:working|thinking|waiting)\b", re.IGNORECASE)
+
+
 def _normalized(text: str) -> str:
     return " ".join(text.split())
 
@@ -200,50 +206,98 @@ def _action_key(kind: ObservationKind, material: str) -> str:
     return _digest(kind.value, _normalized(material))
 
 
-def _approval_material(content: str) -> str:
-    lines = content.splitlines()
-    approval_indexes = [
-        index
-        for index, line in enumerate(lines)
-        if re.search(
-            r"would you like to run|press enter to confirm",
-            line,
-            re.IGNORECASE,
-        )
-    ]
-    if not approval_indexes:
-        for line in reversed(lines):
-            stripped = line.strip()
-            if stripped.startswith("$ ") and len(stripped) > 2:
-                return stripped[2:]
-        return content
-
-    last = approval_indexes[-1]
-    nearby_lines = lines[max(0, last - 5) : min(len(lines), last + 4)]
-    for line in reversed(nearby_lines):
+def _command_line(lines: list[str]) -> str | None:
+    """Return the last `$` line in a slice, without its prompt."""
+    for line in reversed(lines):
         stripped = line.strip()
         if stripped.startswith("$ ") and len(stripped) > 2:
             return stripped[2:]
-    return "\n".join(nearby_lines)
+    return None
+
+
+def _approval_material(content: str) -> str:
+    """Return the command a dialog is asking about, or its question if it has none.
+
+    The command does not sit at a fixed offset from the question. It is drawn
+    above the question on the older dialog and below the reason block on the
+    taller one, so a window of a few lines either way finds it on one shape and
+    a slab of option text on the other. The search instead runs across the whole
+    dialog and stops at the boundaries marking where it begins and ends. A
+    bullet or a rule above the question closes the previous turn, and the option
+    list below it closes the dialog, which together keep a command from an
+    earlier turn from being named as this one.
+    """
+    lines = content.splitlines()
+    openers = [
+        index
+        for index, line in enumerate(lines)
+        if re.search(r"would you like to", line, re.IGNORECASE)
+    ] or [
+        index
+        for index, line in enumerate(lines)
+        if re.search(r"press enter to confirm", line, re.IGNORECASE)
+    ]
+    if not openers:
+        return _command_line(lines) or _normalized(content)
+
+    opener = openers[-1]
+    start = 0
+    for index in range(opener - 1, -1, -1):
+        if _BULLET.match(lines[index]) or lines[index].strip().startswith("─"):
+            start = index + 1
+            break
+    end = next(
+        (index for index in range(opener, len(lines)) if _is_option_line(lines[index])),
+        len(lines),
+    )
+    return _command_line(lines[start:end]) or _normalized(lines[opener].strip())
+
+
+def _message_block(lines: list[str], start: int) -> str:
+    """Read one bullet and the lines belonging to it, stopping at the next turn."""
+    message_lines = [_BULLET.sub("", lines[start])]
+    for line in lines[start + 1 :]:
+        stripped = line.strip()
+        if _BULLET.match(line):
+            break
+        if stripped.startswith((PROMPT_MARKER, "─")) or stripped.endswith(
+            "context left"
+        ):
+            break
+        if stripped and stripped != "? for shortcuts":
+            message_lines.append(stripped)
+    return _normalized("\n".join(message_lines))
+
+
+def _bullet_indexes(lines: list[str]) -> list[int]:
+    return [index for index, line in enumerate(lines) if _BULLET.match(line)]
+
+
+def _bullet_texts(content: str) -> set[str]:
+    """Return every bullet already on screen, for telling a new one from an old one."""
+    lines = content.splitlines()
+    return {_BULLET.sub("", lines[index]).strip() for index in _bullet_indexes(lines)}
+
+
+def _first_new_message(seen: set[str], content: str) -> str | None:
+    """Return the first bullet Codex has drawn that was not on screen before.
+
+    The working spinner is drawn as a bullet and says only that Codex is alive,
+    so it is passed over in favour of something Codex actually did.
+    """
+    lines = content.splitlines()
+    for index in _bullet_indexes(lines):
+        text = _BULLET.sub("", lines[index]).strip()
+        if text and text not in seen and not _STATUS_BULLET.match(text):
+            return _message_block(lines, index)
+    return None
 
 
 def _assistant_message(content: str) -> str:
     lines = content.splitlines()
-    bullet_indexes = [
-        index for index, line in enumerate(lines) if re.match(r"^\s*•(?:\s|$)", line)
-    ]
+    bullet_indexes = _bullet_indexes(lines)
     if bullet_indexes:
-        start = bullet_indexes[-1]
-        message_lines = [re.sub(r"^\s*•\s?", "", lines[start])]
-        for line in lines[start + 1 :]:
-            stripped = line.strip()
-            if stripped.startswith((PROMPT_MARKER, "─")) or stripped.endswith(
-                "context left"
-            ):
-                break
-            if stripped and stripped != "? for shortcuts":
-                message_lines.append(stripped)
-        return _normalized("\n".join(message_lines))
+        return _message_block(lines, bullet_indexes[-1])
     return _normalized(content)
 
 
@@ -322,6 +376,11 @@ _STANDING_GRANT = re.compile(
     r"ask again|don'?t ask|do not ask|always|approve all|every time|no longer ask",
     re.IGNORECASE,
 )
+
+
+def _is_option_line(line: str) -> bool:
+    """Report whether a line opens with a choice number, past any cursor marker."""
+    return bool(_OPTION.match(_OPTION_LINE_LEAD.sub("", line)))
 
 
 def _approval_options(content: str) -> list[tuple[str, str]]:
@@ -1204,28 +1263,39 @@ def send_message(pane_id: str, message: str) -> str:
 
 
 def approve_pending() -> str:
-    """Answer the joined pane's pending approval with one keypress.
+    """Answer the joined pane's pending approval, and report what Codex then did.
 
     A dialog is a select list rather than the composer, so this needs neither
     the literal-then-Enter split nor the `Ready` preflight that `send_message`
-    runs; the guard is `approval_choice` refusing anything that is not a live
-    dialog. The cleared screen is then confirmed, because a keypress can race
-    the dialog and "approved" on screen is not evidence that anything ran.
+    runs, and the guard is instead `approval_choice` refusing anything that is
+    not a live dialog. The cleared screen is then confirmed, because a keypress
+    can race the dialog and "approved" on screen is not evidence that anything
+    ran. Clearing the dialog still says nothing about the outcome, which is the
+    whole reason for approving, so the verb waits a bounded while for Codex to
+    draw something and carries back the first thing it says. A pane that has
+    stayed silent by then is reported as still working rather than guessed at.
     """
     pane_id = joined_pane()
-    content = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+    capture = ("tmux", "capture-pane", "-p", "-t", pane_id)
+    content = run_command(capture)
     choice = approval_choice(content)
     command = _approval_material(content)
+    seen = _bullet_texts(content)
     run_command(("tmux", "send-keys", "-t", pane_id, choice))
     for _ in range(SUBMIT_POLLS):
         time.sleep(SUBMIT_POLL_SECONDS)
-        if not _approval_is_pending(
-            run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
-        ):
-            return f"approved on {pane_id}: {command}"
-    raise MonitorError(
-        f"key {choice!r} did not clear the dialog on {pane_id}; inspect with --tail"
-    )
+        if not _approval_is_pending(run_command(capture)):
+            break
+    else:
+        raise MonitorError(
+            f"key {choice!r} did not clear the dialog on {pane_id}; inspect with --tail"
+        )
+    for _ in range(RESPONSE_POLLS):
+        reply = _first_new_message(seen, run_command(capture))
+        if reply:
+            return f"approved on {pane_id}: {command}\n{reply}"
+        time.sleep(SUBMIT_POLL_SECONDS)
+    return f"approved on {pane_id}: {command}\nstill working; nothing reported yet"
 
 
 def send_prompt(prompt_file: str) -> str:
@@ -1297,7 +1367,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     action.add_argument(
         "--approve",
         action="store_true",
-        help="answer a pending approval with one keypress",
+        help="answer a pending approval and report what codex did next",
     )
     action.add_argument("--send", metavar="PROMPT_FILE", help="send one prompt file")
     action.add_argument(
