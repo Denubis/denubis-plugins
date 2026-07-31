@@ -1,5 +1,13 @@
 # Changelog
 
+## [denubis-external-agents] 0.11.1
+
+`--approve` could not answer the dialog Codex most often draws, and sent it back to the human as having no affirmative on offer. A separate defect the repair exposed, `_approval_material` missing the `$` command line on a dialog this tall, is left for its own change.
+
+**Fixed:**
+- `approval_choice` reads the three-option dialog, where each option sits on its own line and a standing grant sits between `Yes, proceed` and `No`. The option parser had required two options on a single line, which is the older shape, so on the commoner one it returned nothing at all and every such dialog was refused. Selection now reads each option's own label rather than requiring a bare `Yes`, takes the affirmative that grants nothing beyond the command on screen, and answers with the key the label advertises, `y` rather than a list number, wherever Codex prints one.
+- Two affirmatives that both read as narrow are refused rather than guessed between, so a standing grant worded in some way the check does not recognise reaches the human instead of being pressed.
+
 ## [denubis-external-agents] 0.11.0
 
 Codex approvals stop being a keypress treadmill for the human, from both ends: fewer dialogs are raised, and the ones that are raised can be answered in one call.
