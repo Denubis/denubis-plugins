@@ -230,11 +230,16 @@ those with `codex_supervisor.py --approve` rather than handing back each keypres
 made of probes and pytest runs generates one dialog per command, so routing every one to
 the human is the approval loop that *Codex does not commit* was ruled to prevent.
 
-The verb refuses unless a dialog is genuinely pending, selects the plain `Yes` by the
-number printed beside it, prints the command it approved, and confirms the screen
-cleared before reporting success. A dialog whose only affirmative is `Yes, and don't ask
-again` is refused and goes to the human, because a standing grant changes the posture of
-the whole session.
+The verb refuses unless a dialog is genuinely pending, prints the command it approved,
+and confirms the screen cleared before reporting success. Codex draws two dialogs, an
+older `Yes` and `No` pair on a single line and a commoner three-option list running
+`Yes, proceed`, a standing grant, and `No`, one to a line, so the verb reads each
+option's label rather than counting positions and answers with the key the label
+advertises where Codex prints one. It takes the affirmative granting nothing beyond the
+command on screen. A `Yes, and don't ask again` is refused and goes to the human,
+because a standing grant changes the posture of the whole session. Two affirmatives that
+both read as narrow are refused on the same grounds, so a standing grant worded in some
+way the verb does not recognise reaches the human rather than being pressed.
 
 ## Checking the quota before you dispatch
 
