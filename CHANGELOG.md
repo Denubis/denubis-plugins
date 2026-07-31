@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-external-agents] 0.11.4
+
+`--send` reported a message as delivered while it was still sitting in the composer. A paste too long for the composer is drawn as `[Pasted Content N chars]`, so the message's own text is never on screen at all, and the check that went looking for it read that absence as a composer which had accepted and cleared.
+
+**Fixed:**
+- `_submitted` confirms a submission by positive evidence, the pane going `Working` or the composer emptying, rather than by failing to find the message's text in the last few lines of the pane. The old check fired on the first poll for any collapsed paste, and equally for any message whose first line had scrolled out of that window, so it was not only long pastes that could be called sent while unsent.
+
+**New:**
+- The paste is counted before it is submitted. Codex reports a length in its placeholder and the sender already knows what it wrote, so `--send` and `--message` compare the two and refuse a partial paste instead of pressing Enter at it. Codex's counting of non-ASCII text has not been measured, so a count matching either the character length or the UTF-8 byte length is accepted.
+
+**Changed:**
+- The `supervising-codex` skill records that the placeholder is display compression rather than a mangled paste, so a long instruction needs no splitting into shorter sends and the composer needs no clearing. A hand-typed send is confirmed by re-capturing and watching the pane move to `Working`, because an Enter after a large paste has been seen to leave the content unsent for reasons nobody has established. Clearing a composer is `C-a` then `C-k`.
+
 ## [denubis-external-agents] 0.11.3
 
 Codex wraps a long option and a long command, and 0.11.2 could read neither. Since Codex commands are routinely long, this was the ordinary dialog rather than an unusual one.
