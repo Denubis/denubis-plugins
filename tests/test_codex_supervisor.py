@@ -628,7 +628,155 @@ def test_send_preflights_ready_empty_composer_before_submitting(
     result = watch.send_message("%8", "Do the next task.")
 
     assert result == "submitted to %8"
-    assert events == ["status", "capture", "load", "paste", "enter", "status"]
+    assert events == [
+        "status",
+        "capture",
+        "load",
+        "paste",
+        "capture",
+        "enter",
+        "status",
+    ], "the capture between paste and Enter is the paste-landed check"
+
+
+def test_send_does_not_call_a_collapsed_paste_submitted(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A long paste is drawn as a placeholder, so its own text is never on screen.
+
+    Captured from a live pane on 2026-07-31, where a 1584-character paste rendered
+    as a cyan `[Pasted Content N chars]`. Reading the absent text as a composer that
+    had accepted and cleared reported a message still sitting there unsent.
+    """
+    message = "Investigate the failing import contract, and name the slice. " * 26
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    collapsed = (
+        "• Earlier response\n"
+        "\x1b[0m\x1b[48;2;65;69;76m\n"
+        f"\x1b[1m{watch.PROMPT_MARKER}\x1b[0m\x1b[48;2;65;69;76m "
+        f"\x1b[38;5;6m[Pasted Content {len(message)} chars]\x1b[39m\n"
+        "? for shortcuts\n"
+    )
+    pasted = False
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        nonlocal pasted
+        if argv[-1] == "#{pane_title}":
+            return "Ready | google-live\n"
+        if argv[:2] == ("tmux", "capture-pane"):
+            return collapsed if pasted else empty
+        if argv[:2] == ("tmux", "paste-buffer"):
+            pasted = True
+        return ""
+
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+
+    with pytest.raises(watch.MonitorError, match="not submitted"):
+        watch.send_message("%8", message)
+
+
+def test_send_refuses_a_paste_whose_char_count_is_not_the_message(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The placeholder reports a count, and the sender knows what it sent.
+
+    Comparing the two is the one cheap check a partial paste cannot pass, so a
+    disagreement stops the send before Enter rather than running whatever
+    fraction of the message arrived.
+    """
+    message = "Investigate the failing import contract."
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    truncated = f"{watch.PROMPT_MARKER} \x1b[38;5;6m[Pasted Content 12 chars]\x1b[39m\n"
+    pasted = False
+    enters = 0
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        nonlocal pasted, enters
+        if argv[-1] == "#{pane_title}":
+            return "Ready | google-live\n"
+        if argv[:2] == ("tmux", "capture-pane"):
+            return truncated if pasted else empty
+        if argv[:2] == ("tmux", "paste-buffer"):
+            pasted = True
+        if argv[:2] == ("tmux", "send-keys"):
+            enters += 1
+        return ""
+
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+
+    with pytest.raises(watch.MonitorError, match="12 chars"):
+        watch.send_message("%8", message)
+
+    assert enters == 0, "a partial paste must not be submitted"
+
+
+def test_send_submits_a_paste_whose_char_count_matches(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A placeholder counting the whole message is the paste landing intact."""
+    message = "Investigate the failing import contract."
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    landed = (
+        f"{watch.PROMPT_MARKER} "
+        f"\x1b[38;5;6m[Pasted Content {len(message)} chars]\x1b[39m\n"
+    )
+    pasted = False
+    status_reads = 0
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        nonlocal pasted, status_reads
+        if argv[-1] == "#{pane_title}":
+            status_reads += 1
+            return "Ready | google-live\n" if status_reads == 1 else "⠋ Working\n"
+        if argv[:2] == ("tmux", "capture-pane"):
+            return landed if pasted else empty
+        if argv[:2] == ("tmux", "paste-buffer"):
+            pasted = True
+        return ""
+
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+
+    assert watch.send_message("%8", message) == "submitted to %8"
+
+
+def test_send_reads_a_cleared_composer_as_a_submission(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A composer that empties has submitted, whether or not the title is caught.
+
+    Codex can finish a short turn between polls, so `Working` is a signal that
+    can be missed. Guards the collapsed-paste fix against becoming a refusal of
+    everything.
+    """
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    captures = 0
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        nonlocal captures
+        if argv[-1] == "#{pane_title}":
+            return "Ready | google-live\n"
+        if argv[:2] == ("tmux", "capture-pane"):
+            captures += 1
+            if captures == 2:
+                return f"• Earlier response\n{watch.PROMPT_MARKER} Do the next\n"
+            return empty
+        return ""
+
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+
+    assert watch.send_message("%8", "Do the next task.") == "submitted to %8"
 
 
 def test_send_prompt_leaves_write_scope_to_prompt(

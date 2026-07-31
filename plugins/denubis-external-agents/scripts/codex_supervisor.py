@@ -1277,15 +1277,50 @@ def _preflight_send(pane_id: str) -> None:
         )
 
 
-def _submitted(pane_id: str, probe: str) -> bool:
-    """Report whether the composer has accepted and cleared our message."""
+_PASTED_PLACEHOLDER = re.compile(r"\[Pasted Content (\d+) chars\]")
+
+
+def _confirm_paste(pane_id: str, message: str) -> None:
+    """Refuse to submit a paste the composer counts as a different message.
+
+    A paste too long for the composer is drawn as `[Pasted Content N chars]`,
+    and N is a count the sender already holds, so comparing the two is the one
+    cheap check a partial paste cannot pass. Codex's counting of non-ASCII has
+    not been measured, so a count matching either the character length or the
+    UTF-8 byte length is accepted. A message short enough to be drawn literally
+    has no placeholder to read, which is why absence is not a failure here and
+    submission is confirmed separately.
+    """
+    time.sleep(SUBMIT_POLL_SECONDS)
+    snapshot = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+    found = _PASTED_PLACEHOLDER.search(snapshot)
+    if found is None:
+        return
+    counted = int(found[1])
+    if counted in {len(message), len(message.encode())}:
+        return
+    raise MonitorError(
+        f"composer on {pane_id} holds {counted} chars where the message is "
+        f"{len(message)}, so the paste is partial; inspect with --tail"
+    )
+
+
+def _submitted(pane_id: str) -> bool:
+    """Report whether the composer has accepted and cleared our message.
+
+    Both signals are positive evidence of a submission. Hunting the message's
+    own text on screen and calling its absence a clear is not, because a paste
+    too long for the composer is drawn as `[Pasted Content N chars]`, so text
+    that was never displayed reads exactly like text that submitted. Verified
+    against a live pane on 2026-07-31, where a 1584-character paste sat unsent
+    in the composer and the old check called it submitted on the first poll.
+    """
     for _ in range(SUBMIT_POLLS):
         time.sleep(SUBMIT_POLL_SECONDS)
-        title = pane_status(pane_id)
-        if "Working" in title:
+        if "Working" in pane_status(pane_id):
             return True
-        visible = run_command(("tmux", "capture-pane", "-t", pane_id, "-p"))
-        if probe not in "\n".join(visible.splitlines()[-6:]):
+        snapshot = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
+        if _composer_is_empty(snapshot):
             return True
     return False
 
@@ -1308,10 +1343,10 @@ def send_message(pane_id: str, message: str) -> str:
         check=True,
     )
     run_command(("tmux", "paste-buffer", "-b", "codex-send", "-t", pane_id, "-p", "-d"))
-    probe = message.splitlines()[0][:40]
+    _confirm_paste(pane_id, message)
     for _ in range(SUBMIT_ATTEMPTS):
         run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
-        if _submitted(pane_id, probe):
+        if _submitted(pane_id):
             return f"submitted to {pane_id}"
     raise MonitorError(
         f"not submitted after {SUBMIT_ATTEMPTS} Enter attempts; inspect {pane_id}"
