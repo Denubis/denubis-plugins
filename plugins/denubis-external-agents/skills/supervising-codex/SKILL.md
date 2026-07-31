@@ -230,8 +230,11 @@ those with `codex_supervisor.py --approve` rather than handing back each keypres
 made of probes and pytest runs generates one dialog per command, so routing every one to
 the human is the approval loop that *Codex does not commit* was ruled to prevent.
 
-The verb refuses unless a dialog is genuinely pending, prints the command it approved,
-and confirms the screen cleared before reporting success. Codex draws two dialogs, an
+The verb refuses unless a dialog is genuinely pending, names the command it approved
+and nothing else, confirms the screen cleared, and then carries back the first thing
+Codex went on to do, so one call covers the whole round trip from announcement to
+outcome. A pane that has said nothing within the wait is reported as still working,
+which is a different answer from a pane that failed. Codex draws two dialogs, an
 older `Yes` and `No` pair on a single line and a commoner three-option list running
 `Yes, proceed`, a standing grant, and `No`, one to a line, so the verb reads each
 option's label rather than counting positions and answers with the key the label
