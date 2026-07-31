@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-external-agents] 0.11.2
+
+One `--approve` call now covers the whole round trip, from the command being asked about to what Codex did once it ran.
+
+**Fixed:**
+- `--approve` names the command and nothing else. `_approval_material` had read a fixed window of a few lines around the last marker on screen, which finds the command on the older dialog, where it is drawn above the question, and returns a slab of option text on the taller one, where it sits below the reason block. The search now runs across the whole dialog, bounded above by the bullet or rule closing the previous turn and below by the option list, so a command from an earlier turn cannot be named as this one. An approval carrying no command names its question instead. This also fixes what the monitor announces for an approval, not only what the verb prints.
+
+**Changed:**
+- `--approve` waits a bounded while after the dialog clears and reports the first thing Codex draws, so the answer says what happened rather than only that a key landed. The working spinner is drawn as a bullet and is passed over, and a pane that has stayed silent is reported as still working rather than guessed at.
+
 ## [denubis-external-agents] 0.11.1
 
 `--approve` could not answer the dialog Codex most often draws, and sent it back to the human as having no affirmative on offer. A separate defect the repair exposed, `_approval_material` missing the `$` command line on a dialog this tall, is left for its own change.
