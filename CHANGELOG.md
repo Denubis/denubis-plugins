@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-external-agents] 0.12.0
+
+Context handling for a joined codex pane becomes tool behaviour instead of prose the supervisor had to re-derive each session.
+
+**New:**
+- `--clear`, `--compact` and `--quota` verbs on `codex_supervisor.py`. Each types the slash command as keystrokes on its own line, so codex runs it. Delivered as prose or through `--message`, codex reads it as a task and the context meter goes down.
+- Each verb confirms its own effect and waits for the pane to return to `Ready` before reporting, so no follow-up call is needed to learn whether the pane can take the next prompt. A clear is confirmed by codex's session id changing in the pane title, a compaction by its context meter not falling, and a quota check by the panel drawn below codex's echo of the command.
+- A 30% context floor on `--send` and `--message`. Below it the dispatch refuses and names the reading and the remedies. `--under-floor` carries a human ruling past it, and an unreadable meter refuses on the same terms.
+
+**Changed:**
+- The pending-approval guard moved into the shared preflight, so `--send` and `--message` refuse it too. A dialog leaves the title `Ready` and the composer empty, so both older guards passed over the one state where a keystroke does the most damage.
+- `supervising-codex` now routes every keystroke through the tool and names a hand-typed `tmux send-keys` as a bug report rather than a fallback.
+
 ## [denubis-external-agents] 0.11.4
 
 `--send` reported a message as delivered while it was still sitting in the composer. A paste too long for the composer is drawn as `[Pasted Content N chars]`, so the message's own text is never on screen at all, and the check that went looking for it read that absence as a composer which had accepted and cleared.
