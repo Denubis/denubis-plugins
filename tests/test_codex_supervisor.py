@@ -43,6 +43,13 @@ MODULE_PATH = (
     ROOT / "plugins" / "denubis-external-agents" / "scripts" / "codex_supervisor.py"
 )
 
+# A Ready pane always draws this footer, and the dispatch floor reads its meter to
+# decide whether the pane can still hold an answer. The send fixtures below carried
+# no footer, which made them panes no Codex has ever rendered; the floor refused them
+# for that reason rather than for the one each test is about. Shape captured from pane
+# %55 on 2026-08-01, with a percentage comfortably above the floor.
+FOOTER = "  weekly 99% left · google-live · main · Context 96% left · R…"
+
 
 @pytest.fixture(scope="module")
 def watch() -> ModuleType:
@@ -553,6 +560,7 @@ def test_send_treats_dim_placeholder_as_an_empty_composer(
         "\x1b[0m\x1b[48;2;65;69;76m\n"
         f"\x1b[1m{watch.PROMPT_MARKER}\x1b[0m\x1b[48;2;65;69;76m "
         "\x1b[2mImplement {feature}\x1b[0m\x1b[48;2;65;69;76m\n"
+        f"{FOOTER}\n"
     )
 
     def fake_run(argv: tuple[str, ...]) -> str:
@@ -611,7 +619,10 @@ def test_send_preflights_ready_empty_composer_before_submitting(
             return "Ready | google-live\n" if status_reads == 1 else "⠋ Working\n"
         if argv[:2] == ("tmux", "capture-pane"):
             events.append("capture")
-            return f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+            return (
+                f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+                f"{FOOTER}\n"
+            )
         if argv[:2] == ("tmux", "paste-buffer"):
             events.append("paste")
         if argv[:2] == ("tmux", "send-keys"):
@@ -650,7 +661,7 @@ def test_send_does_not_call_a_collapsed_paste_submitted(
     had accepted and cleared reported a message still sitting there unsent.
     """
     message = "Investigate the failing import contract, and name the slice. " * 26
-    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n{FOOTER}\n"
     collapsed = (
         "• Earlier response\n"
         "\x1b[0m\x1b[48;2;65;69;76m\n"
@@ -689,7 +700,7 @@ def test_send_refuses_a_paste_whose_char_count_is_not_the_message(
     fraction of the message arrived.
     """
     message = "Investigate the failing import contract."
-    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n{FOOTER}\n"
     truncated = f"{watch.PROMPT_MARKER} \x1b[38;5;6m[Pasted Content 12 chars]\x1b[39m\n"
     pasted = False
     enters = 0
@@ -722,7 +733,7 @@ def test_send_submits_a_paste_whose_char_count_matches(
 ) -> None:
     """A placeholder counting the whole message is the paste landing intact."""
     message = "Investigate the failing import contract."
-    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n{FOOTER}\n"
     landed = (
         f"{watch.PROMPT_MARKER} "
         f"\x1b[38;5;6m[Pasted Content {len(message)} chars]\x1b[39m\n"
@@ -758,7 +769,7 @@ def test_send_reads_a_cleared_composer_as_a_submission(
     can be missed. Guards the collapsed-paste fix against becoming a refusal of
     everything.
     """
-    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n"
+    empty = f"• Earlier response\n{watch.PROMPT_MARKER} \n? for shortcuts\n{FOOTER}\n"
     captures = 0
 
     def fake_run(argv: tuple[str, ...]) -> str:
@@ -792,7 +803,9 @@ def test_send_prompt_leaves_write_scope_to_prompt(
     monkeypatch.setattr(
         watch,
         "send_message",
-        lambda pane, message: sent.append((pane, message)) or f"submitted to {pane}",
+        lambda pane, message, **_: (
+            sent.append((pane, message)) or f"submitted to {pane}"
+        ),
     )
 
     result = watch.send_prompt(str(prompt))

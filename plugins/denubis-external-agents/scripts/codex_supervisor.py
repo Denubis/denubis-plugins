@@ -42,6 +42,17 @@ SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
 # How long an approval waits for Codex to say what it did before reporting silence.
 RESPONSE_POLLS = 30
+# How long a context verb waits for the pane to come back Ready. A compaction is a model
+# call over the whole transcript and a clear restarts the MCP servers, so both are slow
+# in a way an approval is not; three minutes bounds it without cutting a real one short.
+SETTLE_POLLS = 180
+# Below this much context left, a dispatch stops and asks rather than filling a pane
+# that cannot hold the answer. Brian, 2026-08-01: compaction is to run aggressively
+# here, because the meter falls fast. `--under-floor` carries a human ruling past it.
+CONTEXT_FLOOR_PERCENT = 30
+# Typed into the composer as keystrokes, never pasted. Codex reads a pasted or narrated
+# instruction as a task, so it reads files to answer it and the meter goes down.
+SLASH_COMMANDS = ("/clear", "/compact", "/status")
 CODEX_SPAWN_COMMAND = (
     # Containment is the sandbox rather than a dialog per command: `workspace-write`
     # bounds writes to the working tree, and `on-request` leaves codex to escalate
@@ -1246,11 +1257,11 @@ def visible_text(line: str, *, keep_faint: bool) -> str:
     return "".join(shown)
 
 
-def _composer_is_empty(snapshot: str) -> bool:
-    """Report whether the composer holds typed text.
+def _composer_text(snapshot: str) -> str | None:
+    """Return what the composer holds, or None when no composer is on screen.
 
     Codex renders its composer hint faint, so faint spans are dropped before the
-    line is judged. Reading the hint as an unfinished message blocked every send
+    line is read. Reading the hint as an unfinished message blocked every send
     on 2026-07-23.
     """
     prompt_lines = [
@@ -1261,19 +1272,147 @@ def _composer_is_empty(snapshot: str) -> bool:
         )
     ]
     if not prompt_lines:
-        return False
-    return not prompt_lines[-1].removeprefix(PROMPT_MARKER).strip()
+        return None
+    return prompt_lines[-1].removeprefix(PROMPT_MARKER).strip()
 
 
-def _preflight_send(pane_id: str) -> None:
-    """Refuse to write unless the joined Codex composer is visibly ready."""
+def _composer_is_empty(snapshot: str) -> bool:
+    """Report whether the composer holds typed text.
+
+    A snapshot with no composer at all is not empty: it is a pane that does not
+    look the way this code assumes, which is a reason to refuse rather than send.
+    """
+    return _composer_text(snapshot) == ""
+
+
+def _plain(snapshot: str) -> str:
+    """Strip the escape sequences from a coloured capture, keeping every character."""
+    return "\n".join(
+        visible_text(line, keep_faint=True) for line in snapshot.splitlines()
+    )
+
+
+_CONTEXT_METER = re.compile(r"Context\s+(\d{1,3})%")
+_SESSION_ID = re.compile(
+    r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+    re.IGNORECASE,
+)
+_COMPLETION = re.compile(r"^\s{1,4}(/[a-z][a-z0-9-]*)\s{2,}\S")
+
+
+def context_left(content: str) -> int | None:
+    """Return the percentage of context Codex reports remaining, if it is on screen.
+
+    The footer reads `Context N% left` and is truncated at the pane width, so a
+    narrow pane shows `Context 50% …` with the word cut off. The number arrives
+    before the cut in both widths observed on 2026-08-01, and the word is
+    therefore not required. None means the meter could not be read, which is a
+    different answer from a reading that cleared the floor.
+    """
+    readings = _CONTEXT_METER.findall(_plain(content))
+    return int(readings[-1]) if readings else None
+
+
+def session_identity(title: str) -> str | None:
+    """Return the Codex session id carried in the pane title.
+
+    `/clear` starts a new session and the id changes with it, which is what
+    confirms a clear afterwards. It is found by its shape because the title drops
+    its `weekly` segment while Codex restarts, so counting separators reads the
+    wrong field at exactly the moment the answer matters.
+    """
+    found = _SESSION_ID.search(title)
+    return found[0] if found else None
+
+
+def slash_completions(content: str) -> list[str]:
+    """Return the commands the composer's completion list is currently offering.
+
+    Typing `/` opens the list, and a partial command leaves the wrong entry
+    selected: `/c` offers `/compact`, `/copy`, `/clear` in that order with
+    `/compact` highlighted, so Enter compacts a pane meant to be cleared. Typing
+    the command in full narrows the list to one entry, which is the state this
+    reading exists to confirm.
+
+    The selected entry is drawn bold and coloured while the rest are faint, so the
+    escape sequences are stripped here rather than by each caller: reading the list
+    from a faint-dropped view would delete every entry but the highlighted one, and
+    the highlight is exactly what must not be trusted.
+    """
+    return [
+        found[1]
+        for line in _plain(content).splitlines()
+        if (found := _COMPLETION.match(line)) is not None
+    ]
+
+
+def selected_completion(content: str) -> str | None:
+    """Return the completion Enter would take, read from Codex's own highlighting.
+
+    Narrowing cannot be what Enter is gated on, because a command typed in full does
+    not always leave one entry: `/status` still lists `/statusline` beside it. What
+    always holds is that Codex draws the selected entry's description at full
+    brightness and leaves every other description faint, so dropping the faint spans
+    strips the unselected rows of everything past their command and only the
+    highlighted row still reads as a completion.
+    """
+    highlighted = [
+        found[1]
+        for line in content.splitlines()
+        if (found := _COMPLETION.match(visible_text(line, keep_faint=False)))
+        is not None
+    ]
+    return highlighted[0] if len(highlighted) == 1 else None
+
+
+def _preflight_pane(pane_id: str) -> tuple[str, str]:
+    """Return the pane's title and coloured snapshot once it is safe to type into.
+
+    The approval check is here rather than left to the operator because every
+    keystroke answers whatever dialog is on screen, and a dialog leaves the title
+    `Ready` and the composer empty, so the two older guards both pass over the one
+    state where typing is most destructive.
+    """
     title = pane_status(pane_id)
     if re.search(r"\bready\b", title, re.IGNORECASE) is None:
         raise MonitorError(f"joined Codex pane {pane_id} is not Ready: {title!r}")
     snapshot = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
+    content = _plain(snapshot)
+    if _approval_is_pending("\n".join(content.splitlines()[-12:])):
+        raise MonitorError(
+            f"joined Codex pane {pane_id} holds a pending approval, and any keystroke "
+            f"would answer it; clear it with --approve or read it with --tail"
+        )
     if not _composer_is_empty(snapshot):
         raise MonitorError(
             f"joined Codex pane {pane_id} composer is not empty; inspect with --tail"
+        )
+    return title, snapshot
+
+
+def _check_context_floor(pane_id: str, snapshot: str, *, under_floor: bool) -> None:
+    """Refuse to dispatch into a pane with too little context left to hold the answer.
+
+    An unreadable meter refuses too. Passing on it would be the absence-read-as-a-pass
+    this repo keeps paying for, and the meter was on screen at both pane widths
+    measured on 2026-08-01, so an unreadable one means the pane is not rendering the
+    way this code assumes rather than that all is well.
+    """
+    if under_floor:
+        return
+    reading = context_left(snapshot)
+    if reading is None:
+        raise MonitorError(
+            f"could not read the context meter on {pane_id}, so the {
+                CONTEXT_FLOOR_PERCENT
+            }% floor cannot be checked; inspect with --tail, or pass --under-floor "
+            f"once a human has ruled"
+        )
+    if reading < CONTEXT_FLOOR_PERCENT:
+        raise MonitorError(
+            f"context {reading}% left on {pane_id} is below the "
+            f"{CONTEXT_FLOOR_PERCENT}% floor; run --compact, or --clear and restate "
+            f"the prompt, or pass --under-floor once a human has ruled"
         )
 
 
@@ -1325,7 +1464,7 @@ def _submitted(pane_id: str) -> bool:
     return False
 
 
-def send_message(pane_id: str, message: str) -> str:
+def send_message(pane_id: str, message: str, *, under_floor: bool = False) -> str:
     """Paste one message into the joined pane and confirm it submitted.
 
     Bracketed paste keeps embedded newlines as soft newlines rather than
@@ -1334,7 +1473,8 @@ def send_message(pane_id: str, message: str) -> str:
     """
     if not message:
         raise MonitorError("refusing to send an empty message")
-    _preflight_send(pane_id)
+    _, snapshot = _preflight_pane(pane_id)
+    _check_context_floor(pane_id, snapshot, under_floor=under_floor)
     load_argv: Command = ("tmux", "load-buffer", "-b", "codex-send", "-")
     subprocess.run(  # argv is fixed above; text arrives on stdin.
         load_argv,
@@ -1389,7 +1529,249 @@ def approve_pending() -> str:
     return f"approved on {pane_id}: {command}\nstill working; nothing reported yet"
 
 
-def send_prompt(prompt_file: str) -> str:
+def _clear_composer(pane_id: str) -> None:
+    """Empty the composer, so a refused command does not block the next send."""
+    run_command(("tmux", "send-keys", "-t", pane_id, "C-a"))
+    run_command(("tmux", "send-keys", "-t", pane_id, "C-k"))
+
+
+def _confirm_selection(pane_id: str, snapshot: str, command: str) -> None:
+    """Refuse to submit unless Enter would take the command that was asked for.
+
+    The completion list is the hazard rather than the composer text, because Enter
+    takes the highlight rather than the typing, and `/c` leaves `/compact`
+    highlighted, so a `/clear` typed one character short compacts instead. The gate
+    is therefore the highlight, not the list having narrowed to one entry: typing a
+    command in full does not always narrow it, since `/status` still lists
+    `/statusline` beside itself.
+    """
+    typed = _composer_text(snapshot)
+    selected = selected_completion(snapshot)
+    if typed == command and selected == command:
+        return
+    _clear_composer(pane_id)
+    offered = slash_completions(snapshot)
+    raise MonitorError(
+        f"refusing to submit {command} on {pane_id}: composer holds {typed!r} and "
+        f"Enter would take {selected or 'nothing recognisable'} out of "
+        f"{offered or 'an empty list'}"
+    )
+
+
+def _wait_ready(pane_id: str) -> str | None:
+    """Wait for the pane to come back to `Ready`, or report that it never did.
+
+    Both context verbs leave Codex busy for a while, a clear because it restarts the
+    session and its MCP servers and a compaction because it is a model call over the
+    whole transcript. Returning the moment the effect is visible hands back a pane
+    that the next dispatch then refuses as not Ready, which costs a supervisor round
+    to discover something this call already knew.
+    """
+    for _ in range(SETTLE_POLLS):
+        title = pane_status(pane_id)
+        if re.search(r"\bready\b", title, re.IGNORECASE) is not None:
+            return title
+        time.sleep(SUBMIT_POLL_SECONDS)
+    return None
+
+
+# The panel's own wording. A second model's allowance is reported beneath the first and
+# carries a name in front of `Weekly limit:`, so the anchor keeps the primary one.
+_WEEKLY_LIMIT = re.compile(
+    r"^[\s│|]*Weekly limit:\s*(?:\[[^\]]*\]\s*)?(\d{1,3})%\s*left",
+    re.MULTILINE,
+)
+_RESETS = re.compile(r"\(resets\s+([^)]+?)\)")
+
+
+def weekly_quota(
+    content: str,
+    *,
+    below: str | None = None,
+) -> tuple[int, str | None] | None:
+    """Return the weekly allowance left and when it resets, from a `/status` panel.
+
+    A percentage on its own cannot say whether the burn is on track, because half the
+    allowance left on day two is a problem and the same figure on day six is fine. The
+    reset is the half of that answer the pane title does not carry, which is the whole
+    reason this reads the panel rather than the title.
+
+    `below` names a command whose echo the panel must sit under. Codex prints the
+    submitted command on its own line and draws the panel beneath it, and an answered
+    `/status` stays on screen afterwards, so the echo is what separates the panel this
+    invocation drew from the one the last invocation left behind. Counting panels
+    cannot do it, because drawing a new one scrolls the older one off the visible
+    capture, so the count goes from one to one and a good second reading is refused.
+    Observed on pane %58, 2026-08-01.
+
+    Only the figures are returned. The panel also names the signed-in account, and the
+    quota question has no use for it.
+    """
+    lines = _plain(content).splitlines()
+    start = 0
+    if below is not None:
+        echoes = [index for index, line in enumerate(lines) if line.strip() == below]
+        if not echoes:
+            return None
+        start = echoes[-1] + 1
+    for index in range(start, len(lines)):
+        found = _WEEKLY_LIMIT.match(lines[index])
+        if found is None:
+            continue
+        window = " ".join(lines[index : index + 3])
+        resets = _RESETS.search(window)
+        return int(found[1]), resets[1].strip() if resets else None
+    return None
+
+
+def _confirm_quota(pane_id: str) -> str:
+    """Wait for the panel Codex drew for this invocation and read its figures.
+
+    The pane state is reported alongside them for the same reason the other two verbs
+    report it: a caller left wondering whether the pane can take a prompt has to ask,
+    and that round is the one the verb exists to save.
+    """
+    capture: Command = ("tmux", "capture-pane", "-p", "-e", "-t", pane_id)
+    for _ in range(RESPONSE_POLLS):
+        reading = weekly_quota(run_command(capture), below="/status")
+        if reading is not None:
+            left, resets = reading
+            when = f", resets {resets}" if resets else ", reset date not on screen"
+            state = "Ready" if _wait_ready(pane_id) is not None else "still working"
+            return f"quota on {pane_id}: weekly {left}% left{when}; {state}"
+        time.sleep(SUBMIT_POLL_SECONDS)
+    raise MonitorError(f"{pane_id} drew no status panel; inspect with --tail")
+
+
+def _settled_meter(pane_id: str) -> int | None:
+    """Read the context meter once Codex has finished redrawing its footer.
+
+    The footer is missing for a moment after the title reports `Ready`: a cleared
+    pane prints its token-usage summary and its resume line first, and only then
+    redraws. A single read lands in that gap and reports a meter that is on screen a
+    second later, which was observed on pane %57 on 2026-08-01 turning a clear that
+    had worked into one reported as unreadable.
+    """
+    capture: Command = ("tmux", "capture-pane", "-p", "-e", "-t", pane_id)
+    for _ in range(SUBMIT_POLLS):
+        left = context_left(run_command(capture))
+        if left is not None:
+            return left
+        time.sleep(SUBMIT_POLL_SECONDS)
+    return None
+
+
+def _confirm_clear(pane_id: str, previous_id: str) -> str:
+    """Confirm a clear by the session id rotating, which only `/clear` does."""
+    rotated: str | None = None
+    for _ in range(RESPONSE_POLLS):
+        current = session_identity(pane_status(pane_id))
+        if current is not None and current != previous_id:
+            rotated = current
+            break
+        time.sleep(SUBMIT_POLL_SECONDS)
+    if rotated is None:
+        raise MonitorError(
+            f"session {previous_id} is still current on {pane_id}, so /clear did not "
+            f"run; inspect with --tail"
+        )
+    cleared = f"cleared {pane_id}: session {previous_id} -> {rotated}"
+    if _wait_ready(pane_id) is None:
+        return f"{cleared}; still starting, not Ready yet"
+    left = _settled_meter(pane_id)
+    meter = f"context {left}% left" if left is not None else "meter unreadable"
+    return f"{cleared}; Ready, {meter}"
+
+
+def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
+    """Confirm a compaction by Codex's own marker and then by the settled meter.
+
+    Waiting for the marker rather than for a `Ready` title is what keeps this from
+    reading the pane before the compaction has run, since Codex is briefly still
+    Ready after Enter. The marker alone is not the verdict, because the failure this
+    guards against is Codex reporting success while the meter falls: a keep/drop brief
+    took a live pane from 21% to 18% on 2026-07-28 and said it had compacted.
+
+    The meter is then read from a settled pane rather than from the screen carrying
+    the marker. Codex draws the marker before the footer catches up, so the earlier
+    figure is one that is about to change, and reading it there reports a compaction
+    that worked as one that cost context.
+    """
+    capture: Command = ("tmux", "capture-pane", "-p", "-e", "-t", pane_id)
+    marked = False
+    for _ in range(SETTLE_POLLS):
+        content = _plain(run_command(capture))
+        if any(
+            "context compacted" in text.casefold()
+            for text in _bullet_texts(content) - seen
+        ):
+            marked = True
+            break
+        time.sleep(SUBMIT_POLL_SECONDS)
+    if not marked:
+        raise MonitorError(
+            f"{pane_id} never reported that it compacted; inspect with --tail"
+        )
+
+    settled = _wait_ready(pane_id)
+    after = _settled_meter(pane_id)
+    if after is None:
+        raise MonitorError(
+            f"{pane_id} reports it compacted, but the meter is unreadable, so "
+            f"nothing confirms it; inspect with --tail"
+        )
+    if before is not None and after < before:
+        raise MonitorError(
+            f"{pane_id} reports it compacted while context fell from "
+            f"{before}% to {after}% left, which is what a task does rather "
+            f"than a compaction; inspect with --tail"
+        )
+    state = "Ready" if settled is not None else "still working"
+    return f"compacted {pane_id}: context {before}% -> {after}% left; {state}"
+
+
+def run_slash_command(command: str) -> str:
+    """Type one slash command into the joined composer and confirm what it did.
+
+    This exists because the supervisor kept delivering `/clear` and `/compact` as
+    prose or through `--message`, and Codex reads either as a task: it goes off and
+    reads files to answer you, and the context you were reclaiming grows instead.
+    The command goes in the way the composer accepts it, as keystrokes on their own
+    line, typed and confirmed before Enter is a separate call.
+    """
+    if command not in SLASH_COMMANDS:
+        offered = ", ".join(SLASH_COMMANDS)
+        raise MonitorError(
+            f"unsupported slash command {command!r}; this sends {offered}"
+        )
+    pane_id = joined_pane()
+    title, snapshot = _preflight_pane(pane_id)
+    # Deliberately no context-floor check: these are the two verbs that relieve it,
+    # and gating them would leave an exhausted pane with no way back.
+    previous_id = session_identity(title)
+    if command == "/clear" and previous_id is None:
+        raise MonitorError(
+            f"no session id in the title of {pane_id}, so a clear could not be "
+            f"confirmed: {title!r}"
+        )
+    before = context_left(snapshot)
+    seen = _bullet_texts(_plain(snapshot))
+
+    run_command(("tmux", "send-keys", "-t", pane_id, "-l", command))
+    time.sleep(SUBMIT_POLL_SECONDS)
+    typed = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
+    _confirm_selection(pane_id, typed, command)
+    run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
+
+    if command == "/clear":
+        # previous_id is not None here; the guard above returned otherwise.
+        return _confirm_clear(pane_id, cast("str", previous_id))
+    if command == "/status":
+        return _confirm_quota(pane_id)
+    return _confirm_compact(pane_id, before, seen)
+
+
+def send_prompt(prompt_file: str, *, under_floor: bool = False) -> str:
     """Send the standard ping for a numbered prompt file.
 
     The ping states no write scope. Each prompt declares its own output
@@ -1409,7 +1791,7 @@ def send_prompt(prompt_file: str) -> str:
         f"Read {path.as_posix()} and carry out that task exactly. "
         f"{CODEX_PING_INSTRUCTION}"
     )
-    result = send_message(joined_pane(), ping)
+    result = send_message(joined_pane(), ping, under_floor=under_floor)
     return f"{result}: {path.name}"
 
 
@@ -1420,16 +1802,22 @@ def run_verb(args: argparse.Namespace) -> int | None:
     elif args.spawn:
         print(spawn_pane(args.label))
     elif args.send is not None:
-        print(send_prompt(args.send))
+        print(send_prompt(args.send, under_floor=args.under_floor))
     elif args.tail is not None:
         print(pane_tail(args.tail))
     elif args.status:
         print(pane_status(joined_pane()))
     elif args.message is not None:
         text = sys.stdin.read() if args.message == "-" else args.message
-        print(send_message(joined_pane(), text))
+        print(send_message(joined_pane(), text, under_floor=args.under_floor))
     elif args.approve:
         print(approve_pending())
+    elif args.clear:
+        print(run_slash_command("/clear"))
+    elif args.compact:
+        print(run_slash_command("/compact"))
+    elif args.quota:
+        print(run_slash_command("/status"))
     else:
         return None
     return 0
@@ -1459,6 +1847,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--approve",
         action="store_true",
         help="answer a pending approval and report what codex did next",
+    )
+    action.add_argument(
+        "--clear",
+        action="store_true",
+        help=(
+            "start codex on a fresh session, confirmed by the session id in the "
+            "pane title changing"
+        ),
+    )
+    action.add_argument(
+        "--compact",
+        action="store_true",
+        help=(
+            "have codex summarise its transcript, confirmed by its context meter "
+            "going up rather than by what codex says it did"
+        ),
+    )
+    action.add_argument(
+        "--quota",
+        action="store_true",
+        help=("report how much of the weekly allowance is left and when it resets"),
+    )
+    parser.add_argument(
+        "--under-floor",
+        action="store_true",
+        # The doubled sign is required: argparse expands `%` in a help string.
+        help=(
+            f"dispatch below the {CONTEXT_FLOOR_PERCENT}%% context floor; "
+            f"for carrying a human ruling, not for getting past the refusal"
+        ),
     )
     action.add_argument("--send", metavar="PROMPT_FILE", help="send one prompt file")
     action.add_argument(
