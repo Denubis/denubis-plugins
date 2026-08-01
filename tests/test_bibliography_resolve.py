@@ -1,4 +1,4 @@
-"""Tests for plugins/denubis-bibliography/skills/using-bibliography/resolve.py.
+"""Tests for plugins/denubis-academic/skills/using-bibliography/resolve.py.
 
 Covers the pure functional core of citekey-first resolution: selecting the exact
 citekey matches out of BBT `item.search` hits (which are fuzzy/AND-token and
@@ -15,7 +15,7 @@ from pathlib import Path
 _RESOLVE = (
     Path(__file__).resolve().parent.parent
     / "plugins"
-    / "denubis-bibliography"
+    / "denubis-academic"
     / "skills"
     / "using-bibliography"
     / "resolve.py"
