@@ -1,5 +1,13 @@
 # Changelog
 
+## [marketplace] 3.0.0
+
+**Removed:**
+- `denubis-bibliography`. It is absorbed into `denubis-academic`, which succeeds it and continues its version line. Anyone with `denubis-bibliography` installed must switch, so the marketplace takes a major bump.
+
+**New:**
+- `denubis-academic`.
+
 ## [denubis-academic] 0.13.0
 
 A new plugin holding the scholarly workflow, which had been scattered across two plugins and one untracked directory. Succeeds `denubis-bibliography` and absorbs it, so the version line continues from 0.12.0 rather than restarting.
