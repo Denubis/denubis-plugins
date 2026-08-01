@@ -108,11 +108,44 @@ The verbs, read from the parser rather than from memory:
 | `--spawn [--label NAME]` | open a Codex pane beside this one |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
+| `--clear` | start codex on a fresh session, confirmed by its session id changing |
+| `--compact` | have codex summarise its transcript, confirmed by the context meter |
+| `--quota` | run `/status` and report the weekly allowance and its reset |
+| `--under-floor` | dispatch below the 30% context floor, carrying a human ruling |
 | `--tail [N]` | print the joined pane's non-blank tail (default 12 lines) |
 | `--status` | print the joined pane's status line |
 
 None of them takes a pane ID. Each resolves the pane itself, for the reasons under
 *Sending a prompt*.
+
+Every verb that types into the pane refuses first unless the title is `Ready`, the
+composer is empty, and **no approval dialog is pending**. That last guard is the tool's
+rather than the operator's, because a dialog leaves the title `Ready` and the composer
+empty, so the other two checks pass over precisely the state where a keystroke does the
+most damage.
+
+## The supervisor is the only way in
+
+**Every keystroke reaching the joined pane goes through `codex_supervisor.py`.** A raw
+`tmux send-keys`, a `tmux paste-buffer`, or anything else aimed at the pane by hand is
+out of bounds, whatever it is for and however small it looks.
+
+The verbs are not a convenience wrapper over the tmux calls. Each one carries guards
+that the raw call does not, and every guard is there because its absence cost a session:
+the pane is resolved rather than remembered, an approval dialog is refused rather than
+answered by accident, a half-typed slash command is caught before Enter takes the
+neighbouring entry, and the effect is confirmed by evidence rather than assumed from a
+keypress landing. Reaching past the tool discards all of that at once.
+
+**When the tool cannot do what you need, that is a bug report, not an invitation to
+improvise.** Tell the human what you were about to type and why the verbs did not cover
+it, and let them rule on whether the tool grows a verb. An improvised `send-keys` works
+often enough to look fine and fails in exactly the ways nobody is watching for, which is
+how `/clear` and `/compact` came to be delivered as prose that codex read as work.
+
+There is no exception. Every slash command this skill needs has a verb, and the last one
+without one, the `/status` quota panel, became `--quota` on 2026-08-01 rather than being
+left as a documented licence to improvise.
 
 ## The loop
 
@@ -225,9 +258,9 @@ out to be. Clearing a composer is `C-a` then `C-k`, and `C-u` does not do it.
 
 **Never send a prompt or a slash command into a pane holding a pending approval.** Any
 keystroke answers the dialog that is on screen, so a `/clear` typed blind approves
-whatever was waiting. This is checkable rather than a matter of remembering: the monitor
-classifies a pending approval as `APPROVAL`, so read `--status` or `--tail` and confirm
-before sending.
+whatever was waiting. Every verb now refuses on that state rather than leaving it to the
+operator to remember, which is the whole argument for routing keystrokes through the
+tool: the guard runs whether or not anyone was thinking about it.
 
 **Codex revises after it first reports done.** A stage-2 output grew by 393 bytes two
 minutes after the pane read `Ready`. `DONE` starts a file-settling check; it does not prove
@@ -267,26 +300,26 @@ its own cannot say whether you are on track: half the allowance left on day two 
 problem, and the same figure on day six is fine. What settles it is the reset date, which
 `/status` reports and the title does not.
 
-Send it the way every slash command goes in, as two calls with a capture between them,
-because the composer opens an autocomplete list on `/`:
-
 ```sh
-tmux send-keys -t %NNN -l '/status'
+codex_supervisor.py --quota
 ```
 
-```sh
-tmux send-keys -t %NNN Enter
+It reports both halves of the answer and nothing else:
+
+```
+quota on %58: weekly 99% left, resets 14:41 on 8 Aug
 ```
 
-**Check the pane first**, exactly as for a prompt: a slash command typed into a pane
-holding an approval answers that approval. Clear the dialog with `--approve` first, then
-send.
+The panel itself carries the signed-in account and the session id, so the verb reads the
+figures out and leaves the rest on screen rather than carrying it back.
 
-Then read the panel back:
-
-```sh
-codex_supervisor.py --tail 20
-```
+Two details of the panel are worth knowing, because both have already caught a naive
+reading. A second model's allowance is reported directly beneath the first, so the
+`resets` line belonging to the primary limit is the one above it rather than the last one
+on screen. And an answered `/status` stays on screen, so the verb anchors on codex's echo
+of the command and reads the panel below it. Counting panels does not work, since drawing
+a new one scrolls the older one off the visible capture and the count goes from one to
+one, which refused a perfectly good second reading when it was tried on 2026-08-01.
 
 Compare what remains against how much of the week remains. If the burn is running ahead of
 the calendar, hand codex a smaller phase, split the work, or wait for the reset. Run the
@@ -320,20 +353,65 @@ the way the tool actually accepts, which is the slash command first and then a f
 self-contained prompt restating what matters, rather than a brief asking codex to do the
 preserving itself.
 
-Send it as two calls, typing before submitting, because the composer opens an autocomplete
-list on `/`:
+Both are verbs, and neither is a message:
 
 ```sh
-tmux send-keys -t %NNN -l '/clear'
+codex_supervisor.py --clear
+codex_supervisor.py --compact
 ```
 
-```sh
-tmux send-keys -t %NNN Enter
+Each types the command as keystrokes on its own line, confirms what the composer holds
+before Enter is a separate call, and then waits for the pane to come back `Ready` before
+reporting. The waiting is the point: a clear restarts codex and its MCP servers, and a
+compaction is a model call over the whole transcript, so a verb returning the moment the
+effect appears hands back a pane that the next dispatch refuses as not Ready, which costs
+a supervisor round to discover something the verb already knew.
+
+**Each is confirmed by evidence, and the evidence differs because the two commands do
+different things.**
+
+`/clear` does not wipe a screen. It ends codex's session and starts another one, and the
+pane title carries that session's id:
+
+```
+Ready | brian-ed3d-plugins | main | weekly 99% left | 019fbc8c-ac0b-79d3-… | gpt-5.6-sol
+                                                      ^^^^^^^^^^^^^^^^^^^ the session id
 ```
 
-Capture the pane between them and confirm the composer holds the command with the expected
-entry selected, so Enter cannot choose a neighbouring one. That matters more for `/clear`
-than for `/compact`, since `/clear` is short and sits among other `/c` entries.
+So a clear that ran leaves a different id there from the one that was there before, and
+`--clear` reads it either side and reports both. Nothing else changes it, which is what
+makes it proof rather than a plausible sign.
+
+`/compact` keeps the same session and the same transcript, so its id is unchanged and
+cannot say anything. What moves instead is the context meter, and `--compact` reports it
+either side and refuses when the figure has fallen. Measured on 2026-08-01: a clear ran
+`019fbc8c…` to `019fbc8f…`, and a compaction moved 96% to 100% with its id standing still.
+
+The confirmations cannot be shared, and that is what makes them worth having. Codex's
+completion list puts `/compact` first on the prefix `/c`, so a `/clear` typed one
+character short and submitted would compact instead. A shared confirmation would call
+that a success.
+
+Typing the command in full narrows the list to the one entry, which is the state the
+verb requires before it presses Enter. Where the list has not narrowed to exactly the
+command asked for, the verb empties the composer and refuses, so an unrecognised
+neighbour reaches the human rather than being submitted on the likelier reading.
+
+## The context floor
+
+**Below 30% context left, `--send` and `--message` refuse** (Brian, 2026-08-01). A pane
+that far down cannot hold the answer to the prompt you are about to give it, and the
+meter falls faster than it looks like it will, so the floor is set high on purpose.
+
+The refusal names the reading and the remedies, which are `--compact`, or `--clear`
+followed by restating the prompt. Neither `--clear`, `--compact`, nor `--approve` is
+gated: the first two are what relieve the floor, and refusing to answer a dialog would
+strand codex mid-task with nothing able to release it.
+
+`--under-floor` carries a human ruling past the refusal. It exists so that a human can
+say yes, not so that the supervisor has a way around a halt, and reaching for it without
+having asked is the same improvisation as reaching for `send-keys`. An unreadable meter
+refuses on the same terms, because a gate that passes when it cannot see is not a gate.
 
 ## Same-window event monitor
 
@@ -558,15 +636,18 @@ in frozen snapshots are load-bearing; never edit them.
 | Situation | Action |
 |---|---|
 | Starting a codex session | `codex_supervisor.py --spawn --label <name>` |
-| Checking weekly headroom | `/status` as two `send-keys` calls, then `--tail 20` |
+| Checking weekly headroom | `codex_supervisor.py --quota` |
 | Watching it | `codex_supervisor.py` under the background Monitor tool |
 | Checking what a pane holds | `codex_supervisor.py --tail` |
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
-| Between prompts | `/clear` as two `send-keys` calls, capture between |
-| Directly-following prompt | `/compact` instead |
+| Between prompts | `codex_supervisor.py --clear` |
+| Directly-following prompt | `codex_supervisor.py --compact` |
+| Dispatch refused below 30% | `--compact`, or `--clear` and restate the prompt |
+| The human rules to push on anyway | add `--under-floor` to that one dispatch |
 | Codex asks to run a command | `codex_supervisor.py --approve` |
 | The approval wants a ruling, not a keypress | that one is the human's |
 | Codex reports done | wait for size and mtime to settle, then verify |
+| Tempted to reach for `tmux send-keys` | tell the human what the verbs do not cover |
 
 ## Red flags
 
@@ -583,8 +664,15 @@ in frozen snapshots are load-bearing; never edit them.
 - "Settle the limit" / "settle the policy" in a prompt. An instruction to settle a number
   invites an invented number, which then hardens into an acceptance criterion and a test.
   Assign the concern to its owner instead.
-- "I asked codex to compress its context." That is a task, not a compaction. Type the
-  slash command.
+- "I asked codex to compress its context." That is a task, not a compaction. Run
+  `--compact`.
+- "I'll just send `/clear` with `--message`." That pastes the text into the composer as a
+  message. `--clear` types it, and the difference is whether codex runs the command or
+  reads it.
+- "The verbs don't cover this, so I'll use `tmux send-keys` this once." That is the bug
+  report. Say what you were about to type and let the human rule.
+- "Context is at 22%, but this prompt is small." The floor is not a suggestion about
+  prompt size. Compact, or clear and restate, or get the ruling.
 - "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.
   Clear or compact the pane before the next prompt, or the context you did not reset
   becomes the context the next task inherits.
