@@ -288,7 +288,9 @@ The orchestrator substitutes `<MEMORY_PATH>`, `<WINDOWED_PATH>`, `<AUDIT_PATH>`,
 >
 > **Inputs:**
 > - **Memory file:** `<MEMORY_PATH>` — read with the `Read` tool. The frontmatter (between `---` markers) is metadata; the body is the claim/insight you're checking.
-> - **Windowed transcript stream:** `<WINDOWED_PATH>` — a JSONL file. Each line is `{ts, uuid, role, text}`. Lines are pre-filtered to timestamps ≥ this memory's `lastAudited` (or the full corpus if `lastAudited` was absent). Read with the `Read` tool.
+> - **Windowed transcript stream:** `<WINDOWED_PATH>` — a JSONL file. Each line is `{ts, uuid, role, text}`. Lines are pre-filtered to timestamps ≥ this memory's `lastAudited` (or the full corpus if `lastAudited` was absent).
+>   - On a first dream (or after a long gap) this stream can be **5,000+ lines / 5+ MB** — larger than the `Read` tool's default page. Filter server-side with `Bash` (`jq`/`grep`) first; use `Read` only to fetch full context for specific candidate lines you have already identified.
+>   - Starter shapes: `head -1 <WINDOWED_PATH> | jq .` (inspect line structure); `jq -c 'select(.text | test("<term>"; "i"))' <WINDOWED_PATH> | head -30` (pick terms from the memory body and iterate).
 > - **Repo root:** `<REPO_ROOT>` — the absolute path of the live worktree. Use for `Bash grep` against live code.
 >
 > **Output path:** `<AUDIT_PATH>` — write with the `Write` tool. The file's body must be:
@@ -373,7 +375,9 @@ The orchestrator substitutes `<CORPUS_PATH>`, `<MEMORY_DIGEST_PATH>`, `<FLAGGED_
 > You are scanning a windowed corpus of Claude Code transcript text for memory-worthy regions that no existing memory covers.
 >
 > **Inputs:**
-> - **Corpus stream:** `<CORPUS_PATH>` — JSONL, lines of `{ts, uuid, role, text}`. Pre-filtered to timestamps ≥ the last dream's finalisation timestamp (or unbounded if this is the first dream). Read with the `Read` tool.
+> - **Corpus stream:** `<CORPUS_PATH>` — JSONL, lines of `{ts, uuid, role, text}`. Pre-filtered to timestamps ≥ the last dream's finalisation timestamp (or unbounded if this is the first dream).
+>   - On a first dream this stream can be **5,000+ lines / 5+ MB** — larger than the `Read` tool's default page. Filter server-side with `Bash` (`jq`/`grep`) first; use `Read` only for small samples or to fetch full context for specific candidate lines.
+>   - Starter shapes: `head -1 <CORPUS_PATH> | jq .` (inspect line structure); `jq -c 'select(.role == "user") | .text' <CORPUS_PATH> | head -30` (sample user prompts); `jq -c 'select(.role == "assistant") | .text' <CORPUS_PATH> | head -30` (assistant prose); `grep -i -E 'we decided|user (explicitly|prefers)|stop doing|never|always' <CORPUS_PATH> | head -50` (memory-worthy signals). Iterate.
 > - **Existing memory digest:** `<MEMORY_DIGEST_PATH>` — one line per memory: `<name> :: <description>`. Read with the `Read` tool. Use this to judge "is this region already covered by some memory?".
 > - **Output directory:** `<FLAGGED_DIR>` — write one file per surfaced region.
 >

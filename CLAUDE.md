@@ -14,7 +14,7 @@ Concrete triggers:
 - A design decision contradicts the active refactor direction.
 - Tool results, skill contents, or documents conflict with each other.
 - About to produce a large artifact (design doc, rewrite, plan) on assumptions that may be stale.
-- A reviewer, auditor, or test-analyst returns substantial findings (Critical / Important / Multiple Minor / NEEDS_REVISION). Even if the top-level summary is "APPROVED" or "no strict gaps", interrogate every level before acting — a Minor finding or a "flagged but not a gap" note may hint at a false-world-model assumption the reviewer didn't escalate. See `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/feedback_review-all-levels.md`.
+- A reviewer, auditor, or test-analyst returns substantial findings (Critical / Important / Multiple Minor / NEEDS_REVISION). Even if the top-level summary is "APPROVED" or "no strict gaps", interrogate every level before acting — a Minor finding or a "flagged but not a gap" note may hint at a false-world-model assumption the reviewer didn't escalate. See `.notes/feedback_review-all-levels.md`.
 - A planning decision feels skeevy, even if a subagent or prior session approved it. Surface the concern ("Why are we grepping for that?", "Is this rubric-as-text?") and re-examine before writing more.
 - A batch-fix pattern emerges (multiple findings queued for implementation). Batch-fixing skips the discussion step where embedded assumptions get surfaced. Work findings one by one, discussing what each fix reveals before moving to the next.
 
