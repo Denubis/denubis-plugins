@@ -1,0 +1,19 @@
+{
+  "name": "denubis-academic",
+  "description": "Scholarly workflow for Claude Code: academic register and revision passes, critical-friend manuscript review, and a Zotero corpus rendered to page-keyed markdown for quotation and annotation. Successor to denubis-bibliography, which it absorbs.",
+  "version": "0.13.0",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "academic",
+    "writing",
+    "peer-review",
+    "zotero",
+    "bibliography",
+    "research",
+    "markdown"
+  ]
+}
