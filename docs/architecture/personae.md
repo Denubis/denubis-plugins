@@ -29,7 +29,7 @@ User types, their goals, access patterns, and constraints.
 1. **Starting a new feature.** Invokes `/starting-a-design-plan`. Claude runs `denubis-plan-and-execute`'s brainstorming, clarification, write, and proleptic-challenge skills, dispatching `denubis-research-agents:codebase-investigator` for codebase reality checks. A design plan lands in `docs/design-plans/`.
 2. **Running an implementation plan.** Invokes `/starting-an-implementation-plan`. `impl-plan-write` builds a per-task plan; `/executing-an-implementation-plan` drives `task-implementor` (Opus) and `code-reviewer` (Sonnet) agents through each task with TDD.
 3. **About to commit something risky.** `claudemd-reminder` fires after a `git status`/`git log` reminding to dispatch `project-claude-librarian` if contracts changed. `gh-fork-guard` denies `gh pr create` against upstream. `code-quality-guard` denies file edits that match banned patterns (e.g. `create_all`, migration edits, debug statements).
-4. **Reading academic literature.** Adds a paper to Zotero. Invokes `denubis-bibliography:using-bibliography` to render the PDF into per-page markdown and emit page-keyed blockquotes.
+4. **Reading academic literature.** Adds a paper to Zotero. Invokes `denubis-academic:using-bibliography` to render the PDF into per-page markdown and emit page-keyed blockquotes.
 5. **Generic agent dispatch.** Uses `denubis-basic-agents` (haiku/sonnet/opus general-purpose, python-developer, academic-researcher) when a fresh subagent without specific tooling is the right move; `using-generic-agents` is the selection guide.
 
 ## Persona Relationships

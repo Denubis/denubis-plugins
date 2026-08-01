@@ -25,7 +25,7 @@ Meta + utility:
 - [`denubis-extending-claude/0-context.md`](plugins/denubis-extending-claude/0-context.md) — nine authoring skills + `project-claude-librarian` agent for CLAUDE.md/AGENTS.md upkeep.
 - [`denubis-00-getting-started/0-context.md`](plugins/denubis-00-getting-started/0-context.md) — `/getting-started` and `/setup` slash commands.
 - [`denubis-git-commit/0-context.md`](plugins/denubis-git-commit/0-context.md) — single skill that handles `/commit`.
-- [`denubis-bibliography/0-context.md`](plugins/denubis-bibliography/0-context.md) — Zotero PDF → per-page markdown + page-keyed blockquotes (skill marks itself WIP — only one validated path).
+- [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — Zotero PDF → per-page markdown + page-keyed blockquotes (skill marks itself WIP — only one validated path). Scoped to `using-bibliography`; no Level 0 yet covers `academic-writing` or `paper-review`.
 
 ## Shared Documents
 
