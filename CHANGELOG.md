@@ -1,5 +1,9 @@
 # Changelog
 
+## [marketplace] 2.1.0
+
+`denubis-external-agents` 0.12.0. No plugin added or removed, so the catalogue itself takes a minor bump.
+
 ## [denubis-external-agents] 0.12.0
 
 Context handling for a joined codex pane becomes tool behaviour instead of prose the supervisor had to re-derive each session.
