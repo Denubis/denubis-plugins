@@ -81,14 +81,14 @@ ignore = [
 # torch) are imported lazily inside the shell functions so the pure functional
 # core stays importable and unit-testable without those (gigabyte) deps. The
 # parsers' branch/statement counts are inherent to the formats they handle.
-"plugins/denubis-bibliography/skills/using-bibliography/annotate.py" = ["PLC0415"]
-"plugins/denubis-bibliography/skills/using-bibliography/fetch.py" = [
+"plugins/denubis-academic/skills/using-bibliography/annotate.py" = ["PLC0415"]
+"plugins/denubis-academic/skills/using-bibliography/fetch.py" = [
     "PLC0415",
     "PLR0912",
     "PLR0915",
 ]
-"plugins/denubis-bibliography/skills/using-bibliography/renderer.py" = ["PLC0415"]
-"plugins/denubis-bibliography/skills/using-bibliography/ingest.py" = [
+"plugins/denubis-academic/skills/using-bibliography/renderer.py" = ["PLC0415"]
+"plugins/denubis-academic/skills/using-bibliography/ingest.py" = [
     "PLR0912",
     "PLR0915",
 ]

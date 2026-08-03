@@ -1,4 +1,4 @@
-"""Tests for plugins/denubis-bibliography/skills/using-bibliography/renderer.py.
+"""Tests for plugins/denubis-academic/skills/using-bibliography/renderer.py.
 
 Quality-heuristic coverage: empty pages, marker-only pages (Levenson 1973
 case), marker + content pages (Vanlissa 2024 case), U+FFFD ratio
@@ -16,7 +16,7 @@ import pytest
 _RENDERER = (
     Path(__file__).resolve().parent.parent
     / "plugins"
-    / "denubis-bibliography"
+    / "denubis-academic"
     / "skills"
     / "using-bibliography"
     / "renderer.py"

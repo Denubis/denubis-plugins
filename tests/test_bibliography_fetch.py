@@ -1,4 +1,4 @@
-"""Tests for plugins/denubis-bibliography/skills/using-bibliography/fetch.py.
+"""Tests for plugins/denubis-academic/skills/using-bibliography/fetch.py.
 
 Covers the functional core: resolve_target (human group + collection names ->
 numeric groupID + collectionKey, the step that used to be improvised as a
@@ -20,7 +20,7 @@ import pytest
 _FETCH = (
     Path(__file__).resolve().parent.parent
     / "plugins"
-    / "denubis-bibliography"
+    / "denubis-academic"
     / "skills"
     / "using-bibliography"
     / "fetch.py"

@@ -1,4 +1,4 @@
-"""Tests for plugins/denubis-bibliography/skills/using-bibliography/bbt.py.
+"""Tests for plugins/denubis-academic/skills/using-bibliography/bbt.py.
 
 Path-shape coverage for parse_pdf_paths: Linux/macOS, Windows (unescaped
 and BibLaTeX-escaped drive-letter colon), multi-attachment entries,
@@ -16,7 +16,7 @@ import pytest
 _BBT = (
     Path(__file__).resolve().parent.parent
     / "plugins"
-    / "denubis-bibliography"
+    / "denubis-academic"
     / "skills"
     / "using-bibliography"
     / "bbt.py"

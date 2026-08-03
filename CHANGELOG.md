@@ -1,5 +1,31 @@
 # Changelog
 
+## [marketplace] 3.0.0
+
+**Removed:**
+- `denubis-bibliography`. It is absorbed into `denubis-academic`, which succeeds it and continues its version line. Anyone with `denubis-bibliography` installed must switch, so the marketplace takes a major bump.
+
+**New:**
+- `denubis-academic`.
+
+## [denubis-academic] 0.13.0
+
+A new plugin holding the scholarly workflow, which had been scattered across two plugins and one untracked directory. Succeeds `denubis-bibliography` and absorbs it, so the version line continues from 0.12.0 rather than restarting.
+
+**New:**
+- `paper-review`, promoted from seven files that had never been committed. They lived untracked in a worktree, on a single disk, and any forced worktree removal would have destroyed them. Landed here directly rather than staged through `denubis-plan-and-execute`, so the skill is relocated once instead of twice.
+
+**Changed:**
+- `academic-writing` moves here from `denubis-plan-and-execute`, with its register template and the paired output style. The style is the user-facing half of the same capability, so splitting them across plugins would have divided one thing in two.
+- `using-bibliography` and `references.bib` move here from `denubis-bibliography`, which is dissolved rather than kept as an alias.
+- `paper-review` previously discovered `using-bibliography` from "the separately installed `denubis-bibliography` plugin". They are now siblings, and the text says so.
+- The Crossref and Zotero User-Agent in `ingest.py` and `resolve.py` identifies as `denubis-academic`.
+
+## [denubis-plan-and-execute] 3.0.0
+
+**Removed:**
+- `academic-writing` and its output style now live in `denubis-academic`. A major bump because anyone who installed this plugin alone loses the skill; installing `denubis-academic` restores it.
+
 ## [marketplace] 2.1.0
 
 `denubis-external-agents` 0.12.0. No plugin added or removed, so the catalogue itself takes a minor bump.

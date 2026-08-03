@@ -1,4 +1,4 @@
-"""Tests for plugins/denubis-bibliography/skills/using-bibliography/annotate.py.
+"""Tests for plugins/denubis-academic/skills/using-bibliography/annotate.py.
 
 Covers the functional core of the annotate-back workflow: turning a citation
 (citekey, page, quote, note) into a Zotero highlight annotation via the
@@ -30,7 +30,7 @@ import pytest
 _ANNOTATE = (
     Path(__file__).resolve().parent.parent
     / "plugins"
-    / "denubis-bibliography"
+    / "denubis-academic"
     / "skills"
     / "using-bibliography"
     / "annotate.py"

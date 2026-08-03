@@ -74,7 +74,7 @@ citekey/author/title, it does not inherit the DOI path's failure modes (Crossref
 dependency, empty-author DOIs, DOI drift).
 
 ```bash
-R=plugins/denubis-bibliography/skills/using-bibliography/resolve.py
+R=plugins/denubis-academic/skills/using-bibliography/resolve.py
 # Bare query is auto-classified: DOI shape (10.NNNN/…) -> --doi; citekey shape -> --citekey
 uv run $R vehtariPracticalBayesianModel2017
 uv run $R --author Vehtari --year 2017
@@ -246,7 +246,7 @@ paper does not contain, say so plainly rather than inventing it.
 For batch ingest from DOIs (the most common case):
 
 ```bash
-uv run plugins/denubis-bibliography/skills/using-bibliography/ingest.py \
+uv run plugins/denubis-academic/skills/using-bibliography/ingest.py \
     10.1145/1273445.1273458 \
     10.1111/jels.12413 \
     ...
@@ -298,7 +298,7 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
    **without writing**:
 
    ```bash
-   uv run plugins/denubis-bibliography/skills/using-bibliography/fetch.py \
+   uv run plugins/denubis-academic/skills/using-bibliography/fetch.py \
        --group "<group name or numeric groupID>" \
        --collection "<collection name>" \
        <DOI/ISBN/PMID/arXiv> ...
@@ -332,7 +332,7 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
 4. **Fetch** — re-run the same command with `--fetch` to write:
 
    ```bash
-   uv run plugins/denubis-bibliography/skills/using-bibliography/fetch.py \
+   uv run plugins/denubis-academic/skills/using-bibliography/fetch.py \
        --group "<…>" --collection "<…>" --fetch <DOI> ...
    ```
 
@@ -680,7 +680,7 @@ ai-generated: true   # remove after human review
 **Verify every blockquote with `blockquote.py`** before writing it:
 
 ```bash
-python plugins/denubis-bibliography/skills/using-bibliography/blockquote.py \
+python plugins/denubis-academic/skills/using-bibliography/blockquote.py \
     ~/zettelkasten/papers/<citekey>/pages \
     <citekey> \
     "<verbatim substring>"

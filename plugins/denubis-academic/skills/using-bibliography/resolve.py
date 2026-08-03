@@ -621,7 +621,7 @@ def crossref_first_author_family(doi: str) -> str | None:
             f"https://api.crossref.org/works/{doi}",
             headers={
                 "User-Agent": (
-                    "denubis-bibliography/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
+                    "denubis-academic/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
                 )
             },
             timeout=10,

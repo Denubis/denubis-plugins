@@ -1,6 +1,6 @@
 ---
 name: using-plan-and-execute
-description: Use when starting any conversation - mandatory skill workflows: Read before announcing, brainstorm before coding, TaskCreate for checklists
+description: Use when starting any conversation - mandatory skill workflows. Read before announcing, brainstorm before coding, TaskCreate for checklists
 user-invocable: false
 ---
 
