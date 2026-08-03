@@ -69,9 +69,11 @@ rendered — then renders it by default so it can be "asked questions".
 
 It queries the **running Zotero DB** (BBT JSON-RPC: `item.search` /
 `item.collections` / `item.attachments` / `user.groups`), never the cached `.bib`
-export — so it cannot report a stale ghost. And because it resolves by
-citekey/author/title, it does not inherit the DOI path's failure modes (Crossref
-dependency, empty-author DOIs, DOI drift).
+export — so it cannot report a stale ghost. `--doi` searches the DOI **field**
+itself through the stock local API (`qmode=fields`), so no key routes through
+Crossref any more, and the empty-author and journal-DOI classes that used to
+fail now resolve. DOI drift (the item's DOI field differing from the `.bib`)
+remains real, and no DOI query can resolve it; carry the citekey instead.
 
 ```bash
 R=plugins/denubis-academic/skills/using-bibliography/resolve.py
@@ -79,7 +81,7 @@ R=plugins/denubis-academic/skills/using-bibliography/resolve.py
 uv run $R vehtariPracticalBayesianModel2017
 uv run $R --author Vehtari --year 2017
 uv run $R --title "scoping studies"
-uv run $R --doi 10.1007/s13347-024-00760-w        # DOI: Crossref-surname fallback (the one weak key)
+uv run $R --doi 10.1007/s13347-024-00760-w        # DOI: exact DOI-field search, all libraries
 uv run $R --citekey <key> --library "My Library" --no-render   # narrow + don't render
 ```
 
@@ -415,11 +417,22 @@ bib = requests.post(
   ASCII-folded form and compares folded on both sides, so either spelling
   resolves; by hand, fold the diacritics out of the query token.
 - **`item.search` does NOT index the DOI field.** Searching `"10.1111/jels.12413"`
-  returns zero hits even for the exact item with that DOI. To resolve a DOI to
-  a Zotero item, look up the DOI's first-author surname via Crossref
-  (`https://api.crossref.org/works/<doi>`, free, no auth), then search BBT
-  by that surname, then filter results by `DOI` field exact-match. This is
-  what `ingest.py` does.
+  returns zero hits even for the exact item with that DOI (re-verified against
+  Zotero 9.0.6 + BBT, 2026-08-03: the same query by author surname returns hits
+  that carry that DOI in their own output). **The stock local API can search it**,
+  via `qmode=fields`, which expands to a `field contains` condition over every
+  item data field:
+  `/api/users/0/items?q=<doi>&qmode=fields&format=json`. Two consequences:
+  `contains` over-matches, so filter to an exact DOI client-side; and the mode
+  does not set `noChildren`, so drop attachment children. `/api/users/0/` is My
+  Library ALONE, so sweep `/api/groups/<groupID>/items` too, enumerating groups
+  from `/api/users/0/groups`. `resolve.py --doi` does all of this. `ingest.py`
+  still uses the old Crossref-surname chain and inherits its failures.
+- **Do not read `qmode=everything` for a DOI and conclude the field is
+  unsearchable.** That mode adds PDF fulltext, so a DOI query returns hundreds of
+  attachment hits and the parent sits below the first page. Reading the first few
+  results of that set is what recorded DOI-field search as impossible for six
+  weeks. It was always there.
 - **Cite keys must be read from `item.search` results — never constructed.**
   BBT cite-key formats are deterministic but longer than they look. Tried
   `mageshHallucinationFreeAssessing2025` (truncated guess) → "not found."
@@ -943,7 +956,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Treating a `resolve.py` / `item.search` "no match" as proof a paper is absent | It is not. `item.search` is AND-fuzzy, **first-author-only**, and **ASCII-folded** — three independent ways a present paper returns zero. `resolve.py` now compensates (unions every supplied key, folds diacritics, matches hyphen-components), but if it still says no-match, query the API directly for a distinctive title word before concluding absence. The honest no-match message says exactly this. |
 | Searching `--author` for a co-author (`Ghahramani` in "Wade, Ghahramani"; `Kruschke` in "Liddell, Kruschke") and getting zero | `item.search` indexes only the FIRST author surname. Pass the first author, or add a `--title` word — `resolve.py` unions all supplied keys, so `--author <coauthor> --title <word>` resolves. |
 | Searching `--author Frühwirth` (diacritics) and getting zero | BBT's index is ASCII-folded, so `Frühwirth` misses `fruhwirth`. `resolve.py` searches the folded form too and compares folded on both sides; by hand, strip diacritics from the query token. |
-| Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | DOI field is not indexed for fulltext search. Resolve DOI → surname via Crossref, then search by surname, then filter results by exact DOI match. |
+| Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | BBT does not index DOI, but the stock local API does: `?q=<doi>&qmode=fields`, swept per library, filtered to exact DOI and non-attachment. Use `resolve.py --doi`. Do NOT reach for Crossref. |
 | Using the storage directory name (e.g. `2367YXMF`) as the item key | That's the attachment key. The parent item has a different key; use cite-key based lookups. |
 | Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
 | Asserting "I rendered N papers" without showing the file paths | Verify by `ls ~/zettelkasten/papers/<citekey>/`. Don't claim success without checking. |
@@ -952,7 +965,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Hand-rolling `item.export` + a diff to splice one new citekey into a project bib | That improvisation left a bib in an uncertain state before a freeze — the failure this endpoint exists to remove. Use `resolve.py --citekey <key> --bib <abs path>`: it triggers the registered "Keep updated" export (BBT's own bytes) then verifies the citekey is present in a well-formed bib. Never construct or patch bib entries by hand. |
 | Refreshing a project bib with the library pull-export (`/better-bibtex/library?/<id>/library.biblatex`) | That dumps the WHOLE library, not the project collection the bib targets, so it clobbers `references.bib` with wrong-scope content. Use `resolve.py --bib` (forces the registered collection export); if the endpoint is absent, install/upgrade zotero-api-plus to >= 0.4.0 rather than pulling the whole library. |
 | Searching for an item that lives in multiple libraries and assuming the first `item.search` hit is the canonical copy | The same paper can exist in My Library AND a group library as separate Zotero items with the same cite key. Always pass the explicit `library_id` to `item.attachments` / `item.export` for the library you actually want. |
-| Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so the surname-search step has nothing to query and lookup fails. Bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
+| Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so `ingest.py`'s surname-search step has nothing to query and lookup fails. `resolve.py --doi` is unaffected (it searches the DOI field directly; `10.1002/9780470567333.ch7` resolves). For `ingest.py`, bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
 | Verifying a quote with `blockquote.py` and giving up at the first NO MATCH | Try adjusted substrings before flagging unverified: strip Unicode apostrophes, drop fragments that fall inside an HTML-rendered table cell, check whether the "quote" is actually a paraphrase of source text. The real text is usually present — match logic is brittle. |
 | Treating docling+OCR output as faithful transcription | OCR introduces substitutions (`0`/`o`, `S`/`5`, dropped short words). For a paper rendered via docling+OCR (`meta.json: "renderer": "docling", "ocr": true`), use the markdown to *locate* a quote, then verify the exact wording against the source PDF before pasting verbatim. |
 | Assuming docling defaults to EasyOCR | Recent docling builds default to RapidOCR, which downloads ONNX models from `modelscope.cn` at first OCR use — that endpoint is unreliable outside China. `renderer.py` pins `EasyOcrOptions(lang=["en"])` explicitly. Match that in any one-off script that calls docling directly. |
@@ -1149,10 +1162,15 @@ discovery):
   `--with pymupdf4llm --with docling --with easyocr` because `render.py` has no
   PEP 723 header; `_render_cmd` now encodes that and is regression-tested. Live
   render confirmed end-to-end (Vehtari, 28 pages via pymupdf4llm).
-- DOI remains the one weak key (BBT can't search the DOI field): `--doi` uses the
-  same Crossref-surname fallback as `ingest.py`. A clean DOI-field search + bundled
-  on-disk path is specced for a future `zotero-api-plus` `GET /api/plus/resolve`
-  endpoint, which would let `resolve.py` demote the BBT/Crossref path to a fallback.
+- DOI is no longer the weak key (2026-08-03). `--doi` searches the DOI field
+  through the stock local API's `qmode=fields`, swept across every library, with
+  the exact-DOI and drop-attachments filters applied client-side. Crossref is gone
+  from `resolve.py`. The `GET /api/plus/resolve` endpoint specced for this was
+  **not built**, because the premise did not survive re-verification: stock could
+  already search the DOI field, and the on-disk path half was already answered by
+  BBT `item.attachments`. The prior "stock cannot" finding came from reading the
+  first three results of a 278-hit `qmode=everything` query. `ingest.py` still
+  carries the old Crossref chain.
 - Critical-peer-review pass (2026-06-17) hardened truthfulness: render state is now
   **per-citekey** (a paper renders once; copies never re-render or clobber the
   shared `papers/<citekey>/` dir; `--force` re-renders) — replacing a per-copy

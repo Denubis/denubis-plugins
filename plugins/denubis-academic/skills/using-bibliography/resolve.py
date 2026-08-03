@@ -4,12 +4,15 @@ title, date, citekey, or DOI — report the truth about where it lives and its
 state, and (by default) render it so it can be asked questions.
 
 This is the front door for "ask a paper a question": it makes *a paper*
-available. It is citekey-capable and fully live — resolution queries the
-*running* Zotero database via BBT JSON-RPC, never the cached
-`.bib` export. That removes both failure modes of the old DOI-only path: the
-Crossref dependency (empty-author DOIs, whole journal-DOI classes) and
+available. It is citekey-capable and fully live: resolution queries the
+*running* Zotero database via BBT JSON-RPC and the stock local API, never the
+cached `.bib` export. That removes both failure modes of the old DOI-only path,
+the Crossref dependency (empty-author DOIs, whole journal-DOI classes) and
 stale-file ghosts (a paper present in Zotero reported as missing because the
 on-disk `.bib` lagged).
+
+`--doi` searches the DOI *field* through the stock local API (`qmode=fields`),
+because BBT `item.search` does not index DOI. Crossref is no longer involved.
 
 For each match it reports the libraries AND collections the paper is in, whether
 a PDF is attached and on disk, and whether it has been rendered — and renders it
@@ -42,13 +45,16 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
-# httpx is imported lazily inside the shell functions (rpc / probe_zotero /
-# crossref_first_author_family) so the pure functional core stays importable
-# without the PEP 723 deps — unit tests load this module and exercise pure
-# functions directly. This mirrors fetch.py's idiom.
+# httpx is imported lazily inside the shell functions (rpc / probe_zotero, and
+# inside zotero_local_api) so the pure functional core stays importable without
+# the PEP 723 deps — unit tests load this module and exercise pure functions
+# directly. This mirrors fetch.py's idiom.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from zotero_local_api import search_doi_field
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
+LOCAL_API_BASE = "http://localhost:23119/api"
 # zotero-api-plus >= 0.4.0 forces a registered BBT auto-export to run on demand.
 RUN_AUTOEXPORT_ENDPOINT = "http://localhost:23119/api/plus/run-autoexport"
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
@@ -607,58 +613,22 @@ def probe_zotero() -> None:
         )
 
 
-def crossref_first_author_family(doi: str) -> str | None:
-    """DOI -> first-author family name via Crossref (mirrors ingest.py).
-
-    BBT item.search does NOT index the DOI field, so a DOI search returns
-    nothing. Crossref gives a name token; we search Zotero with that, then
-    filter hits by exact DOI match.
-    """
-    import httpx  # noqa: PLC0415
-
-    try:
-        r = httpx.get(
-            f"https://api.crossref.org/works/{doi}",
-            headers={
-                "User-Agent": (
-                    "denubis-academic/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
-                )
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        msg = r.json().get("message", {})
-        authors = msg.get("author", [])
-        if authors and "family" in authors[0]:
-            return authors[0]["family"]
-    except Exception:
-        return None
-    return None
-
-
 def search_by_doi(doi: str) -> list[Paper]:
-    """Locate Zotero items by DOI via the Crossref fallback.
+    """Locate Zotero items by exact DOI field, server-side, without Crossref.
 
-    Mirrors ingest.py's find_by_doi. Returns all hits whose DOI matches exactly
+    Candidates come from the stock local API DOI-field search; each citekey is
+    then resolved through BBT so every library copy is reported and Paper
+    normalisation stays on one path. Returns all hits whose DOI matches exactly
     (case-insensitive). A DOI can appear in more than one library.
     """
     candidates_seen: set[str] = set()
     papers: list[Paper] = []
 
-    surname = crossref_first_author_family(doi)
-    queries: list[str] = []
-    if surname:
-        queries.append(surname)
-    queries.append(doi)
-    last_segment = doi.rsplit("/", maxsplit=1)[-1]
-    if last_segment not in queries:
-        queries.append(last_segment)
-
-    for q in queries:
+    for citekey in search_doi_field(doi):
         try:
-            hits = rpc("item.search", [q]) or []
+            hits = rpc("item.search", [citekey]) or []
         except Exception:  # noqa: S112
-            # Best-effort: a failed query variant must not abort the others.
+            # Best-effort: a failed citekey query must not abort the others.
             continue
         for h in hits:
             key = h.get("citation-key") or ""
@@ -952,10 +922,11 @@ def print_no_match(
         )
     if doi:
         print(
-            "  DOI path: BBT cannot search the DOI field, so this used a Crossref\n"
-            "  surname lookup; some journal and chapter DOIs return no author there,\n"
-            "  leaving the search nothing to query. This is NOT proof of absence —\n"
-            "  retry with --author or a distinctive --title word.",
+            "  DOI path: this searched the DOI field itself across every library,\n"
+            "  so a no-match means no item carries this DOI. The item may still be\n"
+            "  present under a DIFFERENT DOI (publisher drift between the .bib and\n"
+            "  the item's field) — retry with --citekey, --author, or a distinctive\n"
+            "  --title word before concluding it is absent.",
             flush=True,
         )
     else:
@@ -1180,7 +1151,8 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     near: list[ScoredHit] = []
     search_errors: list[str] = []
     if args.doi:
-        # BBT can't search the DOI field — use the Crossref-surname fallback.
+        # BBT can't search the DOI field; the stock local API can, via
+        # qmode=fields. No Crossref round trip.
         tokens = [args.doi]
         papers = search_by_doi(args.doi)
     else:
