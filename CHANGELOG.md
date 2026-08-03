@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-00-getting-started] 1.5.0
+
+Adds the npm install-script policy skill: the machine's supply-chain defaults, the
+procedure for working inside them, and what they do not cover.
+
+**New:**
+- `npm-install-script-policy` skill. Covers `ESTRICTALLOWSCRIPTS`, `EALLOWSCRIPTS`,
+  and npm 12's `Refusing to fetch` git gate; the block-read-approve procedure;
+  and the residual risks, including that a project `.npmrc` carrying
+  `dangerously-allow-all-scripts=true` defeats the user-level policy entirely.
+  Every claim carries the npm version it was verified against (11.17.0 / 12.0.1,
+  2026-08-03, real installs with positive controls).
+
 ## [marketplace] 3.0.0
 
 **Removed:**

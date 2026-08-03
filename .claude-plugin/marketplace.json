@@ -11,7 +11,7 @@
     {
       "name": "denubis-00-getting-started",
       "description": "Getting started guide and onboarding for denubis-plugins",
-      "version": "1.4.2",
+      "version": "1.5.0",
       "source": "./plugins/denubis-00-getting-started",
       "author": {
         "name": "Brian Ballsun-Stanton",
