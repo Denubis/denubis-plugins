@@ -1,5 +1,24 @@
 # Spec request: `GET /api/plus/resolve` — one live call to resolve a paper
 
+> **STATUS as of 2026-08-03, read this before implementing anything below.**
+> The spec's own prediction came true: the core fix shipped in the Python helper
+> with no plugin change. `resolve.py` is now citekey-capable and fully live
+> against BBT JSON-RPC, searching every supplied key and unioning the hits, with
+> precision filtered client-side. The "Why now" paragraph immediately following
+> describes a resolver that no longer exists.
+>
+> **What is still open is narrower than the whole document.** `--doi` is the one
+> input that still routes through Crossref (`search_by_doi` →
+> `crossref_first_author_family` → BBT surname search → DOI filter), because BBT
+> `item.search` does not index the DOI field and stock `qmode=everything` matches
+> the DOI string in PDF fulltext, returning attachments with `DOI: null` rather
+> than the parent item. Server-side exact search on the DOI field is the live
+> ask. Verify what the helper already derives about attachment paths before
+> treating the second half of the ask as open too.
+>
+> Written 2026-06-17 against Zotero 9.0.4 + BBT. Re-verify that floor before
+> implementing.
+
 **For:** the `zotero-api-plus` plugin (`Zotero.Server.LocalAPI.*`).
 **Why now:** the bibliography skill's current resolver keys on **DOI** and goes
 through a fragile Crossref → author-surname → BBT `item.search` → DOI-filter
