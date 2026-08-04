@@ -1,5 +1,28 @@
 # Changelog
 
+## [denubis-external-agents] 0.13.0
+
+The codex monitor's pending-prompt reminders now stop after an hour, and a prompt that
+survives a spinner frame keeps its clock.
+
+**Changed:**
+- Reminders give up after an hour unanswered (`REMINDER_GIVE_UP_SECONDS`), and the final
+  line carries `no further reminders` so the quiet that follows reads as a decision
+  rather than a dead monitor. The ten-minute repeat ran forever, and a supervisor blocked
+  on a permission prompt in its own pane queued one line per ten minutes it was away:
+  fifteen hours delivered ninety lines all saying what the newest already said. Now nine
+  lines, then quiet. The hour is spent per waiting thing, so a new prompt gets the full
+  two-five-ten ladder.
+
+**Fixed:**
+- A pending approval that saw a single `Working` poll lost its reminder permanently.
+  Dropping the clock on busy is correct, but the returning approval carries a correlation
+  key `advance` has already recorded, so it took the unchanged branch, which neither
+  emits nor arms. Only `classify_snapshot` matching approval text ahead of busy kept this
+  from silencing live panes, and that ordering is what regressed in `fa54c31`.
+  `_ensure_reminder` now restores the clock for the announced prompt, and the comment
+  asserting the old code "re-arms" is corrected in both the source and the skill.
+
 ## [denubis-00-getting-started] 1.5.0
 
 Adds the npm install-script policy skill: the machine's supply-chain defaults, the
