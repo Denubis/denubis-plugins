@@ -38,10 +38,15 @@ _MODULE_PATH = (
     / "codex_supervisor.py"
 )
 
-# The ruling's schedule: two minutes, then five, then ten, then ten forever.
+# The ruling's schedule: two minutes, then five, then ten, then ten until the hour.
 _FIRST = 120.0
 _SECOND = 300.0
 _STEADY = 600.0
+# Brian, 2026-08-04: an hour unanswered is where it stops. The supervisor can be blocked
+# behind a permission prompt in its own pane, and the ten-minute drum then queues one
+# repeat per ten minutes the human is away. Fifteen hours of that is ninety lines
+# carrying one fact between them, since the newest says everything the older ones do.
+_GIVE_UP = 3600.0
 
 
 @pytest.fixture(scope="module")
@@ -114,6 +119,73 @@ def test_the_interval_lengthens_rather_than_repeating_flatly(
     assert gaps == [_FIRST, _SECOND, _STEADY, _STEADY], (
         f"backoff schedule was {gaps}, expected two minutes, five, ten, then ten"
     )
+
+
+def _run_until_it_stops(
+    watch: ModuleType,
+    state: object,
+    now: float,
+) -> tuple[object, object | None, float]:
+    """Tick the clock until the reminder disarms, returning the last line it raised."""
+    last = None
+    for _tick in range(20_000):
+        now += 1.0
+        state, due = watch.due_reminder(state, now)
+        if due is not None:
+            last = due
+        if state.reminder is None:
+            return state, last, now
+    pytest.fail("the reminder never stopped; it is still drumming after 20000 seconds")
+
+
+def test_reminders_stop_once_the_hour_has_passed(watch: ModuleType) -> None:
+    """Brian, 2026-08-04. Past an hour the repeats cost context and add no fact."""
+    state = watch.arm_reminder(watch.MonitorState(), _approval(watch), 1000.0)
+
+    state, last, now = _run_until_it_stops(watch, state, 1000.0)
+
+    assert last is not None, "gave up without ever raising the prompt"
+    assert last.waited_seconds >= _GIVE_UP, (
+        f"stopped after {last.waited_seconds}s, short of the hour the operator ruled"
+    )
+    _, after = watch.due_reminder(state, now + _GIVE_UP * 10)
+    assert after is None, "kept reminding after it had given up"
+
+
+def test_the_last_reminder_says_it_is_the_last(
+    watch: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A monitor that simply stops printing reads exactly like one that has died.
+
+    The quiet after the hour is a decision, and the reader can only tell it from a
+    crashed monitor or a lost clock if the final line says so on its way out.
+    """
+    state = watch.arm_reminder(watch.MonitorState(), _approval(watch), 1000.0)
+    _, last, _ = _run_until_it_stops(watch, state, 1000.0)
+    assert last is not None
+
+    watch._emit("%10", last)
+
+    line = capsys.readouterr().out
+    assert "no further reminders" in line, (
+        f"final line {line!r} is indistinguishable from every earlier repeat, so the "
+        "silence that follows cannot be told from a monitor that stopped working"
+    )
+
+
+def test_an_ordinary_reminder_does_not_claim_to_be_the_last(
+    watch: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The give-up notice means nothing if every repeat carries it."""
+    state = watch.arm_reminder(watch.MonitorState(), _approval(watch), 1000.0)
+    _, due = watch.due_reminder(state, 1000.0 + _FIRST)
+    assert due is not None
+
+    watch._emit("%10", due)
+
+    assert "no further reminders" not in capsys.readouterr().out
 
 
 def test_a_crash_is_never_raised_again(watch: ModuleType) -> None:
@@ -191,9 +263,13 @@ def test_an_answered_approval_stops_nagging(watch: ModuleType) -> None:
     produces three reminders about a prompt that was dealt with in the first thirty
     seconds, which is the failure that teaches people to ignore the monitor.
 
-    Dropping the reminder on busy cannot lose a live approval, because
-    `classify_snapshot` matches pending approval text before falling through to busy:
-    a pane genuinely waiting classifies as APPROVAL on every poll and re-arms.
+    Dropping the clock here cannot lose a live approval, but not for the reason this
+    docstring gave until 2026-08-04. `classify_snapshot` matching approval text before
+    falling through to busy is real, and it was the only protection: `advance` takes its
+    unchanged-correlation branch when the prompt returns, which neither emits nor arms,
+    so the claim that a waiting pane "re-arms" was false and one spinner frame silenced
+    the prompt for good. `_ensure_reminder` is what re-arms it now, and the test above
+    covers that path directly rather than leaving it to the classifier's ordering.
     """
     state = watch.arm_reminder(watch.MonitorState(), _approval(watch), 1000.0)
 
@@ -203,6 +279,60 @@ def test_an_answered_approval_stops_nagging(watch: ModuleType) -> None:
     assert due is None, (
         "kept reminding about an approval while Codex was working; the human answered "
         "it and the monitor is now crying wolf"
+    )
+
+
+def test_an_approval_that_outlasts_a_busy_flicker_gets_its_clock_back(
+    watch: ModuleType,
+) -> None:
+    """One spinner frame must not disarm a prompt that is still on screen.
+
+    Dropping the clock on busy is right, because a working pane waits on nobody. The
+    comment at the busy branch justified it by claiming a pane genuinely waiting
+    "classifies as APPROVAL on every poll and re-arms", and the second half was false.
+    The returning approval carries the correlation key already recorded, so advance
+    takes its unchanged branch, which neither emits nor arms, and the clock never
+    came back.
+
+    Nothing but classify_snapshot's ordering stood between that and a silent pane, and
+    that ordering is exactly what regressed in fa54c31, when a Ready title was read
+    before the approval text beneath it.
+    """
+    approval = _approval(watch)
+    state, _ = watch._apply_observation(
+        watch.MonitorState(seen_activity=True), approval, "%10", 1000.0
+    )
+    assert state.reminder is not None, "the first approval never armed a clock at all"
+
+    state, _ = watch._apply_observation(
+        state, watch.classify_snapshot("⠋ Working", ""), "%10", 1010.0
+    )
+    state, _ = watch._apply_observation(state, approval, "%10", 1020.0)
+
+    assert state.reminder is not None, (
+        "an approval still pending after a busy frame has no clock, so it can never be "
+        "raised again and the pane sits blocked in silence"
+    )
+
+
+def test_a_flicker_does_not_resurrect_a_reminder_that_gave_up(
+    watch: ModuleType,
+) -> None:
+    """The hour is spent per waiting thing, and a spinner frame does not refund it."""
+    approval = _approval(watch)
+    state, _ = watch._apply_observation(
+        watch.MonitorState(seen_activity=True), approval, "%10", 1000.0
+    )
+    state, _, now = _run_until_it_stops(watch, state, 1000.0)
+
+    state, _ = watch._apply_observation(
+        state, watch.classify_snapshot("⠋ Working", ""), "%10", now + 1.0
+    )
+    state, _ = watch._apply_observation(state, approval, "%10", now + 2.0)
+
+    assert state.reminder is None, (
+        "a busy frame restarted the ladder on a prompt already given up on, so the "
+        "hour-long stop can be undone by one spinner and the drum resumes"
     )
 
 

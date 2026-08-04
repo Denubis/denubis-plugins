@@ -37,6 +37,12 @@ PROMPT_MARKER = "\N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK}"
 # and an ungated repeat trains the reader to ignore it. A clock is the repair; removing
 # the guard is not. Operator ruling 2026-07-28, after a pane sat blocked for 57 minutes.
 REMINDER_BACKOFF_SECONDS = (120.0, 300.0, 600.0)
+# ...and stops at the hour (Brian, 2026-08-04). The supervisor reading these lines can
+# be blocked on a permission prompt in its own pane, where the ten-minute drum queues a
+# repeat per ten minutes the human is away, so fifteen hours produced ninety lines
+# carrying one fact between them. The last line says it is the last, because a monitor
+# that simply stops printing reads exactly like one that has died.
+REMINDER_GIVE_UP_SECONDS = 3600.0
 SUBMIT_ATTEMPTS = 3
 SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
@@ -105,6 +111,9 @@ class Observation:
     # Set only on a re-raise, so a reminder can say how long the pane has been waiting.
     # Never transported: serialize_observation whitelists four fields and not this one.
     waited_seconds: float | None = None
+    # Set only on the raise that gives up, so the quiet after it reads as a decision
+    # rather than a failure. Not transported either, for the same reason.
+    final: bool = False
 
 
 @dataclass(frozen=True)
@@ -126,6 +135,10 @@ class MonitorState:
     last_correlation_key: str | None = None
     last_action_scoped: bool = False
     reminder: Reminder | None = None
+    # The correlation key of a prompt whose hour ran out. Without it a busy frame
+    # refunds the hour, because the returning screen looks like any other pending thing
+    # that has lost its clock, and _ensure_reminder would start the ladder again.
+    abandoned_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -551,6 +564,15 @@ def classify_snapshot(title: str, content: str) -> Observation:
     return Observation(ObservationKind.BUSY)
 
 
+def _correlation_of(observation: Observation) -> str:
+    """The key identifying one waiting thing across both the poll and hook channels."""
+    return (
+        observation.correlation_key
+        or observation.key
+        or _digest(observation.kind.value)
+    )
+
+
 def advance(state: MonitorState, observation: Observation) -> Transition:
     """Emit each actionable observation once and keep all busy states silent."""
     if observation.kind is ObservationKind.BUSY:
@@ -560,12 +582,16 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
                 emitted_keys=state.emitted_keys,
                 last_correlation_key=state.last_correlation_key,
                 last_action_scoped=state.last_action_scoped,
-                # Busy means Codex is mid-turn, so nothing is waiting on the human and
-                # a pending reminder would nag about a prompt already answered. Dropping
-                # it cannot lose a live approval: classify_snapshot matches pending
-                # approval text before falling through to busy, so a pane genuinely
-                # waiting classifies as APPROVAL on every poll and re-arms.
+                # Busy means Codex is mid-turn, so nothing waits on the human and a
+                # pending reminder would nag about a prompt already answered.
+                #
+                # This does not re-arm by itself, and a comment here claimed it did
+                # until 2026-08-04. A returning approval carries the correlation key
+                # already recorded, so it takes the unchanged branch below, which
+                # neither emits nor arms. _ensure_reminder is what restores the clock,
+                # and it is all that stands between a spinner frame and a silent pane.
                 reminder=None,
+                abandoned_key=state.abandoned_key,
             ),
             None,
         )
@@ -576,7 +602,7 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
         return Transition(state, None)
 
     key = observation.key or _digest(observation.kind.value)
-    correlation_key = observation.correlation_key or key
+    correlation_key = _correlation_of(observation)
     if observation.scoped:
         if key in state.emitted_keys:
             return Transition(state, None)
@@ -596,6 +622,7 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
             last_correlation_key=correlation_key,
             last_action_scoped=True,
             reminder=state.reminder,
+            abandoned_key=state.abandoned_key,
         )
         return Transition(next_state, None if matched_snapshot else observation)
 
@@ -607,6 +634,7 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
         last_correlation_key=correlation_key,
         last_action_scoped=False,
         reminder=state.reminder,
+        abandoned_key=state.abandoned_key,
     )
     return Transition(next_state, observation)
 
@@ -986,6 +1014,19 @@ def due_reminder(
     reminder = state.reminder
     if reminder is None or now < reminder.due_at:
         return state, None
+    waited = now - reminder.armed_at
+    if waited >= REMINDER_GIVE_UP_SECONDS:
+        # Naming what was abandoned is what makes the give-up stick. Disarming alone is
+        # not enough, because a busy frame followed by the same screen returning reaches
+        # _ensure_reminder as a pending prompt that has lost its clock, which is exactly
+        # the case that must get one back.
+        raised = replace(reminder.action, waited_seconds=waited, final=True)
+        abandoned = replace(
+            state,
+            reminder=None,
+            abandoned_key=_correlation_of(reminder.action),
+        )
+        return abandoned, raised
     step = min(reminder.step + 1, len(REMINDER_BACKOFF_SECONDS) - 1)
     rearmed = Reminder(
         action=reminder.action,
@@ -1020,8 +1061,29 @@ def _emit(pane_id: str, action: Observation) -> None:
         parts.append("compact, clear, or quit?")
     if action.waited_seconds is not None:
         parts.append(f"still waiting {_humanise_wait(action.waited_seconds)}")
+    if action.final:
+        parts.append("no further reminders")
     detail = f": {' | '.join(parts)}" if parts else ""
     print(f"codex {pane_id} — {labels[action.kind]}{detail}", flush=True)
+
+
+def _ensure_reminder(
+    state: MonitorState,
+    observation: Observation,
+    now: float,
+) -> MonitorState:
+    """Give the announced prompt its clock back when a busy frame took it away."""
+    if state.reminder is not None:
+        return state
+    correlation_key = _correlation_of(observation)
+    # Only the thing most recently announced. Anything else either was never introduced,
+    # so a "still waiting" line about it would be the first the reader heard of it, or
+    # has had its hour and been let go.
+    if correlation_key != state.last_correlation_key:
+        return state
+    if correlation_key == state.abandoned_key:
+        return state
+    return arm_reminder(state, observation, now)
 
 
 def _apply_observation(
@@ -1032,7 +1094,7 @@ def _apply_observation(
 ) -> tuple[MonitorState, bool]:
     transition = advance(state, observation)
     if transition.action is None:
-        return transition.state, False
+        return _ensure_reminder(transition.state, observation, now), False
     _emit(pane_id, transition.action)
     if transition.action.kind is ObservationKind.CRASH:
         return transition.state, True
