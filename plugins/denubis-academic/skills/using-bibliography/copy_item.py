@@ -14,13 +14,13 @@ create-collection take. They are different number spaces, and mixing them is the
 mistake this module's resolution exists to prevent.
 
 Usage (find the source item's key — read-only):
-    uv run copy.py --find "Game Theoretic"
+    uv run copy_item.py --find "Game Theoretic"
 
 Usage (resolve + preview only, NO write):
-    uv run copy.py --key ABCD1234 --to "My Library"
+    uv run copy_item.py --key ABCD1234 --to "My Library"
 
 Usage (perform the copy, gated behind --copy):
-    uv run copy.py --key ABCD1234 --from "2025-MQ-Teaching-the-Unknown" \
+    uv run copy_item.py --key ABCD1234 --from "2025-MQ-Teaching-the-Unknown" \
         --to "My Library" --copy
 
 Source selection:
