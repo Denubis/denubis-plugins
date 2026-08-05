@@ -365,6 +365,47 @@ confirmation.
 Nagel, CC-BY) — `create-collection` "test" in a group → `add-item-by-id`
 (`pdf: present`, PDF on disk) → `ingest.py` rendered 24 pages via pymupdf4llm.
 
+## Copying an item between libraries (requires zotero-api-plus >= 0.5.0)
+
+`copy_item.py` copies an item, with its attachments, from one Zotero library to
+another via `POST /api/plus/copy-item`. Zotero exposes no headless cross-library
+copy: the capability lives only in `CollectionTree._copyItem()`, which needs a UI
+`targetTreeRow`. **Use the script, never a hand-written curl** — the resolution
+step below is exactly the improvisation that keeps breaking.
+
+```bash
+S=plugins/denubis-academic/skills/using-bibliography
+uv run $S/copy_item.py --find "Game Theoretic"          # locate the item key
+uv run $S/copy_item.py --key N6MN63GX --to "My Library" # preview, NO write
+uv run $S/copy_item.py --key N6MN63GX --from "2025-MQ-Teaching-the-Unknown" \
+    --to "My Library" --copy                            # perform it
+```
+
+**`--to` takes a libraryID, not a groupID, and the script hides that.** This is
+the one trap worth knowing: `add-item-by-id` and `create-collection` take a
+**groupID**, while `copy-item` takes a **targetLibraryID**. They are different
+number spaces for the same library (the SARDI group is libraryID 33, groupID
+6627731). `copy_item.py` accepts a name or either number and resolves it, so
+pass a name where you can.
+
+**The copy is idempotent, by ruling.** If the target already holds a linked
+counterpart it is returned rather than duplicated, and any attachment it lacks is
+topped up, so re-running after a partial copy repairs it. Attachment statuses:
+`copied` (stored file), `imported` (a linked file whose bytes were imported as a
+stored attachment), `already-present`, `source-file-missing`, `no-file-permission`,
+`copy-failed` (carries a `message`). Only the first two mean new bytes landed.
+
+**Placement never creates a collection.** `--to-collection` must name one that
+already exists in the target; compose with `create-collection` first if needed.
+
+**Verified end-to-end 2026-08-05:** `N6MN63GX` (Hicks & Kitto 2025) copied from
+group `2025-MQ-Teaching-the-Unknown` (libraryID 17) into My Library. The target
+PDF landed in its own storage directory (`ACCCRMVD`, distinct from the source's
+`HBK3L3NP`, both on disk), so it is a real copy rather than a link to the
+source's file; the source was untouched; and a second run returned the same
+target key as `reused existing counterpart` with the attachment
+`already-present`, copying nothing.
+
 ## The proven workflow
 
 ### 1. Resolve cite key → PDF file path
