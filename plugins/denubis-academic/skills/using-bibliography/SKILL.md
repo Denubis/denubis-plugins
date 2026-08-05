@@ -406,6 +406,85 @@ source's file; the source was untouched; and a second run returned the same
 target key as `reused existing counterpart` with the attachment
 `already-present`, copying nothing.
 
+## Fixing an item's metadata (requires zotero-api-plus >= 0.6.0)
+
+Zotero's own local API is read-only — `PATCH` on an item returns **501**. The
+write side is `POST /api/plus/update-item`, and the consumer is `update_item.py`.
+As everywhere else here, **never hand-roll the HTTP call**.
+
+It is a **patch**: only the fields you name are touched. This is not what the
+obvious Zotero primitive does. `Zotero.Item.fromJSON()` is a *replace* — it
+clears every field absent from the payload, and because of the branch at
+`item.js:5684` a payload with no `collections` key **removes the item from its
+collections**. The endpoint never calls it.
+
+```bash
+U=plugins/denubis-academic/skills/using-bibliography/update_item.py
+
+uv run $U --find "Ethnography and Virtual Worlds"        # get the key
+uv run $U --key ABCD1234 --type bookSection --set pages=53-82   # DRY RUN
+uv run $U --key ABCD1234 --type bookSection --set pages=53-82 --apply
+```
+
+**Dry run is the default.** Nothing is written without `--apply`. The gate is a
+real boolean on the wire and the endpoint rejects the string `"false"` rather
+than coercing it, because `"false"` is truthy and a coerced write gate fails in
+the one direction that costs data.
+
+**The diff is Zotero's, not the script's.** The endpoint applies the change to a
+detached `Zotero.Item.clone()` (no itemID, no key, never in the object cache),
+asks Zotero what the clone became, and reports the difference. It never predicts.
+
+That distinction earns its keep on item type changes, which are **not** simply
+destructive. `setType()` migrates values through base-field mappings and
+special-cases book ↔ bookSection (`item.js:470-524`), so `book → bookSection`
+moves the title into `bookTitle` rather than losing it, while a field with no
+counterpart on the new type really is cleared. The response separates the two:
+
+- `typeChange` — the type change itself;
+- `collateral` — what changing the type did **on its own**, before anything you
+  asked for. Zotero's doing, not yours. Read this section carefully; it is where
+  unrequested data loss shows up;
+- `requested` — what you actually asked for.
+
+The script prints cleared fields under "Cleared by this change" so a loss is
+never inferred from a blank column.
+
+**What the clone cannot see.** Being detached is what makes the dry run safe, and
+it is also the limit of what the dry run knows. Anything that reacts to the real
+item changing happens after the diff is built. Better BibTeX is the case that
+shows up in practice. Converting `5TCVZK5L` from `webpage` to `hearing`
+(2026-08-05) dry-ran with no collateral at all, then the apply reported
+`citationKey (empty) -> AdoptingArtificialIntelligence`, and reading the item back
+gave a third value, `AdoptingAIProof2024`. The two keys derive from the two
+titles: BBT generated one from the old title, then regenerated from the new one
+after the response had been built. No field was lost and every requested value
+landed. So a dry run is authoritative about fields, and a BBT-derived value is
+settled only once you read the item back.
+
+**Creators are replaced, not merged**, because Zotero stores them as an ordered
+list rather than a set. Pass every creator you want, not just the missing one:
+
+```bash
+uv run $U --key ABCD1234 \
+    --author "Boellstorff, Tom" --author "Nardi, Bonnie" \
+    --creator "editor=Pearce, Celia" --apply
+```
+
+A `--author` value with no comma is stored as a single-field name, which is how
+Zotero holds organisations ("World Health Organization").
+
+**What it refuses.** Primary fields (`key`, `libraryID`, `version`,
+`dateModified`) are rejected as `invalid_field` — `setField()` would otherwise
+route them to primary-field setters. Notes, attachments and annotations are
+`unsupported_item_type`. A field invalid for the resulting type is
+`invalid_field`, judged against the type *after* any requested type change, so
+setting `pages` while switching to `bookSection` is legal in one request.
+
+**A request is all-or-nothing.** Validation happens on the clone, so if any part
+of a request is bad, nothing is written — a valid first field does not land on
+its own.
+
 ## The proven workflow
 
 ### 1. Resolve cite key → PDF file path
@@ -1280,3 +1359,34 @@ discovery):
   the HTTP-response classifier (triggered / no-autoexport / endpoint-absent /
   bbt-*), and the `--bib`/`--citekey` argument validation. The `--bib` shell flow
   was verified live.
+
+**2026-08-05 addendum** (patching item metadata — update-item endpoint + consumer):
+
+- **zotero-api-plus 0.6.0 adds `POST /api/plus/update-item`**, the write side stock
+  Zotero's local API refuses (`PATCH` on an item returns 501). It is a patch, not a
+  replace: the obvious primitive `Zotero.Item.fromJSON()` clears every field absent
+  from the payload and, via the branch at `item.js:5684`, drops the item out of its
+  collections when the payload carries no `collections` key. The endpoint never
+  calls it.
+- `update_item.py` is the consumer. Dry run is the default and the `apply` gate is a
+  real boolean on the wire, because `"false"` is truthy and a coerced write gate
+  fails in the one direction that costs data. `--find` and `--list <collection>` are
+  read-only triage.
+- The reported diff comes from a detached `Zotero.Item.clone()`, so it is Zotero's
+  answer rather than a prediction, and `collateral` separates what the type change
+  did on its own from what was asked for. The clone's blind spot is documented above
+  under "What the clone cannot see": Better BibTeX never sees the clone, so a
+  BBT-derived `citationKey` in the response can be superseded by the time the write
+  settles.
+- Verified live 2026-08-05 on the Senate committee Hansard for *Adopting AI*
+  (`5TCVZK5L`, My Library). It had arrived from the connector as a `webpage` whose
+  title was the PDF filename, with the real PDF as its child. `webpage -> hearing`
+  plus title, `committee`, `legislativeBody`, `place`, `date` and `pages` landed in
+  one request; the PDF child, the Week3 collection membership, and the parlinfo URL
+  and access date all survived. Rendering the result under APA and both Chicago
+  styles confirmed no creator is wanted: the styles build "Hearing before the …"
+  from `committee` and `legislativeBody`, so a corporate contributor would be the
+  fake-author pattern this endpoint exists to remove.
+- 30 unit tests in `tests/test_bibliography_update.py` cover the consumer's pure
+  core; the endpoint's own core (`parseUpdateItemParams`, `diffSnapshots`,
+  `diffCreators`, `buildChangeReport`) is covered in the plugin's mocha suite.
