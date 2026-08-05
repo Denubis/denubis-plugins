@@ -1,5 +1,30 @@
 # Changelog
 
+## [denubis-academic] 0.14.0
+
+`using-bibliography` can now fix an item's metadata in place, behind a diff you
+approve, instead of bouncing you to the Zotero UI.
+
+**New:**
+- `update_item.py`, the consumer for `POST /api/plus/update-item` in
+  zotero-api-plus 0.6.0. Dry run is the default and nothing is written without
+  `--apply`. It patches named fields rather than replacing the item, so an update
+  cannot silently clear untouched fields or drop the item out of its collections.
+  `--find` and `--list <collection>` are read-only triage for finding what needs
+  fixing.
+- SKILL.md section "Fixing an item's metadata", covering the patch-versus-replace
+  trap, what the endpoint refuses, why creators are replaced rather than merged,
+  and the `collateral` channel that reports what a type change did on its own.
+- 30 unit tests in `tests/test_bibliography_update.py`.
+
+**Changed:**
+- The diff's limits are now documented rather than implied. The endpoint reports
+  what Zotero did to a detached clone, and Better BibTeX never sees that clone, so
+  a `citationKey` in the response can be superseded by the time the write settles.
+  Verified on a live Senate Hansard conversion: the dry run showed no collateral,
+  the apply reported one key, and the item settled on another. Fields are
+  authoritative; BBT-derived values want a read-back.
+
 ## [denubis-external-agents] 0.13.0
 
 The codex monitor's pending-prompt reminders now stop after an hour, and a prompt that
