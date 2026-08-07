@@ -16,6 +16,10 @@
 # Agent teams:
 #   Enabled via CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 #   teammate-mode=auto — detects $TMUX (byobu) and uses split panes if available
+#   ALSO set in ~/.claude/settings.json under env, which covers bare `claude`
+#   as well as claudew. The export below is therefore redundant today and is
+#   kept because the architecture docs describe it as a wrapper property.
+#   To turn agent teams off you must change BOTH places.
 #
 # Post-session transcript:
 #   Fresh interactive sessions get a pre-assigned --session-id. After exit,
@@ -34,7 +38,8 @@ set -euo pipefail
 
 DISALLOWED_TOOLS="NotebookEdit,EnterPlanMode,ExitPlanMode,EnterWorktree,ExitWorktree,ListMcpResourcesTool,ReadMcpResourceTool,RemoteTrigger,CronCreate,CronDelete,CronList"
 
-# Enable experimental agent teams
+# Enable experimental agent teams (also set in ~/.claude/settings.json env —
+# change both to disable)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 
 # Find real claude binary — standard install location, overridable via env
