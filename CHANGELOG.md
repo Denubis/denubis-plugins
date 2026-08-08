@@ -1,5 +1,30 @@
 # Changelog
 
+## [denubis-external-agents] 0.14.0
+
+Both ponytail launchers now live in this plugin, and `codex-ponytail` is the
+version that was actually running rather than the one this repo had been keeping.
+
+**New:**
+- `codex-ponytail` — creates or reuses a worktree and prints an isolated native
+  Codex invocation, with `CODEX_HOME` and `XDG_CONFIG_HOME` under
+  `~/.codex-ponytail` and upstream Ponytail installed as a SHA-pinned marketplace
+  plugin. Adopted from a sibling checkout that had no remote and 62 uncommitted
+  lines; the copy tracked here was an older, unrun design
+- 36-test hermetic bats suite and a `fake_codex` fixture
+
+**Changed:**
+- `claude-ponytail` and `codex-ponytail` moved to
+  `plugins/denubis-external-agents/scripts/`, beside `codex_supervisor.py`.
+  Repoint any `~/.local/bin` symlinks
+
+**Fixed:**
+- `codex-ponytail` left `[sandbox_workspace_write]` alone whenever it existed, so
+  an isolated home created between the network-access grant and the later uv/npm
+  cache grant never received `writable_roots` and refilled the uv cache into the
+  sandbox's private tmp on every run. It now upgrades a section carrying its own
+  marker comment, while a hand-written section stays untouched
+
 ## [denubis-plan-and-execute] 3.1.0
 
 `using-ast-grep` becomes `using-code-search`, covering both search tools in one guide.

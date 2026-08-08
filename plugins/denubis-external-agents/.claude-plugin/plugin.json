@@ -1,7 +1,7 @@
 {
     "name": "denubis-external-agents",
     "description": "Dispatch work to a mind that is not this session, as a heterogeneous second voice: external CLI models and other-model advisors alike. Run OpenAI's codex as a critical peer reviewer at whatever model your codex config selects, spawn a different-model advisor in a pane that is structurally unable to implement, or supervise a codex pane through the prompt-file loop and its event monitor. Review paths carry a mandatory provenance check so a confabulated review cannot pass as real. WIP.",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"
