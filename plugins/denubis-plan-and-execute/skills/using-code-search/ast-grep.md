@@ -1,31 +1,16 @@
----
-name: using-ast-grep
-description: Use when searching code by structure rather than text, or for structural rewrites like renaming functions or migrating APIs - ast-grep guide with Python and TypeScript examples
-user-invocable: false
----
+# ast-grep reference
 
-# Using ast-grep for Structural Code Search and Rewrite
+Companion to `SKILL.md`, which carries the rg-vs-ast-grep decision table and the
+`ast-grep`-not-`sg` naming rule. This file holds patterns, YAML rules, and rewrites.
 
-ast-grep matches code by AST structure, not text. Use it when the search target has syntactic structure. Use Grep when the target is a literal string. ast-grep can also **rewrite** matched code structurally — renaming functions, migrating API calls, replacing patterns across a codebase while preserving arguments and formatting.
+**Version measured 2026-08-07: ast-grep 0.44.1.**
 
-## When to Use ast-grep vs Grep
+ast-grep matches code by AST structure, not text. It can also **rewrite** matched code
+structurally — renaming functions, migrating API calls, replacing patterns across a
+codebase while preserving arguments and formatting.
 
-| Looking for... | Use | Why |
-|---|---|---|
-| Text string, error message, config key | Grep | Literal match, fast |
-| Function/method definition | ast-grep | `def foo` in a comment shouldn't match |
-| All callers of a function | ast-grep | `foo($$$)` catches all argument variations |
-| Class inheriting from X | ast-grep | Requires YAML rule — see below |
-| Import pattern | ast-grep | `from $MOD import $NAME` handles all forms |
-| Decorated function | ast-grep | Requires YAML rule — see below |
-| String in comments or docstrings | Grep | ast-grep skips non-code nodes |
-| Pattern across mixed file types | Grep | ast-grep needs a language specified |
-| Variable assignment pattern | ast-grep | `$VAR = SomeClass($$$)` is structural |
-| Rename function/method calls | ast-grep | `--rewrite` preserves all arguments |
-| Migrate API patterns | ast-grep | Structural rewrite handles argument variations |
-| Replace deprecated calls | ast-grep | YAML `fix` field for complex replacements |
-
-**Rule of thumb:** If the target has parentheses, nesting, or argument lists, use ast-grep. If it's a name or literal string, use Grep. If you need to **change** matched code (not just find it), use ast-grep's rewrite capabilities.
+Invoke it as `ast-grep`. `/usr/bin/sg` is `newgrp`, so whether the short name `sg`
+reaches ast-grep depends on PATH order.
 
 ## Simple Patterns (ast-grep run)
 
