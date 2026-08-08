@@ -1,7 +1,7 @@
 {
   "name": "denubis-research-agents",
   "description": "Agents for codebase investigation and internet research. Other plugins expect this one to be enabled.",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "github": "denubis"

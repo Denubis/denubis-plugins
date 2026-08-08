@@ -1,5 +1,33 @@
 # Changelog
 
+## [denubis-plan-and-execute] 3.1.0
+
+`using-ast-grep` becomes `using-code-search`, covering both search tools in one guide.
+The addition is a measured diff of ripgrep's short flags against GNU grep's: ten
+collide, and four of those exit 0 with wrong output rather than erroring.
+
+**New:**
+- `using-code-search` skill — tool-choice table, the four rg flags that fail silently
+  (`-r` `-L` `-h` `-s`), and the `-h`/`-H`/`-I` triple, each with the correct flag to
+  type instead
+- `ripgrep.md` peer reference — the three flags that error loudly, the twenty safe in
+  both tools, hidden/gitignored visibility defaults, and the ugrep shim
+- `ast-grep.md` peer reference — patterns, YAML rules, and structural rewrites
+
+**Changed:**
+- `using-ast-grep` removed; its content is preserved verbatim in `ast-grep.md`
+- `refactoring-executor`, `impl-plan-write`, and `systematic-debugging` now reference
+  `using-code-search`
+
+Flag meanings are stamped to ripgrep 14.1.0, GNU grep 3.11, and ast-grep 0.44.1,
+measured 2026-08-07.
+
+## [denubis-research-agents] 1.3.1
+
+**Fixed:**
+- `investigating-a-codebase` referenced `using-ast-grep`, which no longer exists; it
+  now points at `using-code-search`
+
 ## [denubis-academic] 0.14.0
 
 `using-bibliography` can now fix an item's metadata in place, behind a diff you
