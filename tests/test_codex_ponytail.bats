@@ -353,6 +353,36 @@ make_bare_main() {
     [ "$(grep -c -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
 }
 
+# A section this script wrote itself is not the operator's choice, so leaving it
+# alone strands every home initialized before the cache grant existed: the grant
+# lands in the script and can never reach the config. The marker comment the
+# script already writes is what tells its own output apart from a hand-written
+# section, which the test above still leaves untouched.
+@test "a codex-ponytail sandbox section predating the cache grant gains writable roots" {
+    local uv_cache="$TEST_DIR/uv cache" npm_cache="$TEST_DIR/npm cache"
+    export UV_CACHE_DIR="$uv_cache"
+    export npm_config_cache="$npm_cache"
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        '# Initialized by codex-ponytail; Codex owns subsequent plugin and hook state.' \
+        'cli_auth_credentials_store = "file"' \
+        '' \
+        '# Added by codex-ponytail so the isolated sandbox can reach a package index.' \
+        '[sandbox_workspace_write]' \
+        'network_access = true' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "writable_roots" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$uv_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$npm_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "network_access = true" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(grep -c -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
+}
+
 @test "printed invocation restricts the sandbox to workspace-write with on-request approval" {
     run bash "$SCRIPT" --dry-run feature
 

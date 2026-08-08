@@ -283,17 +283,51 @@ sandbox_cache_roots() {
 # instead of refilled from scratch under the sandbox's private tmp on every
 # single run. This does not widen the sandbox beyond that pair of grants: no
 # writable_roots beyond the two resolved above, no danger-full-access, no
-# bypass of approvals. An existing [sandbox_workspace_write] section is the
-# operator's own choice and is left alone.
+# bypass of approvals. A [sandbox_workspace_write] section this script did not
+# write is the operator's own choice and is left alone.
+#
+# A section this script wrote itself is a different case. The cache grant landed
+# after the network-access grant, so every home initialized in between carries a
+# section of our own making that the grant can never reach: treating it as the
+# operator's choice strands it forever. The marker comment written beside the
+# section is what tells the two apart, and it is matched on its stable prefix
+# because the sentence after it gained a clause when the caches were added.
+# Observed 2026-08-08 on ~/.codex-ponytail, which had sat without the grant since
+# 08-06 while the script that adds it ran daily.
+SANDBOX_MARKER='^# Added by codex-ponytail so the isolated sandbox'
+
 ensure_sandbox_access() {
     local config="$1"
-    grep -Eq '^[[:space:]]*\[sandbox_workspace_write[].]' "$config" && return 0
 
     local -a roots=()
     local root
     while IFS= read -r root; do
         roots+=("$root")
     done < <(sandbox_cache_roots)
+
+    if grep -Eq '^[[:space:]]*\[sandbox_workspace_write[].]' "$config"; then
+        grep -Eq "$SANDBOX_MARKER" "$config" || return 0
+        grep -Eq '^[[:space:]]*writable_roots[[:space:]]*=' "$config" && return 0
+
+        local rendered temporary
+        rendered=$(
+            printf 'writable_roots = [\n'
+            for root in "${roots[@]}"; do
+                printf '  %s,\n' "$(toml_quote "$root")"
+            done
+            printf ']'
+        )
+        temporary=$(mktemp "${config}.XXXXXX")
+        awk -v block="$rendered" '
+            { print }
+            /^[[:space:]]*\[sandbox_workspace_write[].]/ && !inserted {
+                print block
+                inserted = 1
+            }
+        ' "$config" > "$temporary"
+        mv "$temporary" "$config"
+        return 0
+    fi
 
     {
         printf '%s\n' \
