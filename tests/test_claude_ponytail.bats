@@ -15,7 +15,7 @@
 # shellcheck disable=SC2016,SC2030,SC2031
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/claude-ponytail"
+SCRIPT="$REPO_ROOT/plugins/denubis-external-agents/scripts/claude-ponytail"
 
 make_repo() {
     local r="$1"

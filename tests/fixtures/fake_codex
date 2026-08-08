@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%q ' "$@" >> "$FAKE_CODEX_CALLS"
+printf '\n' >> "$FAKE_CODEX_CALLS"
+
+if [[ "${1:-}" == "--profile" ]]; then
+    [[ "${2:-}" == "ponytail" ]] || exit 91
+    shift 2
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "marketplace" && "${3:-}" == "add" ]]; then
+    [[ -z "${FAKE_CODEX_FAIL_MARKETPLACE:-}" ]] || exit 41
+    source="${4:-}"
+    [[ "${5:-}" == "--ref" && -n "${6:-}" && "${7:-}" == "--json" ]] || exit 92
+    revision="$6"
+    state_dir="$CODEX_HOME/fake-codex-state"
+    state_file="$state_dir/marketplace"
+    mkdir -p "$state_dir"
+    if [[ -f "$state_file" ]]; then
+        IFS= read -r recorded_source < "$state_file"
+        IFS= read -r recorded_revision < <(sed -n '2p' "$state_file")
+        if [[ "$source" != "$recorded_source" || "$revision" != "$recorded_revision" ]]; then
+            printf 'marketplace source or revision mismatch\n' >&2
+            exit 42
+        fi
+        printf '{"marketplaceName":"ponytail","alreadyAdded":true}\n'
+        exit 0
+    fi
+    printf '%s\n%s\n' "$source" "$revision" > "$state_file"
+    printf '\n[plugins."ponytail@ponytail"]\nenabled = true\n' >> "$CODEX_HOME/config.toml"
+    printf '{"marketplaceName":"ponytail","alreadyAdded":false}\n'
+    exit 0
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "add" ]]; then
+    [[ -z "${FAKE_CODEX_FAIL_PLUGIN:-}" ]] || exit 43
+    [[ "${3:-}" == "ponytail@ponytail" && "${4:-}" == "--json" ]] || exit 93
+    mkdir -p "$CODEX_HOME/fake-codex-state"
+    printf 'installed\n' > "$CODEX_HOME/fake-codex-state/plugin"
+    printf '{"pluginId":"ponytail@ponytail","installed":true}\n'
+    exit 0
+fi
+
+printf '%s\0' "$@" > "$FAKE_CODEX_SESSION_ARGS"
+printf '%s' "$CODEX_HOME" > "$FAKE_CODEX_SESSION_HOME"
+printf '%s' "${XDG_CONFIG_HOME:-}" > "$FAKE_CODEX_SESSION_XDG"
+printf '%s' "${OPENAI_API_KEY-unset}" > "$FAKE_CODEX_SESSION_OPENAI_KEY"
+printf '%s' "${CODEX_API_KEY-unset}" > "$FAKE_CODEX_SESSION_CODEX_KEY"

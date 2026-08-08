@@ -1,0 +1,508 @@
+#!/usr/bin/env bash
+# codex-ponytail — create a worktree and print an isolated native Codex
+# invocation with upstream Ponytail installed.
+#
+# Usage:
+#   codex-ponytail <name> [<base-ref>]
+#
+# Flags:
+#   --dry-run   validate and print intended actions without changing files
+#
+# Isolation:
+#   CODEX_HOME and XDG_CONFIG_HOME live under ~/.codex-ponytail. Normal Unix
+#   HOME and cache variables are retained. Skills from ~/.agents/skills are
+#   disabled in the isolated profile.
+
+set -euo pipefail
+
+if [[ "${CODEX_PONYTAIL_TESTING:-}" == "1" ]]; then
+    PONYTAIL_HOME="${CODEX_PONYTAIL_HOME:-$HOME/.codex-ponytail}"
+    CODEX="${CODEX_PONYTAIL_BINARY:-$(command -v codex || true)}"
+    PONYTAIL_MARKETPLACE="${CODEX_PONYTAIL_MARKETPLACE:-DietrichGebert/ponytail}"
+    PONYTAIL_SHA="${CODEX_PONYTAIL_SHA:-16f29800fd2681bdf24f3eb4ccffe38be3baec6b}"
+else
+    # Production values are not environment-overridable. Moving the pin
+    # requires a fresh audit of Ponytail's Codex manifest, skills, and hooks.
+    PONYTAIL_HOME="$HOME/.codex-ponytail"
+    CODEX="$(command -v codex || true)"
+    PONYTAIL_MARKETPLACE="DietrichGebert/ponytail"
+    PONYTAIL_SHA="16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+fi
+PONYTAIL_XDG_CONFIG_HOME="$PONYTAIL_HOME/xdg-config"
+
+DRY_RUN=false
+WORKTREE_ACTION=""
+ROOT=""
+WORKTREE=""
+LOCK_FD=""
+
+die() {
+    printf 'codex-ponytail: %s\n' "$1" >&2
+    exit 1
+}
+
+usage() {
+    printf '%s\n' \
+        'codex-ponytail — create a worktree and print an isolated native Codex invocation' \
+        '' \
+        'Usage:' \
+        '  codex-ponytail <name> [<base-ref>]' \
+        '' \
+        'Flags:' \
+        '  --dry-run   validate and print intended actions without changing files' \
+        '' \
+        'CODEX_HOME and XDG_CONFIG_HOME live under ~/.codex-ponytail.' \
+        '' \
+        'One-time setup: log in if prompted, review /hooks, then restart Codex.' \
+        'Later invocations reuse that login and hook trust while the hook hash is unchanged.'
+}
+
+shell_quote() {
+    local value="$1"
+    printf "'%s'" "${value//\'/\'\\\'\'}"
+}
+
+toml_quote() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    value="${value//$'\t'/\\t}"
+    printf '"%s"' "$value"
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || die "$1 is required"
+}
+
+validate_environment_paths() {
+    case "$PONYTAIL_HOME" in
+        /*) ;;
+        *) die "CODEX_PONYTAIL_HOME must be an absolute path" ;;
+    esac
+    case "$PONYTAIL_HOME" in
+        /|"$HOME"|"$HOME/.codex")
+            die "refusing unsafe isolated Codex home: $PONYTAIL_HOME"
+            ;;
+    esac
+    [[ ! -L "$PONYTAIL_HOME" ]] \
+        || die "isolated Codex home must not be a symlink: $PONYTAIL_HOME"
+    if [[ -e "$PONYTAIL_HOME" ]]; then
+        [[ -d "$PONYTAIL_HOME" ]] \
+            || die "isolated Codex home is not a directory: $PONYTAIL_HOME"
+    fi
+    case "$PONYTAIL_XDG_CONFIG_HOME" in
+        "$PONYTAIL_HOME"/?*) ;;
+        *)
+            die "isolated XDG config home must be inside $PONYTAIL_HOME"
+            ;;
+    esac
+    [[ ! -L "$PONYTAIL_XDG_CONFIG_HOME" ]] \
+        || die "isolated XDG config home must not be a symlink: $PONYTAIL_XDG_CONFIG_HOME"
+    if [[ -e "$PONYTAIL_XDG_CONFIG_HOME" ]]; then
+        [[ -d "$PONYTAIL_XDG_CONFIG_HOME" ]] \
+            || die "isolated XDG config home is not a directory: $PONYTAIL_XDG_CONFIG_HOME"
+    fi
+}
+
+main_checkout() {
+    local common checkout
+    common=$(git rev-parse --git-common-dir 2>/dev/null) \
+        || die "not inside a git repository"
+    case "$common" in
+        /*) ;;
+        *) common="$PWD/$common" ;;
+    esac
+    checkout=$(cd "$(dirname "$common")" 2>/dev/null && pwd -P) \
+        || die "could not resolve main checkout from git common directory '$common'"
+    printf '%s\n' "$checkout"
+}
+
+resolved_common_dir() {
+    local at="$1" common
+    common=$(git -C "$at" rev-parse --git-common-dir 2>/dev/null) || return 1
+    case "$common" in
+        /*) ;;
+        *) common="$at/$common" ;;
+    esac
+    (cd "$common" 2>/dev/null && pwd -P)
+}
+
+is_worktree_root() {
+    local wt="$1" root="$2"
+    local git_root physical_git_root physical_root actual_common expected_common
+    git_root=$(git -C "$wt" rev-parse --show-toplevel 2>/dev/null) || return 1
+    physical_git_root=$(cd "$git_root" 2>/dev/null && pwd -P) || return 1
+    physical_root=$(cd "$wt" 2>/dev/null && pwd -P) || return 1
+    [[ "$physical_git_root" == "$physical_root" ]] || return 1
+    actual_common=$(resolved_common_dir "$wt") || return 1
+    expected_common=$(resolved_common_dir "$root") || return 1
+    [[ "$actual_common" == "$expected_common" ]]
+}
+
+first_linked_worktree() {
+    git -C "$1" worktree list --porcelain 2>/dev/null | awk '
+        /^worktree /{ path = substr($0, 10); bare = 0; next }
+        /^bare$/    { bare = 1; next }
+        /^$/        { if (path != "" && !bare) { print path; found = 1; exit }
+                      path = ""; bare = 0; next }
+        END         { if (!found && path != "" && !bare) print path }
+    '
+}
+
+# check-ignore requires a working tree, so a bare main checkout cannot answer for
+# itself. Any linked worktree shares this repository's ignore configuration, and
+# the one the caller is standing in is the tree they actually work in.
+ignore_check_dir() {
+    local root="$1" here
+    if [[ "$(git -C "$root" rev-parse --is-bare-repository 2>/dev/null)" != "true" ]]; then
+        printf '%s\n' "$root"
+        return 0
+    fi
+    if here=$(git rev-parse --show-toplevel 2>/dev/null) && [[ -d "$here" ]]; then
+        printf '%s\n' "$here"
+        return 0
+    fi
+    first_linked_worktree "$root"
+}
+
+require_worktrees_ignored() {
+    local root="$1" at error status
+    at=$(ignore_check_dir "$root")
+    [[ -n "$at" ]] \
+        || die "no working tree available to check whether .worktrees is ignored in $root"
+    if error=$(git -C "$at" check-ignore -q .worktrees/probe 2>&1); then
+        return 0
+    else
+        status=$?
+    fi
+    if [[ "$status" -eq 1 ]]; then
+        die ".worktrees/ is not gitignored in $root — add it and commit first"
+    fi
+    [[ -z "$error" ]] || printf '%s\n' "$error" >&2
+    die "could not check whether .worktrees is ignored in $at (git exited $status)"
+}
+
+preflight_worktree() {
+    local name="$1" base="$2" actual_branch
+
+    if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
+       || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
+        die "invalid worktree name '$name': must be a valid literal git branch name"
+    fi
+
+    ROOT=$(main_checkout)
+    require_worktrees_ignored "$ROOT"
+    WORKTREE="$ROOT/.worktrees/$name"
+
+    if [[ -e "$WORKTREE" || -L "$WORKTREE" ]]; then
+        [[ ! -L "$WORKTREE" ]] \
+            || die "existing path is not a registered git worktree: $WORKTREE"
+        [[ -d "$WORKTREE" ]] \
+            || die "existing path is not a registered git worktree: $WORKTREE"
+        is_worktree_root "$WORKTREE" "$ROOT" \
+            || die "existing path is not a registered git worktree: $WORKTREE"
+        actual_branch=$(git -C "$WORKTREE" branch --show-current)
+        [[ "$actual_branch" == "$name" ]] \
+            || die "existing worktree uses branch '${actual_branch:-detached HEAD}', expected '$name': $WORKTREE"
+        WORKTREE_ACTION="reuse"
+    elif git -C "$ROOT" show-ref --verify --quiet "refs/heads/$name"; then
+        if git -C "$ROOT" worktree list --porcelain \
+            | grep -Fqx "branch refs/heads/$name"; then
+            die "branch '$name' is already checked out in another worktree"
+        fi
+        WORKTREE_ACTION="existing-branch"
+    else
+        git -C "$ROOT" rev-parse --verify --quiet "$base^{commit}" >/dev/null \
+            || die "base reference does not name a commit: $base"
+        WORKTREE_ACTION="new-branch"
+    fi
+}
+
+# A supervising process reads Codex's status out of the terminal title, so an
+# isolated home that configures no title yields a pane nothing can drive. This
+# is presentation only: it names no skill, plugin, hook, credential or model.
+# An existing [tui] section is the operator's own choice and is left alone.
+ensure_tui_title() {
+    local config="$1"
+    grep -Eq '^[[:space:]]*\[tui[].]' "$config" && return 0
+    printf '%s\n' \
+        '' \
+        '# Added by codex-ponytail so a supervisor can read Codex status.' \
+        '[tui]' \
+        'status_line = [' \
+        '  "weekly-limit",' \
+        '  "five-hour-limit",' \
+        '  "project-name",' \
+        '  "git-branch",' \
+        '  "context-remaining",' \
+        '  "status",' \
+        ']' \
+        'terminal_title = [' \
+        '  "spinner",' \
+        '  "status",' \
+        '  "project",' \
+        '  "git-branch",' \
+        '  "weekly-limit",' \
+        '  "five-hour-limit",' \
+        '  "thread",' \
+        '  "model-with-reasoning",' \
+        ']' >> "$config"
+}
+
+# uv and npm caches are required grants (Brian, 2026-08-06): "the config file
+# should absolutely have the npm and uv caches be part of sandbox". Unlike an
+# optional candidate, each is granted unconditionally — whether or not the
+# directory exists yet — because that is the point of a required grant: it
+# covers the first run on a machine that has never populated the cache, not
+# only a machine that already has. pip, Hugging Face, torch, cargo, and a bare
+# XDG_CACHE_HOME grant were all considered and dropped: nothing in this
+# launcher's actual targets (uv/Python worktrees, cloud-API ASR/TTS, no local
+# torch or HF inference, no Rust) gives a concrete reason to widen the sandbox
+# for them. Add one back only with a specific reason, not because the
+# variable exists.
+#
+# Defaults checked against each tool's own current documentation, not
+# assumed:
+#   uv   docs.astral.sh/uv/concepts/cache: "$XDG_CACHE_HOME/uv or
+#        $HOME/.cache/uv on Unix"; override via UV_CACHE_DIR.
+#   npm  docs.npmjs.com/cli/using-npm/config#cache: "Posix: ~/.npm" (not
+#        XDG-based); override via npm_config_cache (documented; also accepts
+#        NPM_CONFIG_CACHE, which npm's own environment-variable convention
+#        derives the same way).
+sandbox_cache_roots() {
+    printf '%s\n' "${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}"
+    printf '%s\n' "${npm_config_cache:-${NPM_CONFIG_CACHE:-$HOME/.npm}}"
+}
+
+# Codex's built-in sandbox defaults are network_access = false for
+# workspace-write and no writable roots beyond the workspace itself. Both
+# starve an isolated home of what package managers need: reaching a package
+# index at all, and writing into the uv and npm caches so they are reused
+# instead of refilled from scratch under the sandbox's private tmp on every
+# single run. This does not widen the sandbox beyond that pair of grants: no
+# writable_roots beyond the two resolved above, no danger-full-access, no
+# bypass of approvals. An existing [sandbox_workspace_write] section is the
+# operator's own choice and is left alone.
+ensure_sandbox_access() {
+    local config="$1"
+    grep -Eq '^[[:space:]]*\[sandbox_workspace_write[].]' "$config" && return 0
+
+    local -a roots=()
+    local root
+    while IFS= read -r root; do
+        roots+=("$root")
+    done < <(sandbox_cache_roots)
+
+    {
+        printf '%s\n' \
+            '' \
+            '# Added by codex-ponytail so the isolated sandbox can reach a package index' \
+            '# and reuse the uv and npm caches.' \
+            '[sandbox_workspace_write]' \
+            'network_access = true' \
+            'writable_roots = ['
+        for root in "${roots[@]}"; do
+            printf '  %s,\n' "$(toml_quote "$root")"
+        done
+        printf ']\n'
+    } >> "$config"
+}
+
+initialize_base_config() {
+    local config="$PONYTAIL_HOME/config.toml" temporary
+    if [[ -e "$config" || -L "$config" ]]; then
+        [[ ! -L "$config" ]] \
+            || die "base Codex config must not be a symlink: $config"
+        [[ -f "$config" ]] || die "base Codex config is not a regular file: $config"
+        grep -Eq '^[[:space:]]*cli_auth_credentials_store[[:space:]]*=[[:space:]]*"file"[[:space:]]*$' \
+            "$config" \
+            || die "existing base config must set cli_auth_credentials_store = \"file\": $config"
+        ensure_tui_title "$config"
+        ensure_sandbox_access "$config"
+        return
+    fi
+
+    temporary=$(mktemp "$PONYTAIL_HOME/.config.toml.XXXXXX")
+    printf '%s\n' \
+        '# Initialized by codex-ponytail; Codex owns subsequent plugin and hook state.' \
+        'cli_auth_credentials_store = "file"' > "$temporary"
+    ensure_tui_title "$temporary"
+    ensure_sandbox_access "$temporary"
+    chmod 600 "$temporary"
+    mv -- "$temporary" "$config"
+}
+
+write_profile() {
+    local profile="$PONYTAIL_HOME/ponytail.config.toml"
+    local temporary list skill_file
+    if [[ -e "$profile" || -L "$profile" ]]; then
+        [[ ! -L "$profile" ]] \
+            || die "managed profile must not be a symlink: $profile"
+        [[ -f "$profile" ]] \
+            || die "managed profile is not a regular file: $profile"
+    fi
+    temporary=$(mktemp "$PONYTAIL_HOME/.ponytail.config.toml.XXXXXX")
+    list=$(mktemp "$PONYTAIL_HOME/.global-skills.XXXXXX")
+
+    printf '%s\n' \
+        '# Managed by codex-ponytail; changes are replaced on the next invocation.' \
+        > "$temporary"
+
+    if [[ -d "$HOME/.agents/skills" ]]; then
+        if ! find -L "$HOME/.agents/skills" \
+            -mindepth 2 -maxdepth 2 -type f -name SKILL.md -print0 \
+            | sort -z > "$list"; then
+            rm -f -- "$temporary" "$list"
+            die "could not discover global skills beneath $HOME/.agents/skills"
+        fi
+        while IFS= read -r -d '' skill_file; do
+            printf '\n[[skills.config]]\npath = %s\nenabled = false\n' \
+                "$(toml_quote "$skill_file")" >> "$temporary"
+        done < "$list"
+    fi
+
+    chmod 600 "$temporary"
+    mv -T -- "$temporary" "$profile"
+    rm -f -- "$list"
+}
+
+isolated_codex() {
+    env -u OPENAI_API_KEY -u CODEX_API_KEY \
+        CODEX_HOME="$PONYTAIL_HOME" \
+        XDG_CONFIG_HOME="$PONYTAIL_XDG_CONFIG_HOME" \
+        "$CODEX" "$@"
+}
+
+bootstrap_ponytail() {
+    local old_umask lock_path="$PONYTAIL_HOME/.codex-ponytail.lock"
+    old_umask=$(umask)
+    umask 077
+    mkdir -p "$PONYTAIL_HOME" "$PONYTAIL_XDG_CONFIG_HOME"
+    chmod 700 "$PONYTAIL_HOME" "$PONYTAIL_XDG_CONFIG_HOME"
+
+    if [[ -e "$lock_path" || -L "$lock_path" ]]; then
+        [[ ! -L "$lock_path" ]] \
+            || die "isolated-home lock must not be a symlink: $lock_path"
+        [[ -f "$lock_path" ]] \
+            || die "isolated-home lock is not a regular file: $lock_path"
+    fi
+    exec {LOCK_FD}>>"$lock_path"
+    chmod 600 "$lock_path"
+    flock -x "$LOCK_FD"
+
+    initialize_base_config
+    write_profile
+
+    printf 'ensuring native Ponytail at %s\n' "${PONYTAIL_SHA:0:12}" >&2
+    isolated_codex plugin marketplace add "$PONYTAIL_MARKETPLACE" \
+        --ref "$PONYTAIL_SHA" --json >/dev/null
+    isolated_codex plugin add ponytail@ponytail --json >/dev/null
+    umask "$old_umask"
+}
+
+create_or_reuse_worktree() {
+    local name="$1" base="$2"
+
+    # The first preflight occurred before any launcher mutation. Repeat it under
+    # the launcher lock so concurrent invocations see the latest worktree state.
+    preflight_worktree "$name" "$base"
+    case "$WORKTREE_ACTION" in
+        reuse)
+            printf 'reusing existing worktree %s\n' "$WORKTREE" >&2
+            ;;
+        existing-branch)
+            git -C "$ROOT" worktree add "$WORKTREE" "$name"
+            ;;
+        new-branch)
+            git -C "$ROOT" worktree add "$WORKTREE" -b "$name" "$base"
+            ;;
+        *)
+            die "internal error: unknown worktree action '$WORKTREE_ACTION'"
+            ;;
+    esac
+}
+
+print_result() {
+    local command
+    command=$(printf 'env -u OPENAI_API_KEY -u CODEX_API_KEY CODEX_HOME=%s XDG_CONFIG_HOME=%s %s --profile ponytail -C %s -s workspace-write -a on-request' \
+        "$(shell_quote "$PONYTAIL_HOME")" \
+        "$(shell_quote "$PONYTAIL_XDG_CONFIG_HOME")" \
+        "$(shell_quote "$CODEX")" \
+        "$(shell_quote "$WORKTREE")")
+
+    printf '\nworktree : %s\n' "$WORKTREE"
+    printf 'ponytail : %s (native, pinned)\n' "${PONYTAIL_SHA:0:12}"
+    printf 'codex home: %s\n' "$PONYTAIL_HOME"
+    if $DRY_RUN; then
+        printf 'dry run  : no Codex state, branch, or worktree was created\n'
+    fi
+    printf 'remove   : git -C %s worktree remove %s\n' \
+        "$(shell_quote "$ROOT")" "$(shell_quote "$WORKTREE")"
+    printf 'one-time : log in if prompted, review /hooks, then restart Codex\n'
+    printf 'later use: login and hook trust persist while credentials and hook hashes remain valid\n'
+    printf '\nrun this in the window you want it in:\n\n  %s\n\n' "$command"
+}
+
+main() {
+    local name="$1" base="${2:-HEAD}"
+
+    validate_environment_paths
+    [[ -n "$CODEX" && -x "$CODEX" ]] \
+        || die "codex executable not found or not executable: ${CODEX:-<empty>}"
+    require_command git
+    require_command node
+    require_command flock
+
+    preflight_worktree "$name" "$base"
+
+    if $DRY_RUN; then
+        printf '+ initialize isolated Codex home %s\n' "$PONYTAIL_HOME" >&2
+        printf '+ codex plugin marketplace add %s --ref %s\n' \
+            "$PONYTAIL_MARKETPLACE" "$PONYTAIL_SHA" >&2
+        printf '+ codex plugin add ponytail@ponytail\n' >&2
+        case "$WORKTREE_ACTION" in
+            reuse) printf '+ reuse %s\n' "$WORKTREE" >&2 ;;
+            existing-branch)
+                printf '+ git -C %s worktree add %s %s\n' \
+                    "$ROOT" "$WORKTREE" "$name" >&2
+                ;;
+            new-branch)
+                printf '+ git -C %s worktree add %s -b %s %s\n' \
+                    "$ROOT" "$WORKTREE" "$name" "$base" >&2
+                ;;
+        esac
+    else
+        bootstrap_ponytail
+        create_or_reuse_worktree "$name" "$base"
+        exec {LOCK_FD}>&-
+    fi
+
+    print_result
+}
+
+POSITIONAL=()
+while (($# > 0)); do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            die "unknown option: $1"
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+
+((${#POSITIONAL[@]} >= 1)) || die "need a worktree name. Try --help"
+((${#POSITIONAL[@]} <= 2)) || die "too many arguments: ${POSITIONAL[*]}"
+main "${POSITIONAL[@]}"
