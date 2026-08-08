@@ -71,7 +71,7 @@ Counts and groupings (each is a `<name>/SKILL.md`). Manifest commit `1ef36f5`.
 | Implementation discipline | 10 | `coding-tdd`, `coding-effectively`, `coding-fcis`, `coding-good-tests`, `coding-property-testing`, `coding-python-idioms`, `coding-verify`, `defense-in-depth`, `systematic-debugging`, `howto-develop-with-postgres` |
 | Review / verification | 5 | `requesting-code-review`, `critical-peer-review`, `exec-coherence-review`, `exec-uat-gate`, `exec-refactoring-rubric` |
 | Git + branch lifecycle | 3 | `using-git-worktrees`, `make-pr`, `merge-to-main` |
-| Misc utilities | 4 | `controlled-dependency-upgrade`, `exec-session-naming`, `restate-our-assumptions`, `using-ast-grep` |
+| Misc utilities | 4 | `controlled-dependency-upgrade`, `exec-session-naming`, `restate-our-assumptions`, `using-code-search` |
 
 ### Agents (`plugins/denubis-plan-and-execute/agents/`, **10 total**)
 

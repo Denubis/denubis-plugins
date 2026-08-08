@@ -191,7 +191,7 @@ You MUST complete each phase before proceeding to the next.
 1. **Find Working Examples**
    - Locate similar working code in same codebase
    - What works that's similar to what's broken?
-   - For structural patterns (function signatures, class hierarchies, decorator usage), use ast-grep — see `using-ast-grep` skill
+   - For structural patterns (function signatures, class hierarchies, decorator usage), use ast-grep — see `using-code-search` skill
 
 2. **Compare Against References**
    - If implementing pattern, read reference implementation COMPLETELY
