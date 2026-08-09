@@ -1,5 +1,42 @@
 # Changelog
 
+## [denubis-external-agents] 0.15.0
+
+The supervisor stops reporting a pane it cannot read as a pane that is full, and
+`codex-ponytail` can now repair a `[tui]` section it wrote before the status
+line was part of the block.
+
+**New:**
+- Plugin README covering all three scripts, and the fact that both launchers
+  print a command rather than running one
+
+**Fixed:**
+- `codex-ponytail`'s tui upgrade matched nothing. The header pattern reached awk
+  through `-v`, which consumes a backslash before the regex engine sees it, so
+  `\[` became plain `[`, awk warned, and the insertion was skipped while exiting
+  0. Spelled `[[]` instead, which needs no backslash and reads the same to
+  `grep -E`, and hoisted to one constant so the two engines cannot drift
+- `codex_supervisor.py` refused a pane whose composer it could not see with
+  "composer is not empty", a claim about content it never read. Codex sizes its
+  TUI to the pane, so a short pane draws no composer at all. The guard now says
+  so, and reports the pane height and the window's pane count, because the cause
+  is usually layout pressure rather than a deliberately short pane
+- `_check_context_floor` shared the blind spot and needed no code change, since
+  preflight now refuses first. Its docstring justified itself on pane *widths*
+  measured 2026-08-01; height is the variable that removes the meter, and that
+  is now recorded so the stale reasoning is not relied on again
+
+## [denubis-plan-and-execute] 3.2.1
+
+**Fixed:**
+- 3.2.0 removed `using-plan-and-execute`'s rationalizations list citing
+  `writing-claude-directives`, which turns out to prescribe exactly that
+  construct for discipline-enforcing directives, at line 252 under
+  `## Anti-Rationalization`. The policy was cited for the opposite of what it
+  says, because the read stopped short of it. Restored as a four-entry
+  `Red Flags` block in the policy's own template, so loophole closure returns
+  without the shouting 3.2.0 was right to remove
+
 ## [denubis-plan-and-execute] 3.2.0
 
 `using-plan-and-execute` is injected whole at every session start, which made it
