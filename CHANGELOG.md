@@ -1,6 +1,46 @@
 # Changelog
 
+## [denubis-notes-advisory] 0.2.1
+
+**Retracts an accusation made in 0.2.0.** That entry said the advisor fabricated a
+citation. It did not. The message it cited is real, the quotation verbatim, and its
+reading of the source correct; two uncontrolled searches on the caller's side
+returned nothing and the silence was read as proof.
+
+**Fixed:**
+- The `notes-advisor` brief no longer cites a fabrication that did not happen. It now
+  requires identifiers **in full**, because the one real fault was an eight-character
+  uuid prefix against a helper that resolves only full uuids — accurate, and still
+  unopenable
+- `scanning-project-notes` gains the half of the rule it was missing. "A pinpoint that
+  will not open is a void finding" is now conditional on a check whose **positive
+  control fired**: use the full identifier, case-fold, and feed the check something
+  that must match before concluding. As shipped in 0.2.0 the rule converted a correct
+  advisory into a discarded one and then into an accusation
+- A failed lookup may not be escalated to a claim about the advisor. "I could not open
+  this" is a report about the check
+
+**Changed:**
+- ADR 0004 rewritten around the corrected incident and the operator's ruling, carrying
+  the retraction in the body rather than replacing the record silently
+
+## [denubis-external-agents] 0.15.1
+
+**Fixed:**
+- `supervising-codex` now states that the plugin ships the monitor and that it is armed
+  bare — `persistent: true`, no `timeout_ms`, no `2>&1`, no filter, no pane id. A
+  hand-rolled `timeout_ms` kills supervision mid-prompt, and a dead monitor is
+  indistinguishable from a quiet pane, which is the 57-minute silence the reminder
+  ladder exists to prevent arriving from the other end
+- Red flag and quick-reference rows updated to match
+
 ## [denubis-notes-advisory] 0.2.0
+
+> **Corrected by 0.2.1.** The fabrication described under **Changed** below did not
+> happen — the citation was accurate and the caller's checks were broken. The
+> `PIPE_BUF` justification under **New** is also wrong: that threshold is specified for
+> pipes and FIFOs, not regular files. The no-lock decision stands on `O_APPEND`
+> ordering; see ADR 0005.
 
 The advisor stops reproducing what it read, and the hook starts recording that it
 fired, so the next argument about whether any of this earns its place is settled
