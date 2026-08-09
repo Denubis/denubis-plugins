@@ -1,5 +1,40 @@
 # Changelog
 
+## [denubis-notes-advisory] 0.2.0
+
+The advisor stops reproducing what it read, and the hook starts recording that it
+fired, so the next argument about whether any of this earns its place is settled
+with counts instead of impressions.
+
+**New:**
+- Fire log. Each emitted advisory appends one row to
+  `~/.claude/notes-advisory/log/YYYY-MM-DD.jsonl`, carrying `session_id` and
+  `transcript_path` alongside the source, dispatch, note count and notes
+  directory. Those two keys are the point: the question is whether a firing
+  correlates with that session going on to read notes, and the transcript holds
+  the second half. `DENUBIS_NOTES_ADVISORY_LOG_DIR` overrides the location
+- No locking. A single write under PIPE_BUF to a file opened `O_APPEND` is atomic
+  on POSIX, so concurrent sessions interleave whole rows with no lock, no timeout
+  and no `fcntl`. A blocking `flock` in the first draft was rejected because a
+  lock that can wait forever on another process is blocking session start
+- A project with no `.notes/` writes no row and creates no directory
+
+**Changed:**
+- The advisor returns pinpoints only and may not quote or paraphrase. On
+  2026-08-09 it attributed a verbatim sentence to a message uuid that did not
+  resolve, in a source that said close to the opposite, and flagged it as the
+  finding most worth acting on. A pinpoint is the only citation form that fails
+  loudly: an invented `path:line` errors when opened, which is how that one was
+  caught, where an invented paraphrase reads plausibly forever
+- On the caller's side, a pinpoint that will not open is a void finding and makes
+  the rest of the report suspect, rather than a formatting slip to look past
+
+**Known gap:** there is still no valid evidence the SessionStart trigger changes
+behaviour. The three-arm test of 2026-08-09 produced one void arm, one that could
+not be certified clean, and one confirmed fabrication. The log exists so that gap
+can be closed with data. See `.notes/project_notes-advisory-pressure-test-2026-08-09.md`
+and `.notes/reference_did-the-notes-hook-work.md` for the queries.
+
 ## [denubis-external-agents] 0.15.0
 
 The supervisor stops reporting a pane it cannot read as a pane that is full, and
