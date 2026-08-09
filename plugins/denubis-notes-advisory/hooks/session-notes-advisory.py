@@ -17,6 +17,12 @@ does the work:
 Silent by design where it cannot help: a project with no `.notes/` gets no
 output at all.
 
+**Fire log.** Each emitted advisory appends one row to
+``~/.claude/notes-advisory/log/YYYY-MM-DD.jsonl``; set
+``DENUBIS_NOTES_ADVISORY_LOG_DIR`` to override the directory. The log exists to
+test whether a firing correlates with the session later invoking
+``scanning-project-notes``, using that session's transcript as evidence.
+
 **Portability.** Hooks run under whatever interpreter the user's machine
 resolves, which may be stock 3.9 (repo CLAUDE.md, hooks carve-out). So:
 ``from __future__ import annotations`` keeps PEP 604 annotations off the
@@ -34,6 +40,7 @@ non-zero exit, and never a partial line on stdout.
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import json
 import os
 import subprocess
@@ -54,6 +61,10 @@ SKILL_NAME = "scanning-project-notes"
 _IMMEDIATE_SOURCES = frozenset({"compact", "resume", "clear", "fork"})
 
 _GIT_TIMEOUT_S = 5
+_LOG_DIR_ENV = "DENUBIS_NOTES_ADVISORY_LOG_DIR"
+_LOG_LINE_MAX_BYTES = 4096
+_TRUNCATION_MARKER = "[truncated]"
+_TRUNCATION_ORDER = ("notes_dir", "source", "transcript_path", "session_id")
 
 
 def _diag(message: str) -> None:
@@ -205,7 +216,75 @@ def _start_dir(payload: dict) -> Path:
                 return candidate
         except OSError:
             pass
-    return Path(os.getcwd())
+    return Path.cwd()
+
+
+def _log_dir() -> Path:
+    """Return the daily fire-log directory, honoring the test override."""
+    override = os.environ.get(_LOG_DIR_ENV)
+    if override:
+        return Path(override)
+    return Path.home() / ".claude" / "notes-advisory" / "log"
+
+
+def _encoded_log_line(row: dict) -> bytes:
+    """Return one compact JSON line, truncating low-priority fields to fit."""
+    bounded_row = row.copy()
+
+    def encoded() -> bytes:
+        return (
+            json.dumps(bounded_row, sort_keys=True, separators=(",", ":")).encode()
+            + b"\n"
+        )
+
+    line = encoded()
+    for field in _TRUNCATION_ORDER:
+        if len(line) <= _LOG_LINE_MAX_BYTES:
+            return line
+        value = bounded_row.get(field)
+        if not isinstance(value, str) or not value:
+            continue
+
+        bounded_row[field] = _TRUNCATION_MARKER
+        line = encoded()
+        if len(line) > _LOG_LINE_MAX_BYTES:
+            continue
+
+        low = 0
+        high = len(value)
+        best = _TRUNCATION_MARKER
+        while low <= high:
+            kept = (low + high) // 2
+            candidate = _TRUNCATION_MARKER + value[-kept:] if kept else best
+            bounded_row[field] = candidate
+            candidate_line = encoded()
+            if len(candidate_line) <= _LOG_LINE_MAX_BYTES:
+                best = candidate
+                line = candidate_line
+                low = kept + 1
+            else:
+                high = kept - 1
+        bounded_row[field] = best
+
+    if len(line) > _LOG_LINE_MAX_BYTES:
+        raise ValueError("log row exceeds the 4096-byte write budget")
+    return line
+
+
+def _append_log_row(row: dict, timestamp: dt.datetime) -> None:
+    """Append ``row`` to its UTC daily JSONL file with one ``O_APPEND`` write."""
+    log_dir = _log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = log_dir / (timestamp.strftime("%Y-%m-%d") + ".jsonl")
+    line = _encoded_log_line(row)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        written = os.write(descriptor, line)
+    finally:
+        os.close(descriptor)
+    if written != len(line):
+        raise OSError(f"short log write: {written} of {len(line)} bytes")
 
 
 def main() -> int:
@@ -215,16 +294,21 @@ def main() -> int:
     if notes_dir is None:
         return 0
 
-    source = payload.get("source")
+    payload_source = payload.get("source")
+    source = payload_source if isinstance(payload_source, str) else None
     dispatch = "now" if source in _IMMEDIATE_SOURCES else "first-request"
 
     transcript_path = payload.get("transcript_path")
     if not isinstance(transcript_path, str) or not transcript_path:
         transcript_path = None
 
+    payload_session_id = payload.get("session_id")
+    session_id = payload_session_id if isinstance(payload_session_id, str) else None
+
+    note_count = count_notes(notes_dir)
     context = build_context(
         notes_dir=notes_dir,
-        note_count=count_notes(notes_dir),
+        note_count=note_count,
         dispatch=dispatch,
         transcript_path=transcript_path,
     )
@@ -239,6 +323,23 @@ def main() -> int:
             }
         )
     )
+
+    timestamp = dt.datetime.now(
+        dt.timezone.utc  # noqa: UP017 - datetime.UTC is unavailable on Python 3.9
+    )
+    row = {
+        "timestamp": timestamp.isoformat(),
+        "session_id": session_id,
+        "transcript_path": transcript_path,
+        "source": source,
+        "dispatch": dispatch,
+        "note_count": note_count,
+        "notes_dir": str(notes_dir),
+    }
+    try:
+        _append_log_row(row, timestamp)
+    except Exception as err:
+        _diag("log write failed: " + str(err))
     return 0
 
 
@@ -248,6 +349,6 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except SystemExit:
         raise
-    except Exception as err:  # noqa: BLE001 - a hook must not take the session down
+    except Exception as err:
         _diag("unexpected error: " + str(err))
         raise SystemExit(0) from err

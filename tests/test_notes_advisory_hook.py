@@ -34,7 +34,9 @@ test until its timeout instead of failing or passing.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -50,6 +52,8 @@ _HOOK_PATH = (
     / "hooks"
     / "session-notes-advisory.py"
 )
+
+_LOG_DIR_ENV = "DENUBIS_NOTES_ADVISORY_LOG_DIR"
 
 _GIT_IDENTITY = [
     "-c",
@@ -92,9 +96,38 @@ def _seed_notes(root: Path, names: list[str]) -> Path:
     return notes
 
 
+def _run_process(
+    cwd: Path,
+    payload: dict | str | None = None,
+    *,
+    log_dir: Path | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run the hook with an isolated per-test advisory log directory."""
+    if payload is None:
+        stdin = b""
+    elif isinstance(payload, str):
+        stdin = payload.encode()
+    else:
+        stdin = json.dumps(payload).encode()
+
+    env = os.environ.copy()
+    env[_LOG_DIR_ENV] = str(log_dir or cwd.parent / "notes-advisory-test-log")
+
+    return subprocess.run(
+        [sys.executable, str(_HOOK_PATH)],
+        cwd=str(cwd),
+        env=env,
+        input=stdin,
+        capture_output=True,
+        timeout=30,
+    )
+
+
 def _run(
     cwd: Path,
     payload: dict | str | None = None,
+    *,
+    log_dir: Path | None = None,
 ) -> tuple[int, str, dict | None]:
     """Run the hook in ``cwd`` with ``payload`` on stdin.
 
@@ -103,20 +136,7 @@ def _run(
 
     Returns (returncode, raw_stdout, parsed_json_or_None).
     """
-    if payload is None:
-        stdin = b""
-    elif isinstance(payload, str):
-        stdin = payload.encode()
-    else:
-        stdin = json.dumps(payload).encode()
-
-    result = subprocess.run(
-        [sys.executable, str(_HOOK_PATH)],
-        cwd=str(cwd),
-        input=stdin,
-        capture_output=True,
-        timeout=30,
-    )
+    result = _run_process(cwd, payload, log_dir=log_dir)
     raw = result.stdout.decode()
     parsed = json.loads(raw) if raw.strip() else None
     return result.returncode, raw, parsed
@@ -216,6 +236,140 @@ class TestFactsSupplied:
         assert code == 0
         assert parsed is not None
         assert f'dir="{plain / ".notes"}"' in _context(parsed)
+
+
+class TestFireLog:
+    def test_records_only_emitted_context_as_parseable_daily_jsonl(
+        self, repo: Path, tmp_path: Path
+    ):
+        log_dir = tmp_path / "advisory-state" / "log"
+        bare = _init_repo(tmp_path / "bare")
+
+        code, raw, parsed = _run(bare, _payload(bare), log_dir=log_dir)
+        assert code == 0
+        assert raw == ""
+        assert parsed is None
+        assert not log_dir.exists()
+
+        payloads = [
+            _payload(
+                repo,
+                source="startup" if index % 2 == 0 else "resume",
+                session_id=f"00000000-0000-4000-8000-{index:012d}",
+                transcript_path=(
+                    f"/home/someone/.claude/projects/x/{index:012d}.jsonl"
+                ),
+            )
+            for index in range(12)
+        ]
+        env = os.environ.copy()
+        env[_LOG_DIR_ENV] = str(log_dir)
+        processes = [
+            subprocess.Popen(
+                [sys.executable, str(_HOOK_PATH)],
+                cwd=str(repo),
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            for _payload_to_run in payloads
+        ]
+        for process, payload in zip(processes, payloads, strict=True):
+            stdout, stderr = process.communicate(
+                input=json.dumps(payload).encode(), timeout=30
+            )
+            assert process.returncode == 0
+            assert json.loads(stdout)["hookSpecificOutput"]["hookEventName"] == (
+                "SessionStart"
+            )
+            assert stderr == b""
+
+        logged_rows = [
+            (log_file.name, json.loads(line))
+            for log_file in log_dir.glob("*.jsonl")
+            for line in log_file.read_text().splitlines()
+        ]
+        assert len(logged_rows) == len(payloads)
+        expected_by_session = {
+            payload["session_id"]: {
+                "session_id": payload["session_id"],
+                "transcript_path": payload["transcript_path"],
+                "source": payload["source"],
+                "dispatch": (
+                    "first-request" if payload["source"] == "startup" else "now"
+                ),
+                "note_count": 3,
+                "notes_dir": str(repo / ".notes"),
+            }
+            for payload in payloads
+        }
+        assert {row["session_id"] for _name, row in logged_rows} == set(
+            expected_by_session
+        )
+        for filename, row in logged_rows:
+            expected = expected_by_session[row["session_id"]]
+            assert set(row) == {"timestamp", *expected}
+            timestamp = dt.datetime.fromisoformat(row["timestamp"])
+            assert timestamp.utcoffset() == dt.timedelta(0)
+            assert filename == timestamp.strftime("%Y-%m-%d.jsonl")
+            assert {key: row[key] for key in expected} == expected
+
+    def test_logging_failure_preserves_stdout_and_exit_zero(
+        self, repo: Path, tmp_path: Path
+    ):
+        payload = _payload(repo, source="resume")
+        expected = _run_process(repo, payload, log_dir=tmp_path / "writable" / "log")
+        blocked = tmp_path / "unwritable"
+        blocked.mkdir()
+        blocked.chmod(0o000)
+
+        try:
+            actual = _run_process(repo, payload, log_dir=blocked)
+        finally:
+            blocked.chmod(0o700)
+
+        assert actual.returncode == 0
+        assert actual.stdout == expected.stdout
+        diagnostics = actual.stderr.decode().splitlines()
+        assert len(diagnostics) == 1
+        assert diagnostics[0].startswith("notes-advisory: log write failed: ")
+
+    def test_log_row_stays_within_single_write_budget(self, repo: Path, tmp_path: Path):
+        oversized = "x" * 10_000
+        payload = _payload(
+            repo,
+            session_id=oversized,
+            transcript_path=oversized,
+            source=oversized,
+        )
+        log_dir = tmp_path / "bounded" / "log"
+
+        result = _run_process(repo, payload, log_dir=log_dir)
+
+        assert result.returncode == 0
+        raw_lines = [
+            line
+            for log_file in log_dir.glob("*.jsonl")
+            for line in log_file.read_bytes().splitlines(keepends=True)
+        ]
+        assert len(raw_lines) == 1
+        assert raw_lines[0].endswith(b"\n")
+        assert len(raw_lines[0]) <= 4096
+        row = json.loads(raw_lines[0])
+        assert set(row) == {
+            "timestamp",
+            "session_id",
+            "transcript_path",
+            "source",
+            "dispatch",
+            "note_count",
+            "notes_dir",
+        }
+        assert any(
+            "[truncated]" in row[field]
+            for field in ("session_id", "transcript_path", "source", "notes_dir")
+        )
 
 
 class TestWorktreeResolution:
