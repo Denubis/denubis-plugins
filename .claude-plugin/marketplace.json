@@ -231,6 +231,24 @@
         "openai",
         "critique"
       ]
+    },
+    {
+      "name": "denubis-notes-advisory",
+      "description": "SessionStart hook and skill that point a session at the project's .notes/ before it commits resources. The hook supplies the resolved notes directory at the main repo root, the note count, and the transcript path; the scanning-project-notes skill dispatches an advisor that reads every note's frontmatter and the project's chat logs, then reports which notes bear on the work and whether they still hold.",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-notes-advisory",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "hooks",
+        "notes",
+        "retrieval",
+        "memory",
+        "session-start"
+      ]
     }
   ]
 }

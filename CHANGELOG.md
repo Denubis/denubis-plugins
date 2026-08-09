@@ -1,5 +1,31 @@
 # Changelog
 
+## [denubis-notes-advisory] 0.1.0
+
+A session-start pointer at the project's `.notes/`, and an advisor that reads
+them so a session stops rediscovering what it already wrote down. Replaces an
+instruction that existed and was ignored with a mechanism that cannot fail the
+way a keyword search fails.
+
+**New:**
+- SessionStart hook on `startup|resume|clear|compact|fork`. Emits a
+  `<notes-advisory dispatch=… notes=… dir=… transcript=…>` block carrying the
+  notes directory resolved at the **main repo root** (the parent of
+  `git rev-parse --git-common-dir`, so worktrees resolve to the same place), the
+  markdown note count, and the session's transcript path. Silent with no output
+  where a project has no `.notes/`
+- `dispatch="now"` when the transcript already holds a purpose — `compact`,
+  `resume`, `clear`, `fork` — against `dispatch="first-request"` on a cold
+  `startup` and on any source added upstream that this hook has not seen. The
+  attribute is the contract; the prose around it is free to change
+- `notes-advisor` agent on Sonnet. Reads **every** note's frontmatter rather than
+  selecting by grep, searches chat logs through `cc-search-chats` several ways,
+  and reports `path — why it bears — does it still hold` with a coverage line
+  stating what it read and what it could not reach
+- `scanning-project-notes` skill holding the dispatch and the rules for handling
+  what comes back: open what the advisor names, reject a partial coverage line,
+  treat "nothing found" as bounded by what was searched
+
 ## [denubis-external-agents] 0.14.0
 
 Both ponytail launchers now live in this plugin, and `codex-ponytail` is the
