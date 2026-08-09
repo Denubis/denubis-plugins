@@ -1,5 +1,119 @@
 # Changelog
 
+## [denubis-external-agents] 0.14.0
+
+Both ponytail launchers now live in this plugin, and `codex-ponytail` is the
+version that was actually running rather than the one this repo had been keeping.
+
+**New:**
+- `codex-ponytail` — creates or reuses a worktree and prints an isolated native
+  Codex invocation, with `CODEX_HOME` and `XDG_CONFIG_HOME` under
+  `~/.codex-ponytail` and upstream Ponytail installed as a SHA-pinned marketplace
+  plugin. Adopted from a sibling checkout that had no remote and 62 uncommitted
+  lines; the copy tracked here was an older, unrun design
+- 36-test hermetic bats suite and a `fake_codex` fixture
+
+**Changed:**
+- `claude-ponytail` and `codex-ponytail` moved to
+  `plugins/denubis-external-agents/scripts/`, beside `codex_supervisor.py`.
+  Repoint any `~/.local/bin` symlinks
+
+**Fixed:**
+- `codex-ponytail` left `[sandbox_workspace_write]` alone whenever it existed, so
+  an isolated home created between the network-access grant and the later uv/npm
+  cache grant never received `writable_roots` and refilled the uv cache into the
+  sandbox's private tmp on every run. It now upgrades a section carrying its own
+  marker comment, while a hand-written section stays untouched
+
+## [denubis-plan-and-execute] 3.1.0
+
+`using-ast-grep` becomes `using-code-search`, covering both search tools in one guide.
+The addition is a measured diff of ripgrep's short flags against GNU grep's: ten
+collide, and four of those exit 0 with wrong output rather than erroring.
+
+**New:**
+- `using-code-search` skill — tool-choice table, the four rg flags that fail silently
+  (`-r` `-L` `-h` `-s`), and the `-h`/`-H`/`-I` triple, each with the correct flag to
+  type instead
+- `ripgrep.md` peer reference — the three flags that error loudly, the twenty safe in
+  both tools, hidden/gitignored visibility defaults, and the ugrep shim
+- `ast-grep.md` peer reference — patterns, YAML rules, and structural rewrites
+
+**Changed:**
+- `using-ast-grep` removed; its content is preserved verbatim in `ast-grep.md`
+- `refactoring-executor`, `impl-plan-write`, and `systematic-debugging` now reference
+  `using-code-search`
+
+Flag meanings are stamped to ripgrep 14.1.0, GNU grep 3.11, and ast-grep 0.44.1,
+measured 2026-08-07.
+
+## [denubis-research-agents] 1.3.1
+
+**Fixed:**
+- `investigating-a-codebase` referenced `using-ast-grep`, which no longer exists; it
+  now points at `using-code-search`
+
+## [denubis-academic] 0.14.0
+
+`using-bibliography` can now fix an item's metadata in place, behind a diff you
+approve, instead of bouncing you to the Zotero UI.
+
+**New:**
+- `update_item.py`, the consumer for `POST /api/plus/update-item` in
+  zotero-api-plus 0.6.0. Dry run is the default and nothing is written without
+  `--apply`. It patches named fields rather than replacing the item, so an update
+  cannot silently clear untouched fields or drop the item out of its collections.
+  `--find` and `--list <collection>` are read-only triage for finding what needs
+  fixing.
+- SKILL.md section "Fixing an item's metadata", covering the patch-versus-replace
+  trap, what the endpoint refuses, why creators are replaced rather than merged,
+  and the `collateral` channel that reports what a type change did on its own.
+- 30 unit tests in `tests/test_bibliography_update.py`.
+
+**Changed:**
+- The diff's limits are now documented rather than implied. The endpoint reports
+  what Zotero did to a detached clone, and Better BibTeX never sees that clone, so
+  a `citationKey` in the response can be superseded by the time the write settles.
+  Verified on a live Senate Hansard conversion: the dry run showed no collateral,
+  the apply reported one key, and the item settled on another. Fields are
+  authoritative; BBT-derived values want a read-back.
+
+## [denubis-external-agents] 0.13.0
+
+The codex monitor's pending-prompt reminders now stop after an hour, and a prompt that
+survives a spinner frame keeps its clock.
+
+**Changed:**
+- Reminders give up after an hour unanswered (`REMINDER_GIVE_UP_SECONDS`), and the final
+  line carries `no further reminders` so the quiet that follows reads as a decision
+  rather than a dead monitor. The ten-minute repeat ran forever, and a supervisor blocked
+  on a permission prompt in its own pane queued one line per ten minutes it was away:
+  fifteen hours delivered ninety lines all saying what the newest already said. Now nine
+  lines, then quiet. The hour is spent per waiting thing, so a new prompt gets the full
+  two-five-ten ladder.
+
+**Fixed:**
+- A pending approval that saw a single `Working` poll lost its reminder permanently.
+  Dropping the clock on busy is correct, but the returning approval carries a correlation
+  key `advance` has already recorded, so it took the unchanged branch, which neither
+  emits nor arms. Only `classify_snapshot` matching approval text ahead of busy kept this
+  from silencing live panes, and that ordering is what regressed in `fa54c31`.
+  `_ensure_reminder` now restores the clock for the announced prompt, and the comment
+  asserting the old code "re-arms" is corrected in both the source and the skill.
+
+## [denubis-00-getting-started] 1.5.0
+
+Adds the npm install-script policy skill: the machine's supply-chain defaults, the
+procedure for working inside them, and what they do not cover.
+
+**New:**
+- `npm-install-script-policy` skill. Covers `ESTRICTALLOWSCRIPTS`, `EALLOWSCRIPTS`,
+  and npm 12's `Refusing to fetch` git gate; the block-read-approve procedure;
+  and the residual risks, including that a project `.npmrc` carrying
+  `dangerously-allow-all-scripts=true` defeats the user-level policy entirely.
+  Every claim carries the npm version it was verified against (11.17.0 / 12.0.1,
+  2026-08-03, real installs with positive controls).
+
 ## [marketplace] 3.0.0
 
 **Removed:**

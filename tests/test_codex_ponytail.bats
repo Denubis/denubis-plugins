@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
-# Tests for the session-scoped Codex ponytail worktree launcher.
+# Hermetic tests for the isolated native Codex Ponytail launcher.
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-SCRIPT="$REPO_ROOT/scripts/codex-ponytail"
+SCRIPT="$REPO_ROOT/plugins/denubis-external-agents/scripts/codex-ponytail"
+FAKE_CODEX_FIXTURE="$REPO_ROOT/tests/fixtures/fake_codex"
 
 make_repo() {
     local repo="$1"
@@ -15,50 +16,45 @@ make_repo() {
     git -C "$repo" commit -qm init
 }
 
-wait_for_path() {
-    local path="$1"
-    for _ in {1..200}; do
-        [ -e "$path" ] && return 0
-        sleep 0.01
-    done
-    return 1
+printed_command() {
+    local text="$1"
+    printf '%s' "${text##*$'run this in the window you want it in:\n\n  '}"
 }
 
 setup() {
     TEST_DIR="$(mktemp -d)"
     export TEST_DIR
-    export XDG_CACHE_HOME="$TEST_DIR/cache"
+    export HOME="$TEST_DIR/user-home"
+    export CODEX_PONYTAIL_TESTING=1
+    export CODEX_PONYTAIL_HOME="$TEST_DIR/ponytail-home"
+    FAKE_CODEX="$TEST_DIR/fake-codex"
+    cp "$FAKE_CODEX_FIXTURE" "$FAKE_CODEX"
+    chmod +x "$FAKE_CODEX"
+    export FAKE_CODEX
+    export CODEX_PONYTAIL_BINARY="$FAKE_CODEX"
+    export CODEX_PONYTAIL_MARKETPLACE="$TEST_DIR/upstream-ponytail"
+    export CODEX_PONYTAIL_SHA="0123456789abcdef0123456789abcdef01234567"
+    export FAKE_CODEX_CALLS="$TEST_DIR/codex-calls"
+    export FAKE_CODEX_SESSION_ARGS="$TEST_DIR/session-args"
+    export FAKE_CODEX_SESSION_HOME="$TEST_DIR/session-home"
+    export FAKE_CODEX_SESSION_XDG="$TEST_DIR/session-xdg"
+    export FAKE_CODEX_SESSION_OPENAI_KEY="$TEST_DIR/session-openai-key"
+    export FAKE_CODEX_SESSION_CODEX_KEY="$TEST_DIR/session-codex-key"
     export GIT_CONFIG_GLOBAL=/dev/null
     export GIT_CONFIG_SYSTEM=/dev/null
 
-    export CODEX_ARGS_FILE="$TEST_DIR/codex-args"
-    export CODEX_PONYTAIL_BINARY="$TEST_DIR/fake-codex"
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'printf "%s\0" "$@" > "$CODEX_ARGS_FILE"' > "$CODEX_PONYTAIL_BINARY"
-    chmod +x "$CODEX_PONYTAIL_BINARY"
+    # The sandbox-cache-root resolution reads these from the environment, so an
+    # operator shell that happens to export any of them (as this one does, for
+    # UV_CACHE_DIR and PIP_CACHE_DIR) would otherwise leak real host paths into
+    # what is meant to be a hermetic test.
+    unset UV_CACHE_DIR PIP_CACHE_DIR HF_HOME TORCH_HOME CARGO_HOME \
+        XDG_CACHE_HOME NPM_CONFIG_CACHE npm_config_cache
 
-    FAKE_PONYTAIL="$TEST_DIR/fake-ponytail"
-    git init -q -b main "$FAKE_PONYTAIL"
-    git -C "$FAKE_PONYTAIL" config user.email t@e.st
-    git -C "$FAKE_PONYTAIL" config user.name test
-    mkdir -p "$FAKE_PONYTAIL/skills/ponytail"
-    printf '%s\n' \
-        '---' \
-        'name: ponytail' \
-        'description: test instructions' \
-        '---' \
-        "PONYTAIL TEST: don't overbuild." > "$FAKE_PONYTAIL/skills/ponytail/SKILL.md"
-    git -C "$FAKE_PONYTAIL" add -A
-    git -C "$FAKE_PONYTAIL" commit -qm init
-    export CODEX_PONYTAIL_URL="$FAKE_PONYTAIL"
-    CODEX_PONYTAIL_SHA="$(git -C "$FAKE_PONYTAIL" rev-parse HEAD)"
-    export CODEX_PONYTAIL_SHA
-
+    mkdir -p "$HOME/.agents/skills"
     WORK="$TEST_DIR/work"
     export WORK
     make_repo "$WORK"
-    cd "$WORK"
+    cd "$WORK" || return
 }
 
 teardown() {
@@ -66,203 +62,538 @@ teardown() {
     rm -rf "$TEST_DIR"
 }
 
-printed_command() {
-    local text="$1"
-    printf '%s' "${text##*$'run this in the window you want it in:\n\n  '}"
-}
+@test "--help identifies the isolated native launcher" {
+    run bash "$SCRIPT" --help
 
-@test "--help identifies the Codex launcher" {
-    run "$SCRIPT" --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"codex-ponytail <name> [<base-ref>]"* ]]
+    [[ "$output" == *"CODEX_HOME"* ]]
+    [[ "$output" == *"One-time setup"* ]]
 }
 
-@test "creates a worktree and prints a session-scoped Codex command" {
-    run "$SCRIPT" feature
+@test "literal branch validation rejects revision syntax and HEAD" {
+    run bash "$SCRIPT" '@{-1}'
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid worktree name"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+
+    run bash "$SCRIPT" HEAD
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid worktree name"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+}
+
+@test "production mode ignores test-only source and home overrides" {
+    unset CODEX_PONYTAIL_TESTING
+
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"$HOME/.codex-ponytail"* ]]
+    [[ "$output" == *"DietrichGebert/ponytail"* ]]
+    [[ "$output" == *"16f29800fd2681bdf24f3eb4ccffe38be3baec6b"* ]]
+    [[ "$output" != *"$CODEX_PONYTAIL_HOME"* ]]
+    [[ "$output" != *"$CODEX_PONYTAIL_MARKETPLACE"* ]]
+    [[ "$output" != *"$CODEX_PONYTAIL_SHA"* ]]
+}
+
+@test "unsafe worktree preflight happens before isolated-home mutation" {
+    rm "$WORK/.gitignore"
+    git -C "$WORK" add -A
+    git -C "$WORK" commit -qm drop-ignore
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not gitignored"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "branch already checked out elsewhere is rejected before home mutation" {
+    run bash "$SCRIPT" main
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"already checked out"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+}
+
+# A main checkout can be bare while all work happens in linked worktrees.
+# check-ignore cannot run in the bare root at all, so asking it there conflates
+# "cannot answer" with "not ignored" and rejects a repository that qualifies.
+make_bare_main() {
+    git -C "$WORK" worktree add -q "$TEST_DIR/linked" -b linked
+    git -C "$WORK" config core.bare true
+    cd "$TEST_DIR/linked" || return 1
+}
+
+@test "a bare main checkout resolves the gitignore guard from a linked worktree" {
+    make_bare_main
+
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"$WORK/.worktrees/feature"* ]]
+}
+
+@test "a bare main checkout still rejects a repository that does not ignore worktrees" {
+    rm "$WORK/.gitignore"
+    git -C "$WORK" add -A
+    git -C "$WORK" commit -qm drop-ignore
+    make_bare_main
+
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not gitignored"* ]]
+}
+
+@test "a bare main checkout falls back to a linked worktree when the caller is in neither" {
+    make_bare_main
+    cd "$WORK" || return
+
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"$WORK/.worktrees/feature"* ]]
+}
+
+@test "symlinked isolated home is rejected without following it" {
+    local redirected="$TEST_DIR/redirected"
+    mkdir "$redirected"
+    ln -s "$redirected" "$CODEX_PONYTAIL_HOME"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"must not be a symlink"* ]]
+    [ ! -e "$redirected/config.toml" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "symlinked base config cannot redirect plugin state" {
+    local normal_config="$HOME/.codex/config.toml"
+    mkdir -p "$CODEX_PONYTAIL_HOME" "$(dirname "$normal_config")"
+    printf 'cli_auth_credentials_store = "file"\n' > "$normal_config"
+    ln -s "$normal_config" "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"base Codex config must not be a symlink"* ]]
+    [ "$(cat "$normal_config")" = 'cli_auth_credentials_store = "file"' ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "symlink at requested worktree path is not treated as registered" {
+    git -C "$WORK" worktree add -q -b feature "$TEST_DIR/actual-worktree"
+    mkdir -p "$WORK/.worktrees"
+    ln -s "$TEST_DIR/actual-worktree" "$WORK/.worktrees/feature"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not a registered git worktree"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+}
+
+@test "symlinked managed profile cannot redirect writes" {
+    local redirected="$TEST_DIR/redirected-profile"
+    mkdir -p "$CODEX_PONYTAIL_HOME" "$redirected"
+    ln -s "$redirected" "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"managed profile must not be a symlink"* ]]
+    [ -z "$(find "$redirected" -mindepth 1 -maxdepth 1 -print -quit)" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "symlinked lock cannot redirect or truncate writes" {
+    local redirected="$HOME/.codex/lock-target"
+    mkdir -p "$CODEX_PONYTAIL_HOME" "$(dirname "$redirected")"
+    printf 'preserve lock target\n' > "$redirected"
+    ln -s "$redirected" "$CODEX_PONYTAIL_HOME/.codex-ponytail.lock"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"lock must not be a symlink"* ]]
+    [ "$(cat "$redirected")" = "preserve lock target" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "fresh invocation bootstraps pinned native Ponytail before the worktree" {
+    run bash "$SCRIPT" feature
 
     [ "$status" -eq 0 ]
     [ -d "$WORK/.worktrees/feature" ]
-    [[ "$output" == *"$CODEX_PONYTAIL_BINARY"* ]]
-    [[ "$output" == *"developer_instructions="* ]]
-    [[ "$output" != *"codex plugin add"* ]]
+    [ -f "$CODEX_PONYTAIL_HOME/config.toml" ]
+    [ -f "$CODEX_PONYTAIL_HOME/ponytail.config.toml" ]
+    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/plugin" ]
+    [ "$(stat -c %a "$CODEX_PONYTAIL_HOME")" = "700" ]
+    [ "$(stat -c %a "$CODEX_PONYTAIL_HOME/xdg-config")" = "700" ]
+    [ "$(stat -c %a "$CODEX_PONYTAIL_HOME/.codex-ponytail.lock")" = "600" ]
+    grep -F -- "plugin marketplace add" "$FAKE_CODEX_CALLS"
+    grep -F -- "$CODEX_PONYTAIL_MARKETPLACE --ref $CODEX_PONYTAIL_SHA" \
+        "$FAKE_CODEX_CALLS"
+    grep -F -- "plugin add ponytail@ponytail --json" \
+        "$FAKE_CODEX_CALLS"
+    [[ "$output" == *"run this in the window you want it in"* ]]
 }
 
-@test "the printed Fish command passes the worktree and pinned instructions to Codex" {
-    local command
-    run "$SCRIPT" feature
+@test "rerun preserves base config state while replacing only the profile" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '\n[hooks.state.test]\ntrusted = true\n' >> "$CODEX_PONYTAIL_HOME/config.toml"
+    printf 'session\n' > "$CODEX_PONYTAIL_HOME/session-sentinel"
+    printf 'stale profile\n' > "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "[plugins.\"ponytail@ponytail\"]" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "[hooks.state.test]" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(cat "$CODEX_PONYTAIL_HOME/session-sentinel")" = "session" ]
+    run grep -F -- "stale profile" "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    [ "$status" -eq 1 ]
+}
+
+# A supervising process reads Codex's status out of the terminal title, so an
+# isolated home that configures no title produces a pane nothing can drive.
+@test "a fresh isolated home configures a terminal title carrying status" {
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "[tui]" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "terminal_title" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- '"status"' "$CODEX_PONYTAIL_HOME/config.toml"
+    # A supervisor reads the remaining-context percentage off the status line to
+    # honour its dispatch floor, so a title alone leaves it unable to check.
+    grep -F -- "status_line" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- '"context-remaining"' "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+@test "an isolated home predating the title setting gains it on the next run" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        '# Initialized by codex-ponytail; Codex owns subsequent plugin and hook state.' \
+        'cli_auth_credentials_store = "file"' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "terminal_title" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- 'cli_auth_credentials_store = "file"' "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+@test "an existing tui section is left alone rather than duplicated" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        'cli_auth_credentials_store = "file"' \
+        '[tui]' \
+        'terminal_title = ["status", "chosen-by-hand"]' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "chosen-by-hand" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(grep -c -F -- "[tui]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
+}
+
+# Codex's built-in sandbox default is network_access = false for workspace-write,
+# which blocks the isolated home from reaching a package index (e.g. `uv sync`)
+# even though the operator's normal Codex home grants it.
+@test "a fresh isolated home configures workspace-write network access" {
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "network_access = true" "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+@test "an isolated home predating the network access setting gains it on the next run" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        '# Initialized by codex-ponytail; Codex owns subsequent plugin and hook state.' \
+        'cli_auth_credentials_store = "file"' \
+        '' \
+        '[tui]' \
+        'terminal_title = ["status"]' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "network_access = true" "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+@test "an existing sandbox_workspace_write section is left alone rather than duplicated" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        'cli_auth_credentials_store = "file"' \
+        '[sandbox_workspace_write]' \
+        'network_access = false' \
+        'writable_roots = ["chosen-by-hand"]' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "chosen-by-hand" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "network_access = false" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(grep -c -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
+}
+
+# A section this script wrote itself is not the operator's choice, so leaving it
+# alone strands every home initialized before the cache grant existed: the grant
+# lands in the script and can never reach the config. The marker comment the
+# script already writes is what tells its own output apart from a hand-written
+# section, which the test above still leaves untouched.
+@test "a codex-ponytail sandbox section predating the cache grant gains writable roots" {
+    local uv_cache="$TEST_DIR/uv cache" npm_cache="$TEST_DIR/npm cache"
+    export UV_CACHE_DIR="$uv_cache"
+    export npm_config_cache="$npm_cache"
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        '# Initialized by codex-ponytail; Codex owns subsequent plugin and hook state.' \
+        'cli_auth_credentials_store = "file"' \
+        '' \
+        '# Added by codex-ponytail so the isolated sandbox can reach a package index.' \
+        '[sandbox_workspace_write]' \
+        'network_access = true' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "writable_roots" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$uv_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$npm_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "network_access = true" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(grep -c -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
+}
+
+@test "printed invocation restricts the sandbox to workspace-write with on-request approval" {
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-s workspace-write"* ]]
+    [[ "$output" == *"-a on-request"* ]]
+}
+
+# uv and npm caches are required grants, not existence-gated candidates: the
+# operator wants them present unconditionally, so a directory that has never
+# been created yet (a brand-new machine, before either tool has run) is
+# granted the same as one that already exists.
+@test "uv and npm caches are granted at their override paths even before the directory exists" {
+    local uv_cache="$TEST_DIR/uv cache" npm_cache="$TEST_DIR/npm cache"
+    export UV_CACHE_DIR="$uv_cache"
+    export npm_config_cache="$npm_cache"
+    [ ! -e "$uv_cache" ]
+    [ ! -e "$npm_cache" ]
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "writable_roots" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$uv_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$npm_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+# With no override set, each tool's own documented default is resolved and
+# granted just the same — proving the fallback computation runs, not just
+# override-variable passthrough. Neither default directory is pre-created
+# here, for the same unconditional-grant reason as above.
+@test "uv and npm caches are granted at their documented defaults with no override set" {
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "$HOME/.cache/uv" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "$HOME/.npm" "$CODEX_PONYTAIL_HOME/config.toml"
+}
+
+# pip, Hugging Face, torch, cargo, and a bare XDG_CACHE_HOME grant were all
+# candidates at one point; none of them ships because no concrete need for
+# this launcher's actual workloads was found. Setting their env vars (even to
+# directories that exist) must not smuggle them into writable_roots.
+@test "sandbox writable roots are limited to uv and npm, not every cache-shaped env var" {
+    local pip_cache="$TEST_DIR/pip" hf_cache="$TEST_DIR/hf" torch_cache="$TEST_DIR/torch"
+    local cargo_home="$TEST_DIR/cargo" xdg_cache="$TEST_DIR/xdg"
+    mkdir -p "$pip_cache" "$hf_cache" "$torch_cache" "$cargo_home" "$xdg_cache"
+    export PIP_CACHE_DIR="$pip_cache" HF_HOME="$hf_cache" TORCH_HOME="$torch_cache"
+    export CARGO_HOME="$cargo_home" XDG_CACHE_HOME="$xdg_cache"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    run grep -F -- "$pip_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$status" -eq 1 ]
+    run grep -F -- "$hf_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$status" -eq 1 ]
+    run grep -F -- "$torch_cache" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$status" -eq 1 ]
+    run grep -F -- "$cargo_home" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$status" -eq 1 ]
+    # $xdg_cache is checked as an exact array entry, not a substring: with
+    # UV_CACHE_DIR unset, uv's own default legitimately resolves to
+    # "$xdg_cache/uv", which correctly does contain $xdg_cache as a prefix.
+    run grep -F -- "\"$xdg_cache\"," "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$status" -eq 1 ]
+}
+
+@test "the printed invocation no longer carries a cache directory flag" {
+    export UV_CACHE_DIR="$TEST_DIR/uv-cache"
+    mkdir -p "$UV_CACHE_DIR"
+
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"--add-dir"* ]]
+}
+
+@test "profile disables real and symlinked global skills by SKILL.md path" {
+    mkdir -p "$HOME/.agents/skills/real"
+    printf '%s\n' '---' 'name: real' 'description: test' '---' \
+        > "$HOME/.agents/skills/real/SKILL.md"
+    mkdir -p "$TEST_DIR/symlink-target"
+    printf '%s\n' '---' 'name: linked' 'description: test' '---' \
+        > "$TEST_DIR/symlink-target/SKILL.md"
+    ln -s "$TEST_DIR/symlink-target" "$HOME/.agents/skills/linked"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "path = \"$HOME/.agents/skills/real/SKILL.md\"" \
+        "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    grep -F -- "path = \"$HOME/.agents/skills/linked/SKILL.md\"" \
+        "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    [ "$(grep -cF 'enabled = false' "$CODEX_PONYTAIL_HOME/ponytail.config.toml")" -eq 2 ]
+}
+
+@test "new global skill is denied on the following invocation" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    run grep -F -- "/later/SKILL.md" "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    [ "$status" -eq 1 ]
+    mkdir -p "$HOME/.agents/skills/later"
+    printf '%s\n' '---' 'name: later' 'description: test' '---' \
+        > "$HOME/.agents/skills/later/SKILL.md"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "path = \"$HOME/.agents/skills/later/SKILL.md\"" \
+        "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+}
+
+@test "bootstrap failure creates no worktree and prints no run command" {
+    export FAKE_CODEX_FAIL_PLUGIN=1
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+    [[ "$output" != *"run this in the window you want it in"* ]]
+}
+
+@test "existing marketplace at another revision fails instead of repinning" {
+    mkdir -p "$CODEX_PONYTAIL_HOME/fake-codex-state"
+    printf '%s\n%s\n' "$CODEX_PONYTAIL_MARKETPLACE" "another-revision" \
+        > "$CODEX_PONYTAIL_HOME/fake-codex-state/marketplace"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"marketplace source or revision mismatch"* ]]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "dry run creates neither isolated state nor worktree" {
+    run bash "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+    [[ "$output" == *"dry run"* ]]
+    [[ "$output" == *"CODEX_HOME"* ]]
+}
+
+@test "printed Fish command isolates config and removes inherited API keys" {
+    local apostrophe_work="$TEST_DIR/work's path" command
+    make_repo "$apostrophe_work"
+    cd "$apostrophe_work"
+
+    run bash "$SCRIPT" feature
     [ "$status" -eq 0 ]
     command="$(printed_command "$output")"
+    export OPENAI_API_KEY="normal-openai-key"
+    export CODEX_API_KEY="normal-codex-key"
 
-    run fish -c "$command"
+    run fish --no-config -c "$command"
+
     [ "$status" -eq 0 ]
-
-    mapfile -d '' args < "$CODEX_ARGS_FILE"
+    [ "$(cat "$FAKE_CODEX_SESSION_HOME")" = "$CODEX_PONYTAIL_HOME" ]
+    [ "$(cat "$FAKE_CODEX_SESSION_XDG")" = "$CODEX_PONYTAIL_HOME/xdg-config" ]
+    [ "$(cat "$FAKE_CODEX_SESSION_OPENAI_KEY")" = "unset" ]
+    [ "$(cat "$FAKE_CODEX_SESSION_CODEX_KEY")" = "unset" ]
+    grep -F -- "--profile ponytail -C" "$FAKE_CODEX_CALLS"
+    mapfile -d '' args < "$FAKE_CODEX_SESSION_ARGS"
     [ "${args[0]}" = "-C" ]
-    [ "${args[1]}" = "$WORK/.worktrees/feature" ]
-    [ "${args[2]}" = "-c" ]
-    [[ "${args[3]}" == developer_instructions=* ]]
-    [[ "${args[3]}" == *"PONYTAIL TEST: don't overbuild."* ]]
+    [ "${args[1]}" = "$apostrophe_work/.worktrees/feature" ]
 }
 
-@test "the printed Codex command remains valid Fish syntax for a newline path" {
+@test "printed Codex command remains valid Fish syntax for a newline path" {
     local newline_work="$TEST_DIR/"$'work\nnewline' command
     make_repo "$newline_work"
     cd "$newline_work"
 
-    run "$SCRIPT" feature
+    run bash "$SCRIPT" feature
     [ "$status" -eq 0 ]
     command="$(printed_command "$output")"
 
-    run fish -n -c "$command"
+    run fish --no-config -n -c "$command"
+
     [ "$status" -eq 0 ]
 }
 
-@test "previous-checkout syntax is rejected as the literal worktree name" {
-    git -C "$WORK" switch -qc other
-    git -C "$WORK" switch -q main
+@test "registered worktree is reused but an ordinary directory is rejected" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
 
-    run "$SCRIPT" '@{-1}'
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reusing existing worktree"* ]]
 
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"invalid worktree name '@{-1}'"* ]]
-    [[ "$output" != *"branch named 'other' already exists"* ]]
-    [ ! -e "$XDG_CACHE_HOME/claude-ponytail" ]
-}
-
-@test "an unrelated repository is not reused as this repository's worktree" {
-    local unrelated="$WORK/.worktrees/feature"
-    git init -q -b feature "$unrelated"
-    git -C "$unrelated" config user.email t@e.st
-    git -C "$unrelated" config user.name test
-    printf 'unrelated\n' > "$unrelated/file.txt"
-    git -C "$unrelated" add -A
-    git -C "$unrelated" commit -qm unrelated
-
-    run "$SCRIPT" feature
-
+    mkdir -p "$WORK/.worktrees/ordinary"
+    run bash "$SCRIPT" ordinary
     [ "$status" -ne 0 ]
     [[ "$output" == *"not a registered git worktree"* ]]
 }
 
-@test "Codex and Claude launches serialize shared cache installation" {
-    local claude_script="$REPO_ROOT/scripts/claude-ponytail"
-    local real_git first_pid second_pid first_status second_status
-    real_git="$(command -v git)"
-    make_repo "$TEST_DIR/work-two"
-    export CLAUDE_PONYTAIL_WRAPPER="$TEST_DIR/claude-wrapper"
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$CLAUDE_PONYTAIL_WRAPPER"
-    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
-    export CLAUDE_PONYTAIL_URL="$FAKE_PONYTAIL"
-    export CLAUDE_PONYTAIL_SHA="$CODEX_PONYTAIL_SHA"
-    mkdir "$TEST_DIR/fake-bin"
-    export CLONE_LOG="$TEST_DIR/clone.log"
-    export CLONE_STARTED="$TEST_DIR/clone.started"
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'if [ "${1:-}" = clone ]; then' \
-        '    printf "clone\n" >> "$CLONE_LOG"' \
-        '    : > "$CLONE_STARTED"' \
-        '    sleep 0.25' \
-        'fi' \
-        'exec "$REAL_GIT" "$@"' > "$TEST_DIR/fake-bin/git"
-    chmod +x "$TEST_DIR/fake-bin/git"
-    export REAL_GIT="$real_git"
-    export PATH="$TEST_DIR/fake-bin:$PATH"
+@test "normal Codex, global skills, and Claude state remain untouched" {
+    mkdir -p "$HOME/.codex" "$HOME/.claude" "$HOME/.cache/claude-ponytail"
+    printf 'normal codex\n' > "$HOME/.codex/sentinel"
+    printf 'global skills\n' > "$HOME/.agents/skills/sentinel"
+    printf 'claude\n' > "$HOME/.claude/sentinel"
+    printf 'claude ponytail\n' > "$HOME/.cache/claude-ponytail/sentinel"
 
-    (cd "$WORK" && "$SCRIPT" one > "$TEST_DIR/one.out" 2>&1) &
-    first_pid=$!
-    wait_for_path "$CLONE_STARTED"
-    (cd "$TEST_DIR/work-two" && "$claude_script" two > "$TEST_DIR/two.out" 2>&1) &
-    second_pid=$!
-
-    if wait "$first_pid"; then first_status=0; else first_status=$?; fi
-    if wait "$second_pid"; then second_status=0; else second_status=$?; fi
-
-    [ "$first_status" -eq 0 ]
-    [ "$second_status" -eq 0 ]
-    [ "$(wc -l < "$CLONE_LOG")" -eq 1 ]
-    [ "$(git -C "$XDG_CACHE_HOME/claude-ponytail/ponytail" rev-parse HEAD)" = "$CODEX_PONYTAIL_SHA" ]
-    run find "$XDG_CACHE_HOME/claude-ponytail" -maxdepth 1 -name '.staging.*'
-    [ -z "$output" ]
-}
-
-@test "a modified cache at the pinned sha is replaced before it is loaded" {
-    local cached="$XDG_CACHE_HOME/claude-ponytail/ponytail"
-    run "$SCRIPT" one
-    [ "$status" -eq 0 ]
-    printf 'tampered\n' > "$cached/skills/ponytail/SKILL.md"
-
-    run "$SCRIPT" two
+    run bash "$SCRIPT" feature
 
     [ "$status" -eq 0 ]
-    [[ "$(cat "$cached/skills/ponytail/SKILL.md")" == *"PONYTAIL TEST: don't overbuild."* ]]
-    [ -z "$(git -C "$cached" status --porcelain --untracked-files=all)" ]
-}
-
-@test "a failed cache swap restores the previous pinned clone" {
-    local cached="$XDG_CACHE_HOME/claude-ponytail/ponytail" old_sha real_mv
-    run "$SCRIPT" one
-    [ "$status" -eq 0 ]
-    old_sha="$(git -C "$cached" rev-parse HEAD)"
-
-    printf 'new\n' > "$FAKE_PONYTAIL/new.txt"
-    git -C "$FAKE_PONYTAIL" add -A
-    git -C "$FAKE_PONYTAIL" commit -qm new
-    CODEX_PONYTAIL_SHA="$(git -C "$FAKE_PONYTAIL" rev-parse HEAD)"
-    export CODEX_PONYTAIL_SHA
-
-    real_mv="$(command -v mv)"
-    mkdir "$TEST_DIR/fake-bin"
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'source_path="${@: -2:1}"' \
-        'target_path="${@: -1}"' \
-        'if [[ "$source_path" == */new && "$target_path" == */ponytail ]]; then exit 75; fi' \
-        'exec "$REAL_MV" "$@"' > "$TEST_DIR/fake-bin/mv"
-    chmod +x "$TEST_DIR/fake-bin/mv"
-    export REAL_MV="$real_mv"
-    export PATH="$TEST_DIR/fake-bin:$PATH"
-
-    run "$SCRIPT" two
-
-    [ "$status" -ne 0 ]
-    [ "$(git -C "$cached" rev-parse HEAD)" = "$old_sha" ]
-    run find "$XDG_CACHE_HOME/claude-ponytail" -maxdepth 1 -name '.staging.*'
-    [ -z "$output" ]
-}
-
-@test "an interrupted cache swap restores the previous pinned clone" {
-    local cached="$XDG_CACHE_HOME/claude-ponytail/ponytail" old_sha real_mv
-    run "$SCRIPT" one
-    [ "$status" -eq 0 ]
-    old_sha="$(git -C "$cached" rev-parse HEAD)"
-
-    printf 'new\n' > "$FAKE_PONYTAIL/new.txt"
-    git -C "$FAKE_PONYTAIL" add -A
-    git -C "$FAKE_PONYTAIL" commit -qm new
-    CODEX_PONYTAIL_SHA="$(git -C "$FAKE_PONYTAIL" rev-parse HEAD)"
-    export CODEX_PONYTAIL_SHA
-
-    real_mv="$(command -v mv)"
-    mkdir "$TEST_DIR/fake-bin"
-    printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'source_path="${@: -2:1}"' \
-        'target_path="${@: -1}"' \
-        'if [[ "$source_path" == */new && "$target_path" == */ponytail ]]; then' \
-        '    kill -TERM "$PPID"' \
-        '    sleep 0.05' \
-        '    exit 75' \
-        'fi' \
-        'exec "$REAL_MV" "$@"' > "$TEST_DIR/fake-bin/mv"
-    chmod +x "$TEST_DIR/fake-bin/mv"
-    export REAL_MV="$real_mv"
-    export PATH="$TEST_DIR/fake-bin:$PATH"
-
-    run "$SCRIPT" two
-
-    [ "$status" -ne 0 ]
-    [ "$(git -C "$cached" rev-parse HEAD)" = "$old_sha" ]
-    run find "$XDG_CACHE_HOME/claude-ponytail" -maxdepth 1 -name '.staging.*'
-    [ -z "$output" ]
+    [ "$(cat "$HOME/.codex/sentinel")" = "normal codex" ]
+    [ "$(cat "$HOME/.agents/skills/sentinel")" = "global skills" ]
+    [ "$(cat "$HOME/.claude/sentinel")" = "claude" ]
+    [ "$(cat "$HOME/.cache/claude-ponytail/sentinel")" = "claude ponytail" ]
+    run grep -F -- "brian-ed3d" "$FAKE_CODEX_CALLS"
+    [ "$status" -eq 1 ]
 }

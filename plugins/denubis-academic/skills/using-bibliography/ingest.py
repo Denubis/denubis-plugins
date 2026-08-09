@@ -29,11 +29,13 @@ import tomllib
 from contextlib import nullcontext
 from pathlib import Path
 
-import httpx
-
+# httpx is imported lazily inside the shell functions (rpc / probe_zotero) so
+# this module stays importable without the PEP 723 deps, which is what lets the
+# unit tests load it. Mirrors resolve.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bbt import parse_pdf_paths
 from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback
+from zotero_local_api import search_doi_field
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -67,6 +69,8 @@ def load_config() -> dict:
 
 
 def rpc(method: str, params: list, timeout: float = 30.0):
+    import httpx  # noqa: PLC0415
+
     r = httpx.post(
         BBT_ENDPOINT,
         json={"jsonrpc": "2.0", "method": method, "params": params, "id": 1},
@@ -80,6 +84,8 @@ def rpc(method: str, params: list, timeout: float = 30.0):
 
 
 def probe_zotero() -> None:
+    import httpx  # noqa: PLC0415
+
     try:
         r = httpx.get(PING_ENDPOINT, timeout=3)
         if "Zotero is running" not in r.text:
@@ -91,54 +97,25 @@ def probe_zotero() -> None:
         )
 
 
-def crossref_first_author_family(doi: str) -> str | None:
-    """Resolve DOI to the first author's family name via Crossref (free, no auth).
-
-    BBT item.search does NOT index the DOI field, so we cannot search Zotero
-    by DOI directly. Crossref gives us a name token to search Zotero with.
-    """
-    try:
-        r = httpx.get(
-            f"https://api.crossref.org/works/{doi}",
-            headers={
-                "User-Agent": (
-                    "denubis-academic/0.1 (mailto:brian.ballsun-stanton@mq.edu.au)"
-                )
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        msg = r.json().get("message", {})
-        authors = msg.get("author", [])
-        if authors and "family" in authors[0]:
-            return authors[0]["family"]
-    except Exception:
-        return None
-    return None
-
-
 def find_by_doi(doi: str) -> dict | None:
-    """Locate an item in Zotero by DOI.
+    """Locate an item in Zotero by exact DOI field.
 
-    BBT item.search does not index DOIs, so we resolve the DOI to an author
-    surname via Crossref, then search Zotero by that surname, then filter
-    results by exact DOI match. Falls back to direct DOI search (which usually
-    returns nothing) if Crossref is unreachable.
+    BBT `item.search` does not index the DOI field, but the stock local API
+    does, via `qmode=fields` (see zotero_local_api). Candidates come from
+    there; each citekey is then resolved through BBT and gated on an exact DOI
+    match, so the returned hit keeps the BBT shape the rest of this script
+    expects.
+
+    No Crossref round trip. The old chain resolved the DOI to a first-author
+    surname and searched that, which returned nothing whenever Crossref carried
+    no author (Wiley chapter DOIs such as 10.1002/<book>.chN) and reported
+    papers that ARE in Zotero as absent.
     """
     candidates_seen: set[str] = set()
 
-    surname = crossref_first_author_family(doi)
-    queries: list[str] = []
-    if surname:
-        queries.append(surname)
-    queries.append(doi)
-    last_segment = doi.rsplit("/", maxsplit=1)[-1]
-    if last_segment not in queries:
-        queries.append(last_segment)
-
-    for q in queries:
+    for citekey in search_doi_field(doi):
         try:
-            hits = rpc("item.search", [q]) or []
+            hits = rpc("item.search", [citekey]) or []
         except Exception:  # noqa: S112 (skip a query that errors; try the next)
             continue
         for h in hits:

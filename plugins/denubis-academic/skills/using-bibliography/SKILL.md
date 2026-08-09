@@ -69,9 +69,11 @@ rendered — then renders it by default so it can be "asked questions".
 
 It queries the **running Zotero DB** (BBT JSON-RPC: `item.search` /
 `item.collections` / `item.attachments` / `user.groups`), never the cached `.bib`
-export — so it cannot report a stale ghost. And because it resolves by
-citekey/author/title, it does not inherit the DOI path's failure modes (Crossref
-dependency, empty-author DOIs, DOI drift).
+export — so it cannot report a stale ghost. `--doi` searches the DOI **field**
+itself through the stock local API (`qmode=fields`), so no key routes through
+Crossref any more, and the empty-author and journal-DOI classes that used to
+fail now resolve. DOI drift (the item's DOI field differing from the `.bib`)
+remains real, and no DOI query can resolve it; carry the citekey instead.
 
 ```bash
 R=plugins/denubis-academic/skills/using-bibliography/resolve.py
@@ -79,7 +81,7 @@ R=plugins/denubis-academic/skills/using-bibliography/resolve.py
 uv run $R vehtariPracticalBayesianModel2017
 uv run $R --author Vehtari --year 2017
 uv run $R --title "scoping studies"
-uv run $R --doi 10.1007/s13347-024-00760-w        # DOI: Crossref-surname fallback (the one weak key)
+uv run $R --doi 10.1007/s13347-024-00760-w        # DOI: exact DOI-field search, all libraries
 uv run $R --citekey <key> --library "My Library" --no-render   # narrow + don't render
 ```
 
@@ -363,6 +365,126 @@ confirmation.
 Nagel, CC-BY) — `create-collection` "test" in a group → `add-item-by-id`
 (`pdf: present`, PDF on disk) → `ingest.py` rendered 24 pages via pymupdf4llm.
 
+## Copying an item between libraries (requires zotero-api-plus >= 0.5.0)
+
+`copy_item.py` copies an item, with its attachments, from one Zotero library to
+another via `POST /api/plus/copy-item`. Zotero exposes no headless cross-library
+copy: the capability lives only in `CollectionTree._copyItem()`, which needs a UI
+`targetTreeRow`. **Use the script, never a hand-written curl** — the resolution
+step below is exactly the improvisation that keeps breaking.
+
+```bash
+S=plugins/denubis-academic/skills/using-bibliography
+uv run $S/copy_item.py --find "Game Theoretic"          # locate the item key
+uv run $S/copy_item.py --key N6MN63GX --to "My Library" # preview, NO write
+uv run $S/copy_item.py --key N6MN63GX --from "2025-MQ-Teaching-the-Unknown" \
+    --to "My Library" --copy                            # perform it
+```
+
+**`--to` takes a libraryID, not a groupID, and the script hides that.** This is
+the one trap worth knowing: `add-item-by-id` and `create-collection` take a
+**groupID**, while `copy-item` takes a **targetLibraryID**. They are different
+number spaces for the same library (the SARDI group is libraryID 33, groupID
+6627731). `copy_item.py` accepts a name or either number and resolves it, so
+pass a name where you can.
+
+**The copy is idempotent, by ruling.** If the target already holds a linked
+counterpart it is returned rather than duplicated, and any attachment it lacks is
+topped up, so re-running after a partial copy repairs it. Attachment statuses:
+`copied` (stored file), `imported` (a linked file whose bytes were imported as a
+stored attachment), `already-present`, `source-file-missing`, `no-file-permission`,
+`copy-failed` (carries a `message`). Only the first two mean new bytes landed.
+
+**Placement never creates a collection.** `--to-collection` must name one that
+already exists in the target; compose with `create-collection` first if needed.
+
+**Verified end-to-end 2026-08-05:** `N6MN63GX` (Hicks & Kitto 2025) copied from
+group `2025-MQ-Teaching-the-Unknown` (libraryID 17) into My Library. The target
+PDF landed in its own storage directory (`ACCCRMVD`, distinct from the source's
+`HBK3L3NP`, both on disk), so it is a real copy rather than a link to the
+source's file; the source was untouched; and a second run returned the same
+target key as `reused existing counterpart` with the attachment
+`already-present`, copying nothing.
+
+## Fixing an item's metadata (requires zotero-api-plus >= 0.6.0)
+
+Zotero's own local API is read-only — `PATCH` on an item returns **501**. The
+write side is `POST /api/plus/update-item`, and the consumer is `update_item.py`.
+As everywhere else here, **never hand-roll the HTTP call**.
+
+It is a **patch**: only the fields you name are touched. This is not what the
+obvious Zotero primitive does. `Zotero.Item.fromJSON()` is a *replace* — it
+clears every field absent from the payload, and because of the branch at
+`item.js:5684` a payload with no `collections` key **removes the item from its
+collections**. The endpoint never calls it.
+
+```bash
+U=plugins/denubis-academic/skills/using-bibliography/update_item.py
+
+uv run $U --find "Ethnography and Virtual Worlds"        # get the key
+uv run $U --key ABCD1234 --type bookSection --set pages=53-82   # DRY RUN
+uv run $U --key ABCD1234 --type bookSection --set pages=53-82 --apply
+```
+
+**Dry run is the default.** Nothing is written without `--apply`. The gate is a
+real boolean on the wire and the endpoint rejects the string `"false"` rather
+than coercing it, because `"false"` is truthy and a coerced write gate fails in
+the one direction that costs data.
+
+**The diff is Zotero's, not the script's.** The endpoint applies the change to a
+detached `Zotero.Item.clone()` (no itemID, no key, never in the object cache),
+asks Zotero what the clone became, and reports the difference. It never predicts.
+
+That distinction earns its keep on item type changes, which are **not** simply
+destructive. `setType()` migrates values through base-field mappings and
+special-cases book ↔ bookSection (`item.js:470-524`), so `book → bookSection`
+moves the title into `bookTitle` rather than losing it, while a field with no
+counterpart on the new type really is cleared. The response separates the two:
+
+- `typeChange` — the type change itself;
+- `collateral` — what changing the type did **on its own**, before anything you
+  asked for. Zotero's doing, not yours. Read this section carefully; it is where
+  unrequested data loss shows up;
+- `requested` — what you actually asked for.
+
+The script prints cleared fields under "Cleared by this change" so a loss is
+never inferred from a blank column.
+
+**What the clone cannot see.** Being detached is what makes the dry run safe, and
+it is also the limit of what the dry run knows. Anything that reacts to the real
+item changing happens after the diff is built. Better BibTeX is the case that
+shows up in practice. Converting `5TCVZK5L` from `webpage` to `hearing`
+(2026-08-05) dry-ran with no collateral at all, then the apply reported
+`citationKey (empty) -> AdoptingArtificialIntelligence`, and reading the item back
+gave a third value, `AdoptingAIProof2024`. The two keys derive from the two
+titles: BBT generated one from the old title, then regenerated from the new one
+after the response had been built. No field was lost and every requested value
+landed. So a dry run is authoritative about fields, and a BBT-derived value is
+settled only once you read the item back.
+
+**Creators are replaced, not merged**, because Zotero stores them as an ordered
+list rather than a set. Pass every creator you want, not just the missing one:
+
+```bash
+uv run $U --key ABCD1234 \
+    --author "Boellstorff, Tom" --author "Nardi, Bonnie" \
+    --creator "editor=Pearce, Celia" --apply
+```
+
+A `--author` value with no comma is stored as a single-field name, which is how
+Zotero holds organisations ("World Health Organization").
+
+**What it refuses.** Primary fields (`key`, `libraryID`, `version`,
+`dateModified`) are rejected as `invalid_field` — `setField()` would otherwise
+route them to primary-field setters. Notes, attachments and annotations are
+`unsupported_item_type`. A field invalid for the resulting type is
+`invalid_field`, judged against the type *after* any requested type change, so
+setting `pages` while switching to `bookSection` is legal in one request.
+
+**A request is all-or-nothing.** Validation happens on the clone, so if any part
+of a request is bad, nothing is written — a valid first field does not land on
+its own.
+
 ## The proven workflow
 
 ### 1. Resolve cite key → PDF file path
@@ -415,11 +537,22 @@ bib = requests.post(
   ASCII-folded form and compares folded on both sides, so either spelling
   resolves; by hand, fold the diacritics out of the query token.
 - **`item.search` does NOT index the DOI field.** Searching `"10.1111/jels.12413"`
-  returns zero hits even for the exact item with that DOI. To resolve a DOI to
-  a Zotero item, look up the DOI's first-author surname via Crossref
-  (`https://api.crossref.org/works/<doi>`, free, no auth), then search BBT
-  by that surname, then filter results by `DOI` field exact-match. This is
-  what `ingest.py` does.
+  returns zero hits even for the exact item with that DOI (re-verified against
+  Zotero 9.0.6 + BBT, 2026-08-03: the same query by author surname returns hits
+  that carry that DOI in their own output). **The stock local API can search it**,
+  via `qmode=fields`, which expands to a `field contains` condition over every
+  item data field:
+  `/api/users/0/items?q=<doi>&qmode=fields&format=json`. Two consequences:
+  `contains` over-matches, so filter to an exact DOI client-side; and the mode
+  does not set `noChildren`, so drop attachment children. `/api/users/0/` is My
+  Library ALONE, so sweep `/api/groups/<groupID>/items` too, enumerating groups
+  from `/api/users/0/groups`. `resolve.py --doi` does all of this. `ingest.py`
+  still uses the old Crossref-surname chain and inherits its failures.
+- **Do not read `qmode=everything` for a DOI and conclude the field is
+  unsearchable.** That mode adds PDF fulltext, so a DOI query returns hundreds of
+  attachment hits and the parent sits below the first page. Reading the first few
+  results of that set is what recorded DOI-field search as impossible for six
+  weeks. It was always there.
 - **Cite keys must be read from `item.search` results — never constructed.**
   BBT cite-key formats are deterministic but longer than they look. Tried
   `mageshHallucinationFreeAssessing2025` (truncated guess) → "not found."
@@ -943,7 +1076,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Treating a `resolve.py` / `item.search` "no match" as proof a paper is absent | It is not. `item.search` is AND-fuzzy, **first-author-only**, and **ASCII-folded** — three independent ways a present paper returns zero. `resolve.py` now compensates (unions every supplied key, folds diacritics, matches hyphen-components), but if it still says no-match, query the API directly for a distinctive title word before concluding absence. The honest no-match message says exactly this. |
 | Searching `--author` for a co-author (`Ghahramani` in "Wade, Ghahramani"; `Kruschke` in "Liddell, Kruschke") and getting zero | `item.search` indexes only the FIRST author surname. Pass the first author, or add a `--title` word — `resolve.py` unions all supplied keys, so `--author <coauthor> --title <word>` resolves. |
 | Searching `--author Frühwirth` (diacritics) and getting zero | BBT's index is ASCII-folded, so `Frühwirth` misses `fruhwirth`. `resolve.py` searches the folded form too and compares folded on both sides; by hand, strip diacritics from the query token. |
-| Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | DOI field is not indexed for fulltext search. Resolve DOI → surname via Crossref, then search by surname, then filter results by exact DOI match. |
+| Searching by DOI directly (`item.search("10.1234/x.5")`) and getting zero hits | BBT does not index DOI, but the stock local API does: `?q=<doi>&qmode=fields`, swept per library, filtered to exact DOI and non-attachment. Use `resolve.py --doi`. Do NOT reach for Crossref. |
 | Using the storage directory name (e.g. `2367YXMF`) as the item key | That's the attachment key. The parent item has a different key; use cite-key based lookups. |
 | Inventing a quote when `blockquote.py` reports NO MATCH | Don't. Mark `> [unverified]` and flag for the human. |
 | Asserting "I rendered N papers" without showing the file paths | Verify by `ls ~/zettelkasten/papers/<citekey>/`. Don't claim success without checking. |
@@ -952,7 +1085,7 @@ When asked to do any of these, halt and say so explicitly. Do not improvise.
 | Hand-rolling `item.export` + a diff to splice one new citekey into a project bib | That improvisation left a bib in an uncertain state before a freeze — the failure this endpoint exists to remove. Use `resolve.py --citekey <key> --bib <abs path>`: it triggers the registered "Keep updated" export (BBT's own bytes) then verifies the citekey is present in a well-formed bib. Never construct or patch bib entries by hand. |
 | Refreshing a project bib with the library pull-export (`/better-bibtex/library?/<id>/library.biblatex`) | That dumps the WHOLE library, not the project collection the bib targets, so it clobbers `references.bib` with wrong-scope content. Use `resolve.py --bib` (forces the registered collection export); if the endpoint is absent, install/upgrade zotero-api-plus to >= 0.4.0 rather than pulling the whole library. |
 | Searching for an item that lives in multiple libraries and assuming the first `item.search` hit is the canonical copy | The same paper can exist in My Library AND a group library as separate Zotero items with the same cite key. Always pass the explicit `library_id` to `item.attachments` / `item.export` for the library you actually want. |
-| Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so the surname-search step has nothing to query and lookup fails. Bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
+| Assuming Wiley chapter DOIs (`10.1002/<bookdoi>.chN`) work in `ingest.py` | Crossref returns empty `author` for those DOIs, so `ingest.py`'s surname-search step has nothing to query and lookup fails. `resolve.py --doi` is unaffected (it searches the DOI field directly; `10.1002/9780470567333.ch7` resolves). For `ingest.py`, bypass DOI: get the PDF path via `item.attachments` by cite key, then call `render.py` directly. |
 | Verifying a quote with `blockquote.py` and giving up at the first NO MATCH | Try adjusted substrings before flagging unverified: strip Unicode apostrophes, drop fragments that fall inside an HTML-rendered table cell, check whether the "quote" is actually a paraphrase of source text. The real text is usually present — match logic is brittle. |
 | Treating docling+OCR output as faithful transcription | OCR introduces substitutions (`0`/`o`, `S`/`5`, dropped short words). For a paper rendered via docling+OCR (`meta.json: "renderer": "docling", "ocr": true`), use the markdown to *locate* a quote, then verify the exact wording against the source PDF before pasting verbatim. |
 | Assuming docling defaults to EasyOCR | Recent docling builds default to RapidOCR, which downloads ONNX models from `modelscope.cn` at first OCR use — that endpoint is unreliable outside China. `renderer.py` pins `EasyOcrOptions(lang=["en"])` explicitly. Match that in any one-off script that calls docling directly. |
@@ -1149,10 +1282,15 @@ discovery):
   `--with pymupdf4llm --with docling --with easyocr` because `render.py` has no
   PEP 723 header; `_render_cmd` now encodes that and is regression-tested. Live
   render confirmed end-to-end (Vehtari, 28 pages via pymupdf4llm).
-- DOI remains the one weak key (BBT can't search the DOI field): `--doi` uses the
-  same Crossref-surname fallback as `ingest.py`. A clean DOI-field search + bundled
-  on-disk path is specced for a future `zotero-api-plus` `GET /api/plus/resolve`
-  endpoint, which would let `resolve.py` demote the BBT/Crossref path to a fallback.
+- DOI is no longer the weak key (2026-08-03). `--doi` searches the DOI field
+  through the stock local API's `qmode=fields`, swept across every library, with
+  the exact-DOI and drop-attachments filters applied client-side. Crossref is gone
+  from `resolve.py`. The `GET /api/plus/resolve` endpoint specced for this was
+  **not built**, because the premise did not survive re-verification: stock could
+  already search the DOI field, and the on-disk path half was already answered by
+  BBT `item.attachments`. The prior "stock cannot" finding came from reading the
+  first three results of a 278-hit `qmode=everything` query. `ingest.py` still
+  carries the old Crossref chain.
 - Critical-peer-review pass (2026-06-17) hardened truthfulness: render state is now
   **per-citekey** (a paper renders once; copies never re-render or clobber the
   shared `papers/<citekey>/` dir; `--force` re-renders) — replacing a per-copy
@@ -1221,3 +1359,34 @@ discovery):
   the HTTP-response classifier (triggered / no-autoexport / endpoint-absent /
   bbt-*), and the `--bib`/`--citekey` argument validation. The `--bib` shell flow
   was verified live.
+
+**2026-08-05 addendum** (patching item metadata — update-item endpoint + consumer):
+
+- **zotero-api-plus 0.6.0 adds `POST /api/plus/update-item`**, the write side stock
+  Zotero's local API refuses (`PATCH` on an item returns 501). It is a patch, not a
+  replace: the obvious primitive `Zotero.Item.fromJSON()` clears every field absent
+  from the payload and, via the branch at `item.js:5684`, drops the item out of its
+  collections when the payload carries no `collections` key. The endpoint never
+  calls it.
+- `update_item.py` is the consumer. Dry run is the default and the `apply` gate is a
+  real boolean on the wire, because `"false"` is truthy and a coerced write gate
+  fails in the one direction that costs data. `--find` and `--list <collection>` are
+  read-only triage.
+- The reported diff comes from a detached `Zotero.Item.clone()`, so it is Zotero's
+  answer rather than a prediction, and `collateral` separates what the type change
+  did on its own from what was asked for. The clone's blind spot is documented above
+  under "What the clone cannot see": Better BibTeX never sees the clone, so a
+  BBT-derived `citationKey` in the response can be superseded by the time the write
+  settles.
+- Verified live 2026-08-05 on the Senate committee Hansard for *Adopting AI*
+  (`5TCVZK5L`, My Library). It had arrived from the connector as a `webpage` whose
+  title was the PDF filename, with the real PDF as its child. `webpage -> hearing`
+  plus title, `committee`, `legislativeBody`, `place`, `date` and `pages` landed in
+  one request; the PDF child, the Week3 collection membership, and the parlinfo URL
+  and access date all survived. Rendering the result under APA and both Chicago
+  styles confirmed no creator is wanted: the styles build "Hearing before the …"
+  from `committee` and `legislativeBody`, so a corporate contributor would be the
+  fake-author pattern this endpoint exists to remove.
+- 30 unit tests in `tests/test_bibliography_update.py` cover the consumer's pure
+  core; the endpoint's own core (`parseUpdateItemParams`, `diffSnapshots`,
+  `diffCreators`, `buildChangeReport`) is covered in the plugin's mocha suite.

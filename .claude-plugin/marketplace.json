@@ -11,7 +11,7 @@
     {
       "name": "denubis-00-getting-started",
       "description": "Getting started guide and onboarding for denubis-plugins",
-      "version": "1.4.2",
+      "version": "1.5.0",
       "source": "./plugins/denubis-00-getting-started",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -160,7 +160,7 @@
     {
       "name": "denubis-academic",
       "description": "Scholarly workflow for Claude Code: academic register and revision passes, critical-friend manuscript review, and a Zotero corpus rendered to page-keyed markdown for quotation and annotation. Successor to denubis-bibliography, which it absorbs.",
-      "version": "0.13.0",
+      "version": "0.14.0",
       "source": "./plugins/denubis-academic",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -217,7 +217,7 @@
     {
       "name": "denubis-external-agents",
       "description": "Dispatch work to a mind that is not this session, as a heterogeneous second voice: external CLI models and other-model advisors alike. Run OpenAI's codex as a critical peer reviewer at whatever model your codex config selects, spawn a different-model advisor in a pane that is structurally unable to implement, or supervise a codex pane through the prompt-file loop and its event monitor. Review paths carry a mandatory provenance check so a confabulated review cannot pass as real. WIP.",
-      "version": "0.12.0",
+      "version": "0.14.0",
       "source": "./plugins/denubis-external-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",

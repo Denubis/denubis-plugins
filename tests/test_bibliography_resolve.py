@@ -820,3 +820,4 @@ def test_print_duplicate_note_silent_without_variants(capsys):
     ]
     resolve.print_duplicate_note(near)
     assert capsys.readouterr().out == ""
+

@@ -480,13 +480,24 @@ announce once and go quiet, which meant a line missed was a line gone; a pane sa
 for 57 minutes that way on 2026-07-27. A `CRASH` is not repeated, because it is terminal
 and nothing can be done to the pane in response.
 
+**After an hour unanswered it stops**, and the last line says `no further reminders` so
+the quiet that follows reads as a decision rather than a dead monitor (Brian,
+2026-08-04). The repeats exist to survive a line you missed, not to outlast a supervisor
+that cannot answer, and a supervisor blocked on its own permission prompt is exactly the
+case where the drum kept queueing: fifteen hours of ten-minute repeats delivered ninety
+lines at once, all of them saying what the newest already said. The hour is spent per
+waiting thing, so a genuinely new prompt gets the full ladder.
+
 `DONE` is raised again like anything else, because a finished pane is waiting on a
 decision rather than reporting an all-clear. Its line asks whether to compact, clear, or
 quit, which is the choice the numbered-prompt loop expects at exactly that moment.
 
 The reminder lapses as soon as Codex is busy, since a spinner means nothing is waiting on
-you. That cannot lose a live approval: a pane genuinely waiting classifies as `APPROVAL`
-on every poll and re-arms the schedule.
+you, and the clock is restored when the prompt is still there on the next poll. Until
+2026-08-04 it was not: one busy frame disarmed a live approval permanently, and only
+`classify_snapshot` matching approval text ahead of busy kept that from silencing panes.
+That ordering is the guard that regressed in `fa54c31`, so the schedule no longer rests
+on it alone.
 
 Lifecycle hooks wake the monitor immediately for activity, permission requests, and turn
 stops. They are installed **globally**, once per machine, rather than per project:

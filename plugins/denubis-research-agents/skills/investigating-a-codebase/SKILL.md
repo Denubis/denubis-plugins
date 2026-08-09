@@ -55,7 +55,7 @@ When given design assumptions to verify:
 | **Where is X** | Glob likely names → Grep keywords → Read matches |
 | **How does X work** | Find entry point → Follow imports → Read implementation |
 | **What patterns exist** | Find examples → Compare implementations → Extract conventions |
-| **Find structural patterns** | ast-grep for function signatures, class hierarchies, decorators, call sites; also structural rewrites for renaming/migration (see `using-ast-grep` skill) |
+| **Find structural patterns** | ast-grep for function signatures, class hierarchies, decorators, call sites; also structural rewrites for renaming/migration (see `using-code-search` skill) |
 | **Does X exist** | Multiple searches → Definitive yes/no → Evidence |
 | **Verify assumptions** | Extract claims → Search each → Compare reality vs expectation |
 
@@ -64,7 +64,7 @@ When given design assumptions to verify:
 **Multiple search approaches:**
 - Glob for file patterns across codebase
 - Grep for keywords, function names, literal strings
-- ast-grep for structural patterns (function signatures, class hierarchies, decorator usage, call sites with arguments) and structural rewrites (renaming, API migration) — see `using-ast-grep` skill for decision guidance and command reference
+- ast-grep for structural patterns (function signatures, class hierarchies, decorator usage, call sites with arguments) and structural rewrites (renaming, API migration) — see `using-code-search` skill for decision guidance and command reference
 - Read key files to understand implementation
 - Follow imports and references for relationships
 - Check package.json, config files for dependencies
