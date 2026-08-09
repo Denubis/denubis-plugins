@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-hook-skill-reinforcement] 1.2.0
+
+The per-prompt reminder trades volume for a reason. Shouted absolutes on every
+prompt are the reminder people stop reading; naming the consequence is what
+moves behaviour.
+
+**Changed:**
+- The injected text drops the `<EXTREMELY_IMPORTANT>` framing and its
+  `MUST`/`Do NOT skip` absolutes for a `<skills>` block that says why: skills
+  encode workflows already debugged against this codebase, so working without
+  one usually means re-deriving a solved problem and getting it subtly wrong
+- The "not already active" scoping is retained, so the reminder still goes quiet
+  once it has been obeyed rather than repeating at a session that has complied
+
+**Known gap:** the hook still fires on every prompt, including a one-word reply.
+Reducing that is the substance of the remaining work and is untouched here.
+Neither is the softened text pressure-tested against a session looking for a way
+out of it.
+
 ## [denubis-notes-advisory] 0.1.0
 
 A session-start pointer at the project's `.notes/`, and an advisor that reads
