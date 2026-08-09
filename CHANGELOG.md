@@ -1,5 +1,50 @@
 # Changelog
 
+## [denubis-plan-and-execute] 3.2.0
+
+`using-plan-and-execute` is injected whole at every session start, which made it
+the loudest and most-loaded directive in the repo. Brought in line with the
+policy `writing-claude-directives` already documents: rhetorical emphasis on an
+ordinary instruction degrades instruction-following in nearby unrelated
+contexts, and imperatives are reserved for true boundaries.
+
+**Changed:**
+- Dropped the `<EXTREMELY-IMPORTANT>` preamble and the `automatic failure`,
+  `not negotiable`, and `cannot rationalize your way out of this` framing. The
+  underlying instruction is "check whether a skill applies", which the policy
+  writes as a plain trigger
+- The session-start hook's own wrapper moved from `<EXTREMELY_IMPORTANT>` to
+  `<skills>`, since softening the file while the hook still shouted around it
+  would have changed nothing
+- Removed the nine-item **Common Rationalizations** list. It named and rehearsed
+  every escape hatch, which is the pink-elephant pattern the same policy warns
+  against, at the length the policy says dilutes adherence. Its three
+  load-bearing cases survive in positive form: a question is a task, a quick
+  file check is a task, and skills change so read the current version
+- File is roughly half its previous length. The two genuine gates keep their
+  imperative, because "stop and do Y instead" is structural enforcement rather
+  than emphasis: design before EnterPlanMode, and TaskCreate per checklist item
+- Both gates now name a fallback for when the harness tool is absent, which the
+  policy requires of any directive naming a harness tool and which this file
+  never did
+
+## [denubis-basic-agents] 2.2.0
+
+**Changed:**
+- The session-start injection drops `<EXTREMELY_IMPORTANT>` and its `MUST` for a
+  `<agents>` block that gives the reason: the skill carries the model-tier floor
+  and the domain-specific alternatives, so choosing without it tends to land on
+  a tier that cannot carry the task's judgement and returns an answer that reads
+  plausible
+
+## [denubis-notes-advisory] 0.1.1
+
+**Changed:**
+- The injected closing line moves from "Do not substitute a grep for the scan"
+  to the positive form. Negative framing makes the model think about the thing
+  named, and the positive version carries the same fact: a search of `.notes/`
+  comes back clean whether or not the note exists
+
 ## [denubis-hook-skill-reinforcement] 1.2.0
 
 The per-prompt reminder trades volume for a reason. Shouted absolutes on every

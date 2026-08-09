@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Planning and execution workflows for Claude Code. Slow and steady.",
-      "version": "3.1.0",
+      "version": "3.2.0",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -33,7 +33,7 @@
     {
       "name": "denubis-basic-agents",
       "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "source": "./plugins/denubis-basic-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -235,7 +235,7 @@
     {
       "name": "denubis-notes-advisory",
       "description": "SessionStart hook and skill that point a session at the project's .notes/ before it commits resources. The hook supplies the resolved notes directory at the main repo root, the note count, and the transcript path; the scanning-project-notes skill dispatches an advisor that reads every note's frontmatter and the project's chat logs, then reports which notes bear on the work and whether they still hold.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": "./plugins/denubis-notes-advisory",
       "author": {
         "name": "Brian Ballsun-Stanton",
