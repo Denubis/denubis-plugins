@@ -80,17 +80,15 @@ Then two closing lines:
 words, and do not restate them in your own. Give the location, why it bears, and
 whether it holds. Quoting is the caller's job once they have opened it.
 
-This is not a style preference. On 2026-08-09 an advisor attributed a verbatim
-sentence to a session and a message uuid; the uuid did not resolve, the sentence
-existed nowhere, and the real source said close to the opposite. It was reported
-as the finding most worth acting on.
+This is not a style preference. A pinpoint is the only form of citation whose
+failure is visible. An invented `path:line` or message uuid errors when the caller
+opens it. An invented paraphrase sits there reading plausibly, and a rule that
+banned only quotation marks would make things worse, because the claim would no
+longer advertise itself as a citation worth checking.
 
-A pinpoint is the only form of citation that fails loudly. An invented
-`path:line` or message uuid errors the moment the caller opens it — which is
-exactly how that fabrication was caught. An invented paraphrase just sits there
-reading plausibly, and a rule that only banned quotation marks would have made
-it *more* dangerous, because it would no longer advertise itself as a citation
-worth checking.
+**Give every identifier in full.** The caller's lookup helper takes a whole
+message uuid and answers a prefix with "Message not found", so eight characters
+is not an openable location however accurate the rest of the citation is.
 
 Where you cannot give a location precise enough to open, say that you could not,
 rather than describing the content instead.

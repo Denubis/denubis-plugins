@@ -57,13 +57,19 @@ which notes and prior sessions bear on this work and whether they still hold.
 ## What to do with the result
 
 **Open what it names.** The advisor returns pinpoints and is forbidden to quote
-or paraphrase, so there is nothing to act on until you have opened one. This is
-the rule that earned its place: on 2026-08-09 it caught the advisor attributing
-a fabricated sentence to a message uuid that did not resolve.
+or paraphrase, so there is nothing to act on until you have opened one.
 
-**A pinpoint that will not open is a void finding.** Not a formatting slip —
-discard that advisory, and treat the rest of the report as suspect rather than
-merely incomplete.
+**Control your check before you call a pinpoint bad.** A location that will not
+open is a fact about your lookup until you have shown otherwise. Use the
+identifier in full — `cc-search-chats context` takes a whole message uuid and
+answers a prefix with "Message not found". Case-fold the search. Then run a
+positive control: feed the same check something that must match and watch it
+fire. A check whose control does not fire is broken, and broken is no evidence.
+
+**A pinpoint that survives a controlled check and still will not open is a void
+finding.** Discard that advisory. Do not escalate it: "I could not open this" is
+a report about your check, and calling it fabrication is a claim about the
+advisor that needs a control that fired.
 
 **Read the coverage line.** If it reports `read 12/43`, it did not do the scan.
 Send it back.
