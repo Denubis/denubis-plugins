@@ -466,9 +466,8 @@ nothing else:
 No other field. In particular:
 
 - **No `timeout_ms`.** Supervision lasts as long as the session, so it is a persistent
-  watch. A timeout kills the monitor mid-prompt and the quiet that follows is
-  indistinguishable from a pane with nothing to say — which is the 57-minute silence the
-  reminder ladder exists to prevent, reintroduced from the other end.
+  watch. A timeout kills the monitor mid-prompt, and a dead monitor is indistinguishable
+  from a pane with nothing to say.
 - **No `2>&1`.** The tool puts events on stdout and diagnostics on stderr deliberately.
   Merging them turns every diagnostic into a notification.
 - **No `| grep`, `| tail`, `while` loop, or filter of any kind.** The monitor already
@@ -709,9 +708,7 @@ in frozen snapshots are load-bearing; never edit them.
 - "The verbs don't cover this, so I'll use `tmux send-keys` this once." That is the bug
   report. Say what you were about to type and let the human rule.
 - "I'll add a timeout / `2>&1` / a grep to the monitor command." Every addition is a
-  hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`. A
-  `timeout_ms` in particular kills supervision mid-prompt, and a dead monitor and a quiet
-  pane look identical from here.
+  hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`.
 - "Context is at 22%, but this prompt is small." The floor is not a suggestion about
   prompt size. Compact, or clear and restate, or get the ruling.
 - "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.
