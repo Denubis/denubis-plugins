@@ -60,9 +60,16 @@ class TestRealSkill:
         assert output["hookSpecificOutput"]["hookEventName"] == "SessionStart"
 
     def test_includes_skill_content(self):
+        """The wrapper names its source so a reader can find the file it came
+        from. It previously asserted the `EXTREMELY_IMPORTANT` framing, which
+        was dropped on 2026-08-09 when the injected directives were brought in
+        line with `writing-claude-directives`: that framing is rhetorical
+        emphasis on an ordinary instruction, not a true boundary. Embedding of
+        the file's actual bytes is proved by TestEscaping below, which seeds a
+        known string through the seam."""
         _code, _raw, output = _run(None)
         context = output["hookSpecificOutput"]["additionalContext"]
-        assert "EXTREMELY_IMPORTANT" in context
+        assert "using-plan-and-execute" in context
         assert "skill" in context
 
 

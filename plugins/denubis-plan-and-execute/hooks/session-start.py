@@ -23,11 +23,11 @@ except OSError:
     skill_content = "Error reading using-plan-and-execute skill"
 
 context = (
-    "<EXTREMELY_IMPORTANT>\n"
-    "**The content below is from skills/using-plan-and-execute/SKILL.md"
-    " - your introduction to using skills:**\n\n"
+    "<skills>\n"
+    "The content below is skills/using-plan-and-execute/SKILL.md, this"
+    " project's skill-first workflow.\n\n"
     f"{skill_content}\n"
-    "</EXTREMELY_IMPORTANT>"
+    "</skills>"
 )
 
 output = {

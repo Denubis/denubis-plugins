@@ -1,102 +1,57 @@
 ---
 name: using-plan-and-execute
-description: Use when starting any conversation - mandatory skill workflows. Read before announcing, brainstorm before coding, TaskCreate for checklists
+description: Use when starting any conversation - the skill-first workflow. Check for a skill before acting, announce the one you pick, brainstorm before coding, TaskCreate for checklists
 user-invocable: false
 ---
 
-<EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST read the skill.
-
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
-
-This is not negotiable. This is not optional. You cannot rationalize your way out of this.
-</EXTREMELY-IMPORTANT>
-
 # Getting Started with Skills
 
-## MANDATORY FIRST RESPONSE PROTOCOL
+Skills encode workflows already debugged against this codebase. Working without
+one usually means re-deriving a solved problem and getting it subtly wrong, so
+checking costs seconds and skipping costs a rewrite.
 
-Before responding to ANY user message, you MUST complete this checklist:
+## Before you act
 
-1. [ ] List to yourself ALL available skills (shown in your system context)
-2. [ ] Ask yourself: "Does ANY available skill match this request?"
-3. [ ] If yes: use the `Skill` tool to invoke the skill and follow the skill exactly.
+1. Scan the skills listed in your system context.
+2. Ask whether any of them covers this request.
+3. Where one does, invoke it with the `Skill` tool and follow it.
 
-**Responding WITHOUT completing this checklist = automatic failure.**
+A question is a task, and so is a quick look at a file: both are worth the scan.
+Skills also change, so read the current version rather than working from your
+memory of it.
 
-## Critical Rules
+## Announce the skill you are using
 
-1. **Follow mandatory workflows.** Brainstorming before coding. Check for relevant skills before ANY task.
+Say "I'm using [skill] to [what you're doing]" before you start. It lets your
+human partner catch a wrong choice early, and it shows you read the skill rather
+than recalling it.
 
-2. Execute skills with the Skill tool
+## Two gates worth stopping for
 
-3. **EnterPlanMode requires brainstorming first.** If you are about to call EnterPlanMode and you have NOT completed brainstorming in this session, STOP. Invoke `starting-a-design-plan` instead — it will orchestrate context gathering, clarification, brainstorming, and design documentation before implementation planning begins. EnterPlanMode is only valid AFTER a design has been brainstormed and approved.
+**EnterPlanMode without brainstorming.** If you are about to call EnterPlanMode
+and have not brainstormed this session, stop and invoke `starting-a-design-plan`
+instead. It gathers context, clarifies, brainstorms, and documents the design.
+EnterPlanMode comes after that rather than instead of it. Where EnterPlanMode is
+unavailable, run the same sequence and present the plan inline.
 
-## Common Rationalizations That Mean You're About To Fail
+**A skill with a checklist.** Create one task per item with `TaskCreate` before
+starting. A checklist held in your head loses items, and the tracking overhead is
+small against the cost of a missed step. Where TaskCreate is unavailable, keep
+the checklist in a file on disk so it survives an interruption.
 
-If you catch yourself thinking ANY of these thoughts, STOP. You are rationalizing. Check for and use the skill.
+## Following a skill
 
-- "This is just a simple question" → WRONG. Questions are tasks. Check for skills.
-- "I can check git/files quickly" → WRONG. Files don't have conversation context. Check for skills.
-- "Let me gather information first" → WRONG. Skills tell you HOW to gather information. Check for skills.
-- "This doesn't need a formal skill" → WRONG. If a skill exists for it, use it.
-- "I remember this skill" → WRONG. Skills evolve. Read the current version.
-- "This doesn't count as a task" → WRONG. If you're taking action, it's a task. Check for skills.
-- "The skill is overkill for this" → WRONG. Skills exist because simple things become complex. Use it.
-- "I'll just do this one thing first" → WRONG. Check for skills BEFORE doing anything.
+Some skills carry rigid rules — TDD, debugging, verification. Follow those
+exactly, because the discipline is the point. Others are flexible patterns, such
+as architecture and naming, where the principles adapt to context. Each skill
+says which kind it is.
 
-**Why:** Skills document proven techniques that save time and prevent mistakes. Not using available skills means repeating solved problems and making known errors.
+A specific instruction says what to build, not which process to build it with.
+"Add X" is the goal, and the workflow still applies. Clear requirements are
+exactly when it pays, because a step skipped there is easy to take and slow to
+find.
 
-If a skill for your task exists, you must use it or you will fail at your task.
+## In short
 
-## Skills with Checklists
-
-If a skill has a checklist, YOU MUST create task todos for EACH item using TaskCreate.
-
-**Don't:**
-- Work through checklist mentally
-- Skip creating todos "to save time"
-- Batch multiple items into one todo
-- Mark complete without doing them
-
-**Why:** Checklists without task tracking = steps get skipped. Every time. The overhead of task management is tiny compared to the cost of missing steps.
-
-## Announcing Skill Usage
-
-Before using a skill, announce that you are using it.
-"I'm using [Skill Name] to [what you're doing]."
-
-**Examples:**
-- "I'm using the brainstorming skill to refine your idea into a design."
-- "I'm using the coding-tdd skill to implement this feature."
-
-**Why:** Transparency helps your human partner understand your process and catch errors early. It also confirms you actually read the skill.
-
-# About these skills
-
-**Many skills contain rigid rules (TDD, debugging, verification).** Follow them exactly. Don't adapt away the discipline.
-
-**Some skills are flexible patterns (architecture, naming).** Adapt core principles to your context.
-
-The skill itself tells you which type it is.
-
-## Instructions ≠ Permission to Skip Workflows
-
-Your human partner's specific instructions describe WHAT to do, not HOW.
-
-"Add X", "Fix Y" = the goal, NOT permission to skip brainstorming, TDD, or RED-GREEN-REFACTOR.
-
-**Red flags:** "Instruction was specific" • "Seems simple" • "Workflow is overkill"
-
-**Why:** Specific instructions mean clear requirements, which is when workflows matter MOST. Skipping process on "simple" tasks is how simple tasks become complex problems.
-
-## Summary
-
-**Starting any task:**
-1. If relevant skill exists → Use the skill
-3. Announce you're using it
-4. Follow what it says
-
-**Skill has checklist?** TaskCreate for every item.
-
-**Finding a relevant skill = mandatory to read and use it. Not optional.**
+Scan for a skill, announce the one you pick, follow it. Checklists get tasks.
+Design comes before plan mode.
