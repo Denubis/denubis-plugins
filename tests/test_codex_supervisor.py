@@ -540,7 +540,7 @@ def test_send_refuses_nonempty_composer_before_loading_text(
     monkeypatch.setattr(watch.subprocess, "run", fake_load)
     monkeypatch.setattr(watch.time, "sleep", lambda _: None)
 
-    with pytest.raises(watch.MonitorError, match="composer is not empty"):
+    with pytest.raises(watch.MonitorError, match="composer holds"):
         watch.send_message("%8", "Do the next task.")
 
     assert not loaded
@@ -600,8 +600,53 @@ def test_send_still_refuses_typed_text_alongside_colour(
     monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
     monkeypatch.setattr(watch.time, "sleep", lambda _: None)
 
-    with pytest.raises(watch.MonitorError, match="composer is not empty"):
+    with pytest.raises(watch.MonitorError, match="composer holds"):
         watch.send_message("%8", "Do the next task.")
+
+
+def test_guard_distinguishes_an_undrawn_composer_from_a_full_one(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pane too short to draw a composer must not be reported as holding text.
+
+    Codex sizes its TUI to the pane, so a short pane renders no composer line at
+    all and `_composer_text` returns None. The guard refused that correctly but
+    announced it as "composer is not empty", which sends the reader looking for
+    typed text that was never there. Observed 2026-08-09 on a live 127x5 codex
+    pane whose whole capture was five lines of status bar, while a 182x41 pane of
+    the same Codex build drew its composer normally and passed the guard.
+
+    No capture flag recovers this: the composer was never drawn, so it is not in
+    the scrollback either. The only honest move is to say the pane is too short.
+    """
+    height_reads = 0
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        nonlocal height_reads
+        if argv[-1] == "#{pane_title}":
+            return "Ready | integration-review\n"
+        if argv[-1] == "#{pane_height}":
+            height_reads += 1
+            return "5\n"
+        if argv[:2] == ("tmux", "capture-pane"):
+            # Five lines of status bar. No prompt marker anywhere.
+            return f"\x1b[2m────\x1b[0m\n{FOOTER}\n"
+        return ""
+
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.setattr(watch.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+
+    with pytest.raises(watch.MonitorError) as caught:
+        watch.send_message("%46", "Do the next task.")
+
+    message = str(caught.value)
+    assert "5 lines" in message, f"height not reported: {message}"
+    assert "composer is not empty" not in message, (
+        f"an undrawn composer is still being reported as a full one: {message}"
+    )
+    assert height_reads == 1
 
 
 def test_send_preflights_ready_empty_composer_before_submitting(

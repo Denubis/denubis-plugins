@@ -1445,9 +1445,27 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
             f"joined Codex pane {pane_id} holds a pending approval, and any keystroke "
             f"would answer it; clear it with --approve or read it with --tail"
         )
-    if not _composer_is_empty(snapshot):
+    composer = _composer_text(snapshot)
+    if composer is None:
+        # Codex sizes its TUI to the pane, so a short pane draws no composer at
+        # all. That is unreadable rather than full, and reporting it as full
+        # sends the reader hunting for typed text that was never there: on
+        # 2026-08-09 a 127x5 pane produced "composer is not empty" and cost an
+        # hour, while a 182x41 pane of the same build drew its composer and
+        # passed. No capture flag recovers this, because the composer was never
+        # drawn and so is not in the scrollback either.
+        height = run_command(
+            ("tmux", "display-message", "-p", "-t", pane_id, "#{pane_height}")
+        ).strip()
         raise MonitorError(
-            f"joined Codex pane {pane_id} composer is not empty; inspect with --tail"
+            f"no composer drawn on joined Codex pane {pane_id} ({height} lines "
+            f"tall), so its contents cannot be read; give the pane more height, "
+            f"or inspect with --tail"
+        )
+    if composer:
+        raise MonitorError(
+            f"joined Codex pane {pane_id} composer holds {composer!r}; "
+            f"inspect with --tail"
         )
     return title, snapshot
 
@@ -1459,6 +1477,14 @@ def _check_context_floor(pane_id: str, snapshot: str, *, under_floor: bool) -> N
     this repo keeps paying for, and the meter was on screen at both pane widths
     measured on 2026-08-01, so an unreadable one means the pane is not rendering the
     way this code assumes rather than that all is well.
+
+    Width was the wrong variable to have measured. Height is what removes the
+    meter: on 2026-08-09 a 127x5 codex pane captured five lines of status bar
+    holding no `Context` meter at all, while a 182x41 pane of the same build
+    rendered one. That case no longer reaches here, because `_preflight_pane`
+    runs first and refuses a pane too short to draw its composer, but the
+    justification above should not be read as covering a geometry it never
+    tested.
     """
     if under_floor:
         return
