@@ -224,13 +224,32 @@ preflight_worktree() {
 # isolated home that configures no title yields a pane nothing can drive. This
 # is presentation only: it names no skill, plugin, hook, credential or model.
 # An existing [tui] section is the operator's own choice and is left alone.
-ensure_tui_title() {
-    local config="$1"
-    grep -Eq '^[[:space:]]*\[tui[].]' "$config" && return 0
+# Insert keys immediately after a section header, in place. TOML takes keys
+# anywhere in the section before the next header, so this needs no knowledge of
+# what the section already holds.
+#
+# header_re is a dynamic regex, so it must survive awk's -v escape processing.
+# A backslash there is consumed before the regex engine sees it: passing
+# '\[tui[].]' makes awk warn "escape sequence `\[' treated as plain `['" and
+# then match nothing, which silently skips the insertion. Measured 2026-08-09
+# against a real config: '\[' matched 0 lines, '\\[' and '[[]' matched 1 each.
+# Callers therefore spell a literal bracket as [[], which needs no backslash and
+# so reads the same to grep -E and to awk.
+insert_after_section() {
+    local config="$1" header_re="$2" block="$3" temporary
+    temporary=$(mktemp "${config}.XXXXXX")
+    awk -v block="$block" -v hdr="$header_re" '
+        { print }
+        $0 ~ hdr && !inserted { print block; inserted = 1 }
+    ' "$config" > "$temporary"
+    mv "$temporary" "$config"
+}
+
+# The fresh-write path and the upgrade path emit these, so a key added here
+# reaches an existing home as well as a new one. Two copies of the block is what
+# lets the two paths drift, and drift is the whole defect this guards against.
+tui_status_line() {
     printf '%s\n' \
-        '' \
-        '# Added by codex-ponytail so a supervisor can read Codex status.' \
-        '[tui]' \
         'status_line = [' \
         '  "weekly-limit",' \
         '  "five-hour-limit",' \
@@ -238,7 +257,11 @@ ensure_tui_title() {
         '  "git-branch",' \
         '  "context-remaining",' \
         '  "status",' \
-        ']' \
+        ']'
+}
+
+tui_terminal_title() {
+    printf '%s\n' \
         'terminal_title = [' \
         '  "spinner",' \
         '  "status",' \
@@ -248,7 +271,42 @@ ensure_tui_title() {
         '  "five-hour-limit",' \
         '  "thread",' \
         '  "model-with-reasoning",' \
-        ']' >> "$config"
+        ']'
+}
+
+TUI_MARKER='^# Added by codex-ponytail so a supervisor'
+# One spelling for both engines. See insert_after_section on why the literal
+# bracket is [[] rather than \[ — two spellings of one pattern is the drift the
+# single-source blocks below already guard against.
+TUI_SECTION_RE='^[[:space:]]*[[]tui[].]'
+
+ensure_tui_title() {
+    local config="$1"
+
+    if grep -Eq "$TUI_SECTION_RE" "$config"; then
+        # A section this script did not write is the operator's own choice.
+        grep -Eq "$TUI_MARKER" "$config" || return 0
+
+        local block=""
+        if ! grep -Eq '^[[:space:]]*status_line[[:space:]]*=' "$config"; then
+            block=$(tui_status_line)
+        fi
+        if ! grep -Eq '^[[:space:]]*terminal_title[[:space:]]*=' "$config"; then
+            block="${block:+$block$'\n'}$(tui_terminal_title)"
+        fi
+        [[ -n "$block" ]] || return 0
+        insert_after_section "$config" "$TUI_SECTION_RE" "$block"
+        return 0
+    fi
+
+    {
+        printf '%s\n' \
+            '' \
+            '# Added by codex-ponytail so a supervisor can read Codex status.' \
+            '[tui]'
+        tui_status_line
+        tui_terminal_title
+    } >> "$config"
 }
 
 # uv and npm caches are required grants (Brian, 2026-08-06): "the config file

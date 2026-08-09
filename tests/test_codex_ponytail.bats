@@ -353,6 +353,30 @@ make_bare_main() {
     [ "$(grep -c -F -- "[sandbox_workspace_write]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
 }
 
+# The status line is where context-remaining lives, and the context floor reads
+# it. A [tui] section this script wrote before the status line was part of the
+# block therefore leaves the floor unable to see the meter, which is a refusal to
+# dispatch rather than a cosmetic gap.
+@test "a codex-ponytail tui section missing the status line gains it" {
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    printf '%s\n' \
+        'cli_auth_credentials_store = "file"' \
+        '' \
+        '# Added by codex-ponytail so a supervisor can read Codex status.' \
+        '[tui]' \
+        'terminal_title = ["status"]' \
+        > "$CODEX_PONYTAIL_HOME/config.toml"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    grep -F -- "status_line" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "context-remaining" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- 'terminal_title = ["status"]' "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(grep -c -F -- "[tui]" "$CODEX_PONYTAIL_HOME/config.toml")" -eq 1 ]
+}
+
 # A section this script wrote itself is not the operator's choice, so leaving it
 # alone strands every home initialized before the cache grant existed: the grant
 # lands in the script and can never reach the config. The marker comment the
