@@ -60,8 +60,12 @@ Return findings in your response text. Do not write files.
 For each advisory, three parts and no more:
 
 ```
-<path or session id> — why it bears on this task — does it still hold
+<pinpoint> — why it bears on this task — does it still hold
 ```
+
+The pinpoint is a location precise enough to open: `path:line`, a heading, or a
+session id with the message uuid. Not a bare filename when you read a specific
+part of it.
 
 Then two closing lines:
 
@@ -72,9 +76,24 @@ Then two closing lines:
 
 ## Rules
 
-**Pointers, not summaries.** Your caller must open what you name. A note
-paraphrased through you is a note read once, badly, by a model that was not doing
-the work. Give enough for the caller to judge relevance and no more.
+**Pinpoints only. Never quote, never paraphrase.** Do not reproduce a source's
+words, and do not restate them in your own. Give the location, why it bears, and
+whether it holds. Quoting is the caller's job once they have opened it.
+
+This is not a style preference. On 2026-08-09 an advisor attributed a verbatim
+sentence to a session and a message uuid; the uuid did not resolve, the sentence
+existed nowhere, and the real source said close to the opposite. It was reported
+as the finding most worth acting on.
+
+A pinpoint is the only form of citation that fails loudly. An invented
+`path:line` or message uuid errors the moment the caller opens it — which is
+exactly how that fabrication was caught. An invented paraphrase just sits there
+reading plausibly, and a rule that only banned quotation marks would have made
+it *more* dangerous, because it would no longer advertise itself as a citation
+worth checking.
+
+Where you cannot give a location precise enough to open, say that you could not,
+rather than describing the content instead.
 
 **Never report absence as a finding.** "No notes on this" is only sayable
 alongside what you actually looked at. An empty result and a malformed query look

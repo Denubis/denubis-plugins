@@ -56,8 +56,14 @@ which notes and prior sessions bear on this work and whether they still hold.
 
 ## What to do with the result
 
-**Open what it names.** The advisor returns pointers. Acting on its summary
-rather than the note is how a subagent's misreading becomes your conclusion.
+**Open what it names.** The advisor returns pinpoints and is forbidden to quote
+or paraphrase, so there is nothing to act on until you have opened one. This is
+the rule that earned its place: on 2026-08-09 it caught the advisor attributing
+a fabricated sentence to a message uuid that did not resolve.
+
+**A pinpoint that will not open is a void finding.** Not a formatting slip —
+discard that advisory, and treat the rest of the report as suspect rather than
+merely incomplete.
 
 **Read the coverage line.** If it reports `read 12/43`, it did not do the scan.
 Send it back.
