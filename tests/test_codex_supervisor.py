@@ -618,7 +618,10 @@ def test_guard_distinguishes_an_undrawn_composer_from_a_full_one(
     the same Codex build drew its composer normally and passed the guard.
 
     No capture flag recovers this: the composer was never drawn, so it is not in
-    the scrollback either. The only honest move is to say the pane is too short.
+    the scrollback either. The only honest move is to say the pane is too short,
+    and to name the usual cause — a window that has accumulated agent panes
+    until tmux squeezed this one — so the message states an action rather than
+    only a diagnosis.
     """
     height_reads = 0
 
@@ -626,9 +629,9 @@ def test_guard_distinguishes_an_undrawn_composer_from_a_full_one(
         nonlocal height_reads
         if argv[-1] == "#{pane_title}":
             return "Ready | integration-review\n"
-        if argv[-1] == "#{pane_height}":
+        if argv[-1] == "#{pane_height} #{window_panes}":
             height_reads += 1
-            return "5\n"
+            return "5 7\n"
         if argv[:2] == ("tmux", "capture-pane"):
             # Five lines of status bar. No prompt marker anywhere.
             return f"\x1b[2m────\x1b[0m\n{FOOTER}\n"
@@ -643,9 +646,11 @@ def test_guard_distinguishes_an_undrawn_composer_from_a_full_one(
 
     message = str(caught.value)
     assert "5 lines" in message, f"height not reported: {message}"
+    assert "7 panes" in message, f"window pane count not reported: {message}"
     assert "composer is not empty" not in message, (
         f"an undrawn composer is still being reported as a full one: {message}"
     )
+    # Both facts come from a single tmux call, not one round trip each.
     assert height_reads == 1
 
 

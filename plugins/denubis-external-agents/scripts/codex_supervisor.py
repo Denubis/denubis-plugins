@@ -1454,13 +1454,25 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
         # hour, while a 182x41 pane of the same build drew its composer and
         # passed. No capture flag recovers this, because the composer was never
         # drawn and so is not in the scrollback either.
-        height = run_command(
-            ("tmux", "display-message", "-p", "-t", pane_id, "#{pane_height}")
+        # Height and the window's pane count come back in one call, because the
+        # usual cause is layout pressure rather than a deliberately short pane:
+        # panes get squeezed when a window accumulates agent panes.
+        geometry = run_command(
+            (
+                "tmux",
+                "display-message",
+                "-p",
+                "-t",
+                pane_id,
+                "#{pane_height} #{window_panes}",
+            )
         ).strip()
+        height, _, panes = geometry.partition(" ")
         raise MonitorError(
             f"no composer drawn on joined Codex pane {pane_id} ({height} lines "
-            f"tall), so its contents cannot be read; give the pane more height, "
-            f"or inspect with --tail"
+            f"tall, sharing its window with {panes} panes), so its contents "
+            f"cannot be read; close a pane or re-run the layout to give it "
+            f"height, or inspect with --tail"
         )
     if composer:
         raise MonitorError(
