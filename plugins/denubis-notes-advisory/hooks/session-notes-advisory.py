@@ -171,9 +171,9 @@ def build_context(
         "Consider whether any note covers what you are about to do, and "
         "whether it is still correct. If you have questions, pause and ask one "
         "pointed, critical, and specific question at a time.\n\n"
-        "Do not substitute a grep for the scan. `.notes/` is both hidden and "
-        "gitignored, so rg skips it under --hidden alone and under --no-ignore "
-        "alone. A search that comes back clean here has told you nothing."
+        "Read the notes themselves. `.notes/` is both hidden and gitignored, so "
+        "rg skips it under --hidden alone and under --no-ignore alone, and a "
+        "search here comes back clean whether or not the note exists."
     )
 
     return "<notes-advisory " + " ".join(attrs) + ">\n" + body + "\n</notes-advisory>"
