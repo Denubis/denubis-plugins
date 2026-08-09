@@ -66,28 +66,50 @@ class SkillFile(NamedTuple):
     name: str
     description: str
     when_to_use: str
+    error: str | None = None
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
-    assert text.startswith("---\n"), "missing opening YAML fence"
+    """Return the frontmatter mapping, raising ValueError when it is malformed.
+
+    Raises rather than asserts because the caller turns the failure into data.
+    An assertion here reads as a test verdict, and this runs at import.
+    """
+    if not text.startswith("---\n"):
+        raise ValueError("missing opening YAML fence")
 
     try:
         frontmatter_text, _body = text.removeprefix("---\n").split("\n---\n", 1)
     except ValueError as exc:
-        raise AssertionError("missing closing YAML fence") from exc
+        raise ValueError("missing closing YAML fence") from exc
 
-    parsed = yaml.safe_load(frontmatter_text)
-    assert isinstance(parsed, dict), "frontmatter is not a mapping"
+    try:
+        parsed = yaml.safe_load(frontmatter_text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"frontmatter is not valid YAML: {exc}") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError("frontmatter is not a mapping")
     return parsed
 
 
 def _load_skill(path: Path) -> SkillFile:
-    fm = _parse_frontmatter(path.read_text(encoding="utf-8"))
-    plugin = path.parents[2].name
-    skill = path.parent.name
+    """Load one SKILL.md, recording a parse failure instead of raising it.
+
+    `_collect_skills` runs at module import, so an exception escaping here
+    fails collection for every test in this file and names no path.
+    """
+    name = f"{path.parents[2].name}/{path.parent.name}"
+    try:
+        fm = _parse_frontmatter(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return SkillFile(
+            path=path, name=name, description="", when_to_use="", error=str(exc)
+        )
+
     return SkillFile(
         path=path,
-        name=f"{plugin}/{skill}",
+        name=name,
         description=fm.get("description", ""),
         when_to_use=fm.get("when_to_use", ""),
     )
@@ -100,9 +122,35 @@ def _collect_skills() -> list[SkillFile]:
 SKILLS: list[SkillFile] = _collect_skills()
 
 
+def _assert_all_parsed(skills: list[SkillFile]) -> None:
+    broken = [s for s in skills if s.error is not None]
+    assert not broken, "SKILL.md frontmatter did not parse:\n" + "\n".join(
+        f"  {s.path}: {s.error}" for s in broken
+    )
+
+
+def _skill_or_skip(candidate: SkillFile) -> SkillFile:
+    """Hand a parsed skill to a quality test, or skip if it never parsed.
+
+    Skipping keeps a fence error from surfacing as "missing description" on
+    every rule below. It hides nothing: `test_every_skill_frontmatter_parsed`
+    fails on the same file, and pytest counts a skip apart from a pass.
+    """
+    if candidate.error is not None:
+        pytest.skip(f"{candidate.path}: frontmatter did not parse — {candidate.error}")
+    return candidate
+
+
 @pytest.fixture(params=SKILLS, ids=lambda s: s.name)
 def skill(request: pytest.FixtureRequest) -> SkillFile:
-    return request.param
+    return _skill_or_skip(request.param)
+
+
+# --- Collection gate: a malformed file fails here, once, by name ---
+
+
+def test_every_skill_frontmatter_parsed() -> None:
+    _assert_all_parsed(SKILLS)
 
 
 # --- Hard rules: violate Claude Code spec or risk truncation ---
@@ -172,16 +220,61 @@ def test_description_leads_with_trigger(skill: SkillFile) -> None:
     )
 
 
-def test_quoted_description_with_colon_leads_with_trigger(tmp_path: Path) -> None:
-    skill_path = (
-        tmp_path / "denubis-example" / "skills" / "quoted-colon" / "SKILL.md"
+def test_malformed_frontmatter_is_reported_rather_than_raised(tmp_path: Path) -> None:
+    """A broken SKILL.md must not take the whole module down at import.
+
+    `SKILLS` is built at collection time, so an exception escaping `_load_skill`
+    errors every test in this file and the traceback names no path. The failure
+    has to survive as data on the `SkillFile` instead.
+    """
+    skill_path = tmp_path / "denubis-example" / "skills" / "no-fence" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True)
+    skill_path.write_text("name: no-fence\ndescription: Use when\n", encoding="utf-8")
+
+    loaded = _load_skill(skill_path)
+
+    assert loaded.error is not None
+    assert "opening YAML fence" in loaded.error
+
+
+def test_unparseable_skill_fails_the_gate_naming_its_path(tmp_path: Path) -> None:
+    skill_path = tmp_path / "denubis-example" / "skills" / "bad-yaml" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True)
+    skill_path.write_text("---\nname: [unclosed\n---\nbody\n", encoding="utf-8")
+
+    broken = _load_skill(skill_path)
+    assert broken.error is not None
+
+    with pytest.raises(AssertionError, match="bad-yaml"):
+        _assert_all_parsed([broken])
+
+
+def test_quality_tests_skip_rather_than_misreport_an_unparseable_skill() -> None:
+    """The skip keeps `test_description_present` from blaming a fence error.
+
+    Nothing passes silently: `_assert_all_parsed` still fails, and pytest counts
+    a skip separately from a pass.
+    """
+    broken = SkillFile(
+        path=Path("plugins/denubis-example/skills/broken/SKILL.md"),
+        name="denubis-example/broken",
+        description="",
+        when_to_use="",
+        error="missing closing YAML fence",
     )
+
+    with pytest.raises(pytest.skip.Exception):
+        _skill_or_skip(broken)
+
+
+def test_quoted_description_with_colon_leads_with_trigger(tmp_path: Path) -> None:
+    skill_path = tmp_path / "denubis-example" / "skills" / "quoted-colon" / "SKILL.md"
     skill_path.parent.mkdir(parents=True)
     skill_path.write_text(
-        '---\n'
-        'name: quoted-colon\n'
+        "---\n"
+        "name: quoted-colon\n"
         'description: "Use when parsing frontmatter: preserve YAML scalar semantics"\n'
-        '---\n',
+        "---\n",
         encoding="utf-8",
     )
 
