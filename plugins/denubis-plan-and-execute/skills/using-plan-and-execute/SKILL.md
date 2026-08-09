@@ -16,9 +16,16 @@ checking costs seconds and skipping costs a rewrite.
 2. Ask whether any of them covers this request.
 3. Where one does, invoke it with the `Skill` tool and follow it.
 
-A question is a task, and so is a quick look at a file: both are worth the scan.
-Skills also change, so read the current version rather than working from your
-memory of it.
+## Red Flags - STOP
+
+If you find yourself reasoning any of these, you are rationalising:
+
+- "This is just a simple question" — a question is a task.
+- "Let me check the files first" — that check is the task, and a skill covers it.
+- "I remember this skill" — skills change; read the current one.
+- "The skill is overkill here" — simple tasks are where a skipped step hides.
+
+All four mean the same thing: scan first.
 
 ## Announce the skill you are using
 
