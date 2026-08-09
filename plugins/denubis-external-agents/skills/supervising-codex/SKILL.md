@@ -452,11 +452,37 @@ allowlist buys its extra caution in dialogs. Pass `-a untrusted` by hand for a p
 work you have reason to distrust.
 
 When Claude and Codex are joined as panes in one tmux window, start the monitor from
-Claude's pane under the background Monitor tool:
+Claude's pane under the background Monitor tool.
 
-```sh
-codex_supervisor.py
-```
+**This plugin ships the monitor. Do not hand-craft one.** Arm it with exactly this and
+nothing else:
+
+| Monitor field | Value |
+|---|---|
+| `command` | `uv run --no-project --no-config python "<resolved>/codex_supervisor.py"` |
+| `persistent` | `true` |
+| `description` | what is being supervised, e.g. `codex prompt 08 cross-check` |
+
+No other field. In particular:
+
+- **No `timeout_ms`.** Supervision lasts as long as the session, so it is a persistent
+  watch. A timeout kills the monitor mid-prompt and the quiet that follows is
+  indistinguishable from a pane with nothing to say — which is the 57-minute silence the
+  reminder ladder exists to prevent, reintroduced from the other end.
+- **No `2>&1`.** The tool puts events on stdout and diagnostics on stderr deliberately.
+  Merging them turns every diagnostic into a notification.
+- **No `| grep`, `| tail`, `while` loop, or filter of any kind.** The monitor already
+  emits only the four actionable events; anything wrapped around it can only subtract.
+- **No pane ID, and no bare `tmux` command.** See below.
+
+Then say plainly, in the reply, that the monitor is running **from this plugin** and what
+it is watching. The human otherwise cannot tell a real monitor from an improvised one, and
+the two fail in opposite directions.
+
+Reach for a bespoke Monitor invocation only to watch something that is *not* the Codex
+pane. If the plugin's monitor will not do what a Codex supervision task needs, that is a
+bug report for the human, not a licence to assemble a replacement — the same rule, and the
+same reasoning, as *The supervisor is the only way in*.
 
 Do not pass a pane ID. The monitor resolves Claude's `$TMUX_PANE`, searches only that exact
 tmux window, and requires exactly one foreground `codex` process. No match or multiple
@@ -648,7 +674,7 @@ in frozen snapshots are load-bearing; never edit them.
 |---|---|
 | Starting a codex session | `codex_supervisor.py --spawn --label <name>` |
 | Checking weekly headroom | `codex_supervisor.py --quota` |
-| Watching it | `codex_supervisor.py` under the background Monitor tool |
+| Watching it | `codex_supervisor.py` under Monitor, `persistent: true`, nothing else added |
 | Checking what a pane holds | `codex_supervisor.py --tail` |
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
 | Between prompts | `codex_supervisor.py --clear` |
@@ -682,6 +708,10 @@ in frozen snapshots are load-bearing; never edit them.
   reads it.
 - "The verbs don't cover this, so I'll use `tmux send-keys` this once." That is the bug
   report. Say what you were about to type and let the human rule.
+- "I'll add a timeout / `2>&1` / a grep to the monitor command." Every addition is a
+  hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`. A
+  `timeout_ms` in particular kills supervision mid-prompt, and a dead monitor and a quiet
+  pane look identical from here.
 - "Context is at 22%, but this prompt is small." The floor is not a suggestion about
   prompt size. Compact, or clear and restate, or get the ruling.
 - "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.
