@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_GLOB = "plugins/denubis-*/skills/*/SKILL.md"
@@ -68,23 +69,16 @@ class SkillFile(NamedTuple):
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
-    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
-    if not match:
-        return {}
-    fields: dict[str, str] = {}
-    current_key: str | None = None
-    current_value: list[str] = []
-    for line in match.group(1).splitlines():
-        if m := re.match(r"^([a-z][a-z0-9_-]*):\s*(.*)$", line):
-            if current_key is not None:
-                fields[current_key] = "\n".join(current_value).strip()
-            current_key = m.group(1)
-            current_value = [m.group(2)]
-        elif current_key is not None:
-            current_value.append(line)
-    if current_key is not None:
-        fields[current_key] = "\n".join(current_value).strip()
-    return fields
+    assert text.startswith("---\n"), "missing opening YAML fence"
+
+    try:
+        frontmatter_text, _body = text.removeprefix("---\n").split("\n---\n", 1)
+    except ValueError as exc:
+        raise AssertionError("missing closing YAML fence") from exc
+
+    parsed = yaml.safe_load(frontmatter_text)
+    assert isinstance(parsed, dict), "frontmatter is not a mapping"
+    return parsed
 
 
 def _load_skill(path: Path) -> SkillFile:
@@ -176,6 +170,22 @@ def test_description_leads_with_trigger(skill: SkillFile) -> None:
         f"tail-first; triggers must come first. "
         f"First 100 chars: {skill.description[:100]!r}"
     )
+
+
+def test_quoted_description_with_colon_leads_with_trigger(tmp_path: Path) -> None:
+    skill_path = (
+        tmp_path / "denubis-example" / "skills" / "quoted-colon" / "SKILL.md"
+    )
+    skill_path.parent.mkdir(parents=True)
+    skill_path.write_text(
+        '---\n'
+        'name: quoted-colon\n'
+        'description: "Use when parsing frontmatter: preserve YAML scalar semantics"\n'
+        '---\n',
+        encoding="utf-8",
+    )
+
+    test_description_leads_with_trigger(_load_skill(skill_path))
 
 
 # --- Aggregate rule: total budget across all denubis skills ---
