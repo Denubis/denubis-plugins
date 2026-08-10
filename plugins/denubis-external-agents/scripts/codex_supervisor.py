@@ -1179,6 +1179,8 @@ def run_hook() -> int:
         return 0
     raw = sys.stdin.buffer.read(MAX_HOOK_BYTES + 1)
     if len(raw) > MAX_HOOK_BYTES:
+        while sys.stdin.buffer.read(64 * 1024):
+            pass
         return 0
     try:
         payload = json.loads(raw)

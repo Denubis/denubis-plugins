@@ -24,6 +24,7 @@ the contract is not lost by omission.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import re
 import sys
@@ -62,6 +63,19 @@ def watch() -> ModuleType:
     sys.modules["codex_supervisor"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_oversized_hook_payload_is_drained_before_return(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = b"x" * (watch.MAX_HOOK_BYTES + 4096)
+    stdin = io.TextIOWrapper(io.BytesIO(payload))
+    monkeypatch.setattr(watch.sys, "stdin", stdin)
+    monkeypatch.setenv("TMUX_PANE", "%1")
+
+    assert watch.run_hook() == 0
+    assert stdin.buffer.tell() == len(payload)
 
 
 @pytest.mark.parametrize(

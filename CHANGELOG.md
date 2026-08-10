@@ -1,5 +1,13 @@
 # Changelog
 
+## [denubis-external-agents] 0.15.2
+
+**Fixed:**
+- The Codex hook relay drains oversized input before returning. Notebook tool events
+  can exceed the 1 MiB processing limit; returning after the bounded read closed stdin
+  while Codex was still writing, which reported `Broken pipe` even though the tool
+  operation had succeeded
+
 ## [denubis-notes-advisory] 0.2.1
 
 **Retracts an accusation made in 0.2.0.** That entry said the advisor fabricated a
