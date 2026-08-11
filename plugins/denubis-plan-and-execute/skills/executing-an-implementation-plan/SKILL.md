@@ -74,7 +74,8 @@ The main session may inspect, edit, and test directly. Delegation is optional fo
 independent investigation or implementation when it genuinely reduces contention or
 context pressure. Give a delegate an exact scope and no broader authority. Inspect its
 diff and rerun its evidence in the main session; never continue solely because it reported
-success.
+success. Surface the verified delegated result that changes the work; do not substitute
+the delegate's narrative for that result.
 
 ## Implement each task
 
@@ -101,6 +102,11 @@ unrequested compatibility layers, aliases for retired names, or explanation of s
 behavior in living documents. Things state what they are now; historical argument belongs
 in version history or an explicit archive.
 
+For a behavior-preserving refactor beyond local cleanup, use
+`denubis-plan-and-execute:exec-refactoring-rubric` before editing. Establish the concrete
+maintenance cost, current consumers, behavioral coverage, and one bounded transformation.
+Do not route a required behavior change through a refactoring procedure.
+
 Do not broaden a bug fix into a refactor. Do not refactor untested code. If the current
 repository contradicts a task, determine whether the plan's detail is stale or its design
 is invalid before editing either.
@@ -116,6 +122,8 @@ After three failed fixes for the same condition, stop. Preserve pre-existing wor
 the last verified repository state for changes owned by this execution using a recoverable
 method, record the commands and observations that failed, and ask the human before another
 approach. Difficulty, a long task, or an incomplete phase is not itself a blocker.
+Stop sooner if an attempted fix expands the failure surface, threatens data, or invalidates
+the recovery path; do not spend the remaining attempts increasing the blast radius.
 
 ## Close a phase
 
@@ -126,6 +134,10 @@ new interfaces without consumers.
 
 Review is useful when required by the plan or project, when risk is high, or when an
 independent reading could falsify a specific claim. It is not a fixed transition ritual.
+Run a required or risk-targeted review through
+`denubis-plan-and-execute:requesting-code-review` with the bounded claim and surface. If a
+specific design-conformance uncertainty remains after ordinary verification, use
+`denubis-plan-and-execute:exec-coherence-review` for that question only.
 Verify every actionable review finding against code, tests, logs, or current documentation.
 A green review verdict cannot replace those checks, and repeated model reviews do not turn
 agreement into external evidence.
@@ -138,7 +150,8 @@ If there are no UAT entries, do not invent a human gate or ask them to rerun det
 checks.
 
 Do not mark a phase complete while one of its owned criteria is failing, unobserved, or
-blocked. Record the exact unresolved condition and leave later dependent work pending.
+blocked. Record the exact unresolved condition in the current phase file or existing
+project tracker and leave later dependent work pending.
 
 ## Finish the plan
 
@@ -152,9 +165,12 @@ After the final phase:
    acceptance from silence or from a model summary.
 4. Inspect the final diff and repository status. Separate pre-existing changes from this
    execution and identify anything untracked, generated, or not yet verified.
-5. Check living architecture, ADRs, notes, and runbooks touched by the change for current
+5. When the plan is verified and no owned criterion remains open, invoke
+   `denubis-plan-and-execute:finishing-a-development-branch` to report the branch state and
+   route only the integration action already authorised or selected by the human.
+6. Check living architecture, ADRs, notes, and runbooks touched by the change for current
    truth and resolvable source pointers. Do not append correction narratives.
-6. Re-run any check affected by the final cleanup.
+7. Re-run any check affected by the final cleanup.
 
 Report the implemented outcomes, changed-file scope, exact verification commands and
 results, remaining blockers, and any human UAT still required. Do not claim completion

@@ -65,10 +65,10 @@ it.
 | Plugin hooks | Plugin source, enabled by global settings | Claude Code event dispatcher | Event registrations in each plugin's `hooks.json` | Source files cited in the event table | Source, marketplace metadata, cache, and enablement can drift independently. |
 | Skills and commands | Plugin source | Main session when invoked or injected | Markdown procedures loaded on demand; some are injected by hooks | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
 | Agents and external advisors | Plugin source plus model/runtime | Main session and human | Delegated work returned as model output | Source-tagged result; some paths verify source access | A fluent report is not proof. The proposer and verifier can share blind spots. |
-| Project `.notes/` | Human-approved, gitignored project memory | Main session | Direct task-entry inventory, frontmatter read, and relevant-body read | Main-repository `.notes/`; 50 Markdown files observed below | Hidden and ignored scope makes incomplete search look empty. Frontmatter and referenced evidence can drift. |
+| Project `.notes/` | Human-approved, gitignored project memory | Main session | Live state still uses the retiring notes advisor. The core candidate replaces it with direct task-entry inventory and raw-source resolution. `denubis-project-notes` remains source-only until cross-vendor exact resolution is ready. | Main-repository `.notes/`; 50 Markdown files observed below | Hidden and ignored scope makes incomplete search look empty. Frontmatter and referenced evidence can drift. |
 | Human transcripts | Claude and Codex runtimes | Human, search tools, authority-bearing documents | Vendor JSONL and transcript archives; installed `cc-search-chats` 2.0.0a5 currently describes itself as Claude-only | Raw record and exact message locator | Provider schemas and paths differ. Cross-vendor search is prospective. A summary or model quotation is not the human invocation. |
 | Plans, ADRs, notes, constraints, and architecture | Repository or project authors | Humans and future sessions | Markdown memorials and living maps | Resolvable source pointer or repository evidence | A broken pointer is an integrity defect. Correction layers create palimpsests rather than current documents. |
-| Tests and hook logs | Executed mechanism | Human or a downstream gate | External result bound to an artifact or event | Test output or structured log | Self-report is not evidence. A result without subject identity or invalidation rules cannot bind later action. |
+| Tests and hook logs | Executed mechanism | Human or a downstream gate | External result bound to an artifact or event | Test output or structured log | Self-report is not evidence. A result without subject identity or invalidation rules cannot bind later action. A test that only matches source wording observes the edit rather than correctness. |
 
 ## Event topology
 
@@ -96,7 +96,7 @@ fires successfully on every machine.
 | Decisions | ADRs and dated decision records | A decision record memorialises one decision. Current records do not yet share a validated authority-pointer contract. |
 | Situational procedure | Skills and commands | Procedures say how to act in a named situation. Their prose does not prove invocation or success. |
 | Mechanical action control | Permission hooks and executable gates | Only the matching boundary is controlled. Advisory context from the same hook remains prose. |
-| Behavioural feedback | Tests, external results, and event logs | Evidence binds an identified artifact or event. Model critique and self-description remain claims. |
+| Behavioural feedback | Tests, external results, and event logs | Evidence binds an identified artifact or event. Tests exercise behaviour or processed structure independently of the satisfying edit. Non-executable prose expectations live in [`docs/review-rubrics/instruction-control.md`](../../review-rubrics/instruction-control.md). Model critique and self-description remain claims. |
 | Packaging and deployment | Plugin source, marketplace catalogue, installed cache, global settings | These answer what can be installed and what is enabled. They are not the decomposition axis for instruction control. |
 
 ## Source and deployment boundary
@@ -111,7 +111,7 @@ Observed machine-local artifacts on 2026-08-11:
 | Artifact | SHA-256 |
 |---|---|
 | `/home/brian/.claude/CLAUDE.md` | `9140934f252ec41ce931958111391c562c53fb8eb99c1958ca9b6713aea700dc` |
-| `/home/brian/.claude/settings.json` | `dfe0909c0d4bff5726a1c83abfd3a10bad84d51221e8eabfedc98cf3e865b17a` |
+| `/home/brian/.claude/settings.json` | `14f32d5ab7d9c4affd133a9b5e30bd7f3a4cf8f014329d41cd964e052e3741f0` |
 | `/home/brian/.claude/plugins/installed_plugins.json` | `5b144defd1eab7ca2f1f3471724939ff6f3725d1d146f350e0f13ffa3e274311` |
 | `/home/brian/.claude/rules/context7.md` | `89bb452cb064b48513f318508c0ece59a31cd6d9fec334a2dccd763f64a5e46a` |
 | Installed `denubis-academic/0.14.0/output-styles/academic-writing.md` | `039898cbcce93e8ac421392efa9c8644dd4b4f4dd5484435dfa4461be0c525a7` |

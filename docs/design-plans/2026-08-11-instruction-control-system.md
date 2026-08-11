@@ -33,6 +33,16 @@ jq -s -e --argjson line LINE '[.[($line - 1)] | select(.type == "response_item" 
 The line number is one-based. Resolution must return exactly one non-empty input-text
 record. A missing, ambiguous, or non-user record is an integrity defect.
 
+Additional authority record `A2`:
+
+`/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T16-44-15-019fea6a-2e86-7931-ad4d-e6b25bfa666a.jsonl:358`
+
+Resolve it directly with:
+
+```fish
+jq -s -e '[.[357] | select(.type == "response_item" and .payload.type == "message" and .payload.role == "user") | .payload.content[] | select(.type == "input_text") | .text] | select(length == 1 and (.[0] | length > 0)) | .[0]' /home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T16-44-15-019fea6a-2e86-7931-ad4d-e6b25bfa666a.jsonl
+```
+
 ## Current system map
 
 | Surface | Current state | Intended owner |
@@ -41,7 +51,7 @@ record. A missing, ambiguous, or non-user record is an integrity defect.
 | Project `CLAUDE.md` | Project conventions plus duplicates of global reviewer and halting rules | Project boundaries, current conventions, and finding aids |
 | `denubis-hook-skill-reinforcement` | Source retired; installed 1.2.0 remains enabled until the deployment slice | Remove from live settings and cache only after source verification |
 | `denubis-hook-claudemd-reminder` | Source retired; installed 1.1.4 remains enabled until the deployment slice | Commit preparation owns the documentation-freshness check |
-| Project notes | Source replaces `denubis-notes-advisory` with direct `denubis-project-notes` retrieval; installed 0.2.1 remains live until deployment | Main agent inventories notes and resolves relevant chat sources at task entry |
+| Project notes | Source provides `denubis-project-notes`, but the core deployment does not install it while cross-vendor exact search is unfinished | Global task-entry inventory and raw-source resolution replace the advisor; the skill is a later deployment slice |
 | `denubis-plan-and-execute` SessionStart context | Source removes generic context while retaining the live-marker side effect; two distinct planning gates remain in `using-plan-and-execute` | Deploy plan-and-execute 4.0.0 after source verification |
 | `denubis-basic-agents` SessionStart context | Source removes the hook; routing remains in `using-generic-agents` | Deploy basic-agents 2.2.1 after source verification |
 | `denubis-hook-branch-bg` | Source preserves the terminal side effect and is silent on ordinary success; installed 0.2.5 still injects `Success` | Deploy the verified source change in the live fulfilment slice |
@@ -68,12 +78,13 @@ exact live/source baselines; it does not claim deployment.
 | Codebase adaptation procedure | Reduce to “inspect instructions/config/patterns”; detailed method belongs to coding procedures | Global invariant plus coding skills |
 | TDD, minimal bug fixes, cache safety, no commit, verification | Keep as cross-project engineering boundaries | Global `CLAUDE.md` |
 | Detailed good-test catalogue | Move out of always-on prose | `coding-good-tests` and project test guidance |
+| Skill-selection reminder | Keep one task-entry invariant; retire repeated hook delivery | Global `CLAUDE.md` plus the selected skill |
 | Reviewer incident and batch-fix history | Remove from living instructions | Review skills; old argument in Git/archives |
 | Prose revision procedure | Move out of global context | `academic-writing` or the selected output style |
 | Note discovery, search, keyword repair, advisor route | Replace with direct task-entry procedure | `denubis-project-notes:scanning-project-notes` |
 | Git commit splitting and command procedure | Remove from global context | `denubis-git-commit:commit` |
 | Shell distinction | Keep as a short machine invariant | Global `CLAUDE.md` |
-| Settings distribution | Remove; the recorded procedure is retired and SSH is human access, not a sync contract | No agent-owned always-on procedure |
+| Settings distribution (`A2`) | Remove; the recorded procedure is retired and SSH is human access, not a sync contract | No agent-owned always-on procedure |
 | Search tool diagnostics and measured edge cases | Remove from global context | Project search rules and `using-code-search` |
 | Project HALT/reviewer duplicate | Remove from project file | Global integrity boundary and review/design skills |
 | Task-invocation XML template | Move to directive authoring | `writing-claude-directives` |
@@ -156,6 +167,14 @@ A control identifies the action it changes, the boundary where it changes it, an
 observable failure it prevents. Text with no effect beyond reminding or explaining is
 reference material, not a control.
 
+### 11. Tests observe something independent
+
+An automated test does not read instruction text, assert a chosen phrase is present or
+absent, and then treat writing that phrase as correctness. It exercises behaviour or
+processes the subject into a structural or semantic observation that is independent of
+the satisfying edit. When prose quality cannot be decided mechanically, its expectations
+belong in a review rubric for a human or reviewing agent.
+
 ## Method
 
 For each responsibility:
@@ -198,9 +217,10 @@ Each slice must leave the repository and live system coherent on its own.
    current carrier.
 3. **Silent ordinary hooks.** Remove no-op model context from branch background and other
    telemetry while preserving their actual side effects.
-4. **Notes ownership.** Give the main agent direct task-entry retrieval. Retire the
-   SessionStart request, advisor route, and contradictory keyword-repair prose in one
-   coherent change.
+4. **Notes ownership.** Give the main agent direct task-entry retrieval and retire the
+   SessionStart request, advisor route, and contradictory keyword-repair prose. Keep the
+   project-notes skill as source only; install it separately after provider-qualified
+   exact resolution is available and verified.
 5. **Always-on ownership.** Rewrite global and project `CLAUDE.md` by distinct rule count
    and owner, not by word count. Move search diagnostics, authoring templates, settings
    sync, commit procedure, reviewer incident history, and academic style to their

@@ -8,26 +8,32 @@
   "authority": {
     "design": "docs/design-plans/2026-08-11-instruction-control-system.md",
     "human_source": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
-    "human_source_lines": [126, 227, 304, 314, 324, 334, 352, 362, 383, 403, 423, 433, 7809]
+    "human_source_lines": [126, 227, 304, 314, 324, 334, 352, 362, 383, 403, 423, 433, 7809],
+    "additional_human_sources": [
+      {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T16-44-15-019fea6a-2e86-7931-ad4d-e6b25bfa666a.jsonl",
+        "lines": [358]
+      }
+    ]
   },
   "candidates": {
     "global_claude": {
       "path": "deployment/instruction-control/foa4008439/CLAUDE.md",
       "live_path": "/home/brian/.claude/CLAUDE.md",
-      "bytes": 5543,
-      "sha256": "f85710cc18382d9e93fb51a9e7661b37ebb83b75bf02534f660e5f0852f88192"
+      "bytes": 6134,
+      "sha256": "f990d99f8272390ad17b45213ce79184a91c8301defb37cb48e164e45dd9039a"
     },
     "project_claude": {
       "path": "CLAUDE.md",
       "live_path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
-      "bytes": 1989,
-      "sha256": "6480017c13c7c5566bbc42ab6f5c5185c4b257682f91ce689f1419db5c34c2c1"
+      "bytes": 2165,
+      "sha256": "811a61decf7323d0ae6ef5fe99fcec78aa0c2b856210b032765150c9e2b12862"
     },
     "settings": {
       "path": "deployment/instruction-control/foa4008439/settings.json",
       "live_path": "/home/brian/.claude/settings.json",
-      "bytes": 6260,
-      "sha256": "591bb4ce1423356d3a98b9d66e8ec0c81163382ff31d9b8a231349f50ea38bb1"
+      "bytes": 6432,
+      "sha256": "b29aec688241f90c3df535e486b61e5030495a6fbb7beb9b386b7ea25af049c1"
     }
   },
   "plugin_releases": {
@@ -60,13 +66,7 @@
         "name": "denubis-plan-and-execute",
         "version": "4.0.0",
         "source": "plugins/denubis-plan-and-execute",
-        "tree_sha256": "848bf9c9744ea0eaf4881fc2e20408ee5d74d9c8854f8fc05bcb3c380e1c4cc8"
-      },
-      {
-        "name": "denubis-project-notes",
-        "version": "0.1.0",
-        "source": "plugins/denubis-project-notes",
-        "tree_sha256": "1e1cabe612138f33e1bc791d1c6cda739d11391a4de5579fbebb8778c4ae4ac9"
+        "tree_sha256": "fc2aa95841ff5c431805a4659e0ad8aea6823c615545ce3a36dd6f87038baf84"
       }
     ],
     "retire": [
@@ -88,13 +88,35 @@
     },
     "settings": {
       "path": "/home/brian/.claude/settings.json",
-      "bytes": 6702,
-      "sha256": "dfe0909c0d4bff5726a1c83abfd3a10bad84d51221e8eabfedc98cf3e865b17a"
+      "bytes": 6703,
+      "sha256": "14f32d5ab7d9c4affd133a9b5e30bd7f3a4cf8f014329d41cd964e052e3741f0"
     },
     "plugin_registry": {
       "path": "/home/brian/.claude/plugins/installed_plugins.json",
       "bytes": 15846,
       "sha256": "5b144defd1eab7ca2f1f3471724939ff6f3725d1d146f350e0f13ffa3e274311"
+    }
+  },
+  "settings_transition": {
+    "baseline": "settings",
+    "candidate": "settings",
+    "enabled_plugins": {
+      "remove": [
+        "denubis-bibliography@denubis-plugins",
+        "denubis-hook-claudemd-reminder@denubis-plugins",
+        "denubis-hook-skill-reinforcement@denubis-plugins",
+        "denubis-notes-advisory@denubis-plugins"
+      ],
+      "add": {}
+    },
+    "permission_allow": {
+      "remove": [
+        "Bash(~/.claude/bin/claude-sync:*)",
+        "Skill(denubis-bibliography:*)"
+      ],
+      "add": [
+        "Skill(denubis-academic:*)"
+      ]
     }
   },
   "deployment_contract": {

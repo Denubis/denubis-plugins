@@ -15,6 +15,8 @@
 
 ## Request boundary
 
+- At task entry, inspect the available skills and use the most specific applicable
+  procedure before acting. Do not turn skill selection into an announcement ritual.
 - Execute a trivial or explicit request directly.
 - For an exploratory request, inspect the relevant system and report evidence before
   proposing a change. Do not mutate it unless the user also asked for a change.
@@ -32,6 +34,10 @@
 - Use test-driven development for features and bug fixes: a relevant failing test, the
   smallest implementation that passes, then cleanup while green. Never delete or weaken a
   test to make a failure disappear.
+- Do not use tests as change detectors for prose or source wording. A test must exercise
+  behaviour or a processed structure independently of the edit that satisfies it. When
+  text requires judgment rather than executable verification, provide a review rubric
+  instead of asserting that chosen phrases appear or disappear.
 - Fix bugs minimally. Do not refactor untested code while fixing a bug.
 - A check is evidence only when it can fail for the claimed reason. An empty search, empty
   query result, or absent string needs a positive control and an explicit coverage bound.
@@ -71,8 +77,10 @@
 - No archaeology: map the relevant universe of documents, code, installed state, hidden
   state, and worktrees before asserting absence. Document the target owner and boundary so
   later work consumes the map instead of repeating discovery.
-- Use the project-notes retrieval skill when a task may depend on project-owned memory.
-  Write or update a `.notes/` file only after the user agrees to the durable wording.
+- When a task may depend on project-owned memory, inventory the main repository's
+  `.notes/` including hidden and ignored files, read relevant bodies, and resolve every
+  human source relied on. Write or update a note only after the user agrees to its
+  durable wording.
 - Map, then document, then update, then verify the contract that authorised the change.
 
 ## Communication

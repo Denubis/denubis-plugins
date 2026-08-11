@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_PATH = (
     REPO_ROOT / "deployment" / "instruction-control" / "verify_candidate.py"
 )
-SPEC = importlib.util.spec_from_file_location("instruction_control_verifier", VERIFIER_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "instruction_control_verifier", VERIFIER_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 verifier = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verifier)
@@ -92,6 +94,139 @@ def test_source_verification_rejects_wrong_authority_role(tmp_path: Path) -> Non
     assert errors == ["authority line 1 is not one non-empty user input_text record"]
 
 
+def test_source_verification_checks_additional_authority_source(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    additional = tmp_path / "additional-session.jsonl"
+    additional.write_text(
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "input_text", "text": "not authority"}],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest["authority"]["additional_human_sources"] = [
+        {"path": str(additional), "lines": [1]}
+    ]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == [
+        f"additional authority {additional} line 1 is not one non-empty user "
+        "input_text record"
+    ]
+
+
+def test_baseline_verification_checks_git_binding() -> None:
+    manifest = {
+        "baselines": {
+            "project_claude": {
+                "path": "git:HEAD:CLAUDE.md",
+                "bytes": 0,
+                "sha256": hashlib.sha256(b"").hexdigest(),
+            }
+        }
+    }
+
+    assert verifier.verify_baselines(manifest, repo_root=REPO_ROOT) == [
+        "live baseline project_claude bytes changed",
+        "live baseline project_claude sha256 changed",
+    ]
+
+
+def test_baseline_verification_rejects_unknown_relative_binding(
+    tmp_path: Path,
+) -> None:
+    manifest = {
+        "baselines": {
+            "ambiguous": {
+                "path": "relative/file.md",
+                "bytes": 0,
+                "sha256": hashlib.sha256(b"").hexdigest(),
+            }
+        }
+    }
+
+    assert verifier.verify_baselines(manifest, repo_root=tmp_path) == [
+        "live baseline ambiguous has unsupported binding: relative/file.md"
+    ]
+
+
+def _settings_transition_manifest(
+    tmp_path: Path, *, candidate_model: str
+) -> dict[str, object]:
+    live = tmp_path / "live-settings.json"
+    live.write_text(
+        json.dumps(
+            {
+                "model": "fable",
+                "enabledPlugins": {"retired@example": True, "kept@example": True},
+                "permissions": {"allow": ["Old permission", "Kept permission"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    candidate = tmp_path / "candidate-settings.json"
+    candidate.write_text(
+        json.dumps(
+            {
+                "model": candidate_model,
+                "enabledPlugins": {"kept@example": True},
+                "permissions": {"allow": ["Kept permission", "New permission"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "baselines": {
+            "settings": {
+                "path": str(live),
+                "bytes": live.stat().st_size,
+                "sha256": verifier.sha256_file(live),
+            }
+        },
+        "candidates": {"settings": {"path": candidate.name}},
+        "settings_transition": {
+            "baseline": "settings",
+            "candidate": "settings",
+            "enabled_plugins": {
+                "remove": ["retired@example"],
+                "add": {},
+            },
+            "permission_allow": {
+                "remove": ["Old permission"],
+                "add": ["New permission"],
+            },
+        },
+    }
+
+
+def test_settings_transition_accepts_only_declared_changes(tmp_path: Path) -> None:
+    manifest = _settings_transition_manifest(tmp_path, candidate_model="fable")
+
+    assert verifier.verify_baselines(manifest, repo_root=tmp_path) == []
+
+
+def test_settings_transition_rejects_unowned_change(tmp_path: Path) -> None:
+    manifest = _settings_transition_manifest(tmp_path, candidate_model="opus")
+
+    errors = verifier.verify_baselines(manifest, repo_root=tmp_path)
+
+    assert errors == [
+        "settings transition changes values outside its declared ownership"
+    ]
+
+
 def test_deployed_verification_compares_live_files_and_cache(tmp_path: Path) -> None:
     manifest_path = _write_fixture(tmp_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -132,6 +267,17 @@ def test_deployed_verification_compares_live_files_and_cache(tmp_path: Path) -> 
     assert verifier.verify_deployed(manifest, cache_root=tmp_path / "cache") == [
         "installed plugin example@1.2.3 tree sha256 does not match source candidate"
     ]
+
+
+def test_deployed_verification_rejects_candidate_without_live_path(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    errors = verifier.verify_deployed(manifest, cache_root=tmp_path / "cache")
+
+    assert "deployed candidate global_claude has no live_path" in errors
 
 
 def test_deployed_verification_rejects_retired_registry_entry(tmp_path: Path) -> None:

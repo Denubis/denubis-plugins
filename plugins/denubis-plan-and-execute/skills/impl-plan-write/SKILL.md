@@ -84,7 +84,6 @@ Every phase starts with:
 **Goal:** [observable state this phase creates]
 **Architecture:** [how this phase fits the accepted design]
 **Tech Stack:** [current tools and dependency versions]
-**Phase Type:** infrastructure | functionality | preparatory-refactor
 **Depends on:** [prior phase or external prerequisite]
 
 ## Acceptance Criteria Coverage
@@ -167,6 +166,19 @@ Each UAT entry states what the human does with the built surface, what they judg
 specific experience that would falsify the design. A phase that produced zero entries is normal,
 and an entirely empty UAT plan is valid. Do not pad deterministic assertions with words such
 as “feels” to make a manual gate.
+
+Before retaining an entry, apply three distinctions:
+
+- **Separation:** after every automated prerequisite passes, can the human judgment still
+  fail? If not, route the claim to automated verification.
+- **Reduction:** can the scenario be decomposed into checks whose outputs settle the
+  verdict? If so, automate those checks instead of asking the human to perform them.
+- **Disagreement:** could informed observers using the same built surface reasonably
+  disagree about the result? If not, the entry describes a deterministic check.
+
+When an entry combines a deterministic boundary with an irreducible judgment, split it:
+route the boundary to `test-requirements.md` and keep only the independently falsifiable
+human judgment in `uat-requirements.md`.
 
 No model-authored stamp binds either file. Execution evidence comes from the tests,
 operational results, and human interaction the entries name.

@@ -35,5 +35,7 @@ Claude Code plugins for design, implementation, and development workflows.
   and `scripts/pre-commit`.
 - Task-invocation syntax and directive structure:
   `denubis-extending-claude:writing-claude-directives`.
-- Main-repository memory and relevant prior chat work:
-  `denubis-project-notes:scanning-project-notes`.
+- Repository search flags, scope, and negative-result handling:
+  `denubis-plan-and-execute:using-code-search`.
+- Main-repository memory: resolve the Git common directory, inventory its parent's
+  `.notes/` including hidden and ignored files, and open relevant bodies and sources.

@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 _IGNORED_TREE_PARTS = {".in_use", ".pytest_cache", "__pycache__"}
 
@@ -64,13 +65,12 @@ def _candidate_errors(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _authority_errors(manifest: dict[str, Any]) -> list[str]:
-    authority = manifest.get("authority", {})
-    source = Path(authority["human_source"])
-    wanted = set(authority["human_source_lines"])
+def _authority_source_errors(
+    source: Path, wanted: set[int], *, label: str
+) -> list[str]:
     found: dict[int, Any] = {}
     if not source.is_file():
-        return [f"authority source is missing: {source}"]
+        return [f"{label} source is missing: {source}"]
 
     with source.open(encoding="utf-8") as stream:
         for line_number, raw_line in enumerate(stream, start=1):
@@ -101,9 +101,28 @@ def _authority_errors(manifest: dict[str, Any]) -> list[str]:
         )
         if not valid:
             errors.append(
-                f"authority line {line_number} is not one non-empty user "
+                f"{label} line {line_number} is not one non-empty user "
                 "input_text record"
             )
+    return errors
+
+
+def _authority_errors(manifest: dict[str, Any]) -> list[str]:
+    authority = manifest.get("authority", {})
+    errors = _authority_source_errors(
+        Path(authority["human_source"]),
+        set(authority["human_source_lines"]),
+        label="authority",
+    )
+    for record in authority.get("additional_human_sources", []):
+        source = Path(record["path"])
+        errors.extend(
+            _authority_source_errors(
+                source,
+                set(record["lines"]),
+                label=f"additional authority {source}",
+            )
+        )
     return errors
 
 
@@ -141,7 +160,9 @@ def _plugin_source_errors(repo_root: Path, manifest: dict[str, Any]) -> list[str
                 )
         for retired in manifest.get("plugin_releases", {}).get("retire", []):
             if retired["name"] in versions:
-                errors.append(f'catalogue still publishes retired plugin {retired["name"]}')
+                errors.append(
+                    f'catalogue still publishes retired plugin {retired["name"]}'
+                )
     return errors
 
 
@@ -155,31 +176,144 @@ def verify_source(repo_root: Path, manifest_path: Path) -> list[str]:
     ]
 
 
-def verify_baselines(manifest: dict[str, Any]) -> list[str]:
-    """Reject deployment if a mutable live file changed after candidate preparation."""
+def _git_binding_content(
+    repo_root: Path, binding: str
+) -> tuple[bytes | None, str | None]:
+    parts = binding.split(":", maxsplit=2)
+    if len(parts) != 3 or parts[0] != "git" or not all(parts[1:]):
+        return None, f"unsupported binding: {binding}"
+
+    revision, relative_path = parts[1:]
+    completed = subprocess.run(
+        ["git", "show", "--no-ext-diff", f"{revision}:{relative_path}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.decode(errors="replace").strip()
+        return None, f"cannot resolve {binding}: {detail}"
+    return completed.stdout, None
+
+
+def _apply_enabled_plugin_changes(
+    settings: dict[str, Any], changes: dict[str, Any]
+) -> list[str]:
     errors: list[str] = []
-    for name, record in manifest.get("baselines", {}).items():
-        path = Path(record["path"])
-        if not path.is_absolute():
-            continue
-        if not path.is_file():
-            errors.append(f"live baseline {name} is missing: {path}")
-            continue
-        if path.stat().st_size != record["bytes"]:
-            errors.append(f"live baseline {name} bytes changed")
-        if sha256_file(path) != record["sha256"]:
-            errors.append(f"live baseline {name} sha256 changed")
+    enabled_plugins = settings.get("enabledPlugins", {})
+    for plugin_id in changes.get("remove", []):
+        if plugin_id not in enabled_plugins:
+            errors.append(
+                f"settings transition cannot remove missing plugin {plugin_id}"
+            )
+        else:
+            del enabled_plugins[plugin_id]
+    for plugin_id, value in changes.get("add", {}).items():
+        enabled_plugins[plugin_id] = value
     return errors
 
 
-def verify_deployed(
-    manifest: dict[str, Any], *, cache_root: Path
+def _apply_permission_changes(
+    settings: dict[str, Any], changes: dict[str, Any]
 ) -> list[str]:
-    """Compare live files and installed plugin trees with the source candidate."""
+    errors: list[str] = []
+    allowed = settings.get("permissions", {}).get("allow", [])
+    for permission in changes.get("remove", []):
+        if permission not in allowed:
+            errors.append(
+                f"settings transition cannot remove missing permission {permission}"
+            )
+        else:
+            allowed.remove(permission)
+    for permission in changes.get("add", []):
+        if permission not in allowed:
+            allowed.append(permission)
+    return errors
+
+
+def _settings_transition_errors(
+    manifest: dict[str, Any], *, repo_root: Path
+) -> list[str]:
+    transition = manifest.get("settings_transition")
+    if not transition:
+        return []
+
+    baseline_name = transition.get("baseline")
+    candidate_name = transition.get("candidate")
+    baseline_record = manifest.get("baselines", {}).get(baseline_name)
+    candidate_record = manifest.get("candidates", {}).get(candidate_name)
+    if not baseline_record or not candidate_record:
+        return ["settings transition names an unknown baseline or candidate"]
+
+    baseline_path = Path(baseline_record["path"])
+    candidate_path = (repo_root / candidate_record["path"]).resolve()
+    if not baseline_path.is_absolute() or not baseline_path.is_file():
+        return ["settings transition baseline is not a live absolute file"]
+    if not candidate_path.is_relative_to(repo_root.resolve()):
+        return ["settings transition candidate escapes repository root"]
+    if not candidate_path.is_file():
+        return [f"settings transition candidate is missing: {candidate_path}"]
+
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+    expected = copy.deepcopy(baseline)
+    errors = _apply_enabled_plugin_changes(
+        expected, transition.get("enabled_plugins", {})
+    )
+    errors.extend(
+        _apply_permission_changes(
+            expected, transition.get("permission_allow", {})
+        )
+    )
+
+    if not errors and expected != candidate:
+        errors.append(
+            "settings transition changes values outside its declared ownership"
+        )
+    return errors
+
+
+def verify_baselines(
+    manifest: dict[str, Any], *, repo_root: Path
+) -> list[str]:
+    """Reject deployment if a mutable live file changed after candidate preparation."""
+    errors: list[str] = []
+    for name, record in manifest.get("baselines", {}).items():
+        binding = record["path"]
+        path = Path(binding)
+        if path.is_absolute():
+            if not path.is_file():
+                errors.append(f"live baseline {name} is missing: {path}")
+                continue
+            content = path.read_bytes()
+        elif binding.startswith("git:"):
+            content, binding_error = _git_binding_content(repo_root, binding)
+            if binding_error is not None:
+                errors.append(f"live baseline {name} {binding_error}")
+                continue
+            if content is None:
+                errors.append(f"live baseline {name} returned no content")
+                continue
+        else:
+            errors.append(
+                f"live baseline {name} has unsupported binding: {binding}"
+            )
+            continue
+
+        if len(content) != record["bytes"]:
+            errors.append(f"live baseline {name} bytes changed")
+        if hashlib.sha256(content).hexdigest() != record["sha256"]:
+            errors.append(f"live baseline {name} sha256 changed")
+    errors.extend(_settings_transition_errors(manifest, repo_root=repo_root))
+    return errors
+
+
+def _deployed_candidate_errors(manifest: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     for name, record in manifest.get("candidates", {}).items():
         live_path_value = record.get("live_path")
         if not live_path_value:
+            errors.append(f"deployed candidate {name} has no live_path")
             continue
         live_path = Path(live_path_value)
         if not live_path.is_file():
@@ -189,6 +323,14 @@ def verify_deployed(
             errors.append(f"deployed candidate {name} bytes do not match")
         if sha256_file(live_path) != record["sha256"]:
             errors.append(f"deployed candidate {name} sha256 does not match")
+    return errors
+
+
+def verify_deployed(
+    manifest: dict[str, Any], *, cache_root: Path
+) -> list[str]:
+    """Compare live files and installed plugin trees with the source candidate."""
+    errors = _deployed_candidate_errors(manifest)
 
     releases = manifest.get("plugin_releases", {})
     installs = releases.get("install", [])
@@ -207,9 +349,12 @@ def verify_deployed(
         for release in installs:
             plugin_id = f'{release["name"]}@denubis-plugins'
             selected = registry_plugins.get(plugin_id, [])
-            if not any(entry.get("version") == release["version"] for entry in selected):
+            if not any(
+                entry.get("version") == release["version"] for entry in selected
+            ):
                 errors.append(
-                    f'plugin registry does not select {release["name"]}@{release["version"]}'
+                    "plugin registry does not select "
+                    f'{release["name"]}@{release["version"]}'
                 )
         for retired in releases.get("retire", []):
             plugin_id = f'{retired["name"]}@denubis-plugins'
@@ -258,7 +403,7 @@ def main() -> int:
     if args.mode == "source":
         errors = verify_source(repo_root, manifest_path)
     elif args.mode == "baseline":
-        errors = verify_baselines(manifest)
+        errors = verify_baselines(manifest, repo_root=repo_root)
     else:
         errors = verify_deployed(manifest, cache_root=args.cache_root)
 

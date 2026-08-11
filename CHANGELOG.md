@@ -1,5 +1,16 @@
 # Changelog
 
+## Instruction-control source candidate
+
+**Fixed:**
+- Deployment verification now resolves declared Git baselines and rejects unsupported
+  bindings or candidates without live targets instead of silently skipping them
+- The settings candidate preserves the current model, output style, and date hook. Its
+  remaining diff is limited to explicitly retired or replaced plugins and permissions
+- `denubis-project-notes` installation is split from the core candidate until
+  cross-vendor exact source resolution is available; direct `.notes/` inspection does
+  not depend on PostgreSQL receipt correlation
+
 ## [denubis-extending-claude] 1.10.1
 
 **Changed:**
@@ -68,10 +79,13 @@
   requiring an interactive preparatory-refactor decision
 - Added structural tests that reject unresolved plugin-qualified skill references and
   missing dispatched agents
-- Added structural contracts that prevent the design, execution, review, acceptance, and
-  challenge workflows from regaining mandatory model-to-model transition ceremony
-- Added contracts for architecture, debugging, Git lifecycle, coding-skill routing,
-  session naming, optional analysis tools, and bundled agent authority
+- Added a family-graph gate and explicit callers for internal review, conformance,
+  refactoring, and branch-finish procedures
+- Restored lean separation, reduction, and disagreement checks that keep deterministic
+  assertions out of UAT without restoring stamps or duplicated prose
+- Replaced exact-string tests that merely froze instruction wording with a review rubric.
+  An AST-based test-quality gate now rejects raw documentation wording assertions while
+  allowing behaviour checks and genuinely parsed structures
 
 ## [denubis-project-notes] 0.1.0
 

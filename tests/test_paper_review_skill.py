@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = (
     REPO_ROOT
@@ -28,6 +27,17 @@ REQUIRED_FILES = (
 
 def _markdown_files() -> list[Path]:
     return sorted(SKILL_ROOT.rglob("*.md"))
+
+
+def _schedule_rows(text: str) -> list[tuple[int, str, set[str]]]:
+    rows: list[tuple[int, str, set[str]]] = []
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 3 or not cells[0].isdigit():
+            continue
+        lanes = set(re.findall(r"`([A-Z]+)`", cells[2]))
+        rows.append((int(cells[0]), cells[1], lanes))
+    return rows
 
 
 def test_paper_review_package_is_complete() -> None:
@@ -58,75 +68,36 @@ def test_relative_markdown_links_resolve() -> None:
 
 def test_hybrid_schedule_preserves_independent_lanes_and_serial_gates() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    expected_rows = (
-        "| 0 | Serial | Source lock, register/venue gate, paragraph and claim map |",
-        "| 1 | Parallel wave | `ARG`, `APP`, `TRN` |",
-        "| 2 | Serial | Substantive synthesis and validity-blocker assessment |",
-        "| 3 | Parallel wave | `SRC`, `COH`, `SCAR` |",
-        "| 4 | Serial | Source-fidelity/argument/coherence/cold-reader synthesis |",
-        "| 5 | Parallel wave | `REG`, `CUT` |",
-        "| 6 | Serial | Final synthesis, promotion triage, hostile recheck, coverage audit |",
-    )
-    absent = [row for row in expected_rows if row not in skill]
-    assert not absent, f"paper-review schedule has drifted: {absent}"
+    rows = _schedule_rows(skill)
 
-
-def test_source_fidelity_lane_requires_a_pinpoint_ledger() -> None:
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    source_lane = (SKILL_ROOT / "references/source-fidelity.md").read_text(
-        encoding="utf-8"
-    )
-    records = (SKILL_ROOT / "references/review-records.md").read_text(
-        encoding="utf-8"
-    )
-    combined = "\n".join((skill, source_lane, records))
-    for required in (
-        "source-claims.md",
-        "using-bibliography",
-        "physical page",
-        "SUPPORTED",
-        "PARTIAL",
-        "QUALIFIED",
-        "CONTRADICTED",
-        "NOT-FOUND",
-        "UNVERIFIED",
-    ):
-        assert required in combined, f"source-fidelity contract is missing: {required}"
+    assert [stage for stage, _mode, _lanes in rows] == list(range(7))
+    assert [mode for _stage, mode, _lanes in rows] == [
+        "Serial",
+        "Parallel wave",
+        "Serial",
+        "Parallel wave",
+        "Serial",
+        "Parallel wave",
+        "Serial",
+    ]
+    assert [lanes for _stage, _mode, lanes in rows if lanes] == [
+        {"ARG", "APP", "TRN"},
+        {"SRC", "COH", "SCAR"},
+        {"REG", "CUT"},
+    ]
 
 
 def test_evidence_base_retains_source_identifiers() -> None:
     evidence = (SKILL_ROOT / "references/evidence-base.md").read_text(
         encoding="utf-8"
     )
-    for identifier in (
+    observed = set(
+        re.findall(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+|\b\d{13}\b", evidence)
+    )
+    required = {
         "10.1038/s41559-018-0545-z",
         "10.1177/14782715251369964",
         "9780521847131",
-    ):
-        assert identifier in evidence, f"missing evidence identifier: {identifier}"
+    }
 
-
-def test_author_facing_findings_pass_mode_aware_promotion_triage() -> None:
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    records = (SKILL_ROOT / "references/review-records.md").read_text(
-        encoding="utf-8"
-    )
-    triage = (SKILL_ROOT / "references/promotion-triage.md").read_text(
-        encoding="utf-8"
-    )
-    combined = "\n".join((skill, records, triage)).lower()
-
-    for required in (
-        "evidence-only",
-        "same author decision",
-        "batch local faults",
-        "hostile recheck",
-        "merely arguable",
-        "textual recovery",
-        "no target count",
-        "critical-friend",
-        "adversarial",
-    ):
-        assert required in combined, f"promotion-triage contract is missing: {required}"
-
-    assert "candidate for author-facing feedback: yes | no | defer" not in combined
+    assert required <= observed

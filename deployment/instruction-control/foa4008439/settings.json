@@ -70,7 +70,6 @@
       "Skill(denubis-plan-and-execute:*)",
       "Skill(denubis-git-commit:*)",
       "Skill(denubis-crash-recovery:*)",
-      "Skill(denubis-project-notes:*)",
       "Skill(denubis-academic:*)"
     ],
     "deny": [
@@ -85,8 +84,19 @@
       "/home/brian/zettelkasten"
     ]
   },
-  "model": "opus",
+  "model": "fable",
+  "outputStyle": "denubis-plan-and-execute:Academic Writing",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"Current date: $(date '+%Y-%m-%d %A')\""
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -160,8 +170,7 @@
     "denubis-crash-recovery@denubis-plugins": true,
     "denubis-external-agents@denubis-plugins": true,
     "denubis-token-estimator@denubis-plugins": true,
-    "denubis-academic@denubis-plugins": true,
-    "denubis-project-notes@denubis-plugins": true
+    "denubis-academic@denubis-plugins": true
   },
   "extraKnownMarketplaces": {
     "transcript-archive-marketplace": {

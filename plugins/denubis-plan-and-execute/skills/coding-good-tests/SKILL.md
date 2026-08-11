@@ -19,6 +19,23 @@ Tests verify real behaviour, not implementation details. The goal is confidence 
 4. Mock strategically — real dependencies when feasible
 5. Don't pollute production code with test-only methods
 
+## No change-detection tests
+
+Do not read source or prose, assert that an exact phrase is present or absent, and then
+write that phrase to make the test pass. That test observes the edit itself, not whether
+the system is correct. Renaming or rewriting without changing behaviour should not create
+a failure.
+
+An automated gate needs an independent observation. Exercise the public behaviour, parse
+a declared structure, compare a recomputable property, or use syntax/AST analysis that
+classifies the defect without sharing the implementation's chosen wording. Include a
+positive control whenever success is otherwise an empty result.
+
+If the subject is prose and its quality cannot be distinguished mechanically, do not
+manufacture automation. Write a review rubric containing the expectations, scenarios,
+and evidence a human or reviewing agent must inspect. The review reports exact findings;
+the rubric does not become an approval certificate.
+
 ## Test Invocation
 
 Standard pytest command:

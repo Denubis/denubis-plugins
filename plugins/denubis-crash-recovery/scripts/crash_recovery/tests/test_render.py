@@ -32,6 +32,8 @@ each of which checks a specific behaviour without reference to the snapshots.
 
 from __future__ import annotations
 
+import hashlib
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -66,6 +68,16 @@ _BASE_EPOCH = 1_700_000_000
 def _ts(index: int) -> int:
     """Return a deterministic epoch ``index`` minutes after ``_BASE_EPOCH``."""
     return _BASE_EPOCH + index * 60
+
+
+def _markdown_facts(text: str) -> tuple[list[str], set[str]]:
+    headings = [
+        line.lstrip("#").strip()
+        for line in text.splitlines()
+        if line.startswith("#")
+    ]
+    short_uuids = set(re.findall(r"\b[0-9a-f]{8}\b", text))
+    return headings, short_uuids
 
 
 # ---------------------------------------------------------------------------
@@ -251,10 +263,14 @@ def test_render_overwrites_user_edits(tmp_path: Path) -> None:
     output = tmp_path / "llm-resume.md"
     sentinel = "USER HAND-EDITED THIS FILE — DO NOT REMOVE"
     output.write_text(sentinel, encoding="utf-8")
+    before = hashlib.sha256(output.read_bytes()).digest()
     _render_to_file(db_path, output)
     actual = output.read_text(encoding="utf-8")
-    assert sentinel not in actual
-    assert "# Claude Code session resume" in actual
+    after = hashlib.sha256(output.read_bytes()).digest()
+    headings, _short_uuids = _markdown_facts(actual)
+
+    assert after != before
+    assert headings[0] == "Claude Code session resume"
 
 
 def test_regenerate_preserves_concluded_rows(tmp_path: Path) -> None:
@@ -292,10 +308,10 @@ def test_regenerate_preserves_concluded_rows(tmp_path: Path) -> None:
     output = tmp_path / "llm-resume.md"
     _render_to_file(db_path, output)
     actual = output.read_text(encoding="utf-8")
-    assert "aaaaaaaa" in actual
-    assert "bbbbbbbb" in actual
-    # Both must live under the "Recently concluded" section header.
-    assert "## Recently concluded" in actual
+    headings, short_uuids = _markdown_facts(actual)
+
+    assert {session.uuid[:8] for session in sessions} <= short_uuids
+    assert "Recently concluded" in headings
 
 
 def test_reason_prefix_partition_is_exhaustive() -> None:

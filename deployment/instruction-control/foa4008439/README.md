@@ -4,6 +4,12 @@ This directory contains the exact global-instruction and settings candidates con
 the deployment. `candidate-manifest.json` binds their bytes, the changed plugin source
 trees, the human-source records, and the observed live baselines.
 
+This candidate does not install `denubis-project-notes`. Direct `.notes/` inspection in
+the global candidate replaces the retiring advisor without depending on unfinished
+cross-vendor search. Install the project-notes skill only in a later candidate that can
+verify provider-qualified exact resolution. PostgreSQL receipt correlation is not a
+prerequisite for that resolver.
+
 The manifest state is `source-candidate`. It does not authorise a commit, publication, or
 live write. Plugin installation must wait until the reviewed source commit is available
 to the installed `denubis-plugins` marketplace.
@@ -39,13 +45,12 @@ Then, without starting an intervening Claude session:
 1. Run `claude plugin marketplace update denubis-plugins` and verify that its checkout
    contains the reviewed commit.
 2. Update the five existing changed plugins named in the manifest.
-3. Install `denubis-project-notes@denubis-plugins` at user scope.
-4. Atomically replace the live global `CLAUDE.md` and `settings.json` with the two bound
+3. Atomically replace the live global `CLAUDE.md` and `settings.json` with the two bound
    candidates, preserving the live files' modes.
-5. Uninstall the three retired plugins at user scope with their persistent data kept.
-6. Reapply the bound settings candidate after the plugin CLI finishes, because install
+4. Uninstall the three retired plugins at user scope with their persistent data kept.
+5. Reapply the bound settings candidate after the plugin CLI finishes, because install
    and uninstall commands may rewrite that file.
-7. Run the deployed verifier:
+6. Run the deployed verifier:
 
 ```fish
 uv run python deployment/instruction-control/verify_candidate.py deployed deployment/instruction-control/foa4008439/candidate-manifest.json --repo-root .

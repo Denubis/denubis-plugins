@@ -8,26 +8,11 @@ the same traversal finds a known active hook boundary.
 import json
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
-COMMIT_SKILL = (
-    REPO_ROOT / "plugins" / "denubis-git-commit" / "skills" / "commit" / "SKILL.md"
-)
 PROJECT_NOTES_ROOT = REPO_ROOT / "plugins" / "denubis-project-notes"
-PROJECT_NOTES_SKILL = (
-    PROJECT_NOTES_ROOT / "skills" / "scanning-project-notes" / "SKILL.md"
-)
 PLAN_HOOKS = (
     REPO_ROOT / "plugins" / "denubis-plan-and-execute" / "hooks" / "hooks.json"
-)
-PLAN_ENTRY_SKILL = (
-    REPO_ROOT
-    / "plugins"
-    / "denubis-plan-and-execute"
-    / "skills"
-    / "using-plan-and-execute"
-    / "SKILL.md"
 )
 
 
@@ -77,17 +62,6 @@ def test_no_marketplace_plugin_reminds_after_git_review() -> None:
     ) not in _marketplace_hook_events()
 
 
-def test_commit_boundary_owns_context_document_freshness() -> None:
-    """The commit procedure retains the useful requirement from the old reminder."""
-    skill = COMMIT_SKILL.read_text(encoding="utf-8")
-    plain_text = skill.replace("`", "")
-
-    assert "### Step 3: Check Context Documentation" in skill
-    assert "contracts, APIs, domain structure, or agent instructions" in skill
-    assert "CLAUDE.md or AGENTS.md" in plain_text
-    assert "Do not proceed to commit" in skill
-
-
 def test_notes_retrieval_does_not_run_at_session_start() -> None:
     """Project-memory retrieval starts from a task, not an empty session."""
     assert (
@@ -97,16 +71,14 @@ def test_notes_retrieval_does_not_run_at_session_start() -> None:
 
 
 def test_project_notes_retrieval_is_direct_main_agent_work() -> None:
-    """The retrieval procedure has no hook or delegated-advisor dependency."""
-    skill = PROJECT_NOTES_SKILL.read_text(encoding="utf-8")
+    """The plugin exposes one skill without hook or agent machinery."""
 
     assert not (PROJECT_NOTES_ROOT / "hooks").exists()
     assert not (PROJECT_NOTES_ROOT / "agents").exists()
-    assert "Read every note's frontmatter yourself" in skill
-    assert "cc-search-chats search" in skill
-    assert "cc-search-chats context" in skill
-    assert "<invoke name=\"Task\">" not in skill
-    assert "subagent_type" not in skill
+    assert (PROJECT_NOTES_ROOT / ".claude-plugin" / "plugin.json").is_file()
+    assert (
+        PROJECT_NOTES_ROOT / "skills" / "scanning-project-notes" / "SKILL.md"
+    ).is_file()
 
 
 def test_session_start_keeps_side_effects_without_generic_workflow_context() -> None:
@@ -122,13 +94,3 @@ def test_session_start_keeps_side_effects_without_generic_workflow_context() -> 
     assert session_commands == [
         'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/update-live-marker.py"'
     ]
-
-
-def test_plan_entry_skill_owns_its_two_unique_gates() -> None:
-    skill = PLAN_ENTRY_SKILL.read_text(encoding="utf-8")
-
-    assert "Use when beginning non-trivial" in skill
-    assert "EnterPlanMode without brainstorming" in skill
-    assert "A skill with a checklist" in skill
-    assert "starting-a-design-plan" in skill
-    assert "TaskCreate" in skill

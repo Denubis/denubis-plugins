@@ -40,6 +40,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS = REPO_ROOT / "plugins"
 
@@ -113,10 +115,10 @@ def test_advisor_skill_is_user_invocable() -> None:
     own, which is the auto-dispatch the gate forbids.
     """
     text = (ADVISOR_DIR / "SKILL.md").read_text(encoding="utf-8")
-    assert "user-invocable: true" in text, (
-        f"{ADVISOR_SKILL} must declare 'user-invocable: true'; without it the "
-        "model may reach for it unprompted, which breaches the Fable cost gate."
-    )
+    _opening, frontmatter, _body = text.split("---", 2)
+    metadata = yaml.safe_load(frontmatter)
+
+    assert metadata["user-invocable"] is True
 
 
 def test_no_other_skill_references_the_fable_advisor() -> None:
@@ -181,7 +183,9 @@ def test_no_agent_definition_declares_a_fable_model() -> None:
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
             if re.match(r"^model:\s*(claude-)?fable", line.strip(), re.IGNORECASE):
-                offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+                offenders.append(
+                    f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}"
+                )
 
     assert not offenders, (
         "Agent definitions may not declare a Fable-tier model:\n  "
