@@ -73,7 +73,9 @@ Skill-adjacent files: `writing-claude-directives/graphviz-conventions.dot`, `wri
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-extending-claude/.claude-plugin/plugin.json` (`1ef36f5`), version 1.7.2. Manifest description: *"Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md."*
+- **Plugin manifest:** `plugins/denubis-extending-claude/.claude-plugin/plugin.json`, version 1.10.1. Manifest description: *"Knowledge skills for extending Claude Code: creating plugins, agents, skills, and maintaining CLAUDE.md."*
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
-- **Hook that invokes `project-claude-librarian`:** `denubis-hook-claudemd-reminder` emits a reminder after git status/log to consider dispatching this agent before commits.
+- **Commit-time consumer:** `denubis-git-commit:commit` invokes
+  `maintaining-project-context` when a pending commit changes documented contracts,
+  APIs, domain structure, or agent instructions.
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

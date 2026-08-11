@@ -63,7 +63,7 @@ Registered in `plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json` (`dd
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-hook-pretooluse-dispatcher/hooks/.claude-plugin/plugin.json` (`a9b22d8`), version 1.1.0.
+- **Plugin manifest:** `plugins/denubis-hook-pretooluse-dispatcher/.claude-plugin/plugin.json` (`6557abb`), version 1.1.3.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **README:** `plugins/denubis-hook-pretooluse-dispatcher/README.md`.
 - **Sub-hook discovered today (in this marketplace, with an empty `hooks.json` and a `pretooluse-bash.sh` wrapper):** `denubis-hook-gh-fork-guard` (priority 10).

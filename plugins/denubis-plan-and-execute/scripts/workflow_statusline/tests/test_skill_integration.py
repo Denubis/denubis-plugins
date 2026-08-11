@@ -30,34 +30,15 @@ class TestSessionNamingInvocation:
 
 
 # ---------------------------------------------------------------------------
-# AC7.1 / AC7.2 — Implementation skills invoke critical-peer-review
+# Review and context changes are evidence-bound, not mandatory transitions
 # ---------------------------------------------------------------------------
-class TestCriticalPeerReviewInvocation:
-    def test_starting_implementation_invokes_critical_peer_review(self) -> None:
-        md = (_SKILLS_DIR / "starting-an-implementation-plan" / "SKILL.md").read_text()
-        assert "denubis-plan-and-execute:critical-peer-review" in md
-
-    def test_executing_implementation_invokes_critical_peer_review(self) -> None:
+class TestOptionalTransitions:
+    def test_execution_makes_independent_review_conditional(self) -> None:
         md = (_SKILLS_DIR / "executing-an-implementation-plan" / "SKILL.md").read_text()
-        assert "denubis-plan-and-execute:critical-peer-review" in md
+        assert "Review is useful when required by the plan or project" in md
+        assert "It is not a fixed transition ritual" in md
 
-
-# ---------------------------------------------------------------------------
-# AC8.1 / AC8.2 — systematic-debugging has context clear with copy-then-clear
-# ---------------------------------------------------------------------------
-class TestContextClearPattern:
-    @pytest.fixture
-    def debugging_md(self) -> str:
-        return (_SKILLS_DIR / "systematic-debugging" / "SKILL.md").read_text()
-
-    def test_contains_clear_command(self, debugging_md: str) -> None:
-        """AC8.1: systematic-debugging has a section containing /clear."""
-        assert "/clear" in debugging_md
-
-    def test_copy_before_clear(self, debugging_md: str) -> None:
-        """AC8.2: 'copy' or 'Copy' appears before the first /clear."""
-        clear_idx = debugging_md.index("/clear")
-        preceding = debugging_md[:clear_idx].lower()
-        assert "copy" in preceding, (
-            "Expected 'copy'/'Copy' to appear before /clear in systematic-debugging"
-        )
+    def test_debugging_does_not_force_context_clear(self) -> None:
+        md = (_SKILLS_DIR / "systematic-debugging" / "SKILL.md").read_text()
+        assert "/clear" not in md
+        assert "Do not force a fresh context" in md

@@ -4,13 +4,20 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 
 ## Marketplace and Plugin Structure
 
-- **Marketplace**: the registry of plugins listed in `.claude-plugin/marketplace.json` at the repo root. Plugins are installed individually via `claude plugin install <name>@brian-ed3d-plugins` (`.claude-plugin/marketplace.json`, `18f3b80`).
-- **Plugin**: a directory under `plugins/<name>/` shipping any combination of skills, agents, commands, hooks, and scripts. Each plugin has its own manifest at `.claude-plugin/plugin.json`. Hook-only plugins place the manifest under `hooks/.claude-plugin/plugin.json` instead.
+- **Marketplace**: the deployment catalogue in `.claude-plugin/marketplace.json` at the
+  repo root. Plugins are installed individually as `<name>@denubis-plugins`. The
+  marketplace is packaging, not the architectural decomposition axis.
+- **Plugin**: a directory under `plugins/<name>/` shipping any combination of skills,
+  agents, commands, hooks, and scripts. Every plugin manifest is at
+  `plugins/<name>/.claude-plugin/plugin.json`; hook registration remains under
+  `plugins/<name>/hooks/hooks.json`.
 - **Skill**: a `SKILL.md` file under `plugins/<name>/skills/<skill-name>/` providing structured instructions to Claude for a specific task. Loaded into the model's context when invoked. A skill is `user-invocable: true` if the user can trigger it via `/<skill-name>`; otherwise it's invoked by other skills or agents.
 - **Agent**: a markdown file under `plugins/<name>/agents/<agent-name>.md` with frontmatter declaring `name`, `model`, and `description`. Dispatched via the `Task` tool with `subagent_type: <plugin>:<agent-name>`.
 - **Command**: a slash-command markdown file under `plugins/<name>/commands/<name>.md`. The user types `/<name>` to invoke; the command body is loaded directly into the model's context.
 - **Hook**: a Python or shell script under `plugins/<name>/hooks/` declared in a `hooks.json` config. Triggered by Claude Code on lifecycle events. Returns a JSON decision on stdout.
-- **Hook events** seen in this marketplace: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`. Matchers (where used) include `Bash`, `Write|Edit`, and the SessionStart variants `startup|resume|clear|compact`.
+- **Hook events** in the current source marketplace: `SessionStart` and `PreToolUse`.
+  The remaining SessionStart hooks perform terminal recolouring or live-marker
+  maintenance; they do not inject generic workflow prose.
 - **Auto-discovery dispatcher**: the `denubis-hook-pretooluse-dispatcher` plugin scans enabled marketplace plugins for `hooks/pretooluse-bash.sh` and a `~/.claude/hooks/pretooluse-bash.d/` drop directory, sorts by priority comment, and runs each with the original stdin. Used by `denubis-hook-gh-fork-guard` (which has an empty `hooks.json` of its own).
 
 ## Runtime Tools
@@ -49,7 +56,7 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 
 ## Behaviour Surfaces
 
-- **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Used heavily by `denubis-hook-skill-reinforcement` (`UserPromptSubmit`), `denubis-basic-agents` and `denubis-plan-and-execute` session-start hooks, and `denubis-hook-claudemd-reminder`.
+- **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Remaining uses are boundary-specific guard advice, not generic SessionStart workflow prose.
 - **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Used by `denubis-hook-gh-fork-guard` and the `code-quality-guard` hook in `denubis-plan-and-execute`.
 - **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. No shipped plugin currently emits it.
 - **MCP server**: an external tool provider connected to Claude Code via the Model Context Protocol. The marketplace consumes MCP (Gmail/Calendar/Drive, `context7`, `ast-grep`) but does not host servers.
@@ -57,14 +64,12 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 ## Repository Conventions
 
 - **Version-sync invariant**: when any plugin's `plugin.json` changes version, the same change must appear in `.claude-plugin/marketplace.json` and a `CHANGELOG.md` entry must be added in the same commit (`CLAUDE.md`, `b9bed28`).
-- **HALT-when-sideways**: discipline of pausing to discuss when the repo state, a design decision, a tool result, or a reviewer finding looks contradictory — rather than working around the anomaly (`CLAUDE.md`, `b9bed28`).
 - **`denubis-` prefix**: every plugin in this repo carries the prefix to distinguish from the upstream `ed3d-plugins` fork from which the repo was renamed.
 
 ## Workflow Artefacts (under `docs/`)
 
 - **Design plan**: a markdown file under `docs/design-plans/<date>-<slug>.md` produced by `denubis-plan-and-execute`'s design pipeline. Captures Summary, Definition of Done, Acceptance Criteria, Glossary, Architecture, Data Model, Decision Record, Existing Patterns, Implementation Phases.
 - **Implementation plan**: a per-task plan under `docs/implementation-plans/<plan>/`, generated from a design plan's phases by the `impl-plan-write` skill.
-- **Test plan**: a manual test plan under `docs/test-plans/`, generated by the `test-analyst` agent after a code-review pass.
 - **Architecture docs**: this directory (`docs/architecture/`).
 
 ## Abbreviations

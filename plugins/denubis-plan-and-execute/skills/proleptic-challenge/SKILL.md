@@ -1,132 +1,84 @@
 ---
 name: proleptic-challenge
-description: Use before phase transitions to generate counterarguments and force deliberate evaluation - fires at design finalisation, between implementation phases, and before acceptance
+description: Use when a consequential decision has a named uncertainty that would benefit from evidence-grounded counterarguments before the decision binds later work
 ---
 
 # Proleptic Challenge
 
-## Overview
+## Purpose
 
-Generate counterarguments before committing to decisions. Force deliberate evaluation rather than premature consensus.
+Anticipate a consequential failure before it becomes repeated correction. A proleptic
+challenge tests a proposal's vulnerable assumptions; it is not a routine phase ceremony,
+a demand for model self-criticism, or a way to transfer every imagined objection to the
+human.
 
-**Core principle:** The value is in the evaluation, not the counterarguments.
+A counterargument is a lead. It changes action only after its cited evidence or predicted
+failure is checked.
 
-**Announce at start:** "I'm using the proleptic-challenge skill to generate counterarguments before we proceed."
+## When to use
 
-## Theoretical Foundation
+Use when a consequential decision has a named uncertainty, when the accepted design asks
+for a challenge at a particular boundary, or when the human requests adversarial analysis.
+The concern must be capable of changing the proposal, its verification, or its risk
+acceptance.
 
-Based on proleptic reasoning from argumentation theory—anticipating objections, articulating them charitably, and responding preemptively.
+Do not invoke for routine task completion, every implementation phase, an empty UAT plan,
+or a proposal whose material risks are already settled by current evidence. Confidence
+alone is not a reason to skip a genuine risk, but a calendar transition alone is not a
+reason to manufacture one.
 
-**Reference:** Kudina, O., Ballsun-Stanton, B., & Alfano, M. (2025). The use of large language models as scaffolds for proleptic reasoning. *Asian Journal of Philosophy*, 4, 24. DOI: 10.1007/s44204-025-00247-1
+## Establish the challenge
 
-## When to Invoke
+Resolve:
 
-Proleptic challenges fire **before phase transitions**, not at every decision point:
+- the exact proposal or decision document;
+- the boundary about to become costly to reverse;
+- the assumptions on which that boundary depends;
+- current code, tests, operational observations, and external sources that bear on those
+  assumptions; and
+- the concrete downstream consequence of being wrong.
 
-| Trigger | When | What Gets Challenged |
-|---------|------|---------------------|
-| Design finalisation | After design-write completes, before commit | The design about to be committed |
-| Between implementation phases | After phase code review passes, before UAT/coherence routing | The completed phase before moving to next |
-| Before acceptance | After code review passes on final phase, before UAT or coherence review | The implementation before declaring complete |
+Generate counterarguments directly or delegate a bounded challenge when an independent
+context is useful. A delegated prompt names the proposal, uncertainty, evidence surface,
+and falsifier. It grants no edit, commit, publication, or deployment authority.
 
-**DO NOT invoke:**
-- After every user message
-- For routine confirmations ("yes, proceed")
-- For trivial decisions
-- When user explicitly skips ("I've already considered this")
+Each candidate objection states:
 
-## Invocation Template
+1. the assumption it disputes;
+2. the plausible failure and affected consumer;
+3. the exact evidence supporting the concern;
+4. the observation that would falsify the objection; and
+5. the smallest change in decision or verification if confirmed.
 
-Dispatch the proleptic-challenger agent:
+## Filter against evidence
 
-```
-<invoke name="Task">
-<parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
-<parameter name="description">Proleptic challenge: [brief description]</parameter>
-<parameter name="prompt">
-PROPOSAL:
-[The decision, design, or completed work being challenged]
+Verify it before presenting it. Open every cited artifact and run any bounded check that
+can settle the claim. Discard objections that are unsupported, contradict the inspected
+source, merely restate an acceptance criterion, invent an alternative without a real
+consumer, or can be resolved by an ordinary implementation detail.
 
-TRIGGER: [Design finalisation | Phase transition | UAT]
+Record a confirmed technical correction directly when it is already determined by the
+accepted design and existing authority. Do not ask the human to adjudicate facts the
+repository or current documentation answers.
 
-CONTEXT:
-[Any relevant background - Definition of Done, design constraints, etc.]
-</parameter>
-</invoke>
-```
+## Resolve surviving decisions
 
-## Presenting Results to Human
+If a material choice survives the evidence filter, ask one pointed question at a time.
+State the decision, the viable alternatives, what each implies, and exact sources the
+human can open. Do not include rejected objections or a narrative about how the model
+nearly got the work wrong.
 
-After receiving counterarguments from the agent, present them with this framing:
+The human may dismiss a concern, accept its risk, or change the proposal. Their statement
+is the authority for that choice; do not require them to produce a citation to overrule a
+model-generated objection. If their answer is ambiguous about the actual choice, ask one
+focused follow-up.
 
-```markdown
-## Proleptic Challenge
+When the answer changes a durable design or decision, update that document to current
+truth and attach the exact human source locator and resolver. Do not preserve the dispute
+as correction prose in the living document.
 
-Before proceeding, here are counterarguments to consider:
+## Boundary
 
-[Insert agent's counterargument output]
-
----
-
-**Your judgement is required.** These counterarguments may or may not be valid. Evaluate them and either:
-- Dismiss concerns that don't apply (briefly note why)
-- Address concerns that do apply (adjust the proposal)
-- Proceed with awareness (acknowledge the tradeoff)
-
-When ready, let me know how you'd like to proceed.
-```
-
-## Presenting Findings: No Pre-Filtering
-
-**Present ALL counterarguments to the human.** Do not dismiss, downgrade, or filter findings on the human's behalf. "I think this one is fine" is not dismissal — it is the orchestrator overriding the challenge process.
-
-If the challenger found it worth raising, it goes to the human. The human decides what to dismiss.
-
-## After Human Responds
-
-| Human Response | Action |
-|----------------|--------|
-| Dismisses with cited evidence | Proceed. Evidence = specific file, design plan section, or test that refutes the concern |
-| Addresses concerns by adjusting proposal | Update proposal, then proceed |
-| Acknowledges tradeoff and proceeds | Proceed with noted risk |
-| Identifies new issues | Discuss further, do NOT proceed until resolved |
-| Dismisses without evidence | Ask for evidence. "Which file/test/design section refutes this?" |
-
-**DO NOT proceed automatically.** Wait for human response.
-
-**Dismissal requires evidence.** A dismissed concern must cite the specific code (`file::symbol`), design plan section, or test that makes the concern inapplicable. "I've already considered this" or "that's not relevant" without a citation is not sufficient — ask what specifically refutes it.
-
-## The "Drunk Tutor" Framing
-
-Both the proposal AND the counterarguments may be flawed:
-- The proposal may have unconsidered risks
-- The counterarguments may be based on misunderstanding
-- The human must evaluate BOTH critically
-
-**Never present counterarguments as definitive objections.** They are considerations for evaluation.
-
-## Common Rationalizations - STOP
-
-| Excuse | Reality |
-|--------|---------|
-| "User seems confident, skip challenge" | Confidence ≠ correctness. Challenge anyway. |
-| "Design is simple, no need for counterarguments" | Simple designs can have hidden assumptions. |
-| "We're running behind, skip this step" | Skipping now = fixing later at higher cost. |
-| "Counterarguments seem weak, don't present" | Human judges strength, not you. Present them. |
-| "This concern doesn't apply" | Cite the specific code or design section that refutes it, or present it. |
-| "User already addressed these concerns" | Present anyway. Fresh eyes may see new angles. |
-| "This is just busywork" | Forcing evaluation prevents premature consensus. |
-
-## Integration with Other Skills
-
-**design-write:** Invoke proleptic challenge before committing design document.
-
-**executing-an-implementation-plan:** Invoke proleptic challenge after each phase's code review passes, before proceeding to next phase or UAT.
-
-**requesting-code-review:** After code review returns APPROVED, invoke proleptic challenge before UAT gate.
-
-## Remember
-
-**You are a scaffold for thinking, not a gatekeeper.**
-
-The goal is not to block progress but to ensure decisions are made deliberately. Even if all counterarguments are dismissed, the act of evaluation strengthens confidence in the decision.
+The challenge may change a proposal or its verification plan. It does not certify the
+result and does not grant authority to commit, publish, deploy, or mutate another system.
+Those actions retain their own boundaries and evidence.

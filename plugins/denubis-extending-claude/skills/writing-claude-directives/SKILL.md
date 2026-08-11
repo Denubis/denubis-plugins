@@ -154,6 +154,23 @@ XML also works as format indicators:
 <structured_data>JSON or tables here</structured_data>
 ```
 
+### Task invocations
+
+When documenting a Task invocation in a skill or agent prompt, use an XML invocation
+block. The structure keeps the agent type, description, and prompt as distinct fields:
+
+```xml
+<invoke name="Task">
+<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
+<parameter name="description">Short task description</parameter>
+<parameter name="prompt">
+The complete task, evidence boundary, and expected return shape.
+</parameter>
+</invoke>
+```
+
+If the Task tool is unavailable, the directive must name its fallback explicitly.
+
 In long prompts, XML tags tend to preserve rules more reliably than markdown, JSON, or YAML.
 
 ### Match Prompt Style to Desired Output

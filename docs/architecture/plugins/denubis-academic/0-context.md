@@ -1,88 +1,65 @@
-# denubis-academic: using-bibliography — Context (Level 0)
+# denubis-academic — Context (Level 0)
 
-> **Scope note (2026-08-01).** This document describes the `using-bibliography`
-> skill only. It was written when that skill was the whole of the former
-> `denubis-bibliography` plugin, which has since been absorbed into
-> `denubis-academic` alongside `academic-writing` and `paper-review`. Paths and
-> the plugin name below have been updated, but the boundary this document draws
-> is now one skill's, not the plugin's. The manifest version it cites was already
-> stale before the move. Treat the surrounding claims as scoped to
-> `using-bibliography` until a Level 0 for the whole plugin is written.
+> System boundary: scholarly writing and review procedures, a continuous academic
+> output style, and Zotero-to-Markdown helpers for source-grounded literature work.
 
-> System boundary: renders Zotero-managed PDFs to per-page markdown under `~/zettelkasten/papers/<citekey>/` and emits page-keyed blockquotes for use as verified citations. The skill's own frontmatter and manifest mark this workflow as WIP — only the path validated end-to-end on one paper is documented.
-
-## Diagram
+## Context
 
 ```mermaid
 flowchart LR
-    User[Human user]
-    CC[Claude Code host]
-    Zotero@{ shape: das, label: "Zotero + Better BibTeX\nlocal JSON-RPC at\nhttp://localhost:23119" }
-    Config@{ shape: das, label: "~/.config/denubis-academic-research/\nconfig.toml" }
-    Zettel@{ shape: das, label: "Zettelkasten root\n~/zettelkasten/papers/<citekey>/" }
-    Pymupdf[pymupdf4llm Python lib]
+    H[Human author or reviewer]
+    C[Claude Code host]
+    P[Academic plugin]
+    N[Project writing and register notes]
+    M[Manuscript]
+    Z[Zotero and Better BibTeX]
+    K[Zettelkasten rendered papers]
+    V[Venue and primary sources]
 
-    Plugin((0.0\nusing-bibliography))
-
-    User -->|"render <citekey>\nor blockquote a page"| CC
-    CC -->|"loads SKILL.md\ninto context;\ninvokes ingest/render/blockquote\nvia uv run"| Plugin
-    Plugin -->|"connector ping;\nresolve citekey → PDF path"| Zotero
-    Plugin --> Config
-    Plugin --> Pymupdf
-    Plugin -->|"writes per-page markdown\n+ blockquotes"| Zettel
-    Plugin -.->|"page-keyed blockquote\ntext for citations"| CC
+    H -->|writing, review, or literature request| C
+    C -->|loads skill or output style| P
+    P -->|read local register first| N
+    C <-->|draft or diagnostic review| M
+    P <-->|resolve attachment and metadata| Z
+    P -->|render page-keyed Markdown| K
+    C -->|verify requirements and claims| V
 ```
 
-## External Entities
+## What the plugin ships
 
-| Entity | Description | Inputs to System | Outputs from System |
-|--------|-------------|------------------|---------------------|
-| Human user | Invokes the skill `/using-bibliography` (`user-invocable: true`) when wanting to render a paper or surface a blockquote. | Citekey + page or quote range | Rendered markdown files; blockquote snippets returned in the model's reply |
-| Claude Code host | Loads `SKILL.md` and runs the helper Python scripts via Bash/uv. | Skill invocation | Skill body as behavioural prompt + tool calls into the helper scripts |
-| Zotero + Better BibTeX | Local Zotero application with the Better BibTeX plugin, reachable via JSON-RPC at `http://localhost:23119`. The skill explicitly *does not* fetch papers itself — the user adds them via the Zotero connector (`plugins/denubis-academic/skills/using-bibliography/SKILL.md`, `18f3b80`). | Connector ping (`/connector/ping`); citekey-to-attachment lookups | PDF attachment paths + bibliographic metadata |
-| `~/.config/denubis-academic-research/config.toml` | User-owned configuration with the zettelkasten root path. Skill halts if missing rather than fabricating a default (`SKILL.md::Hard preconditions`, `18f3b80`). | Config values | (none) |
-| `~/zettelkasten/papers/<citekey>/` | Where rendered markdown lands. User-owned directory — skill halts rather than creating it silently (`SKILL.md::Hard preconditions`, `18f3b80`). | (none) | Per-page markdown files and blockquote snippets produced by the helpers |
-| `pymupdf4llm` Python library | The PDF-to-markdown converter used by `render.py`. Skill requires it to be installed in a usable venv (`SKILL.md::Hard preconditions`, `18f3b80`). | PDF bytes | Page-numbered markdown |
+| Component | Responsibility |
+|---|---|
+| `academic-writing` skill | Loads project register notes before drafting or revising, then applies the portable prose and revision discipline (`plugins/denubis-academic/skills/academic-writing/SKILL.md`, `8dae417`). |
+| `paper-review` skill | Runs a diagnostic manuscript review across independent lanes while keeping defects, concerns, competing readings, and uncertainty distinct (`plugins/denubis-academic/skills/paper-review/SKILL.md`, `ba8acdb`). |
+| `using-bibliography` skill | Resolves Zotero-managed sources and renders or retrieves page-keyed Markdown without independently fetching papers (`plugins/denubis-academic/skills/using-bibliography/SKILL.md`, `0441064`). |
+| `Academic Writing` output style | Holds the portable prose register continuously while retaining coding instructions (`plugins/denubis-academic/output-styles/academic-writing.md`, `8dae417`). |
+| Bibliography helpers | `ingest.py` drives per-paper ingestion; `render.py` converts PDFs; `blockquote.py` emits page-keyed blockquotes (`plugins/denubis-academic/skills/using-bibliography/ingest.py`, `d3602a6`; `plugins/denubis-academic/skills/using-bibliography/render.py`, `42a3287`; `plugins/denubis-academic/skills/using-bibliography/blockquote.py`, `42a3287`). |
 
-## System Boundary
+## External boundaries
 
-**In scope:**
-- The single skill `using-bibliography` and its three helper scripts:
-  - `ingest.py` — accepts a list of DOIs / citekeys and drives the per-paper render pipeline (`plugins/denubis-academic/skills/using-bibliography/ingest.py`, `18f3b80`).
-  - `render.py` — converts a PDF to per-page markdown via `pymupdf4llm` (`render.py`, `18f3b80`).
-  - `blockquote.py` — produces a page-keyed blockquote with a pandoc-style citation for a given page span (`blockquote.py`, `18f3b80`).
-- Halting on missing preconditions: Zotero not running, missing config, missing zettelkasten root, or missing `pymupdf4llm` (`SKILL.md::Hard preconditions`, `18f3b80`).
-- A self-described WIP marker — only one paper's workflow (`yimTeachersPerceptionsAttitudes2024`, dated 2026-05-11) is validated end-to-end (`SKILL.md`, `18f3b80`).
+| Entity | Contract |
+|---|---|
+| Project `.notes/` | Project-specific register and writing rules override the portable floor after the procedure opens them. |
+| Zotero and Better BibTeX | Own bibliographic records and attachment resolution. The plugin does not silently create or fetch corpus items. |
+| Zettelkasten | Stores rendered paper text by resolved citekey for source inspection. |
+| Venue guidance | Supplies current submission requirements. The review procedure verifies current official guidance when the project has no dated copy. |
+| Human | Owns authorial intent, durable register approval, and acceptance of manuscript changes. |
 
-**Out of scope:**
-- Fetching PDFs from the internet — the skill explicitly does not do this; papers must be added via the Zotero connector first (`SKILL.md::When NOT to use`, `18f3b80`).
-- Editing the user's permanent notes — only renders/blockquotes are emitted; permanent-note authoring stays with the user or a human-supervised agent (`SKILL.md::When NOT to use`, `18f3b80`).
-- Anything beyond the single validated path — the WIP notice is the truthful scope statement.
+## Boundary and failure modes
 
-## What This Plugin Ships
+- The output style supplies continuous prose guidance. It does not perform the
+  `academic-writing` skill's note-loading or revision workflow.
+- A diagnostic review discusses the manuscript; it does not silently edit it.
+- Rendered Markdown supports source inspection. A model's citation or summary is not
+  verified merely because a rendered paper exists.
+- Missing Zotero, configuration, attachment, renderer, or zettelkasten preconditions
+  block only the literature operation that depends on them.
+- A project register can override the portable writing floor. The session must read it;
+  a one-line project summary is not a substitute.
 
-### Skills (`plugins/denubis-academic/skills/`)
+## Cross-references
 
-| Skill | User-invocable? | Description (frontmatter, abbreviated) |
-|-------|-----------------|----------------------------------------|
-| `using-bibliography` | yes | Render a PDF from the user's Zotero corpus to per-page markdown, or surface a page-keyed blockquote. Consumes Zotero output via Better BibTeX JSON-RPC; never fetches papers itself. `last-reviewed: 2026-05-11`. (`using-bibliography/SKILL.md`, `18f3b80`) |
-
-### Skill-adjacent helper scripts (under `skills/using-bibliography/`)
-
-| Script | Purpose |
-|--------|---------|
-| `ingest.py` (`18f3b80`) | Batch ingest from DOIs/citekeys — drives the render pipeline per paper. |
-| `render.py` (`18f3b80`) | PDF-to-markdown conversion via `pymupdf4llm`. |
-| `blockquote.py` (`18f3b80`) | Emit a page-keyed blockquote with a pandoc-style citation for a given span. |
-
-### Other plugin files
-
-| File | Purpose |
-|------|---------|
-| `references.bib` (`18f3b80`) | A BibTeX bibliography file shipped with the plugin. |
-
-## Cross-References
-
-- **Plugin manifest:** `plugins/denubis-academic/.claude-plugin/plugin.json` (`18f3b80`), version 0.1.0. Manifest description: *"Render PDFs from a Zotero corpus to per-page markdown for engagement; emit page-keyed blockquotes with pandoc-style citations. WIP — only documents the workflow proven end-to-end so far."*
-- **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
-- **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.
+- **Plugin manifest:** `plugins/denubis-academic/.claude-plugin/plugin.json`, version
+  0.14.0 (`b5595dc`).
+- **Bundled bibliography:** `plugins/denubis-academic/references.bib` (`42a3287`).
+- **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

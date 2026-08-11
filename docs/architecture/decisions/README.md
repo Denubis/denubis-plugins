@@ -11,14 +11,15 @@ and consequences section. One ADR per decision.
   in the post-implementation review.
 - **Accepted** — decision has been used and the post-acceptance pass
   promoted it from Proposed.
-- **Superseded by ADR-NNNN** — kept for the audit trail; a later ADR
-  records the change.
+- **Superseded by ADR-NNNN** — the replacement records the current decision. Retire the
+  superseded document to Git or an explicit archive rather than layering corrections
+  into a living decision.
 
 ## Numbering
 
-Four-digit zero-padded, in the order ADRs were authored. Numbers are
-permanent and never reused; if an ADR is withdrawn, its number stays and
-the body documents the withdrawal.
+Four-digit zero-padded, in the order ADRs were authored. Numbers are never reused. A gap
+means that Git or an explicit archive holds a retired decision; it is not an invitation
+to reconstruct the old argument in the living set.
 
 ## When to write an ADR vs. a constraint row
 

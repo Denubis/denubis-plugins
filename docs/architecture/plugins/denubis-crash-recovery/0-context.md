@@ -92,15 +92,15 @@ flowchart LR
 | `liveness.py` | Liveness file parser (`read_liveness`), boot-id reader (`current_boot_id`), PID-alive check (`pid_alive`), local-filesystem refusal (`assert_local_filesystem`). |
 | `jsonl.py` | JSONL tail parser (`parse_tail`, `TailKind`, `TailSummary`) and the `_REAL_TYPES` deny-list filtering for top-level `type` values (re-sampling cadence documented in `constraints.md`). |
 | `scan.py` | `run_scan()` orchestrator: enumerate JSONLs + liveness files, classify each session (`_classify_fact`), build `SessionFact` / `ScanContext` / `ScanRunResult`. Pure-read; delegates the write block to `scan_db.py`. |
-| `scan_db.py` | The four DB-writer helpers consumed by `run_scan`: `_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`. Plus `WriteContext`. Single-transaction discipline lives here. Functional-Core / Imperative-Shell separation made explicit at the module boundary (an implementation-time decision not in the original design plan; see Departures from design plan below). |
+| `scan_db.py` | The four DB-writer helpers consumed by `run_scan`: `_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`. Plus `WriteContext`. Owns the single-transaction write boundary. |
 | `correlate.py` | Maps cwds to encoded project directory names (handles `/` and `.` lossy collapse) and correlates liveness markers to JSONL UUIDs. Precedence: `session_id` exact (branch 0, shipped Phase 2; the field is runtime-maintained on the live transcript by the `update-live-marker.py` hook, ADR 0003) → `--resume <uuid>` → tight first-entry-ts window `[started-60, started+120]` with optional tmux-resurrect pane corroboration for id-less backlog (shipped Phase 3) (`docs/design-plans/2026-06-12-crash-detection.md`). |
 | `resurrect.py` | Pure parser for `~/.byobu-sessions/tmux_resurrect_*.txt` (shipped Phase 3): `snapshot_near` selects the latest snapshot at/before a marker's `started`; `corroborating_cwds` returns ALL pane cwds for **path-based** Stage-2 corroboration (NOT command/glyph — the command field is the shell and the title glyph is a volatile spinner on busy panes); `label_for_cwd` uses the `✳` prefix only to pick a render label (tolerates a `None` snapshot → `None`) (`docs/design-plans/2026-06-12-crash-detection.md`, Phase 3). |
 | `render.py` | Section model + `render()` byte-stable markdown emitter. Signature `render(db_path) -> tuple[str, int]` (string + entry count; tuple form lands in Phase 6 to resolve a TOCTOU window — the Phase 5 plan documents the single-string form). |
 | `note.py` / `history.py` / `prune.py` / `list_live.py` | One module per CLI subcommand of similar name. |
 
-### Module Inventory — deliberate private-symbol cross-imports
+### Module inventory — private-symbol cross-imports
 
-The following private symbols (leading underscore) are intentionally shared across module boundaries as part of the FCIS module split documented in "Departures from design plan" below:
+The following private symbols are intentionally shared inside the package:
 
 | Symbol | Defined in | Imported by | Rationale |
 |--------|-----------|-------------|-----------|
@@ -124,16 +124,9 @@ The four `scan_db.py` helpers (`_write_scan_run`, `_upsert_session`, `_append_hi
 - **Sibling plugin:** `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes liveness files. The `scan` subcommand reads what that wrapper writes.
 - **Platform:** Linux (for `/proc/sys/kernel/random/boot_id` and `/proc/<pid>`). Non-Linux platforms exit code 2 from `scan` and `triage`; other subcommands work cross-platform against an existing DB.
 
-## Departures from design plan
-
-Two implementation-time choices diverge from `docs/design-plans/2026-05-08-crash-recovery.md` as written. Both are reasoned engineering decisions caught during build; neither has been retroactively edited into the design plan. Stage 2 design-conformance review (2026-05-20) rated both notable.
-
-- **`scan` module split into `scan.py` + `scan_db.py`.** Design plan named a single `crash_recovery.scan` module. Implementation split the orchestrator (`scan.py`: pure-read enumeration + classification) from the four DB-writer helpers (`scan_db.py`: `_write_scan_run`, `_upsert_session`, `_append_history`, `_orphan_sweep`, plus `WriteContext`). The split is a Functional-Core / Imperative-Shell separation at the module boundary; the rationale is recorded in both modules' docstrings. Future plan edits referencing "`scan.py::_orphan_sweep`" by symbol path will not match grep — `_orphan_sweep` lives in `scan_db.py`.
-- **No boolean `liveness_present` column on `sessions`.** Design plan line 508 described "liveness presence/absence is recorded in `sessions` as a boolean flag." The implementation instead encodes the same information via a render-side partition: `render.py::LIVENESS_REASONS`, `NO_LIVENESS_REASONS`, `JSONL_ONLY_REASONS` form a disjoint partition over every reason `classify.py::RULES` can emit. `_reduced_confidence_text` reads the reason and returns the appropriate inline warning. The partition is pinned by `test_render.py::test_reason_prefix_partition_is_exhaustive` (any new reason must be assigned to exactly one set or the test fails). The schema is simpler at the cost of an extra render-side guarantee.
-
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-crash-recovery/.claude-plugin/plugin.json`, version 1.0.0.
+- **Plugin manifest:** `plugins/denubis-crash-recovery/.claude-plugin/plugin.json` (`b99adbe`), version 1.2.0.
 - **Marketplace entry:** `.claude-plugin/marketplace.json`.
 - **Design plan:** `docs/design-plans/2026-05-08-crash-recovery.md` (Phases 1-8 design).
 - **Implementation plan:** `docs/implementation-plans/2026-05-08-crash-recovery/` (8 phase files + design conformance + UAT requirements + test requirements).

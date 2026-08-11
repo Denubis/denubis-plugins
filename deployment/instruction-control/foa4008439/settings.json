@@ -1,0 +1,185 @@
+{
+  "cleanupPeriodDays": 36500,
+  "env": {
+    "DISABLE_AUTOUPDATER": "1",
+    "ENABLE_TOOL_SEARCH": "false",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "COLORTERM": "truecolor",
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "20",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "5",
+    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "20000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh label list:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh release list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh api:*)",
+      "Bash(uv:*)",
+      "Bash(uvx:*)",
+      "Bash(python3:*)",
+      "Bash(alembic history:*)",
+      "Bash(ast-grep:*)",
+      "Bash(/usr/local/bin/ast-grep:*)",
+      "Bash(latexmk:*)",
+      "Bash(~/.TinyTeX/bin/x86_64-linux/latexmk:*)",
+      "Bash(~/.TinyTeX/bin/x86_64-linux/lualatex:*)",
+      "Bash(~/.TinyTeX/bin/x86_64-linux/texdoc:*)",
+      "Bash(~/.TinyTeX/bin/x86_64-linux/tlmgr:*)",
+      "Bash(PATH=\"$HOME/.TinyTeX/bin/x86_64-linux:$PATH\" latexmk:*)",
+      "Bash(PATH=\"$HOME/.TinyTeX/bin/x86_64-linux:$PATH\")",
+      "Bash(export PATH=\"$HOME/.TinyTeX/bin/x86_64-linux:$PATH\")",
+      "Bash(bash:*)",
+      "Bash(bats:*)",
+      "Bash(cd:*)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(npm:*)",
+      "Bash(pandoc:*)",
+      "Bash(psql:*)",
+      "Bash(tree:*)",
+      "Bash(wc:*)",
+      "Bash(xdg-open:*)",
+      "Bash(claude-transcript-archive:*)",
+      "Bash(~/.claude/bin/workflow-state:*)",
+      "Bash(~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow-state-wrapper.sh:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:astral.sh)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:denubis.github.io)",
+      "mcp__ast-grep__find_code",
+      "mcp__ast-grep__dump_syntax_tree",
+      "mcp__ast-grep__find_code_by_rule",
+      "mcp__ast-grep__test_match_code_rule",
+      "Skill(denubis-00-getting-started:*)",
+      "Skill(denubis-basic-agents:*)",
+      "Skill(denubis-research-agents:*)",
+      "Skill(denubis-extending-claude:*)",
+      "Skill(denubis-plan-and-execute:*)",
+      "Skill(denubis-git-commit:*)",
+      "Skill(denubis-crash-recovery:*)",
+      "Skill(denubis-project-notes:*)",
+      "Skill(denubis-academic:*)"
+    ],
+    "deny": [
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(sudo:*)",
+      "Bash(su:*)",
+      "Bash(doas:*)"
+    ],
+    "defaultMode": "default",
+    "additionalDirectories": [
+      "/home/brian/zettelkasten"
+    ]
+  },
+  "model": "opus",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/approver/.venv/bin/python3 ~/.claude/hooks/approver/approver.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/approver/.venv/bin/python3 ~/.claude/hooks/approver/approver.py"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/brian/people/Brian/session-runner/bin/notify-agent.sh Claude"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "uv run --project /home/brian/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-plan-and-execute/scripts/workflow_statusline workflow-statusline",
+    "refreshInterval": 30
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": false,
+    "context7@claude-plugins-official": false,
+    "code-review@claude-plugins-official": false,
+    "github@claude-plugins-official": false,
+    "feature-dev@claude-plugins-official": false,
+    "code-simplifier@claude-plugins-official": false,
+    "serena@claude-plugins-official": false,
+    "commit-commands@claude-plugins-official": false,
+    "playwright@claude-plugins-official": false,
+    "pr-review-toolkit@claude-plugins-official": false,
+    "pyright-lsp@claude-plugins-official": false,
+    "agent-sdk-dev@claude-plugins-official": false,
+    "greptile@claude-plugins-official": false,
+    "hookify@claude-plugins-official": false,
+    "linear@claude-plugins-official": false,
+    "claude-md-management@claude-plugins-official": false,
+    "claude-code-setup@claude-plugins-official": false,
+    "denubis-00-getting-started@denubis-plugins": true,
+    "denubis-basic-agents@denubis-plugins": true,
+    "denubis-research-agents@denubis-plugins": true,
+    "denubis-extending-claude@denubis-plugins": true,
+    "denubis-plan-and-execute@denubis-plugins": true,
+    "denubis-git-commit@denubis-plugins": true,
+    "ralph-loop@claude-plugins-official": false,
+    "cc-search-chats@cc-search-chats-marketplace": true,
+    "denubis-hook-gh-fork-guard@denubis-plugins": true,
+    "denubis-hook-pretooluse-dispatcher@denubis-plugins": true,
+    "security-guidance@claude-plugins-official": false,
+    "ast-grep@ast-grep-marketplace": false,
+    "denubis-hook-branch-bg@denubis-plugins": true,
+    "transcript-archive@transcript-archive-marketplace": true,
+    "denubis-crash-recovery@denubis-plugins": true,
+    "denubis-external-agents@denubis-plugins": true,
+    "denubis-token-estimator@denubis-plugins": true,
+    "denubis-academic@denubis-plugins": true,
+    "denubis-project-notes@denubis-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "transcript-archive-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "Denubis/claude-code-research-transcript-hook"
+      }
+    }
+  },
+  "language": "English (Australian)",
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "xhigh",
+  "promptSuggestionEnabled": false,
+  "tui": "fullscreen",
+  "autoMemoryEnabled": false,
+  "skipWorkflowUsageWarning": true,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true
+}

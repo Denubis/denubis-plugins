@@ -27,7 +27,7 @@ flowchart LR
 
 | Entity | Description | Inputs to System | Outputs from System |
 |--------|-------------|------------------|---------------------|
-| Dispatching skill / agent | Any other plugin's skill or agent that uses `Task` to spawn one of these research agents. The `using-research-agents` skill (`plugins/denubis-research-agents/skills/using-research-agents/SKILL.md`, `8498518`) documents how to choose between them. | Caller-supplied research question or task | Research findings as text in the subagent return message (`plugins/denubis-research-agents/agents/codebase-investigator.md`, `internet-researcher.md`, `combined-researcher.md`, `remote-code-researcher.md`, `5bfcd99` — all explicit: "Return findings in your response text only. Do not write files") |
+| Dispatching skill / agent | Any other plugin's skill or agent that uses `Task` to spawn one of these research agents. The `using-research-agents` skill (`plugins/denubis-research-agents/skills/using-research-agents/SKILL.md`, `ebfc608`) documents how to choose between them. | Caller-supplied research question or task | Research findings as text in the subagent return message (`plugins/denubis-research-agents/agents/codebase-investigator.md`, `internet-researcher.md`, `combined-researcher.md`, `remote-code-researcher.md`, `ebfc608`) |
 | Claude Code host | Loads agent markdown when `Task` is invoked with `subagent_type: denubis-research-agents:<agent-name>`. | `Task` dispatches | Subagent prompt + caller-defined toolset per agent |
 | Internet | `WebSearch`/`WebFetch` for current docs and patterns; `mcp__context7__*` tools for library documentation lookups. | URLs and search queries from the running agent | Pages, docs, code snippets |
 | External git repositories | Cloned to a temp directory by `remote-code-researcher` to read library internals locally (`plugins/denubis-research-agents/agents/remote-code-researcher.md`, `5bfcd99`). | `git clone` invocations | Source files for inspection |
@@ -36,9 +36,9 @@ flowchart LR
 ## System Boundary
 
 **In scope:**
-- Provide four research agents, each with a `REQUIRED SKILL` line pointing at the corresponding investigation skill: `codebase-investigator` → `investigating-a-codebase`; `internet-researcher` → `researching-on-the-internet`; `combined-researcher` → both; `remote-code-researcher` → both (clones external repos to a temp dir first) (`plugins/denubis-research-agents/agents/*.md`, `5bfcd99`).
-- Provide the three skills the agents require, plus a selection skill `using-research-agents` that documents agent choice + academic-citation protocol + anti-patterns (`plugins/denubis-research-agents/skills/*/SKILL.md`, `8498518`).
-- Forbid file writes from inside the agents — every agent's body contains: *"Return findings in your response text only. Do not write files (summaries, reports, temp files) unless the calling agent explicitly asks you to write to a specific path."* (`plugins/denubis-research-agents/agents/*.md`, `5bfcd99`).
+- Provide four research agents, each with a `REQUIRED SKILL` line pointing at the corresponding investigation skill: `codebase-investigator` → `investigating-a-codebase`; `internet-researcher` → `researching-on-the-internet`; `combined-researcher` → both; `remote-code-researcher` → both (clones external repos to a temp dir first) (`plugins/denubis-research-agents/agents/`, `ebfc608`).
+- Provide three companion skills: `using-research-agents` (`ebfc608`), `investigating-a-codebase` (`ea1cd49`), and `researching-on-the-internet` (`8498518`) under `plugins/denubis-research-agents/skills/`.
+- Require findings to return through the calling conversation unless the caller explicitly names a file target (`plugins/denubis-research-agents/agents/`, `ebfc608`).
 
 **Out of scope:**
 - Implementation / refactoring — these agents are read-only research roles.
@@ -56,8 +56,6 @@ flowchart LR
 | `combined-researcher` | sonnet | Both local and internet research synthesised into one answer (`combined-researcher.md`, `ebfc608`). |
 | `remote-code-researcher` | sonnet | Examine library internals by cloning external repos to a temp directory and reading actual source code (`remote-code-researcher.md`, `ebfc608`). |
 
-All four ran on `haiku` until 2026-07-25, when an operator ruling made Sonnet the floor. Research is the sharpest case for that floor, because judging source credibility is judgement work rather than mechanical retrieval (`.notes/feedback_haiku-no-judgement.md`).
-
 ### Skills (`plugins/denubis-research-agents/skills/`)
 
 | Skill | Description (frontmatter) |
@@ -68,7 +66,7 @@ All four ran on `haiku` until 2026-07-25, when an operator ruling made Sonnet th
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-research-agents/.claude-plugin/plugin.json` (`1ef36f5`), version 1.1.1. Manifest description: *"Agents for codebase investigation and internet research. Other plugins expect this one to be enabled."*
+- **Plugin manifest:** `plugins/denubis-research-agents/.claude-plugin/plugin.json` (`63c0f42`), version 1.3.1. Manifest description: *"Agents for codebase investigation and internet research. Other plugins expect this one to be enabled."*
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **Plugins that dispatch these agents:** primarily `denubis-plan-and-execute`'s skills (e.g. `brainstorming`, `starting-a-design-plan`).
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

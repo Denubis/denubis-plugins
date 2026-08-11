@@ -1,882 +1,140 @@
 ---
 name: design-write
 family: starting-a-design-plan
-description: Use after brainstorming completes - writes validated designs to docs/design-plans/ with structured format and discrete implementation phases required for creating detailed implementation plans
+description: Use after a design direction is selected - writes one current design with resolvable authority, explicit boundaries, acceptance criteria, and coherent implementation phases
 user-invocable: false
 ---
 
-# Writing Design Plans
+# Writing a Design Plan
 
-## Overview
+## Purpose
 
-Complete the design document by appending validated design from brainstorming to the existing file (created in Phase 3 of starting-a-design-plan) and filling in the Summary and Glossary placeholders.
+Write the selected design so another session can understand the relevant universe, why the
+boundaries exist, how failure appears, and what observable results would make the design
+accepted. The document is a current design, not a transcript, review certificate, or
+step-by-step implementation script.
 
-**Core principle:** Append body to existing document. Generate Summary and Glossary. Commit for permanence.
+## Location and status
 
-**Announce at start:** "I'm using the design-write skill to complete the design document."
+Write `docs/design-plans/YYYY-MM-DD-<topic>.md` in the selected working root. Use `Draft`
+until the human has accepted the design and every authority source on which it depends
+resolves exactly. Change the status to `Current design` only after those conditions hold.
 
-**Context:** Design document already exists with Title, Summary placeholder, confirmed Definition of Done, and Glossary placeholder. This skill appends the body and fills in placeholders.
+If an existing current design owns the same decision, update it rather than layering a
+second source of truth. Superseded argument belongs in Git or an explicit archive; do not
+append correction history to living sections.
 
-## Level of Detail: Design vs Implementation
+## Document contract
 
-**Design plans are directional and archival.** They can be checked into git and referenced months later. Other design plans may depend on contracts specified here.
-
-**Implementation plans are tactical and just-in-time.** They verify current codebase state and generate executable code immediately before execution.
-
-**What belongs in design plans:**
-
-| Include | Exclude |
-|---------|---------|
-| Module and directory structure | Task-level breakdowns |
-| Component names and responsibilities | Implementation code |
-| File paths (from investigation) | Function bodies |
-| Dependencies between components | Step-by-step instructions |
-| "Done when" verification criteria | Test code |
-
-**Exception: Contracts get full specification.** When a component exposes an interface that other systems depend on, specify the contract fully:
-
-- API endpoints with request/response shapes
-- Inter-service interfaces (types, method signatures)
-- Database schemas that other systems read
-- Message formats for queues/events
-
-Contracts can include code blocks showing types and interfaces. This is different from implementation code — contracts define boundaries, not behavior.
-
-**Example — Contract specification (OK):**
-```python
-from typing import Protocol
-
-class TokenService(Protocol):
-    def generate(self, claims: TokenClaims) -> str: ...
-    def validate(self, token: str) -> TokenClaims | None: ...
-
-@dataclass(frozen=True)
-class TokenClaims:
-    sub: str        # service identifier
-    aud: list[str]  # allowed audiences
-    exp: int        # expiration timestamp
-```
-
-**Example — Implementation code (NOT OK for design plans):**
-```python
-def generate(self, claims: TokenClaims) -> str:
-    payload = {"sub": claims.sub, "aud": claims.aud, "exp": claims.exp, "iat": time.time()}
-    return jwt.encode(payload, config.secret, algorithm="RS256")
-```
-
-The first defines what the boundary looks like. The second implements behavior — that belongs in implementation plans.
-
-## File Location and Naming
-
-**File location:** `docs/design-plans/YYYY-MM-DD-<topic>.md`
-
-The file is created by starting-a-design-plan Phase 3. This skill appends to that file.
-
-**Expected naming convention:**
-- Good: `docs/design-plans/2025-01-18-oauth2-svc-authn-42.md`
-- Good: `docs/design-plans/2025-01-18-user-prof-redesign-87.md`
-- Good: `docs/design-plans/2025-01-18-oauth2-svc-authn.md` (no linked issue)
-- Bad: `docs/design-plans/2025-01-18-42-oauth2-svc-authn.md` (issue number must be at end)
-- Bad: `docs/design-plans/design.md`
-- Bad: `docs/design-plans/new-feature.md`
-
-## Document Structure
-
-**The design document already exists** from Phase 3 of starting-a-design-plan with this structure:
+Use the sections the design actually needs, drawn from this shape:
 
 ```markdown
-# [Feature Name] Design
+# [Design title]
 
-**GitHub Issue:** [#123 | org/repo#123 | None]
+**Status:** Draft | Current design
 
-## Summary
-<!-- TO BE GENERATED after body is written -->
+## Purpose
+[Problem, desired outcome, and why this design exists]
 
-## Definition of Done
-[Already written - confirmed in Phase 3]
+## Authority Sources
 
-## Acceptance Criteria
-<!-- TO BE GENERATED and validated before glossary -->
+| Decision or instruction | Exact source | Resolver | Resolution condition |
+|---|---|---|---|
+| [human-owned boundary] | [provider-qualified locator] | `[exact invocation]` | [unique expected result] |
 
-## Glossary
-<!-- TO BE GENERATED after body is written -->
+## Universe of discourse
+[Actors, systems, data, consumers, external boundaries, and explicit exclusions]
+
+## Current state
+[Observed behavior with code, test, log, or architecture pointers]
+
+## Goals and non-goals
+[Current scope]
+
+## Design
+[Components, responsibilities, data flow, state transitions, and contracts]
+
+## Failure and recovery
+[Observable failures, invalidation conditions, and safe recovery]
+
+## Decisions
+[Only decisions with continuing consequences: choice, alternatives that were genuinely
+viable, evidence, consequences, and invalidation condition]
+
+## Acceptance criteria
+[Scoped identifiers with positive and failure observations]
+
+## Implementation phases
+[Coherent outcomes, dependencies, criteria owned, and resulting usable state]
+
+## Verification and human judgment
+[What automation or operations can prove, and the irreducible judgments reserved for UAT]
 ```
 
-**This skill appends the body sections:**
+Add a glossary only for terms whose local meaning is not obvious from the document. Add
+dependency or migration sections when the design actually introduces them.
 
-```markdown
-## Architecture
-[Approach selected in brainstorming Phase 2]
+## Authority and evidence
 
-[Key components and how they interact]
+Every human-derived decision includes an exact locator and resolver invocation. The
+resolver must select exactly one human message. A quotation, paraphrase, session UUID
+without a message locator, model note, or review summary does not satisfy the reference.
 
-[Data flow and system boundaries]
+Code and operational claims cite the current file, symbol, test, log, or generated
+artifact. External contracts cite authoritative current documentation and the applicable
+version. State inference as inference.
 
-## Decision Record
+If a pointer is missing, ambiguous, stale, wrong-role, or unavailable, repair it. When it
+cannot be repaired from the current evidence, keep the design draft and obtain a focused
+human invocation rather than inventing authority.
 
-### DR[N]: [Decision title — what was chosen over what]
-**Status:** Proposed | Accepted | Superseded by [link] | Deprecated
-**Confidence:** High | Medium | Low
-**Reevaluation triggers:** [Conditions under which to revisit]
+## Content boundaries
 
-**Decision:** [Active voice: "We chose X over Y."]
+Specify architecture and public contracts at enough detail to protect decisions:
+component responsibilities, schemas or message shapes consumed elsewhere, state
+transitions, validation boundaries, and failure behavior. Leave function bodies, exact
+task sequences, and incidental file edits to implementation planning.
 
-**Consequences:**
-- **Enables:** [What this unlocks]
-- **Prevents:** [What this forecloses]
+Living architecture describes implemented state. A future design remains in the design
+plan until implementation changes the system; do not rewrite living architecture as if
+proposed components already exist. If current architecture is already false, record and
+repair that integrity defect separately.
 
-**Alternatives considered:**
-- **[Alternative]:** Rejected because [reason]
+Decision entries state what is currently chosen and its consequences. Do not include the
+conversation, apology, earlier mistaken version, or a model's argument with an offscreen
+claim. No model-authored approval, review status, or provenance-shaped record proves the
+design was accepted.
 
-[Repeat DR[N+1], DR[N+2], ... for each significant decision]
+## Acceptance and phases
 
-## Existing Patterns
-[Document codebase patterns discovered by investigator that this design follows]
+Every acceptance criterion names an observable success and relevant failure condition.
+Cover every goal, contract, compatibility boundary, and failure behavior. Distinguish
+deterministic checks from human judgment; do not disguise a command with expected output
+as UAT.
 
-[If introducing new patterns, explain why and note divergence from existing code]
+Implementation phases are coherent usable outcomes, not arbitrary time slices. Each phase
+names its dependencies, the criteria it owns, and the state it leaves working. Put a new
+interface with its first real consumer. Avoid phases consisting only of speculative
+abstractions or cleanup of untested code.
 
-[If no existing patterns found, state that explicitly]
+## Challenge and acceptance
 
-## Implementation Phases
+Before asking for acceptance, resolve technical inconsistencies directly. Invoke
+`denubis-plan-and-execute:proleptic-challenge` only for a named consequential uncertainty
+that survives the evidence already in the document. Apply evidence-determined corrections
+without burdening the human; present genuine design choices one at a time.
 
-Break implementation into discrete phases (<=8 recommended).
+Ask the human one final pointed question: whether the written design matches the intended
+outcome and boundaries. Resolve their exact response and add it to `## Authority Sources`.
+If they change the design, update the relevant sections to current truth and recheck
+criteria and phases before asking again.
 
-**REQUIRED: Wrap each phase in HTML comment markers:**
+## Verify and return
 
-<!-- START_PHASE_1 -->
-### Phase 1: [Name]
-**Goal:** What this phase achieves
+Before handoff, verify that every source resolves, every goal has acceptance coverage,
+every phase has a usable outcome and dependency order, every public interface has a named
+consumer, and no section claims unimplemented state as current architecture.
 
-**Components:** What gets built/modified (exact paths from investigator)
-
-**Dependencies:** What must exist first
-
-**Done when:** How to verify this phase is complete (see Phase Verification below)
-<!-- END_PHASE_1 -->
-
-<!-- START_PHASE_2 -->
-### Phase 2: [Name]
-[Same structure]
-<!-- END_PHASE_2 -->
-
-...continue for each phase...
-
-**Why markers:** These enable impl-plan-write to parse phases individually, reducing context usage and enabling granular task tracking across compaction boundaries.
-
-## Additional Considerations
-[Error handling, edge cases, future extensibility - only if relevant]
-
-[Don't include hypothetical "nice to have" features]
-```
-
-**Then this skill:**
-1. Generates Acceptance Criteria (inline) and gets human validation
-2. Generates Summary and Glossary to replace the placeholders
-
-## Legibility Header
-
-The first three sections (Summary, Definition of Done, Glossary) form the **legibility header**. These sections help human reviewers quickly understand what the document is about before diving into technical details.
-
-**Definition of Done is already written** — it was captured in Phase 3 immediately after user confirmation, preserving full fidelity.
-
-**Summary and Glossary are generated AFTER writing the body.** This avoids summarizing something that hasn't been written yet and ensures they accurately reflect the full document.
-
-See "After Writing: Generating Summary and Glossary" below for the extraction process.
-
-## Implementation Phases: Critical Requirements
-
-**YOU MUST break design into discrete, sequential phases.**
-
-**Each phase should:**
-- Achieve one cohesive goal
-- Build on previous phases (explicit dependencies)
-- End with a working build and clear "done" criteria
-- Use exact file paths and component names from codebase investigation
-
-## Phase Verification
-
-**Verification depends on what the phase delivers:**
-
-| Phase Type | Done When | Examples |
-|------------|-----------|----------|
-| Infrastructure/scaffolding | Operational success | Project installs, builds, runs, deploys |
-| Functionality/behavior | Tests pass that verify the ACs this phase covers | Unit tests, integration tests, E2E tests |
-
-**The rule:** If a phase implements functionality, it must include tests that verify the specific acceptance criteria it claims to cover. Tests are a deliverable of the phase, not a separate "testing phase" later.
-
-**Tying tests to ACs:** A functionality phase lists which ACs it covers (e.g., `oauth2-svc-authn-42.AC1.1`, `oauth2-svc-authn-42.AC1.3`). The phase is not "done" until tests exist that verify each of those specific cases. This creates traceability: AC → phase → test.
-
-**Don't over-engineer infrastructure verification.** You don't need unit tests for pyproject.toml. "uv sync succeeds" is sufficient verification for a dependency setup phase. Infrastructure phases typically don't list ACs—their verification is operational.
-
-**Do require tests for functionality.** Any code that does something needs tests that prove it does that thing. These tests must map to specific ACs, not just "test the code." If a phase covers `oauth2-svc-authn-42.AC1.3` ("Invalid password returns 401"), a test must verify exactly that.
-
-**Tests can evolve.** A test written in Phase 2 may be modified in Phase 4 as requirements expand. This is expected. The constraint is that Phase 2 ends with passing tests for the ACs Phase 2 claims to cover.
-
-**Structure phases as subcomponents.** A phase may contain multiple logical subcomponents. List them at the component level — the implementation plan will break these into tasks.
-
-Good structure (component-level):
-```
-<!-- START_PHASE_2 -->
-### Phase 2: Core Services
-**Goal:** Token generation and session management
-
-**Components:**
-- TokenService in `src/services/auth/` — generates and validates JWT tokens
-- SessionManager in `src/services/auth/` — creates, validates, and invalidates sessions
-- Models in `src/models/auth.py` — TokenClaims, SessionData dataclasses
-
-**Dependencies:** Phase 1 (project setup)
-
-**Done when:** Token generation/validation works, sessions can be created/invalidated, all tests pass
-<!-- END_PHASE_2 -->
-```
-
-Bad structure (task-level — this belongs in implementation plans):
-```
-Phase 2: Core Services
-- Task 1: TokenPayload type and TokenConfig
-- Task 2: TokenService implementation
-- Task 3: TokenService tests
-- Task 4: SessionManager implementation
-- Task 5: SessionManager tests
-```
-
-Design plans describe WHAT gets built. Implementation plans describe HOW to build it step-by-step.
-
-**Phase count:**
-- Target: 5-8 phases (sweet spot for planning)
-- Maximum: 8 phases (hard limit for impl-plan-write skill)
-- If >8 phases needed: Note that multiple implementation plans will be required
-
-**Why <=8 phases matters:**
-- impl-plan-write skill has hard limit of 8 phases per implementation plan
-- Exceeding 8 phases forces user to scope or split
-- This is by design to prevent overwhelming implementation plans
-
-**If design needs >8 phases:**
-
-Add note to Additional Considerations:
-```markdown
-## Additional Considerations
-
-**Implementation scoping:** This design has [N] phases total. The impl-plan-write skill limits implementation plans to 8 phases. Consider:
-1. Implementing first 8 phases in initial plan
-2. Creating second implementation plan for remaining phases
-3. Simplifying design to fit within 8 phases
-```
-
-## Using Codebase Investigation Findings
-
-**Include paths and component descriptions from investigation. Do NOT include implementation details.**
-
-Good Phase definitions:
-
-**Infrastructure phase example:**
-```markdown
-<!-- START_PHASE_1 -->
-### Phase 1: Project Setup
-**Goal:** Initialize project structure and dependencies
-
-**Components:**
-- `pyproject.toml` with auth dependencies (pyjwt, argon2-cffi)
-- `src/__init__.py` entry point
-- Ruff and ty configuration
-
-**Dependencies:** None (first phase)
-
-**Done when:** `uv sync` succeeds, `uv run ruff check .` clean
-<!-- END_PHASE_1 -->
-```
-
-**Functionality phase example:**
-```markdown
-<!-- START_PHASE_2 -->
-### Phase 2: Token Generation Service
-**Goal:** JWT token generation and validation for service-to-service auth
-
-**Components:**
-- TokenService in `src/services/auth/` — generates signed JWTs, validates signatures and expiration
-- TokenValidator in `src/services/auth/` — middleware-friendly validation that returns claims or raises
-
-**Dependencies:** Phase 1 (project setup)
-
-**Done when:** Tokens can be generated, validated, and rejected when invalid/expired
-<!-- END_PHASE_2 -->
-```
-
-Bad Phase definitions:
-
-**Too vague:**
-```markdown
-### Phase 1: Authentication
-**Goal:** Add auth stuff
-**Components:** Auth files
-**Dependencies:** Database maybe
-```
-
-**Too detailed (task-level):**
-```markdown
-### Phase 2: Token Service
-**Components:**
-- Create `src/models/token.py` with TokenClaims dataclass
-- Create `src/services/auth/token_service.py` with generate() and validate()
-- Create `tests/services/auth/test_token_service.py`
-- Step 1: Write failing test for generate()
-- Step 2: Implement generate()
-- Step 3: Write failing test for validate()
-...
-```
-
-The second example is doing implementation planning's job. Design plans stay at component level.
-
-## Writing Style
-
-**REQUIRED SUB-SKILL:** Use house-style:writing-for-a-technical-audience if available.
-
-Otherwise follow these guidelines:
-
-**Be concise:**
-- Remove throat-clearing
-- State facts directly
-- Skip obvious explanations
-
-**Be specific:**
-- Use exact component names
-- Reference actual file paths
-- Include concrete examples
-
-**Be honest:**
-- Acknowledge unknowns
-- State assumptions explicitly
-- Don't over-promise
-
-**Example - Good:**
-```markdown
-## Architecture
-
-Service-to-service authentication using OAuth2 client credentials flow.
-
-Auth service (`src/services/auth/`) generates and validates JWT tokens. API middleware (`src/api/middleware/auth.py`) validates tokens on incoming requests. Token store (`src/data/token_store.py`) maintains revocation list in PostgreSQL.
-
-Tokens expire after 1 hour. Refresh not needed for service accounts (can request new token).
-```
-
-**Example - Bad:**
-```markdown
-## Architecture
-
-In this exciting new architecture, we'll be implementing a robust and scalable authentication system that leverages the power of OAuth2! The system will be designed with best practices in mind, ensuring security and performance at every level. We'll use industry-standard JWT tokens that provide excellent flexibility and are widely supported across the ecosystem. This will integrate seamlessly with our existing infrastructure and provide a solid foundation for future enhancements!
-```
-
-## Existing Patterns Section
-
-**Purpose:** Document what codebase investigation revealed.
-
-**Include:**
-- Patterns this design follows from existing code
-- Why those patterns were chosen (if known)
-- Any divergence from existing patterns with justification
-
-**If following existing patterns:**
-```markdown
-## Existing Patterns
-
-Investigation found existing authentication in `src/services/legacy-auth/`. This design follows the same service structure:
-- Service modules in `src/services/<domain>/`
-- Middleware in `src/api/middleware/`
-- Data access in `src/data/`
-
-Token storage follows pattern from `src/data/session_store.py` (PostgreSQL with TTL).
-```
-
-**If no existing patterns:**
-```markdown
-## Existing Patterns
-
-Investigation found no existing authentication implementation. This design introduces new patterns:
-- Service layer for business logic (`src/services/`)
-- Middleware for request interception (`src/api/middleware/`)
-
-These patterns align with functional core, imperative shell separation.
-```
-
-**If diverging from existing patterns:**
-```markdown
-## Existing Patterns
-
-Investigation found legacy authentication in `src/auth/`. This design diverges:
-- OLD: Monolithic `src/auth/auth.py` (600 lines, mixed concerns)
-- NEW: Separate services (`token_service.py`, `validator.py`) following FCIS
-
-Divergence justified by: Legacy code violates FCIS pattern, difficult to test, high coupling.
-```
-
-## Decision Record Section
-
-**Purpose:** Capture significant design decisions with enough context to understand why they were made, what they enable, and when to revisit them.
-
-**Placement:** After Architecture, before Existing Patterns. Decisions emerge from the architecture discussion, so readers have context before encountering the formal records.
-
-**What warrants a decision record:**
-- If brainstorming Phase 2 explored it as a named approach, it's a decision record
-- Technology choices (library X over Y) warrant a record
-- Architectural patterns (event-driven vs synchronous) warrant a record
-- Scope trade-offs explicitly discussed with the user warrant a record
-- If only one option was ever considered, it's not a decision — it's just the design
-
-**Mapping brainstorming output to Decision Record fields:**
-- The approach selected in Phase 2 becomes the **Decision** field
-- Rejected approaches become **Alternatives considered** with rejection reasons from the discussion
-- Trade-offs discussed during exploration inform **Consequences** (Enables/Prevents)
-- User's certainty during selection maps to **Confidence** (High if clear preference, Medium if close call, Low if "let's try this")
-- Concerns raised during brainstorming become **Reevaluation triggers**
-
-**Status values:**
-- **Proposed:** Decision under discussion, not yet approved.
-- **Accepted:** Decision is active and governs current implementation.
-- **Superseded by [new plan/section]:** A new decision replaces this one. The old record stays immutable; the new record references what it supersedes.
-- **Deprecated:** Decision is no longer relevant (e.g., feature removed) but was never formally replaced.
-
-**Fowler's superseding rule:** Accepted decisions are never reopened or edited. To change a decision, create a new record marked as superseding the old one. This preserves the audit trail — future readers see what governed work during each period. (Fowler, M. "Architecture Decision Record." <https://martinfowler.com/bliki/ArchitectureDecisionRecord.html>, verified 2026-06-11; the status conventions follow Nygard's ADR format.)
-
-**Confidence levels:**
-- **High:** Strong evidence, well-understood domain, clear consensus.
-- **Medium:** Reasonable choice but alternatives were close, or domain has unknowns.
-- **Low:** Best guess given constraints; expect to revisit.
-
-**Style:**
-- Use the inverted pyramid: lead with what was decided, then why, then consequences
-- Active voice for Decision field: "We chose X over Y" not "X was selected"
-- Keep each record concise — if the explanation exceeds a paragraph, the decision may need splitting
-- Number records sequentially per document: DR1, DR2, DR3
-
-**Example:**
-```markdown
-## Decision Record
-
-### DR1: Enrich existing templates rather than create new ADR artefact type
-**Status:** Accepted
-**Confidence:** High
-**Reevaluation triggers:** If standalone decisions (not tied to a design plan) exceed what architecture docs can capture; if a separate docs/adr/ directory becomes needed.
-
-**Decision:** We chose to add ADR fields to existing design plan and architecture doc templates rather than creating a docs/adr/ directory or standalone ADR skill.
-
-**Consequences:**
-- **Enables:** ADR vocabulary in all future design plans with zero workflow change. Brainstorming output feeds directly into Decision Records.
-- **Prevents:** Capturing standalone architectural decisions not tied to a design plan or database doc.
-
-**Alternatives considered:**
-- **Standalone docs/adr/ directory:** Rejected because it creates a parallel system that would drift from design plans.
-- **New ADR skill:** Rejected because existing workflows already handle decision documentation.
-```
-
-## Additional Considerations
-
-**Only include if genuinely relevant:**
-
-**Error handling** - if not obvious:
-```markdown
-## Additional Considerations
-
-**Error handling:** Token validation failures return 401 with generic message (don't leak token details). Service-to-service communication failures retry 3x with exponential backoff before returning 503.
-```
-
-**Edge cases** - if non-obvious:
-```markdown
-**Edge cases:** Clock skew handled by 5-minute token validation window. Revoked tokens remain in database for 7 days for audit trail.
-```
-
-**Future extensibility** - if architectural decision enables future features:
-```markdown
-**Future extensibility:** Token claims structure supports adding user metadata (currently unused). Enables future human user authentication without architecture change.
-```
-
-**Do NOT include:**
-- "Nice to have" features not in current design
-- Hypothetical future requirements
-- Generic platitudes ("should be secure", "needs good testing")
-
-## After Body: Generating and Validating Acceptance Criteria
-
-After appending the body, generate Acceptance Criteria and get human validation BEFORE Summary/Glossary.
-
-Acceptance Criteria translate the Definition of Done into specific, verifiable items that become the basis for test requirements during implementation. You have full context from just writing the phases—do this inline, no subagent needed.
-
-### What Acceptance Criteria Must Cover
-
-For **each Definition of Done item**, think through:
-
-1. **Success cases**: What are all the ways this can succeed? List each distinctly.
-   - Happy path: the normal, expected flow
-   - Variations: different valid inputs, configurations, user types
-   - Edge cases: boundary values, empty inputs, maximum sizes
-
-2. **Important failure cases**: What should the system reject or handle gracefully?
-   - Invalid inputs (malformed, out of range, wrong type)
-   - Unauthorized access attempts
-   - Resource exhaustion or unavailability
-   - Concurrent access conflicts
-
-Then look at the **Implementation Phases and brainstorming details** for additional cases:
-- Integration points between phases (data flows correctly between components)
-- Behavior implied by architectural decisions (caching, retries, timeouts)
-- Edge cases surfaced during design discussion
-
-### Writing Criteria
-
-Each criterion must be **observable and testable**:
-
-**Good:** "API returns 401 when token is expired"
-**Good:** "User sees error message when password is less than 8 characters"
-**Good:** "System processes 100 concurrent requests within 2 seconds"
-
-**Bad:** "System is secure" (vague)
-**Bad:** "Code is clean" (subjective)
-**Bad:** "Performance is acceptable" (unmeasurable)
-
-### Structure
-
-**Scoped AC format:** `{slug}.AC{N}.{M}` where `{slug}` is extracted from the design plan filename (everything after `YYYY-MM-DD-`, excluding `.md`).
-
-For design plan `2025-01-18-oauth2-svc-authn-42.md`, the slug is `oauth2-svc-authn-42`. All AC identifiers use this prefix:
-
-```markdown
-## Acceptance Criteria
-
-### oauth2-svc-authn-42.AC1: Users can authenticate
-- **oauth2-svc-authn-42.AC1.1 Success:** User with valid credentials receives auth token
-- **oauth2-svc-authn-42.AC1.2 Success:** Token contains correct user ID and permissions
-- **oauth2-svc-authn-42.AC1.3 Failure:** Invalid password returns 401 with generic error (no password hint)
-- **oauth2-svc-authn-42.AC1.4 Failure:** Locked account returns 403 with lockout duration
-- **oauth2-svc-authn-42.AC1.5 Edge:** Empty password field shows validation error before submission
-
-### oauth2-svc-authn-42.AC2: Sessions persist across page refresh
-- **oauth2-svc-authn-42.AC2.1 Success:** ...
-- **oauth2-svc-authn-42.AC2.2 Failure:** ...
-...
-
-### oauth2-svc-authn-42.AC[N]: Cross-Cutting Behaviors
-- **oauth2-svc-authn-42.AC[N].1:** Token expiration triggers re-authentication prompt (not silent failure)
-- **oauth2-svc-authn-42.AC[N].2:** All API errors include correlation ID for debugging
-- ...
-```
-
-**Why scoped:** Multiple plan-and-execute rounds accumulate tests in the same codebase. Scoped identifiers prevent collision—`oauth2-svc-authn-42.AC2.1` and `user-prof-87.AC2.1` are unambiguous. Implementation phases, task specs, and test names all use the full scoped identifier.
-
-### Validation
-
-Present generated criteria to the user. **The question MUST summarise what's being approved** — state the number of criteria, which DoD items they cover, and how many success vs failure cases.
-
-Example: "Generated 8 acceptance criteria (5 success, 3 failure) covering all 3 DoD items. AC1-AC3 cover auth flow, AC4-AC5 cover token refresh, AC6-AC8 cover error cases. Approve to continue, or describe what's missing or needs revision."
-
-Loop until approved. Then replace the placeholder in the document and proceed to Summary/Glossary.
-
-## After Writing: Generating Summary and Glossary
-
-After appending the body (Architecture through Additional Considerations), generate Summary and Glossary using a subagent with fresh context.
-
-**Why a subagent?**
-- Fresh context avoids "context rot" from the long brainstorming/writing session
-- Acts as a forcing function: if the subagent can't extract a coherent summary, the document is unclear
-- Mirrors the experience of a human reviewer seeing the document for the first time
-
-**Step 1: At this point the document looks like:**
-
-The body has been appended and Acceptance Criteria validated:
-
-```markdown
-# [Feature Name] Design
-
-**GitHub Issue:** [#123 | org/repo#123 | None]
-
-## Summary
-<!-- TO BE GENERATED after body is written -->
-
-## Definition of Done
-[Already written from Phase 3]
-
-## Acceptance Criteria
-[Validated in previous step]
-
-## Glossary
-<!-- TO BE GENERATED after body is written -->
-
-## Architecture
-[... body content ...]
-
-## Existing Patterns
-[... body content ...]
-
-## Implementation Phases
-[... body content ...]
-
-## Additional Considerations
-[... body content ...]
-```
-
-**Step 2: Dispatch extraction subagent**
-
-Use the Task tool to generate Summary and Glossary:
-
-```
-<invoke name="Task">
-<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
-<parameter name="description">Generating Summary and Glossary for design document</parameter>
-<parameter name="prompt">
-Read the design document at [file path].
-
-Generate two sections to replace the placeholders in the document:
-
-1. **Summary**: Write 1-2 paragraphs summarizing what is being built and the
-   high-level approach. This should be understandable to someone unfamiliar
-   with the codebase. The Definition of Done section already exists — your
-   summary should complement it by explaining the "how" rather than restating
-   the "what."
-
-2. **Glossary**: List domain terms from the application and third-party concepts
-   (libraries, frameworks, patterns) that a reviewer needs to understand this
-   document. Format as:
-   - **[Term]**: [Brief explanation]
-
-   Include only terms that appear in the document and would benefit from
-   explanation.
-
-3. **Omitted Terms**: List terms you considered but skipped as too obvious or
-   generic. Only include borderline cases — terms that a less technical reviewer
-   might not know. Format as a simple comma-separated list.
-
-Return all three sections. The first two are markdown ready to insert; the
-third is for transparency about what was excluded.
-</parameter>
-</invoke>
-```
-
-**Step 3: Review omitted terms with user**
-
-Before inserting the extracted sections, briefly mention the omitted terms to the user:
-
-"Glossary includes [X terms]. Omitted as likely obvious: [list from subagent]. Let me know if any of those should be included."
-
-Don't wait for approval — proceed to insert the sections. The user can hit escape and ask for adjustments if needed.
-
-**Step 4: Replace placeholders**
-
-Replace the Summary and Glossary placeholder comments with the subagent's output. Do not insert the Omitted Terms section — that was for your transparency message only.
-
-**Step 5: Review and adjust**
-
-Briefly review the generated sections for accuracy. The subagent may miss nuance from the conversation — adjust if needed, but prefer the subagent's version when it's accurate (it reflects what the document actually says, not what you remember).
-
-## Before Commit: Dependency Rationale
-
-If this design introduces **any new dependencies** (packages, libraries, frameworks, tools), document each in `docs/dependency-rationale.md`. This file is the persistent, cross-project record of why each dependency exists.
-
-**Check the design's Architecture section and Implementation Phases for new packages.** If none are introduced, skip this step.
-
-**For each new dependency, append an entry:**
-
-```markdown
-## <package-name>
-**Added:** YYYY-MM-DD
-**Design plan:** docs/design-plans/YYYY-MM-DD-<topic>.md
-**Claim:** <falsifiable statement of why we need this package>
-**Evidence:** <file paths where it will be used>
-**Serves:** <who benefits — runtime users, developers, CI, type checking>
-```
-
-**The claim must be falsifiable.** "We use requests for HTTP calls" can be verified by searching for imports. "It's a good library" cannot. Write claims that a future audit (controlled-dependency-upgrade skill) can test against the codebase.
-
-**If `docs/dependency-rationale.md` doesn't exist yet,** create it with a header:
-
-```markdown
-# Dependency Rationale
-
-Falsifiable justifications for every direct dependency. Each entry records why the package was added, what evidence supports its use, and who it serves.
-
-Maintained by design plans (when adding deps) and controlled-dependency-upgrade (when auditing). Reviewed by restate-our-assumptions (periodic philosophical audit).
-```
-
-**If updating an existing dependency's rationale** (e.g., a redesign changes why we use a package), update the existing entry rather than appending a duplicate. Add a `**Revised:** YYYY-MM-DD` line and update the claim/evidence.
-
-## Before Commit: Proleptic Challenge
-
-**REQUIRED:** Before committing the design, invoke proleptic challenge.
-
-This is a phase transition (design → implementation). Challenge the design before it becomes permanent.
-
-**Dispatch proleptic-challenger:**
-
-```
-<invoke name="Task">
-<parameter name="subagent_type">denubis-plan-and-execute:proleptic-challenger</parameter>
-<parameter name="description">Proleptic challenge: design finalisation</parameter>
-<parameter name="prompt">
-PROPOSAL:
-The design document at [file path] is about to be committed. Key decisions:
-- Architecture: [summarise]
-- Phases: [count] implementation phases
-- Key components: [list]
-
-TRIGGER: Design finalisation
-
-CONTEXT:
-Definition of Done:
-[paste from document]
-
-This design will guide implementation. Once committed, changes require revisiting the design process.
-</parameter>
-</invoke>
-```
-
-**Present counterarguments to user:**
-
-"Before committing this design, here are counterarguments to consider:"
-
-[Insert agent output]
-
-"Your judgement is required. Evaluate these concerns and let me know how to proceed."
-
-**Wait for human response before committing.**
-
-## Before Commit: Architecture Documentation
-
-**After proleptic challenge is resolved,** invoke the architecture documentation skill.
-
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:architecture-update
-
-Announce: "I'm using the architecture-update skill to assess architecture documentation."
-
-Pass the design plan file path as the artifact:
-
-The inner skill will:
-1. Read current `docs/architecture/` (or detect its absence for bootstrap)
-2. Parse the design plan for architecture-relevant content
-3. Detect contradictions with existing docs (may HALT)
-4. Propose changes grouped by doc type
-5. Write approved changes
-
-**Include architecture doc changes in the design plan commit:**
-
-```bash
-git add docs/design-plans/YYYY-MM-DD-<topic>.md docs/architecture/ docs/dependency-rationale.md
-```
-
-**If no architecture changes detected:** The inner skill reports this and exits. Continue to commit.
-
-**If bootstrap triggered:** The inner skill scaffolds `docs/architecture/` and proposes initial files. All created files are included in the commit.
-
-## After Proleptic Challenge: Commit
-
-**Only commit after human has evaluated proleptic challenge.**
-
-**Commit the design document:**
-
-```bash
-git add docs/design-plans/YYYY-MM-DD-<topic>.md docs/architecture/ docs/dependency-rationale.md
-git commit -m "$(cat <<'EOF'
-docs: add [feature name] design plan
-
-Completed brainstorming session. Design includes:
-- [Key architectural decision 1]
-- [Key architectural decision 2]
-- [N] implementation phases
-EOF
-)"
-```
-
-**Announce completion:**
-
-"Design plan documented in `docs/design-plans/YYYY-MM-DD-<topic>.md` and committed."
-
-## After Commit: Label GitHub Issue
-
-If the design document has a `GitHub Issue:` field with a value other than `None`, apply the `design-planned` label to the issue.
-
-**Step 1: Parse the issue reference**
-
-Read the `**GitHub Issue:**` line from the design document. Parse the reference:
-
-| Format | `gh` command |
-|--------|-------------|
-| `#123` or `123` | `gh issue edit 123 --add-label design-planned` |
-| `org/repo#123` | `gh issue edit 123 --repo org/repo --add-label design-planned` |
-| `https://github.com/org/repo/issues/123` | Extract org, repo, number → `gh issue edit 123 --repo org/repo --add-label design-planned` |
-| `None` or empty | Skip — no issue linked |
-
-**Step 2: Ensure label exists, then apply**
-
-```bash
-# Create label if it doesn't exist (--force updates if it does)
-gh label create "design-planned" --description "Design plan exists for this issue" --color "FBCA04" --force 2>/dev/null || true
-
-# Apply label to issue
-gh issue edit <number> [--repo org/repo] --add-label "design-planned"
-```
-
-**Best-effort:** If `gh` is not available, not authenticated, or the command fails (e.g., no write access), warn the user and continue. Do not block the workflow.
-
-Example warning: "Could not apply `design-planned` label to #123 — `gh` returned an error. You may want to label it manually."
-
-## Common Rationalizations - STOP
-
-| Excuse | Reality |
-|--------|---------|
-| "I'll write the summary first since I know what I'm building" | Write body first. Summarize what you wrote, not what you planned. |
-| "I can write Summary and Glossary myself, don't need subagent" | Subagent has fresh context and acts as forcing function. Use it. |
-| "Glossary isn't needed, terms are obvious" | Obvious to you after brainstorming. Not to fresh reviewer. Include it. |
-| "Design is simple, don't need phases" | Phases make implementation manageable. Always include. |
-| "Phases are obvious, don't need detail" | impl-plan-write needs component descriptions. Provide them. |
-| "Can have 10 phases if needed" | Hard limit is 8. Scope or split. |
-| "I'll include the code so implementation is easier" | No. Implementation plans generate code fresh from codebase state. Design provides direction only. |
-| "npm install succeeds is good enough" | Use `uv sync` — this is a Python-first toolchain. |
-| "Breaking into tasks helps the reader" | Task breakdown is implementation planning's job. Design stays at component level. |
-| "I'll just show how the function works" | Implementation code doesn't belong in design. Show contracts/interfaces if needed, not function bodies. |
-| "Additional considerations should be comprehensive" | Only include if relevant. YAGNI applies. |
-| "Should document all future possibilities" | Document current design only. No hypotheticals. |
-| "Existing patterns section can be skipped" | Shows investigation happened. Always include. |
-| "Can use generic file paths" | Exact paths from investigation. No handwaving. |
-| "Tests can be a separate phase at the end" | No. Tests for functionality belong in the phase that creates that functionality. |
-| "We'll add tests after the code works" | Phase isn't done until its tests pass. Tests are deliverables, not afterthoughts. |
-| "Infrastructure needs unit tests too" | No. Infrastructure verified operationally. Don't over-engineer. |
-| "Phase 3 tests will cover Phase 2 code" | Each phase tests its own deliverables. Later phases may extend tests, but don't defer. |
-| "Phase markers are just noise" | Markers enable granular parsing. Implementation planning depends on them. Always include. |
-| "Acceptance criteria are just the Definition of Done restated" | Criteria must be specific and verifiable. "System is secure" becomes "API rejects invalid tokens with 401." |
-| "User approved DoD, don't need to validate criteria" | Criteria translate DoD into testable items. User must confirm this translation is correct. |
-| "I'll skip criteria validation to save time" | Implementation planning depends on validated criteria. Skipping creates downstream confusion. |
-| "Criteria are obvious from the phases" | Obvious to you. User must confirm they agree on what 'done' means before proceeding. |
-
-**All of these mean: STOP. Follow the structure exactly.**
-
-## Integration with Workflow
-
-This skill completes the design document started in Phase 3:
-
-```
-Phase 3 (Definition of Done) completes
-  -> User confirms Definition of Done
-  -> File created with Title, Summary placeholder, DoD, AC placeholder, Glossary placeholder
-  -> DoD captured at full fidelity
-
-Brainstorming (Phase 4) completes
-  -> Validated design exists in conversation
-  -> User approved incrementally
-
-Writing Design Plans (this skill)
-  -> Append body: Architecture, Decision Record, Existing Patterns, Implementation Phases, Additional Considerations
-  -> Add exact paths from investigation
-  -> Create discrete phases (<=8)
-  -> Generate Acceptance Criteria inline (success + failure cases for each DoD item)
-  -> USER VALIDATES Acceptance Criteria
-  -> Replace AC placeholder with validated criteria
-  -> Dispatch subagent to generate Summary and Glossary
-  -> Replace Summary/Glossary placeholders with generated content
-  -> Commit to git
-
-Writing Implementation Plans (next step)
-  -> Reads this design document
-  -> Uses phases as basis for detailed tasks
-  -> Uses Acceptance Criteria to generate test-requirements.md
-  -> Expects exact paths and structure
-```
-
-**Purpose:** Create contract between design and implementation. Writing-plans relies on this structure. The legibility header (Summary, DoD, Acceptance Criteria, Glossary) ensures human reviewers can quickly understand the document. Acceptance Criteria provide traceability for test requirements.
+Return the absolute design path, status, unresolved blockers, and working directory. Do
+not commit, publish, deploy, or mutate GitHub. Those actions require separate authority and
+their own observable evidence.

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "host": "foa4008439",
+  "state": "source-candidate",
+  "prepared_on": "2026-08-11",
+  "catalogue_path": ".claude-plugin/marketplace.json",
+  "plugin_registry_path": "/home/brian/.claude/plugins/installed_plugins.json",
+  "authority": {
+    "design": "docs/design-plans/2026-08-11-instruction-control-system.md",
+    "human_source": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+    "human_source_lines": [126, 227, 304, 314, 324, 334, 352, 362, 383, 403, 423, 433, 7809]
+  },
+  "candidates": {
+    "global_claude": {
+      "path": "deployment/instruction-control/foa4008439/CLAUDE.md",
+      "live_path": "/home/brian/.claude/CLAUDE.md",
+      "bytes": 5543,
+      "sha256": "f85710cc18382d9e93fb51a9e7661b37ebb83b75bf02534f660e5f0852f88192"
+    },
+    "project_claude": {
+      "path": "CLAUDE.md",
+      "live_path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
+      "bytes": 1989,
+      "sha256": "6480017c13c7c5566bbc42ab6f5c5185c4b257682f91ce689f1419db5c34c2c1"
+    },
+    "settings": {
+      "path": "deployment/instruction-control/foa4008439/settings.json",
+      "live_path": "/home/brian/.claude/settings.json",
+      "bytes": 6260,
+      "sha256": "591bb4ce1423356d3a98b9d66e8ec0c81163382ff31d9b8a231349f50ea38bb1"
+    }
+  },
+  "plugin_releases": {
+    "install": [
+      {
+        "name": "denubis-basic-agents",
+        "version": "2.2.1",
+        "source": "plugins/denubis-basic-agents",
+        "tree_sha256": "794aa7fbd5af1d6390276292d48f9ce1955b994134a61c1b562fb56e1c5aa1f7"
+      },
+      {
+        "name": "denubis-extending-claude",
+        "version": "1.10.1",
+        "source": "plugins/denubis-extending-claude",
+        "tree_sha256": "7458066d666b5b1642b9239a678fb9a786c8fcfcfa8a33eaa8c32bcd939000cf"
+      },
+      {
+        "name": "denubis-git-commit",
+        "version": "1.2.2",
+        "source": "plugins/denubis-git-commit",
+        "tree_sha256": "ec752e011c195999fcd7e3eed78fe3ef921b22f4f92c6cd8767bc3310dc15e7e"
+      },
+      {
+        "name": "denubis-hook-branch-bg",
+        "version": "0.2.6",
+        "source": "plugins/denubis-hook-branch-bg",
+        "tree_sha256": "3552bc6984ba2514b9851025a6742183533ac75e8c67f67773f5f6d10f7abd86"
+      },
+      {
+        "name": "denubis-plan-and-execute",
+        "version": "4.0.0",
+        "source": "plugins/denubis-plan-and-execute",
+        "tree_sha256": "848bf9c9744ea0eaf4881fc2e20408ee5d74d9c8854f8fc05bcb3c380e1c4cc8"
+      },
+      {
+        "name": "denubis-project-notes",
+        "version": "0.1.0",
+        "source": "plugins/denubis-project-notes",
+        "tree_sha256": "1e1cabe612138f33e1bc791d1c6cda739d11391a4de5579fbebb8778c4ae4ac9"
+      }
+    ],
+    "retire": [
+      {"name": "denubis-hook-skill-reinforcement", "last_version": "1.2.0"},
+      {"name": "denubis-hook-claudemd-reminder", "last_version": "1.1.4"},
+      {"name": "denubis-notes-advisory", "last_version": "0.2.1"}
+    ]
+  },
+  "baselines": {
+    "global_claude": {
+      "path": "/home/brian/.claude/CLAUDE.md",
+      "bytes": 21369,
+      "sha256": "9140934f252ec41ce931958111391c562c53fb8eb99c1958ca9b6713aea700dc"
+    },
+    "project_claude": {
+      "path": "git:c6882d2:CLAUDE.md",
+      "bytes": 8017,
+      "sha256": "36a786ee807be7dbafb8ef1ec6531be221b67c6ffffdc57ff26d030ba26bc720"
+    },
+    "settings": {
+      "path": "/home/brian/.claude/settings.json",
+      "bytes": 6702,
+      "sha256": "dfe0909c0d4bff5726a1c83abfd3a10bad84d51221e8eabfedc98cf3e865b17a"
+    },
+    "plugin_registry": {
+      "path": "/home/brian/.claude/plugins/installed_plugins.json",
+      "bytes": 15846,
+      "sha256": "5b144defd1eab7ca2f1f3471724939ff6f3725d1d146f350e0f13ffa3e274311"
+    }
+  },
+  "deployment_contract": {
+    "require_candidate_digest_match": true,
+    "require_live_baseline_match": true,
+    "require_recoverable_backup": true,
+    "require_post_install_digest_match": true
+  }
+}

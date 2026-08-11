@@ -1,64 +1,36 @@
 ---
 name: using-plan-and-execute
-description: Use when starting any conversation - the skill-first workflow. Check for a skill before acting, announce the one you pick, brainstorm before coding, TaskCreate for checklists
+description: Use when beginning non-trivial design, implementation, debugging, or review work - select the applicable workflow, route planning through design, and materialize checklists
 user-invocable: false
 ---
 
-# Getting Started with Skills
+# Using Plan and Execute
 
-Skills encode workflows already debugged against this codebase. Working without
-one usually means re-deriving a solved problem and getting it subtly wrong, so
-checking costs seconds and skipping costs a rewrite.
+Choose the procedure that owns the work before changing project state. The skill
+catalogue is the index; this skill does not repeat each procedure.
 
-## Before you act
+## Task entry
 
-1. Scan the skills listed in your system context.
-2. Ask whether any of them covers this request.
-3. Where one does, invoke it with the `Skill` tool and follow it.
+1. Identify whether the request is design, implementation planning, execution,
+   debugging, review, acceptance, or branch lifecycle work.
+2. Invoke the most specific applicable skill.
+3. Follow that skill's evidence and exit conditions.
 
-## Red Flags - STOP
-
-If you find yourself reasoning any of these, you are rationalising:
-
-- "This is just a simple question" — a question is a task.
-- "Let me check the files first" — that check is the task, and a skill covers it.
-- "I remember this skill" — skills change; read the current one.
-- "The skill is overkill here" — simple tasks are where a skipped step hides.
-
-All four mean the same thing: scan first.
-
-## Announce the skill you are using
-
-Say "I'm using [skill] to [what you're doing]" before you start. It lets your
-human partner catch a wrong choice early, and it shows you read the skill rather
-than recalling it.
+Routine answers and already-grounded lookups do not need workflow ceremony.
 
 ## Two gates worth stopping for
 
-**EnterPlanMode without brainstorming.** If you are about to call EnterPlanMode
-and have not brainstormed this session, stop and invoke `starting-a-design-plan`
-instead. It gathers context, clarifies, brainstorms, and documents the design.
-EnterPlanMode comes after that rather than instead of it. Where EnterPlanMode is
-unavailable, run the same sequence and present the plan inline.
+**EnterPlanMode without brainstorming.** If you are about to call EnterPlanMode and have
+not brainstormed this session, stop and invoke `starting-a-design-plan` instead. It
+gathers context, clarifies the goal, develops the design, and records the result. Where
+EnterPlanMode is unavailable, run the same sequence and present the plan inline.
 
-**A skill with a checklist.** Create one task per item with `TaskCreate` before
-starting. A checklist held in your head loses items, and the tracking overhead is
-small against the cost of a missed step. Where TaskCreate is unavailable, keep
-the checklist in a file on disk so it survives an interruption.
+**A skill with a checklist.** Create one task per item with `TaskCreate` before starting.
+Where TaskCreate is unavailable, keep the checklist in a project file that survives an
+interruption. The checklist is state, not a reminder.
 
-## Following a skill
+## Evidence boundary
 
-Some skills carry rigid rules — TDD, debugging, verification. Follow those
-exactly, because the discipline is the point. Others are flexible patterns, such
-as architecture and naming, where the principles adapt to context. Each skill
-says which kind it is.
-
-A specific instruction says what to build, not which process to build it with.
-"Add X" is the goal, and the workflow still applies. Clear requirements are
-exactly when it pays, because a step skipped there is easy to take and slow to
-find.
-
-## In short
-
-Scan for a skill, announce the one you pick, follow it. Checklists get tasks.
-Design comes before plan mode.
+A skill supplies a procedure. Repository state, test output, tool results, and focused
+human acceptance establish whether the procedure succeeded. Do not use a skill
+announcement or self-assessment as completion evidence.

@@ -29,13 +29,20 @@ flowchart LR
 ## System Boundary
 
 **In scope:**
-- Drive Claude to run `git status`, `git diff`, and `git log` to inspect changes; draft a commit message that matches the repo's existing style; stage relevant files; create the commit (`plugins/denubis-git-commit/skills/commit/SKILL.md`, `1ef36f5`). The skill is `user-invocable: true` so the user can type `/commit` directly.
+- Drive Claude to run `git status`, `git diff`, and `git log` to inspect changes;
+  check whether changed contracts, APIs, domain structure, or agent instructions require
+  corresponding `CLAUDE.md` or `AGENTS.md` updates; draft a commit message that matches
+  the repo's existing style; stage relevant files; and create the commit
+  (`plugins/denubis-git-commit/skills/commit/SKILL.md`). The skill is
+  `user-invocable: true` so the user can type `/commit` directly.
 
 **Out of scope:**
 - Pushing — no `git push` unless the user separately asks.
 - Pre-commit hook bypass — the skill respects `--no-verify` only on explicit user request.
 - Authoring `.gitignore`, branch management, or rebase operations.
 - Multi-repo or cross-worktree commits.
+- Generic reminders after read-only git inspection; documentation freshness is checked
+  at the commit-preparation boundary.
 
 ## What This Plugin Ships
 
@@ -47,6 +54,6 @@ flowchart LR
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-git-commit/.claude-plugin/plugin.json` (`1ef36f5`), version 1.2.1. Manifest description: *"Git commit skill for Claude Code. Handles /commit as a proper skill instead of failing as a non-existent built-in."*
+- **Plugin manifest:** `plugins/denubis-git-commit/.claude-plugin/plugin.json`, version 1.2.2. Manifest description: *"Git commit skill for Claude Code. Handles /commit as a proper skill instead of failing as a non-existent built-in."*
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

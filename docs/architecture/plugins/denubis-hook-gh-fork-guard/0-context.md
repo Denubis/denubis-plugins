@@ -51,7 +51,7 @@ flowchart LR
 
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-hook-gh-fork-guard/hooks/.claude-plugin/plugin.json` (`566f230`), version 1.2.0.
+- **Plugin manifest:** `plugins/denubis-hook-gh-fork-guard/.claude-plugin/plugin.json` (`6557abb`), version 1.2.2.
 - **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
 - **Dispatcher that runs this plugin:** `denubis-hook-pretooluse-dispatcher`.
 - **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.

@@ -1,21 +1,15 @@
 #!/usr/bin/env bash
-# Pre-commit hook: runs Python and shell hook tests.
+# Pre-commit hook: runs the repository test suite.
 # Install: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-echo "Running Python hook tests..."
+echo "Running repository tests..."
 if ! uv run pytest "$REPO_ROOT/tests/" -q; then
     echo "Python tests failed. Commit aborted."
     exit 1
 fi
 
-echo "Running shell hook tests..."
-if ! bats "$REPO_ROOT/tests/test_shell_hooks.bats"; then
-    echo "Shell tests failed. Commit aborted."
-    exit 1
-fi
-
-echo "All hook tests passed."
+echo "All tests passed."

@@ -1,356 +1,71 @@
 ---
 name: coding-tdd
 family: coding-effectively
-description: Use when implementing any feature or bugfix - write the test first, watch it fail, then write minimal code to pass
+description: Use when implementing a feature, bug fix, or behavioral refactor - establishes the behavior with a failing test, makes it pass minimally, then cleans up under green tests
 user-invocable: false
 ---
 
-# Test-Driven Development (TDD)
-
-## Overview
-
-Write the test first. Watch it fail. Write minimal code to pass.
-
-**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
-
-**Violating the letter of the rules is violating the spirit of the rules.**
-
-## When to Use
-
-**Always:**
-- New features
-- Bug fixes
-- Refactoring
-- Behavior changes
-
-**Exceptions (ask your human partner):**
-- Throwaway prototypes
-- Generated code
-- Configuration files
+# Test-Driven Development
 
-Thinking "skip TDD just this once"? Stop. That's rationalization.
+## Scope
 
-## The Iron Law
+Use the project test harness for features, bug fixes, and behavioral refactors. Generated
+artifacts, declarative configuration, and exploratory spikes may need a different positive
+check, but they do not justify shipping unverified behavior. Follow stricter project rules
+when present.
 
-```
-NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
-```
+## RED
 
-Write code before the test? Delete it. Start over.
+RED: write the smallest behavioral test that expresses the missing or broken observable
+result. Prefer the public boundary and real domain values. Name the condition and expected
+outcome; avoid asserting incidental calls or private structure unless that structure is
+itself the contract.
 
-**No exceptions:**
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Don't look at it
-- Delete means delete
-
-Implement fresh from tests. Period.
-
-## Red-Green-Refactor
-
-```dot
-digraph tdd_cycle {
-    rankdir=LR;
-    red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
-    verify_red [label="Verify fails\ncorrectly", shape=diamond];
-    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
-    verify_green [label="Verify passes\nAll green", shape=diamond];
-    refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
-    next [label="Next", shape=ellipse];
-
-    red -> verify_red;
-    verify_red -> green [label="yes"];
-    verify_red -> red [label="wrong\nfailure"];
-    green -> verify_green;
-    verify_green -> refactor [label="yes"];
-    verify_green -> green [label="no"];
-    refactor -> verify_green [label="stay\ngreen"];
-    verify_green -> next;
-    next -> red;
-}
-```
-
-### RED - Write Failing Test
-
-Write one minimal test showing what should happen.
-
-<Good>
-```python
-def test_retries_failed_operations_3_times():
-    attempts = 0
-
-    def operation():
-        nonlocal attempts
-        attempts += 1
-        if attempts < 3:
-            raise RuntimeError("fail")
-        return "success"
-
-    result = retry_operation(operation)
-
-    assert result == "success"
-    assert attempts == 3
-```
-Clear name, tests real behaviour, one thing
-</Good>
+Run the focused test before implementation. Observe it fail for the intended reason. A
+syntax error, missing fixture, wrong import, malformed command, or failure in unrelated
+setup is not a valid red state. A test that passes on its first run provides no red-state
+evidence; determine whether the behavior already exists or the test cannot observe it.
 
-<Bad>
-```python
-def test_retry_works(mocker):
-    mock = mocker.Mock(side_effect=[RuntimeError(), RuntimeError(), "success"])
-    retry_operation(mock)
-    assert mock.call_count == 3
-```
-Vague name, tests mock not code
-</Bad>
+For a bug, reproduce the actual symptom or establish the closest bounded production path.
+For existing untested behavior that must be refactored, first add characterization tests
+whose expected behavior is supported by current requirements or observed consumers.
 
-**Requirements:**
-- One behavior
-- Clear name
-- Never mock internal code — build scaffolding for isolation. Always mock external boundaries (network, shell, filesystem, third-party APIs)
+## GREEN
 
-### Verify RED - Watch It Fail
+GREEN: make the smallest coherent implementation that satisfies the test. Keep the change
+at the responsible boundary and include the first real consumer of any new interface. Do
+not weaken the test, special-case only the fixture, or bundle unrelated refactoring.
 
-**MANDATORY. Never skip.**
+Run the focused test and inspect its positive signal. Then run nearby tests capable of
+detecting regressions in the affected contract.
 
-```bash
-Find the test command in CLAUDE.md and run it
-```
+## REFACTOR
 
-Confirm:
-- Test fails (not errors)
-- Failure message is expected
-- Fails because feature missing (not typos)
+REFACTOR: improve structure only while the behavior stays green. Remove duplication or
+improve names within the tested scope. Do not use the passing test as authority to refactor
+uncovered neighboring code.
 
-**Test passes?** You're testing existing behavior. Fix test.
+Rerun the focused and affected checks after cleanup. Repeat the cycle for the next distinct
+behavior; do not combine several failure conditions into one opaque test.
 
-**Test errors?** Fix error, re-run until it fails correctly.
+## Test quality
 
-### GREEN - Minimal Code
+A useful test:
 
-Write simplest code to pass the test.
+- fails when the required behavior is absent and passes when present;
+- is deterministic and isolated from unrelated global state;
+- verifies output, state transition, error, or externally visible interaction;
+- uses mocks only at actual external boundaries;
+- cleans up resources it creates; and
+- provides a failure message that identifies the broken contract.
 
-<Good>
-```python
-def retry_operation[T](fn: Callable[[], T]) -> T:
-    for i in range(3):
-        try:
-            return fn()
-        except Exception:
-            if i == 2:
-                raise
-    raise RuntimeError("unreachable")
-```
-Just enough to pass
-</Good>
+Property-based tests are appropriate when the behavior is better expressed as an
+invariant, round trip, idempotence rule, or normalization property. Integration tests are
+appropriate when the contract crosses a real service, process, filesystem, or database
+boundary.
 
-<Bad>
-```python
-def retry_operation[T](
-    fn: Callable[[], T],
-    *,
-    max_retries: int = 3,
-    backoff: Literal["linear", "exponential"] = "linear",
-    on_retry: Callable[[int], None] | None = None,
-) -> T:
-    ...  # YAGNI
-```
-Over-engineered
-</Bad>
+## Completion evidence
 
-Don't add features, refactor other code, or "improve" beyond the test.
-
-### Verify GREEN - Watch It Pass
-
-**MANDATORY.**
-
-```bash
-Find the test command in CLAUDE.md and run it
-```
-
-Confirm:
-- Test passes
-- Other tests still pass
-- Output pristine (no errors, warnings)
-
-**Test fails?** Fix code, not test.
-
-**Other tests fail?** Fix now.
-
-### REFACTOR - Clean Up
-
-After green only:
-- Remove duplication
-- Improve names
-- Extract helpers
-
-Keep tests green. Don't add behavior.
-
-### Repeat
-
-Next failing test for next feature.
-
-## Good Tests
-
-| Quality | Good | Bad |
-|---------|------|-----|
-| **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
-| **Clear** | Name describes behavior | `test('test1')` |
-| **Shows intent** | Demonstrates desired API | Obscures what code should do |
-
-## Why Order Matters
-
-**"I'll write tests after to verify it works"**
-
-Tests written after code pass immediately. Passing immediately proves nothing:
-- Might test wrong thing
-- Might test implementation, not behavior
-- Might miss edge cases you forgot
-- You never saw it catch the bug
-
-Test-first forces you to see the test fail, proving it actually tests something.
-
-**"I already manually tested all the edge cases"**
-
-Manual testing is ad-hoc. You think you tested everything but:
-- No record of what you tested
-- Can't re-run when code changes
-- Easy to forget cases under pressure
-- "It worked when I tried it" ≠ comprehensive
-
-Automated tests are systematic. They run the same way every time.
-
-**"Deleting X hours of work is wasteful"**
-
-Sunk cost fallacy. The time is already gone. Your choice now:
-- Delete and rewrite with TDD (X more hours, high confidence)
-- Keep it and add tests after (30 min, low confidence, likely bugs)
-
-The "waste" is keeping code you can't trust. Working code without real tests is technical debt.
-
-**"TDD is dogmatic, being pragmatic means adapting"**
-
-TDD IS pragmatic:
-- Finds bugs before commit (faster than debugging after)
-- Prevents regressions (tests catch breaks immediately)
-- Documents behavior (tests show how to use code)
-- Enables refactoring (change freely, tests catch breaks)
-
-"Pragmatic" shortcuts = debugging in production = slower.
-
-**"Tests after achieve the same goals - it's spirit not ritual"**
-
-No. Tests-after answer "What does this do?" Tests-first answer "What should this do?"
-
-Tests-after are biased by your implementation. You test what you built, not what's required. You verify remembered edge cases, not discovered ones.
-
-Tests-first force edge case discovery before implementing. Tests-after verify you remembered everything (you didn't).
-
-30 minutes of tests after ≠ TDD. You get coverage, lose proof tests work.
-
-## Common Rationalizations
-
-| Excuse | Reality |
-|--------|---------|
-| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
-| "I'll test after" | Tests passing immediately prove nothing. |
-| "Tests after achieve same goals" | Tests-after = "what does this do?" Tests-first = "what should this do?" |
-| "Already manually tested" | Ad-hoc ≠ systematic. No record, can't re-run. |
-| "Deleting X hours is wasteful" | Sunk cost fallacy. Keeping unverified code is technical debt. |
-| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
-| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
-| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
-| "TDD will slow me down" | TDD faster than debugging. Pragmatic = test-first. |
-| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
-| "Existing code has no tests" | You're improving it. Add tests for existing code. |
-
-## Red Flags - STOP and Start Over
-
-- Code before test
-- Test after implementation
-- Test passes immediately
-- Can't explain why test failed
-- Tests added "later"
-- Rationalizing "just this once"
-- "I already manually tested it"
-- "Tests after achieve the same purpose"
-- "It's about spirit not ritual"
-- "Keep as reference" or "adapt existing code"
-- "Already spent X hours, deleting is wasteful"
-- "TDD is dogmatic, I'm being pragmatic"
-- "This is different because..."
-
-**All of these mean: Delete code. Start over with TDD.**
-
-## Example: Bug Fix
-
-**Bug:** Empty email accepted
-
-**RED**
-```python
-def test_rejects_empty_email():
-    result = submit_form(email="")
-    assert result.error == "Email required"
-```
-
-**Verify RED**
-```bash
-$ [project test command]
-FAILED: AssertionError: assert None == 'Email required'
-```
-
-**GREEN**
-```python
-def submit_form(*, email: str) -> FormResult:
-    if not email.strip():
-        return FormResult(error="Email required")
-    ...
-```
-
-**Verify GREEN**
-```bash
-$ [project test command]
-PASSED
-```
-
-**REFACTOR**
-Extract validation for multiple fields if needed.
-
-## Verification Checklist
-
-Before marking work complete:
-
-- [ ] Every new function/method has a test
-- [ ] Watched each test fail before implementing
-- [ ] Each test failed for expected reason (feature missing, not typo)
-- [ ] Wrote minimal code to pass each test
-- [ ] All tests pass
-- [ ] Output pristine (no errors, warnings)
-- [ ] Internal code never mocked — scaffolding used for isolation. Only external boundaries mocked
-- [ ] Edge cases and errors covered
-
-Can't check all boxes? You skipped TDD. Start over.
-
-## When Stuck
-
-| Problem | Solution |
-|---------|----------|
-| Don't know how to test | Write wished-for API. Write assertion first. Ask your human partner. |
-| Test too complicated | Design too complicated. Simplify interface. |
-| Must mock everything | Code too coupled. Use dependency injection. |
-| Test setup huge | Extract helpers. Still complex? Simplify design. |
-
-## Debugging Integration
-
-Bug found? Write failing test reproducing it. Follow TDD cycle. Test proves fix and prevents regression.
-
-Never fix bugs without a test.
-
-## Final Rule
-
-```
-Production code → test exists and failed first
-Otherwise → not TDD
-```
-
-No exceptions without your human partner's permission.
+Report the red command and intended failure, the green command and result, affected-suite
+results, and any boundary not exercised. Do not claim that a test guards the behavior if
+its red state was never observed.

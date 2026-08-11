@@ -1,6 +1,6 @@
 ---
 name: using-code-search
-description: Use when writing any rg, grep, or ast-grep command line - in rg, -r is --replace, -h is --help, -L is --follow, -s is --case-sensitive and -E is --encoding, and the first four exit 0 with wrong output rather than erroring; ast-grep is spelled ast-grep, never sg
+description: Use when writing or reviewing repository searches with rg or ast-grep, especially when translating grep flags, choosing text versus structural search, or interpreting a negative result
 user-invocable: false
 ---
 

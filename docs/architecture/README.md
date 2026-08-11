@@ -1,41 +1,77 @@
 # Architecture — brian-ed3d-plugins
 
-Per-plugin context diagrams + shared glossary, personae, and constraints. Each plugin is its own system with its own boundary. There is no marketplace-level Level-0 because the marketplace decomposes recursively into plugins and the plugins themselves are the right unit of analysis.
+Architecture is indexed first by behavioural system boundary. Plugin pages are
+subsidiary packaging views: they show what a deployable bundle ships, but a marketplace
+or plugin boundary is not assumed to be the right axis for a cross-cutting behaviour.
 
-## Plugin Contexts (15)
+## Cross-cutting systems
 
-Hook plugins:
-- [`denubis-hook-branch-bg/0-context.md`](plugins/denubis-hook-branch-bg/0-context.md) — `SessionStart`: recolours terminal background based on git repo (hue) + branch (offsets).
-- [`denubis-hook-claudemd-reminder/0-context.md`](plugins/denubis-hook-claudemd-reminder/0-context.md) — `PostToolUse:Bash`: reminds to update CLAUDE.md after `git status`/`git log`.
-- [`denubis-hook-gh-fork-guard/0-context.md`](plugins/denubis-hook-gh-fork-guard/0-context.md) — `PreToolUse:Bash` (via dispatcher): blocks `gh` against non-fork repos.
-- [`denubis-hook-pretooluse-dispatcher/0-context.md`](plugins/denubis-hook-pretooluse-dispatcher/0-context.md) — `PreToolUse:Bash`: discovers and runs sibling `pretooluse-bash.sh` hooks, merges outputs.
-- [`denubis-hook-skill-reinforcement/0-context.md`](plugins/denubis-hook-skill-reinforcement/0-context.md) — `UserPromptSubmit`: reminds the model to invoke applicable skills.
+- [`instruction-control/0-context.md`](instruction-control/0-context.md) — how global and
+  project instructions, output style, hooks, skills, project memory, transcripts,
+  documentary authority, and external evidence combine in a live Claude Code session.
 
-Agent-and-skill plugins:
-- [`denubis-basic-agents/0-context.md`](plugins/denubis-basic-agents/0-context.md) — five Task-dispatchable agents (haiku/sonnet/opus general-purpose + python-developer + academic-researcher), one selection skill, one `SessionStart` hook.
-- [`denubis-research-agents/0-context.md`](plugins/denubis-research-agents/0-context.md) — four research agents (codebase, internet, combined, remote-code) + three companion skills.
+## Plugin packaging views (14)
 
-Orchestration:
-- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md) — the largest plugin: 34 skills, 10 agents, 6 commands, 2 hooks (`session-start.py`, `code-quality-guard.py`), and 2 scripts (`workflow_statusline/`, `claude-wrapper.sh` — the wrapper writes liveness files consumed by `denubis-crash-recovery`).
+### Event hooks
 
-Crash recovery:
-- [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) — 9 CLI subcommands + `/denubis-crash-recovery:triage` skill + SQLite schema; classifies live/crashed/concluded sessions deterministically. Linux-only (`/proc`-dependent). Sibling-coupled to `denubis-plan-and-execute >= 2.32.2` for the wrapper that writes the liveness files this plugin reads.
+- [`denubis-hook-branch-bg/0-context.md`](plugins/denubis-hook-branch-bg/0-context.md) —
+  `SessionStart`: recolours the terminal from repository and branch identity.
+- [`denubis-hook-gh-fork-guard/0-context.md`](plugins/denubis-hook-gh-fork-guard/0-context.md)
+  — `PreToolUse:Bash`, through the dispatcher: blocks `gh` against a non-fork target.
+- [`denubis-hook-pretooluse-dispatcher/0-context.md`](plugins/denubis-hook-pretooluse-dispatcher/0-context.md)
+  — `PreToolUse:Bash`: discovers sibling Bash guards and merges their outputs.
+### Workflow and delegated work
 
-Meta + utility:
-- [`denubis-extending-claude/0-context.md`](plugins/denubis-extending-claude/0-context.md) — nine authoring skills + `project-claude-librarian` agent for CLAUDE.md/AGENTS.md upkeep.
-- [`denubis-00-getting-started/0-context.md`](plugins/denubis-00-getting-started/0-context.md) — `/getting-started` and `/setup` slash commands.
-- [`denubis-git-commit/0-context.md`](plugins/denubis-git-commit/0-context.md) — single skill that handles `/commit`.
-- [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — Zotero PDF → per-page markdown + page-keyed blockquotes (skill marks itself WIP — only one validated path). Scoped to `using-bibliography`; no Level 0 yet covers `academic-writing` or `paper-review`.
+- [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md)
+  — 34 skills, 10 agents, 2 commands, two hook programs, the workflow statusline,
+  and the Claude wrapper.
+- [`denubis-basic-agents/0-context.md`](plugins/denubis-basic-agents/0-context.md) — five
+  general-purpose or domain agents and one situational selection skill.
+- [`denubis-research-agents/0-context.md`](plugins/denubis-research-agents/0-context.md) —
+  four research agents and three companion skills.
+- [`denubis-external-agents/0-context.md`](plugins/denubis-external-agents/0-context.md) —
+  three procedures and their scripts for Codex review/supervision and Fable advice.
+- [`denubis-extending-claude/0-context.md`](plugins/denubis-extending-claude/0-context.md)
+  — ten authoring skills and the `project-claude-librarian` agent.
+- [`denubis-git-commit/0-context.md`](plugins/denubis-git-commit/0-context.md) — one
+  commit procedure.
 
-## Shared Documents
+### Knowledge, research, and measurement
 
-- [`glossary.md`](glossary.md) — ubiquitous language for the marketplace.
-- [`personae.md`](personae.md) — single human persona.
-- [`constraints.md`](constraints.md) — repo conventions (version sync, HALT-when-sideways, per-plugin scope, version-bump cadence).
-- [`database.md`](database.md) — schema, relationships, and migration strategy for the `denubis-crash-recovery` SQLite database.
+- [`denubis-project-notes/0-context.md`](plugins/denubis-project-notes/0-context.md) —
+  direct main-agent retrieval of project memory and relevant chat history at task entry.
+- [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — three
+  academic skills, one output style, and bibliography helper scripts.
+- [`denubis-token-estimator/0-context.md`](plugins/denubis-token-estimator/0-context.md)
+  — one command, one methodology skill, and read-only Claude/Codex log analysis.
+- [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) —
+  deterministic session classification, rendering, and triage over its SQLite state.
+
+### Onboarding
+
+- [`denubis-00-getting-started/0-context.md`](plugins/denubis-00-getting-started/0-context.md)
+  — two onboarding commands and one npm install-script policy skill.
+
+## Shared documents
+
+- [`glossary.md`](glossary.md) — ubiquitous language.
+- [`personae.md`](personae.md) — human users, goals, and access patterns.
+- [`constraints.md`](constraints.md) — current repository and runtime constraints,
+  separated by how they are verified.
+- [`database.md`](database.md) — schema, relationships, and migration strategy for the
+  crash-recovery SQLite database.
 
 ## Conventions
 
-- **Citation format:** every factual claim in a plugin context cites a real file at a real commit hash, in the form `(path/to/file::SymbolName, abc1234)` for code or `(path/to/file.json, abc1234)` for config.
-- **Scope:** these docs describe what exists in the marketplace now. Future or in-development work is not represented here. When a design plan lands and becomes code, its plugin gets a context (or its existing context gets updated).
-- **Numbering:** each plugin's level-0 file is `0-context.md`. Decomposition into `1-*.md`, `2-*.md` etc. is added per plugin only when the plugin warrants it; most don't.
+- **Citation format:** factual repository claims cite a real file at a real commit in the
+  form `(path/to/file::SymbolName, abc1234)` or `(path/to/file.json, abc1234)`.
+- **External observations:** machine-local or external facts name the artifact, the
+  observation date, and an identity such as a digest. They are snapshots, not source
+  truth.
+- **Scope:** living architecture describes the implemented system. Prospective contracts
+  stay in design plans until implementation lands.
+- **Decomposition:** use the boundary that owns the behaviour or design decision. A
+  plugin page is appropriate for a deployable bundle; it does not replace a cross-cutting
+  map.
+- **Numbering:** a system or plugin context is `0-context.md`. Add deeper levels only
+  when they protect a useful design boundary.

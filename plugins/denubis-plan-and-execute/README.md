@@ -1,270 +1,127 @@
 # denubis-plan-and-execute
 
-A workflow plugin for Claude Code that guides you from rough idea to working implementation through structured design, planning, and execution phases.
+Design, implementation, debugging, verification, architecture, and Git lifecycle
+procedures for Claude Code.
 
-## The Problem
+The plugin separates three kinds of work:
 
-Claude Code is excellent at implementing specific, well-defined tasks. But when you have a feature idea that's still forming - where you don't yet know exactly what you want, let alone how to build it - you need more structure. You need to explore alternatives, ground your design in the actual codebase, and break work into verifiable steps.
-
-This plugin provides that structure through three connected commands.
-
-## The Workflow
-
-```
-Rough Idea
-    │
-    ▼
-/start-design-plan  ──────► Design Document (committed to git)
-    │
-    ▼
-/start-implementation-plan ──► Implementation Plan (phase files)
-    │
-    ▼
-/execute-implementation-plan ──► Working Code (reviewed & committed)
+```text
+human request
+    ↓
+current design
+    ↓
+just-in-time implementation plan
+    ↓
+verified repository state
 ```
 
-Each phase produces artifacts that feed the next. You clear context between phases to ensure fresh, focused work.
+Each transition has one owner and one evidence boundary. The workflow does not create
+commits, worktrees, reviews, pull requests, merges, deployments, or human gates merely
+because the preceding stage finished.
 
----
+## Main workflow
 
-## Philosophy: What Each Phase Produces
+### 1. Design
 
-**Design (archival)** — Can be checked into git and referenced months later. Describes WHAT to build and WHY at module/component level. Fully specifies contracts (APIs, interfaces) because other designs may depend on them. Does NOT include implementation code — that's intentional.
+Invoke:
 
-**Implementation Plan (just-in-time)** — Created immediately before execution. Verifies current codebase state matches design assumptions. Generates fresh, executable code based on actual state. May diverge from design if codebase has changed. Tasks are 2-5 minutes of work each.
-
-**Execution** — Follows implementation plan exactly. Code review at every step ensures quality.
-
-The key insight: **design plans tell you where you're going; implementation plans tell you how to get there from where you are now.** A design plan written two weeks ago is still valid direction. But the implementation plan must be generated fresh because the codebase may have changed.
-
----
-
-## Phase 1: Design (`/start-design-plan`)
-
-**What you provide:** A rough idea, some constraints, maybe URLs to relevant docs.
-
-**What happens:**
-
-1. **Context Gathering** - Claude asks what you're building, what constraints exist, what you've already decided.
-
-2. **Clarification** - Ambiguous terms get disambiguated. "OAuth2" becomes "client credentials flow for service accounts." "Users" becomes "internal services, not humans." This prevents building the wrong thing.
-
-3. **Brainstorming** - Claude proposes 2-3 architectural approaches with trade-offs. A codebase investigator subagent finds existing patterns your design should follow. You pick an approach through incremental validation - small sections presented for feedback.
-
-4. **Design Documentation** - The validated design gets written to `docs/design-plans/YYYY-MM-DD-<topic>.md` with explicit implementation phases (≤8).
-
-**Output:** A committed design document with clear phases, explicit file paths, and "done when" criteria for each phase.
-
----
-
-## Phase 2: Planning (`/start-implementation-plan @design-doc.md`)
-
-**What you provide:** Path to the design document from Phase 1.
-
-**What happens:**
-
-1. **Branch Setup** - Claude asks if you want a git worktree (isolated workspace) or standard branch. Creates the branch from main/master.
-
-2. **Codebase Verification** - For each design phase, a codebase investigator verifies that assumptions about existing files, patterns, and dependencies are accurate. If the design says "auth is in src/services/auth.ts," the investigator confirms it exists and has the expected structure.
-
-3. **Task Creation** - Each design phase becomes detailed tasks with:
-   - Exact file paths (confirmed by investigator)
-   - Complete code examples (no TODOs or placeholders)
-   - Specific verification commands and expected output
-   - Clear commit points
-
-4. **Plan Validation** - A code reviewer validates that the implementation plan fully covers the design before you start.
-
-**Output:** Implementation plan files in `docs/implementation-plans/YYYY-MM-DD-<feature>/` with one file per phase.
-
----
-
-## Phase 3: Execution (`/execute-implementation-plan @plan-directory/`)
-
-**What you provide:** Path to the implementation plan directory (not a single phase file — pass the directory so all phases execute).
-
-**What happens:**
-
-For each task (or group of related tasks that complete a subcomponent):
-
-1. **Dispatch Implementor** - A task-implementor subagent implements exactly what the task specifies, using TDD (test first, then code), and commits.
-
-2. **Code Review** - A code-reviewer subagent verifies:
-   - Tests pass, build succeeds, linter clean
-   - Implementation matches plan requirements
-   - Code quality standards met (FCIS pattern, type safety, error handling)
-   - No shortcuts or missing coverage
-
-3. **Fix Loop** - If issues are found (Critical, Important, or Minor), a bug-fixer subagent resolves them. Re-review continues until zero issues.
-
-4. **Progress** - Task marked complete, move to next task.
-
-After all tasks:
-
-5. **Project Context Update** - A librarian subagent checks if CLAUDE.md files need updating based on what changed.
-
-6. **Final Review** - Full implementation reviewed against all requirements.
-
-7. **Completion Options** - Merge to main, create PR, keep branch, or discard.
-
-**Output:** Working, reviewed code on your feature branch with clean commits.
-
----
-
-## Proleptic Reasoning and UAT Gates
-
-This plugin implements proleptic reasoning as a workflow discipline, based on [Kudina, Ballsun-Stanton & Alfano (2025)](https://doi.org/10.1007/s44204-025-00247-1).
-
-**What is proleptic reasoning?** Anticipating objections to a position, articulating them charitably, and responding preemptively. The value is not in the counterarguments being correct - it's in forcing deliberate evaluation before committing.
-
-**When it fires:**
-- Before design is committed (design → implementation transition)
-- Between implementation phases
-- During UAT (before declaring complete)
-
-**The "drunk tutor" framing:** Both proposals AND counterarguments may be flawed. The human must evaluate both critically. This prevents premature consensus and forces thinking.
-
-**Human UAT gates:** After code review passes, the workflow stops and presents acceptance criteria from the Definition of Done. The human must explicitly verify the implementation meets requirements before proceeding. Rejection loops back to fix and re-verify.
-
----
-
-## Project Customisation
-
-Create optional guidance files in `.ed3d/` at your project root:
-
-- **`.ed3d/design-plan-guidance.md`** - Domain terminology, architectural constraints, technology preferences. Loaded before clarification.
-- **`.ed3d/implementation-plan-guidance.md`** - Coding standards, testing requirements, review criteria. Loaded at plan start and during code reviews.
-
-Run `/how-to-customize` for examples and details.
-
----
-
-## Why This Structure?
-
-**Design before code.** Brainstorming surfaces constraints and alternatives you'd otherwise discover mid-implementation. The design document becomes a contract between "what we decided" and "what we'll build."
-
-**Plans grounded in reality.** Codebase investigation confirms assumptions. You won't write a plan that references files that don't exist or patterns that aren't followed.
-
-**Bite-sized, verifiable tasks.** Each task is 2-5 minutes of work with explicit verification. No task depends on "this will exist somehow" - dependencies are explicit.
-
-**Code review at every step.** Issues caught early are cheaper than issues caught at PR review. The review-fix loop runs until zero issues, not until "good enough."
-
-**Fresh context between phases.** You /clear between design → plan and plan → execute. Each phase gets full context for its specific job.
-
----
-
-## Working with Larger Problems
-
-For larger efforts, we've found success in first decomposing the problem before starting the design phase.
-
-**Identify independent and dependent parts.** Before running `/start-design-plan`, sketch out which parts of the system can be built independently and which have dependencies. A service that other services call should be built first. A UI that consumes an API depends on that API existing.
-
-**Build blocks of specifications.** Each independent block becomes its own input to the design planner. Rather than one massive design, you get several focused designs that can be planned and executed separately.
-
-**Chain the designs.** Run `/start-design-plan` for the foundational blocks first. Their completed implementations become context for dependent blocks. This prevents the "design assumes X exists but it doesn't" problem.
-
-This decomposition happens before you touch the plugin - it's thinking work you do to scope what goes into each design cycle.
-
----
-
-## Required Plugins
-
-This plugin uses subagents and skills from other plugins. Install these for full functionality:
-
-| Plugin | What It Provides | Required For |
-|--------|------------------|--------------|
-| **denubis-research-agents** | `codebase-investigator`, `internet-researcher` | Codebase verification, external research during design |
-| **denubis-extending-claude** | `project-claude-librarian` | Updating CLAUDE.md files after implementation |
-
-**Note:** The `coding-effectively` skill and its sub-skills are included in this plugin.
-
-Without these plugins, the workflow will still run but will skip the corresponding subagent dispatches (with a warning).
-
----
-
-## Subagents
-
-The plugin uses specialized subagents for different roles:
-
-| Agent | Plugin | Role |
-|-------|--------|------|
-| **codebase-investigator** | denubis-research-agents | Verifies file paths, finds patterns, confirms assumptions |
-| **internet-researcher** | denubis-research-agents | Finds current API docs, library patterns, best practices |
-| **task-implementor** | denubis-plan-and-execute | Implements tasks with TDD, runs verification, commits |
-| **code-reviewer** | denubis-plan-and-execute | Enforces quality standards, blocks on issues |
-| **task-bug-fixer** | denubis-plan-and-execute | Fixes issues identified by code reviewer |
-| **proleptic-challenger** | denubis-plan-and-execute | Generates counterarguments at phase transitions |
-| **project-claude-librarian** | denubis-extending-claude | Updates CLAUDE.md files when contracts change |
-
-You interact with the main orchestrating agent. It dispatches subagents and shows you their full responses.
-
----
-
-## Getting Started
-
-```bash
-# Start with an idea
-/start-design-plan
+```text
+/denubis-plan-and-execute:starting-a-design-plan <request or topic>
 ```
 
-Claude will guide you through context gathering, brainstorming, and design documentation.
+The design workflow inspects the project directly, asks only about intent or material
+tradeoffs that evidence cannot recover, compares genuine alternatives, and writes one
+current design under `docs/design-plans/`.
 
-When design is complete, you'll get instructions to copy the next command, then /clear:
+Human-derived decisions carry an exact source locator and resolver. Proposed components
+remain in the design plan; living architecture changes only when implementation changes
+the system.
 
-```bash
-# Copy this command first, then run /clear, then paste it
-/start-implementation-plan @docs/design-plans/2025-01-14-your-feature.md .
+### 2. Implementation planning
+
+Invoke the exact handoff returned by design:
+
+```text
+/denubis-plan-and-execute:starting-an-implementation-plan <absolute-design-path>
 ```
 
-After planning, same pattern:
+Planning uses the current workspace unless isolation is requested, required by project
+instructions, or needed to avoid overlapping edits. It produces:
 
-```bash
-# Copy this command first, then run /clear, then paste it
-/execute-implementation-plan @docs/implementation-plans/2025-01-14-your-feature .
+- `phase_##.md` files containing coherent tasks and acceptance ownership;
+- `test-requirements.md` for automated and operational evidence; and
+- `uat-requirements.md` for irreducible human judgment, which may contain no entries.
+
+Planning inspects the repository directly. Delegated investigation and review are optional.
+No model-authored stamp or verdict certifies the plan.
+
+### 3. Execution
+
+Invoke the exact plan and working directory:
+
+```text
+/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-directory> <absolute-working-directory>
 ```
 
----
+The main session executes one phase at a time by default. Behavior changes use the
+project-native red–green–refactor cycle. Tests, type checks, builds, and operational
+read-backs establish deterministic claims. Human UAT runs only for a planned item that
+automation cannot decide.
 
-## Utility Command: `/flesh-it-out`
+Execution preserves pre-existing changes and does not commit, publish, deploy, or mutate
+another system without separate authority.
 
-Not every idea needs the full design-plan-execute workflow. Sometimes you have a rough concept - a feature description, a technical approach, a document draft - that just needs to be made more specific and coherent.
+## Explicit lifecycle skills
 
-`/flesh-it-out` uses the clarifying-questions skill in standalone mode. It focuses on understanding what you actually mean, not just what you said:
+These user-invocable skills perform only their named action:
 
-- **Surfaces contradictions** - "Real-time updates" and "batch processing is fine" pull in different directions. Which do you actually need?
-- **Disambiguates terminology** - "OAuth2" could mean authorization code flow, client credentials, or both. Which one?
-- **Clarifies scope boundaries** - "Users" might mean human customers, service accounts, internal employees, or all of the above.
-- **Verifies assumptions** - "Must use library X" might be a hard requirement, team preference, or outdated guideline.
+| Skill | Boundary |
+|---|---|
+| `using-git-worktrees` | Create and verify one isolated checkout |
+| `systematic-debugging` | Diagnose a failure; fix only when the request includes a fix |
+| `maintain-architecture` | Reconcile living docs with implemented state |
+| `controlled-dependency-upgrade` | Audit or upgrade one direct dependency at a time |
+| `critical-peer-review` | Read-only falsification review of a bounded artifact |
+| `restate-our-assumptions` | Test a scoped assumption against current evidence |
+| `make-pr` | Verify, push, create, and read back one pull request |
+| `merge-to-main` | Perform and verify one local integration |
+| `exec-session-naming` | Rename the tmux window containing the current pane |
 
-The goal is to resolve unacknowledged trade-offs and turn vague intentions into concrete requirements. The output might become input to `/start-design-plan` later, or it might just be clearer thinking about a problem you're not ready to solve yet.
+`make-pr` does not merge or edit issue labels. `merge-to-main` does not push or delete the
+feature branch. Worktree cleanup and destructive discard are separate actions.
 
----
+## Optional agents
 
-## Customization
+Bundled agents are bounded tools, not workflow stages. Implementors and fixers may edit
+only their assigned scope and never commit. Reviewers are read-only and return exact-source
+leads without approval tokens or persistent findings files. The main session verifies any
+delegated result before acting on it.
 
-Provide project-specific guidance by creating files in a `.ed3d/` directory:
+The plugin does not require the research-agent or extending-Claude plugins to complete its
+main workflow. Their specialists may be used when a bounded task genuinely benefits from
+them.
 
-- `.ed3d/design-plan-guidance.md` — Loaded before clarification in `/start-design-plan`. Define domain terminology, architectural constraints, technology preferences, and scope boundaries.
-- `.ed3d/implementation-plan-guidance.md` — Loaded when creating implementation plans and during final code review. Specify coding standards, testing requirements, and review criteria.
+## Project customization
 
-Run `/how-to-customize` for details and example files.
+Optional project guidance lives at:
 
----
+- `.ed3d/design-plan-guidance.md`
+- `.ed3d/implementation-plan-guidance.md`
 
-## What This Is Not
+`/how-to-customize` describes their supported shape. `/flesh-it-out` provides standalone
+clarification without starting the full design workflow.
 
-- **Not for simple tasks.** If you know exactly what to change and it's a few files, just do it. This workflow adds overhead that pays off for larger features.
+## Runtime surfaces
 
-- **Not infinitely scoped.** Design phases are capped at 8 to keep implementations tractable. Larger efforts split into multiple implementation plans.
+The plugin also ships:
 
----
+- a `SessionStart` hook that updates the wrapper's live-transcript marker and emits no
+  ordinary workflow prose;
+- a `PreToolUse:Write|Edit` quality guard for its explicitly implemented banned patterns;
+- the `claudew` wrapper and workflow statusline.
 
-## Attribution
+The hook, wrapper, and statusline report or control only their actual runtime boundaries.
+They do not establish that a model followed a skill.
 
-This plugin is derived from [obra/superpowers](https://github.com/obra/superpowers) by Jesse Vincent.
-
-## License
-
-The original [obra/superpowers](https://github.com/obra/superpowers) code is licensed under the MIT License, copyright Jesse Vincent. See `LICENSE.superpowers`.
-
-All modifications and additions are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/), copyright Ed Ropple.
+See the [architecture context](../../docs/architecture/plugins/denubis-plan-and-execute/0-context.md)
+for the current system map and failure boundaries.

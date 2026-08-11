@@ -1,5 +1,113 @@
 # Changelog
 
+## [denubis-extending-claude] 1.10.1
+
+**Changed:**
+- `writing-claude-directives` now owns the Claude Task-invocation XML format that was
+  removed from the project-wide instructions
+
+## [denubis-basic-agents] 2.2.1
+
+**Changed:**
+- Removed the generic SessionStart reminder. `using-generic-agents` now appears only when
+  agent selection is actually needed
+
+## [denubis-plan-and-execute] 4.0.0
+
+**Breaking:**
+- Planning, execution, debugging, review, refactoring, and delegated workers no longer
+  create checkpoint commits, require model approval stages, or perform adjacent Git and
+  GitHub lifecycle actions. Callers that need a commit, PR, merge, deployment, independent
+  review, or human UAT must invoke that boundary explicitly
+
+**Changed:**
+- `impl-plan-write` integrates the reviewed decision-discipline work from branch
+  `impl-plan-decision-discipline` at `a724452`. It has one review route: only choices
+  that survive the restatement, invented-alternative, and obvious-default filters reach
+  the human
+- Test and UAT requirements each have one unconditional generation route. UAT collation
+  consumes both phase decisions and acceptance criteria not mapped to automated tests;
+  zero UAT entries remains valid
+- Implementation planning now permits direct repository inspection and optional
+  delegation. It no longer requires self-certifying stamps, forced coordination or
+  review ceremonies, artificial two-to-five-minute tasks, unauthorised commit steps, or
+  a mandatory worktree and context clear before handoff
+- Plan execution now performs phases directly by default and verifies them against their
+  acceptance criteria. Delegation and review are situational; model verdicts, fixed
+  review pipelines, mandatory per-task commits, and synthetic human gates no longer stand
+  between implementation and observable evidence
+- Design now follows one direct clarify-explore-write route. It asks only for
+  unrecoverable intent, compares genuine alternatives, records exact human authority
+  sources, and hands off without forced agents, commits, issue labels, or future-state
+  architecture edits
+- Code review, design-conformance review, human UAT, and proleptic challenge are bounded
+  by the claim each can test. Review findings are leads; UAT owns only planned human
+  judgment; counterarguments are checked before any surviving decision reaches the human
+- Systematic debugging now uses a bounded observe–hypothesise–falsify–fix loop. It no
+  longer forces context clearing, sentence-level self-audits, hostile model review, or a
+  written causal-analysis artifact before a minimal fix
+- Architecture maintenance now follows implemented state and exact source evidence;
+  future design stays in the design plan until implementation changes the living system
+- PR, local merge, branch-finish, worktree, and dependency-upgrade procedures perform only
+  their named action. Automatic rebases, issue-label mutations, cleanup, package commits,
+  and invented setup metadata are removed
+- Coding guidance loads only applicable procedures. TDD, verification, functional-core
+  separation, and boundary validation state observable contracts without incident
+  dialogue, moral self-correction, or arbitrary size thresholds
+- All ten bundled agents have bounded authority. Mutating workers preserve unrelated work
+  and never commit; reviewers are read-only and return exact evidence leads without
+  persistent status files
+- Session naming derives a short task name directly, targets its own tmux pane, and reads
+  the resulting window name back without model dispatch or a cache
+- Removed generic SessionStart skill injection while preserving the independent
+  live-transcript marker update. `using-plan-and-execute` retains the two unique gates:
+  design before plan mode and durable state for skill checklists
+
+**Fixed:**
+- Removed the contradictory mode that could write phases without review while still
+  requiring an interactive preparatory-refactor decision
+- Added structural tests that reject unresolved plugin-qualified skill references and
+  missing dispatched agents
+- Added structural contracts that prevent the design, execution, review, acceptance, and
+  challenge workflows from regaining mandatory model-to-model transition ceremony
+- Added contracts for architecture, debugging, Git lifecycle, coding-skill routing,
+  session naming, optional analysis tools, and bundled agent authority
+
+## [denubis-project-notes] 0.1.0
+
+**New:**
+- `scanning-project-notes` is direct main-session task-entry retrieval. It resolves the
+  main repository's `.notes/`, inventories every Markdown note, reads every frontmatter
+  block, opens relevant bodies, and resolves relevant chat messages before use
+
+**Retired:**
+- `denubis-notes-advisory` 0.2.1. Its SessionStart request, fire telemetry, and delegated
+  advisor are removed. They measured or narrated retrieval without performing it at the
+  task boundary
+- ADR 0005 and its constraint row, whose only current consequence was the retired fire
+  log. Git retains the historical decision
+
+## [denubis-git-commit] 1.2.2
+
+**Changed:**
+- Commit preparation now checks whether changed contracts, APIs, domain structure, or
+  agent instructions require matching `CLAUDE.md` or `AGENTS.md` updates
+- `denubis-hook-claudemd-reminder` is retired. Read-only `git status` and `git log`
+  commands no longer inject a generic reminder
+
+## [denubis-hook-branch-bg] 0.2.6
+
+**Changed:**
+- The SessionStart hook retains terminal recolouring but emits no model context on
+  ordinary success
+
+## Removed plugins
+
+- `denubis-hook-skill-reinforcement` 1.2.0. The unconditional `UserPromptSubmit`
+  reminder is removed; task-entry skill selection remains owned by applicable skills
+- `denubis-hook-claudemd-reminder` 1.1.4. Its useful requirement moved to the commit
+  procedure above
+
 ## [denubis-external-agents] 0.15.2
 
 **Fixed:**

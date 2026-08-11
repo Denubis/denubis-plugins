@@ -1,0 +1,18 @@
+{
+  "name": "denubis-project-notes",
+  "description": "Direct task-entry retrieval of project-owned .notes memory and relevant chat history, with complete note coverage and resolvable source pointers.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "notes",
+    "retrieval",
+    "memory",
+    "chat-search"
+  ]
+}

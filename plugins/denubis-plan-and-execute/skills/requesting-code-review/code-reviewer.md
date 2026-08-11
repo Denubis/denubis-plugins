@@ -1,23 +1,21 @@
 # Code Review Task
 
-Review the diff between BASE_SHA and HEAD_SHA. The diff is your primary review surface — do not audit unchanged code.
+Attempt to falsify the named implementation claims within the supplied surface. Do not
+edit files or broaden the audit to unrelated code.
 
 ## Scope
 
-**What was implemented:** {WHAT_WAS_IMPLEMENTED}
+**Working directory:** {WORKING_DIRECTORY}
 
-**Description:** {DESCRIPTION}
+**Requirements or plan:** {PLAN_REFERENCE}
 
-**Requirements/Plan:** {PLAN_REFERENCE}
+**Changed surface:** {CHANGED_SURFACE}
 
-## Git Range
+**Review questions:** {REVIEW_QUESTIONS}
 
-**Base:** {BASE_SHA}
-**Head:** {HEAD_SHA}
+**Inspection commands:** {REVIEW_COMMANDS}
 
-```bash
-git diff --stat {BASE_SHA}..{HEAD_SHA}
-git diff {BASE_SHA}..{HEAD_SHA}
-```
-
-Start with these commands. Follow your review process from there.
+Open the requirements and changed files. For each candidate defect, provide an exact
+source pointer, the claim at risk, its consequence, supporting observation, and a check
+that could confirm or falsify it. State any relevant surface the supplied commands could
+not see. Return no approval status.
