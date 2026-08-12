@@ -26,9 +26,11 @@ branch merely because design work began. If isolation is needed and its base can
 resolved safely, ask one pointed question.
 
 Read project `AGENTS.md` or `CLAUDE.md`, the named request, relevant `.notes/` through the
-project's retrieval procedure, current architecture, design guidance, and two or three
-nearby implementations. Inventory the relevant entities, consumers, external systems, and
-known exclusions before asserting that something is absent.
+project's retrieval procedure, accepted decision records and constraints, current
+architecture, design guidance, and two or three nearby implementations. Inventory the
+relevant entities, consumers, external systems, and known exclusions before asserting that
+something is absent. Say which retrieved memory, feedback, or decision changes the design
+boundary.
 
 Resolve the initiating human request to an exact human source locator and resolver. A
 session identifier without a message locator, model summary, quotation, or paraphrase is

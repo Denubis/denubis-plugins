@@ -1,6 +1,5 @@
 ---
 name: systematic-debugging
-family: standalone
 description: Use for bugs, failing tests, crashes, or unexpected behavior - establishes the failure boundary, tests causal hypotheses, and fixes only the demonstrated mechanism
 user-invocable: true
 ---

@@ -11,7 +11,13 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
   agents, commands, hooks, and scripts. Every plugin manifest is at
   `plugins/<name>/.claude-plugin/plugin.json`; hook registration remains under
   `plugins/<name>/hooks/hooks.json`.
-- **Skill**: a `SKILL.md` file under `plugins/<name>/skills/<skill-name>/` providing structured instructions to Claude for a specific task. Loaded into the model's context when invoked. A skill is `user-invocable: true` if the user can trigger it via `/<skill-name>`; otherwise it's invoked by other skills or agents.
+- **Skill**: a `SKILL.md` file under `plugins/<name>/skills/<skill-name>/` providing
+  structured instructions to Claude for a specific task. A model-invocable skill's
+  description is available to Claude and its full body loads when invoked.
+  `user-invocable: false` prevents user invocation but still permits Claude to invoke the
+  skill; `disable-model-invocation: true` prevents Claude from doing so. See the current
+  [Claude Code skill invocation controls](https://code.claude.com/docs/en/slash-commands#control-who-invokes-a-skill)
+  (verified 2026-08-12).
 - **Agent**: a markdown file under `plugins/<name>/agents/<agent-name>.md` with frontmatter declaring `name`, `model`, and `description`. Dispatched via the `Task` tool with `subagent_type: <plugin>:<agent-name>`.
 - **Command**: a slash-command markdown file under `plugins/<name>/commands/<name>.md`. The user types `/<name>` to invoke; the command body is loaded directly into the model's context.
 - **Hook**: a Python or shell script under `plugins/<name>/hooks/` declared in a `hooks.json` config. Triggered by Claude Code on lifecycle events. Returns a JSON decision on stdout.

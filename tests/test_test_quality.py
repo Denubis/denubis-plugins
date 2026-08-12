@@ -45,6 +45,51 @@ def test_rule_is_absent():
     assert [violation.line for violation in violations] == [12]
 
 
+def test_detector_finds_inline_path_read() -> None:
+    source = '''
+from pathlib import Path
+
+def test_rule_is_present():
+    assert "required" in Path("SKILL.md").read_text()
+'''
+
+    violations = find_prose_change_assertions(source, filename="test_rule.py")
+
+    assert [violation.line for violation in violations] == [5]
+
+
+def test_detector_finds_wording_comparison_nested_in_all() -> None:
+    source = '''
+from pathlib import Path
+
+SKILL = Path("SKILL.md")
+
+def test_rules_are_present():
+    text = SKILL.read_text()
+    assert all(word in text for word in ("required",))
+'''
+
+    violations = find_prose_change_assertions(source, filename="test_rule.py")
+
+    assert [violation.line for violation in violations] == [8]
+
+
+def test_detector_finds_regex_probe_of_raw_document() -> None:
+    source = '''
+import re
+from pathlib import Path
+
+SKILL = Path("SKILL.md")
+
+def test_rule_is_present():
+    assert re.search("required", SKILL.read_text())
+'''
+
+    violations = find_prose_change_assertions(source, filename="test_rule.py")
+
+    assert [violation.line for violation in violations] == [8]
+
+
 def test_detector_allows_assertions_on_program_output() -> None:
     source = '''
 def test_cli_result():
@@ -70,7 +115,8 @@ def test_manifest_state():
     assert find_prose_change_assertions(source, filename="test_manifest.py") == []
 
 
-def test_repository_has_no_prose_change_detection_tests() -> None:
+def test_python_tests_have_no_detectable_markdown_wording_assertions() -> None:
+    """Apply the positively controlled lint within its stated Python-test scope."""
     paths = sorted(ROOT.glob("tests/test_*.py"))
     paths.extend(sorted(ROOT.glob("plugins/**/tests/test_*.py")))
     violations = [

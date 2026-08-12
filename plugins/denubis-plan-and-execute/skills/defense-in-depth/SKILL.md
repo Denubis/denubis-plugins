@@ -1,6 +1,5 @@
 ---
 name: defense-in-depth
-family: coding-effectively
 description: Use when invalid or untrusted data crosses system boundaries - assigns distinct invariants to the earliest reliable owners and tests bypass paths
 ---
 

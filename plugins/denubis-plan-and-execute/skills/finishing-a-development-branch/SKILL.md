@@ -1,6 +1,5 @@
 ---
 name: finishing-a-development-branch
-family: executing-an-implementation-plan,make-pr,merge-to-main
 description: Use when verified branch work is ready for a human-selected integration route - reports current state and delegates only the requested PR or local-merge action
 user-invocable: false
 ---
@@ -18,7 +17,9 @@ Inspect branch status and verification evidence:
 
 - current branch, upstream, remote, base, and worktree path;
 - staged, unstaged, and untracked files;
-- commits and diff relative to the intended base;
+- commits and diff relative to the intended base. Treat an upstream `ahead` count only as
+  divergence from that configured ref; before calling commits unpushed or at risk, check
+  whether the intended base or any remote ref already contains them;
 - fresh required test and operational results; and
 - unresolved human UAT or documented blockers.
 

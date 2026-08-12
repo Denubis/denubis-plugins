@@ -9,7 +9,7 @@ A meta-rubric: the standard that directive-writing standards (writing-claude-dir
 Every directive names which model tier executes it (main-loop vs subagent, and which subagent model). A rule written for one tier silently misfires on another, so the audience must be explicit before any other rule applies.
 
 - Vendor basis: "Test your Skill with all the models you plan to use it with" (skill-authoring best practices, verified 2026-06-10).
-- Operator basis: Haiku-no-judgement position (2026-04-22, feedback_haiku-no-judgement.md) — judgement-heavy work routes to Sonnet or above.
+- Model routing: `plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md`.
 
 ## R2. Prescriptiveness budget scales inversely with executor capability
 
@@ -69,13 +69,16 @@ No standard ships without baseline failures observed (RED), compliance verified 
 
 ## R11. Operator-empirical override channel
 
-Vendor guidance is the default; recorded operator evidence overrides it where they conflict, and the override must be dated, filed (`.notes/feedback_*.md` or equivalent), and cited where applied. Precedent: Haiku-no-judgement (2026-04-22) overriding Anthropic's "nuanced tasks" marketing. The override itself is subject to R6 staleness review.
+Vendor guidance is the default; recorded operator evidence overrides it where they conflict,
+and the override must cite its raw authority record in its governing document. The override
+itself is subject to R6 staleness review.
 
 ## R12. Living documents carry current truth; git carries the change history
 
 A directive, standard, plan instruction, or note states its current position only — no amendment blocks, dated "we decided" markers, RESOLVED stacks, or passages arguing with earlier versions of themselves. Edit the content in place; the rationale for the change goes in the commit message. Exception: designated append-only audit artefacts (review verdicts, GREEN verifications, postmortems) are archives, must declare themselves as such, and are exempt. A single dated `last-verified` header is provenance metadata, not scar.
 
-- Operator basis: `.notes/feedback_scar-tissue.md` (2026-06-10), maintenance register.
+- Current owner: the no-palimpsest rule in the global instruction-control candidate;
+  authority resolves through `docs/design-plans/2026-08-11-instruction-control-system.md`.
 
 ## Pending reconciliation items (for skill-skills-upstream-sync Phase 2 or successor)
 

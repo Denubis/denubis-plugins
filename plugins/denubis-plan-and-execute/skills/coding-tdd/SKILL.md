@@ -1,6 +1,5 @@
 ---
 name: coding-tdd
-family: coding-effectively
 description: Use when implementing a feature, bug fix, or behavioral refactor - establishes the behavior with a failing test, makes it pass minimally, then cleans up under green tests
 user-invocable: false
 ---

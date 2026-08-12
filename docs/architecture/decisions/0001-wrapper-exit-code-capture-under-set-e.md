@@ -2,6 +2,16 @@
 
 **Status:** Accepted
 
+## Authority evidence
+
+- Human invocation:
+  `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-crash-recovery/0df390b7-41f5-4e92-a69d-bce7548f00ce.jsonl:9`
+- Exact resolver:
+  `cc-search-chats context 899dd8df-1a41-49f1-bbfb-ba77ddcc0691 --json`
+
+The invocation directs the post-acceptance promotion of this ADR. The resolver supplies
+the human message; this ADR does not reproduce it.
+
 ## Context
 
 `claude-wrapper.sh` runs with `set -euo pipefail`. Its liveness-marker cleanup and final

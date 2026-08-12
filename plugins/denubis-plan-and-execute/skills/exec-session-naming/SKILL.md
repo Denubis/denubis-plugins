@@ -1,6 +1,5 @@
 ---
 name: exec-session-naming
-family: executing-an-implementation-plan,starting-an-implementation-plan,starting-a-design-plan,systematic-debugging
 description: Use when a substantial session starts or changes purpose - directly gives the current tmux window a short repository-and-task name and verifies the terminal side effect
 user-invocable: true
 ---

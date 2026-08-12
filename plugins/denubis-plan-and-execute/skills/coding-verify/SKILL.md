@@ -1,6 +1,5 @@
 ---
 name: coding-verify
-family: coding-effectively
 description: Use before reporting code complete, fixed, clean, or passing - runs the check that owns each claim and reports its fresh result, scope, and exclusions
 user-invocable: false
 ---

@@ -1,6 +1,5 @@
 ---
 name: requesting-code-review
-family: executing-an-implementation-plan,finishing-a-development-branch,make-pr,merge-to-main
 description: Use when a requested, project-required, or risk-targeted review could falsify a concrete implementation claim before handoff or integration
 user-invocable: false
 ---

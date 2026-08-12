@@ -2,6 +2,18 @@
 
 **Status:** Accepted
 
+## Authority evidence
+
+- Runtime-owner direction:
+  `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/80357450-6297-4fd1-a7ec-0a68665e42a8.jsonl:175`
+  — `cc-search-chats context 57248254-730e-4d9d-a5b9-27786335231b --json`
+- Structured-rewrite direction:
+  `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/80357450-6297-4fd1-a7ec-0a68665e42a8.jsonl:546`
+  — `cc-search-chats context 69bf33af-e999-4581-8f31-4a7577c9839c --json`
+
+The resolvers supply the human messages that selected the runtime owner and implementation
+substrate. This ADR does not reproduce them.
+
 ## Context
 
 The wrapper process and its PID-keyed liveness file survive a Claude `/clear`, while the

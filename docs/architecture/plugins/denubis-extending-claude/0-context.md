@@ -58,10 +58,10 @@ flowchart LR
 | `maintaining-a-marketplace` | no | Use when creating, releasing, or maintaining a Claude Code Plugin Marketplace — covers marketplace.json schema, version sync, changelog, release validation (`maintaining-a-marketplace/SKILL.md`, `8498518`). |
 | `maintaining-project-context` | no | Use when completing development phases to identify and update stale CLAUDE.md or AGENTS.md files against code changes (`maintaining-project-context/SKILL.md`, `8498518`). |
 | `syncing-with-upstream` | **yes** | Use when integrating changes from upstream ed3d-plugins into this fork — handles the ed3d→denubis rename, conflict resolution, merge workflow (`syncing-with-upstream/SKILL.md`, `7bee729`). |
-| `testing-skills-with-subagents` | no | Use when creating or editing skills to verify they work under pressure — applies RED-GREEN-REFACTOR with subagents to find rationalisation loopholes (`testing-skills-with-subagents/SKILL.md`, `8498518`). |
+| `testing-skills-with-subagents` | no | Separates executable checks from falsifiable prose-review expectations and makes independent review optional (`testing-skills-with-subagents/SKILL.md`, working-tree source candidate). |
 | `writing-claude-directives` | no | Use when writing instructions that guide Claude behaviour — skills, CLAUDE.md, agent prompts. Covers token efficiency, compliance techniques, discovery optimisation (`writing-claude-directives/SKILL.md`, `2a3f5ff`). |
 | `writing-claude-md-files` | no | Use when creating or updating CLAUDE.md files — top-level vs domain-level scope, architectural intent, freshness stamps (`writing-claude-md-files/SKILL.md`, `8498518`). |
-| `writing-skills` | no | Use when creating or editing skills — applies TDD with subagent testing to find rationalisation loopholes (`writing-skills/SKILL.md`, `8498518`). |
+| `writing-skills` | no | Maps a skill's owner and consumer, writes the smallest current procedure, and defines proportionate verification (`writing-skills/SKILL.md`, working-tree source candidate). |
 
 Skill-adjacent files: `writing-claude-directives/graphviz-conventions.dot`, `writing-claude-directives/long-running-state-patterns.md`, and `writing-claude-directives/model-tier-notes.md` (per-model behavioural specifics on its own refresh cycle, `a97b0f3`) are reference assets the skill points to; `epistemic-humility/absencejudgement-citations.md` and `epistemic-humility/self-application.md` are that skill's citation index and self-screen record (`6077868`).
 

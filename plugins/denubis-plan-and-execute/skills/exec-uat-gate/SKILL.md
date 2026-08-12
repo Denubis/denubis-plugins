@@ -1,6 +1,5 @@
 ---
 name: exec-uat-gate
-family: executing-an-implementation-plan
 description: Use when a built surface has a planned acceptance criterion that only human interaction and judgment can verify
 user-invocable: false
 ---
@@ -34,7 +33,13 @@ implementation rather than presenting a hypothetical exercise.
 
 ## Present and wait
 
-Present one entry at a time. Include only:
+The plan owns the complete set of probes. Present one entry at a time so the human can
+perform it without a bundled questionnaire; do not make the human design the next action.
+Across the planned entries, preserve the intended positive, negative, failure-path, and
+adjacent-system coverage rather than treating the first accepted workflow as acceptance of
+the whole surface.
+
+For the current entry, include only:
 
 1. the surface or workflow to use;
 2. the concrete action to perform;

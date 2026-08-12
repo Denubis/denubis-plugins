@@ -24,24 +24,9 @@ caller's instruction that several fixes edit files first touched earlier in the 
 ### Critical
 
 **C1 — unsourced operator attribution ("no carve-out for cosmetic work").**
-**Resolved.** `.notes/feedback_haiku-no-judgement.md` (main repo root, gitignored, read directly)
-now carries a dated "Amendment 2026-07-26" paragraph: *"Asked whether the floor governed only
-agent definitions ... or also the skills that dispatch Haiku at runtime, Brian ruled both move
-to Sonnet, with no carve-outs. Three sites were settled by it"* — naming `exec-session-naming`,
-`design-clarify`, and `testing-skills-with-subagents` explicitly, and recording the argument on
-which the carve-out was declined (a Haiku GREEN failure can't be told apart from a Haiku
-fabrication). The two shipped citations now point at this amendment and get the dates right:
-- `plugins/denubis-plan-and-execute/skills/exec-session-naming/SKILL.md:183` (commit `cd839f8`):
-  *"This dispatched Haiku until the 2026-07-25 Sonnet floor ruling, which was extended on
-  2026-07-26 to reach live dispatch sites with no carve-out for cosmetic work. Both are recorded
-  in `.notes/feedback_haiku-no-judgement.md`."* — matches the note's two separate dates exactly
-  (floor 2026-07-25, carve-out 2026-07-26).
-- `CHANGELOG.md:13` (commit `cd839f8`): *"A 2026-07-26 amendment extends the floor to live
-  dispatch sites with no carve-out for cosmetic work"* — same correction, date now separated
-  from the 2026-07-25 floor ruling stated two lines above it.
-Also checked `testing-skills-with-subagents/SKILL.md:63` for the same class of claim: it now
-attributes "Three operator rulings" with three distinct dates (2026-04-22, 2026-07-25,
-2026-07-26), each matching a dated paragraph in the note. No unsourced attribution remains.
+**Resolved.** The current dispatch contract and its raw human authority records live in
+`plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md`.
+Dependent skills point to that owner rather than restating the decision.
 
 **C2 — `long-running-state-patterns.md` contradicted the floor one directory from where it was declared.**
 **Resolved.** Commit `412857f` rewrote the header disclaimer, the ASCII orchestration diagram,
@@ -62,14 +47,8 @@ why Haiku is *excluded*), confirming no residual prescriptive Haiku guidance sur
 ### Important
 
 **I1 — "the cost is real and was accepted deliberately" overclaimed operator deliberation.**
-**Resolved.** Commit `cd839f8` drops "and was accepted deliberately." The replacement text
-(`testing-skills-with-subagents/SKILL.md:65`) states the argument itself — *"A Haiku GREEN
-failure could no longer be told apart from a Haiku fabrication, so the extra diagnostic bite
-that a weaker tier bought was not worth what it cost in trustworthy signal"* — and attributes
-its source correctly: *"That argument is the one on which the carve-out was declined, and it is
-recorded in `.notes/feedback_haiku-no-judgement.md` rather than inferred here."* This is exactly
-the fix the prior review prescribed (state the argument, cite the record, stop asserting
-operator deliberation the record doesn't evidence).
+**Resolved.** `testing-skills-with-subagents` now states the current Sonnet test floor and
+points to the model-routing owner; it does not reconstruct operator deliberation.
 
 **I2 — `docs/architecture/plugins/denubis-research-agents/0-context.md` stale (all four agents listed as haiku, stale commit citation).**
 **Resolved.** Commit `5b66e0e` updates the Model column to `sonnet` for all four agents and
@@ -150,8 +129,8 @@ sweep would skip:
   ("haiku is unacceptable for internet research ... sonnet 5 the floor for almost everything").
   None of these seven independently asserts the 2026-07-26 carve-out without a citation — the two
   live-dispatch-site files that do state the carve-out (`exec-session-naming`,
-  `testing-skills-with-subagents`) both cite `.notes/feedback_haiku-no-judgement.md` by path, per
-  C1's fix. No recurrence of the unsourced-attribution defect class.
+  `testing-skills-with-subagents`) both point to the model-routing owner. No recurrence of the
+  unsourced-attribution defect class.
 
 **Result: zero new issues.** The fix cycle's own stated blind spot (markdown-only sweep scope)
 is exactly what this pass targeted, and it did not reproduce in non-markdown surfaces.

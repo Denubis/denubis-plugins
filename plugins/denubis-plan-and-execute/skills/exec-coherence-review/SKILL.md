@@ -1,6 +1,5 @@
 ---
 name: exec-coherence-review
-family: executing-an-implementation-plan
 description: Use when a specific design-conformance risk warrants an independent audit of implemented behavior against an accepted design and its current evidence
 user-invocable: false
 ---
@@ -24,6 +23,8 @@ Resolve:
 - the accepted design and relevant phase;
 - the exact acceptance criteria or assumptions at risk;
 - the implementation files and current diff;
+- the predicted boundary-flow artifact and implemented-state map when the plan says the
+  change affects meaningful data or control flow;
 - the tests, operational results, architecture, and decision records that claim to bind
   the behavior; and
 - the repository state those sources describe.
@@ -44,6 +45,7 @@ For each scoped question, compare:
 | Verification | Test or operational command with its positive and failure signals |
 | Assumption | Condition on which the comparison depends and what would invalidate it |
 | Downstream fit | Named consumer and whether the implemented interface satisfies it |
+| Boundary flow | Predicted versus implemented participants, data or control, transformation, effect, ordering, persistence, failure route, and consumer |
 
 Inspection may be direct or optionally delegated with this exact bounded surface. The
 main session opens every returned pointer and recomputes relevant checks.

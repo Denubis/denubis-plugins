@@ -13,15 +13,21 @@ Use these when you need a general-purpose executor without domain-specific defau
 
 | Agent | Model | Best For |
 |-------|-------|----------|
-| `haiku-general-purpose` | Haiku | **No currently sanctioned use.** Kept callable because removing it would foreclose a decision that is not ripe. Dispatching it needs a positive justification naming a bounded mechanical task. |
-| `sonnet-general-purpose` | Sonnet | Default for most work. Code review, debugging, implementation, structured analysis. Near Opus-level on software engineering tasks at 1/5 the cost. |
-| `opus-general-purpose` | Opus | Deep scientific reasoning, sustained multi-step analysis, high-stakes architectural decisions. When the task needs genuine depth, not just breadth. |
+| `haiku-general-purpose` | Haiku | Legacy definition; no sanctioned dispatch. |
+| `sonnet-general-purpose` | Sonnet | Default for general implementation, review, debugging, and structured analysis. |
+| `opus-general-purpose` | Opus | Work that requires deeper judgement or sustained analysis. |
 
-**Model floor (operator ruling, 2026-07-25).** Sonnet is the floor for almost everything,
-because the hallucination rate below it is unacceptable. Default a new dispatch to
-`sonnet-general-purpose`, and reach for `opus-general-purpose` when the task needs depth.
-The falsifier is Haiku 5 shipping plus a dated operator trial on it, so no vendor benchmark
-or announcement overturns this on its own.
+Default a new dispatch to `sonnet-general-purpose`, and reach for
+`opus-general-purpose` when the task needs depth.
+
+Dispatch authority:
+
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/f7df1451-ba25-41cb-a76b-6deb33e53dad.jsonl:329`
+  (`cc-search-chats context 0f4e9cd4-8cbd-4e40-866e-d7a69a35731c --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:916`
+  (`cc-search-chats context ece0feb2-ffbd-4f4e-a466-1a5120d1ce46 --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:1116`
+  (`cc-search-chats context 4766cd4c-359f-4644-a9b9-6baae0e43796 --json`)
 
 ### Domain Agents (Opinionated)
 
@@ -31,16 +37,6 @@ Use these when you want pre-baked defaults for specific workflows.
 |-------|-------|-----------------|
 | `python-developer` | Sonnet | Type hints, pytest, dataclasses, pathlib, f-strings. Python idioms baked in. |
 | `academic-researcher` | Opus | Citations, argument structure, LaTeX conventions, scholarly tone. Research rigor baked in. |
-
-## Model Characteristics (Sonnet 4.6 era)
-
-These are heuristics, not absolute truths. Override based on task requirements.
-
-**Haiku:** Follows specific, detailed instructions with tool calls, but its output cannot be trusted without independent verification, so the cost of checking it usually exceeds what the cheaper tier saves. Never for judgement calls or root-cause debugging, and since 2026-07-25 not for research either. See the model floor above.
-
-**Sonnet 4.6:** The daily driver. Near-parity with Opus on SWE-bench (79.6% vs 80.8%). Handles code review, implementation, debugging, and structured analysis well. **Caveat:** can be more verbose than Opus — may use significantly more tokens on complex tasks, partially offsetting the 5x price advantage. Guard against over-explanation when you just need execution.
-
-**Opus:** Strongest at deep reasoning (17-point lead over Sonnet on GPQA Diamond). Use for: scientific analysis, complex architectural decisions, tasks where Sonnet loops or wanders, and sustained multi-step reasoning over large context. The gap with Sonnet has narrowed — don't default to Opus out of habit.
 
 ## When to Use Domain Agents
 

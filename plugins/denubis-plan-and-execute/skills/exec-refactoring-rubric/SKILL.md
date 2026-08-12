@@ -1,6 +1,5 @@
 ---
 name: exec-refactoring-rubric
-family: executing-an-implementation-plan
 description: Use when evaluating or applying a behavior-preserving refactor - requires a concrete maintenance cost, current consumers, behavioral coverage, and one bounded transformation
 user-invocable: false
 ---

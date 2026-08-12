@@ -18,6 +18,7 @@ _RAW_STRING_METHODS = {
     "upper",
 }
 _CONTENT_PROBE_METHODS = {"count", "endswith", "find", "index", "startswith"}
+_REGEX_PROBE_METHODS = {"fullmatch", "match", "search"}
 _WORDING_COMPARE_OPERATORS = (ast.Eq, ast.NotEq, ast.In, ast.NotIn)
 
 
@@ -72,16 +73,16 @@ def _is_document_path_expression(
         )
     elif isinstance(expression, ast.JoinedStr):
         result = any(_is_markdown_literal(value) for value in expression.values)
-    elif (
-        isinstance(expression, ast.Call)
-        and isinstance(expression.func, ast.Attribute)
-        and expression.func.attr
-        in {
-            "glob",
-            "rglob",
-        }
-    ):
-        result = any(
+    elif isinstance(expression, ast.Call):
+        function = expression.func
+        is_path_constructor = (
+            isinstance(function, ast.Name) and function.id == "Path"
+        )
+        is_path_enumerator = (
+            isinstance(function, ast.Attribute)
+            and function.attr in {"glob", "rglob"}
+        )
+        result = (is_path_constructor or is_path_enumerator) and any(
             _is_document_path_expression(
                 argument,
                 document_path_names=document_path_names,
@@ -323,18 +324,29 @@ def _uses_content_probe(
     raw_names: set[str],
     raw_functions: set[str],
 ) -> bool:
-    return any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in _CONTENT_PROBE_METHODS
-        and _is_raw_text_expression(
+    for node in ast.walk(expression):
+        if not isinstance(node, ast.Call) or not isinstance(
+            node.func, ast.Attribute
+        ):
+            continue
+        if node.func.attr in _CONTENT_PROBE_METHODS and _is_raw_text_expression(
             node.func.value,
             document_path_names=document_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
-        )
-        for node in ast.walk(expression)
-    )
+        ):
+            return True
+        if node.func.attr in _REGEX_PROBE_METHODS and any(
+            _is_raw_text_expression(
+                argument,
+                document_path_names=document_path_names,
+                raw_names=raw_names,
+                raw_functions=raw_functions,
+            )
+            for argument in node.args
+        ):
+            return True
+    return False
 
 
 def _is_wording_assertion(
@@ -351,27 +363,32 @@ def _is_wording_assertion(
         raw_functions=raw_functions,
     ):
         return True
-    if not isinstance(assertion.test, ast.Compare):
-        return False
-    if not any(
-        isinstance(operator, _WORDING_COMPARE_OPERATORS)
-        for operator in assertion.test.ops
-    ):
-        return False
-    operands = [assertion.test.left, *assertion.test.comparators]
-    return any(
-        _is_raw_text_expression(
-            operand,
-            document_path_names=document_path_names,
-            raw_names=raw_names,
-            raw_functions=raw_functions,
-        )
-        for operand in operands
-    )
+    for comparison in ast.walk(assertion.test):
+        if not isinstance(comparison, ast.Compare) or not any(
+            isinstance(operator, _WORDING_COMPARE_OPERATORS)
+            for operator in comparison.ops
+        ):
+            continue
+        operands = [comparison.left, *comparison.comparators]
+        if any(
+            _is_raw_text_expression(
+                operand,
+                document_path_names=document_path_names,
+                raw_names=raw_names,
+                raw_functions=raw_functions,
+            )
+            for operand in operands
+        ):
+            return True
+    return False
 
 
 def find_prose_change_assertions(source: str, *, filename: str) -> list[Violation]:
-    """Return raw-document wording assertions in one Python test module."""
+    """Return obvious raw-document wording assertions in one Python test module.
+
+    This is a bounded lint for supported AST shapes, not a proof that prose tests are
+    absent or semantically independent.
+    """
     module = ast.parse(source, filename=filename)
     if not _mentions_markdown(module):
         return []

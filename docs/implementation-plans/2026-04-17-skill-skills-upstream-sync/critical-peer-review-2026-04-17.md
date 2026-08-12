@@ -218,4 +218,5 @@ Plan files on disk (seven phases + test-requirements + uat-requirements + this r
 User chose "Halt and escalate" over Path A (substantial revision), Path B (scope reduction), or Path C (hybrid). Next session should re-open this file, decide strategy, and apply fixes with fresh context.
 
 **Applicable skills feedback memory updated:**
-- `feedback_review-all-levels.md` saved to `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/` — all reviewer levels must be discussed; interrogate Minor/Flagged for false-world-model assumptions.
+- Review labels do not decide disposition; inspect every finding's evidence and hidden
+  assumptions. Current owner: the global instruction-control candidate.

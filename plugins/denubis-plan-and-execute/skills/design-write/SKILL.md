@@ -1,6 +1,5 @@
 ---
 name: design-write
-family: starting-a-design-plan
 description: Use after a design direction is selected - writes one current design with resolvable authority, explicit boundaries, acceptance criteria, and coherent implementation phases
 user-invocable: false
 ---

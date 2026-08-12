@@ -6,7 +6,8 @@
 > system, not its architectural boundary.
 
 This document separates the source candidate in this worktree from the live state observed
-on host `foa4008439` on 2026-08-11. The governing design is
+on host `foa4008439` on 2026-08-11. The project-note inventory was rechecked on
+2026-08-12. The governing design is
 [`2026-08-11-instruction-control-system.md`](../../design-plans/2026-08-11-instruction-control-system.md).
 
 ## Context
@@ -65,9 +66,9 @@ it.
 | Plugin hooks | Plugin source, enabled by global settings | Claude Code event dispatcher | Event registrations in each plugin's `hooks.json` | Source files cited in the event table | Source, marketplace metadata, cache, and enablement can drift independently. |
 | Skills and commands | Plugin source | Main session when invoked or injected | Markdown procedures loaded on demand; some are injected by hooks | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
 | Agents and external advisors | Plugin source plus model/runtime | Main session and human | Delegated work returned as model output | Source-tagged result; some paths verify source access | A fluent report is not proof. The proposer and verifier can share blind spots. |
-| Project `.notes/` | Human-approved, gitignored project memory | Main session | Live state still uses the retiring notes advisor. The core candidate replaces it with direct task-entry inventory and raw-source resolution. `denubis-project-notes` remains source-only until cross-vendor exact resolution is ready. | Main-repository `.notes/`; 50 Markdown files observed below | Hidden and ignored scope makes incomplete search look empty. Frontmatter and referenced evidence can drift. |
+| Project `.notes/` | Human-approved, gitignored project memory | Main session | The core candidate performs direct task-entry inventory and raw-source resolution. No top-level Markdown notes remain; `.notes/local-mail/` is operational coordination state, not project memory. `denubis-project-notes` remains source-only until cross-vendor exact resolution is ready. | Main-repository `.notes/`, exhaustively listed with hidden and ignored scope on 2026-08-12 | Hidden and ignored scope makes incomplete search look empty. Frontmatter and referenced evidence can drift. |
 | Human transcripts | Claude and Codex runtimes | Human, search tools, authority-bearing documents | Vendor JSONL and transcript archives; installed `cc-search-chats` 2.0.0a5 currently describes itself as Claude-only | Raw record and exact message locator | Provider schemas and paths differ. Cross-vendor search is prospective. A summary or model quotation is not the human invocation. |
-| Plans, ADRs, notes, constraints, and architecture | Repository or project authors | Humans and future sessions | Markdown memorials and living maps | Resolvable source pointer or repository evidence | A broken pointer is an integrity defect. Correction layers create palimpsests rather than current documents. |
+| Plans, ADRs, notes, constraints, and architecture | Repository or project authors | Humans and future sessions | Markdown memorials and living maps | Resolvable source pointer or repository evidence | A broken pointer is an integrity defect. Correction layers create palimpsests rather than current documents. The deployment manifest now verifies the raw human records used by this candidate. |
 | Tests and hook logs | Executed mechanism | Human or a downstream gate | External result bound to an artifact or event | Test output or structured log | Self-report is not evidence. A result without subject identity or invalidation rules cannot bind later action. A test that only matches source wording observes the edit rather than correctness. |
 
 ## Event topology
@@ -93,7 +94,7 @@ fires successfully on every machine.
 | Human authority | The original human invocation in a raw transcript | Notes, ADRs, plans, and model reports can point to authority; they do not manufacture it. |
 | Current system description | Living architecture | Architecture describes deployed reality. The design plan owns proposed removals and contracts until implementation lands. |
 | Project memory | `.notes/` | Notes preserve local observations and feedback. They are neither executable policy nor decision authority by themselves. |
-| Decisions | ADRs and dated decision records | A decision record memorialises one decision. Current records do not yet share a validated authority-pointer contract. |
+| Decisions | ADRs and dated decision records | A decision record memorialises one decision. Documents relying on a human ruling point to the original record and an exact resolver; the deployment verifier validates this candidate's registered records and action mappings. |
 | Situational procedure | Skills and commands | Procedures say how to act in a named situation. Their prose does not prove invocation or success. |
 | Mechanical action control | Permission hooks and executable gates | Only the matching boundary is controlled. Advisory context from the same hook remains prose. |
 | Behavioural feedback | Tests, external results, and event logs | Evidence binds an identified artifact or event. Tests exercise behaviour or processed structure independently of the satisfying edit. Non-executable prose expectations live in [`docs/review-rubrics/instruction-control.md`](../../review-rubrics/instruction-control.md). Model critique and self-description remain claims. |
@@ -116,16 +117,19 @@ Observed machine-local artifacts on 2026-08-11:
 | `/home/brian/.claude/rules/context7.md` | `89bb452cb064b48513f318508c0ece59a31cd6d9fec334a2dccd763f64a5e46a` |
 | Installed `denubis-academic/0.14.0/output-styles/academic-writing.md` | `039898cbcce93e8ac421392efa9c8644dd4b4f4dd5484435dfa4461be0c525a7` |
 | `/home/brian/.local/bin/cc-search-chats`, package metadata 2.0.0a5 | `1d94f04e95cefc02ad84981d2444619aad93aaf1b0ca0fc0438c7f2ec815e35c` |
-| Main-repository `.notes/*.md` sorted digest list, 50 files | `c305e1df1df08dd5a3824062ee11cf2c96ab41efe3e030149dac0f070ad74112` |
 
 These are observation stamps, not synchronization policy. Recompute them before relying
 on the snapshot. Each machine's live `~/.claude` is authoritative for that machine;
 remote shell access does not imply replicated state.
 
+The 2026-08-12 exhaustive inventory found zero top-level Markdown files in the
+main-repository `.notes/`; only `.notes/local-mail/index.sqlite3` remained.
+
 ## Exclusions
 
-- Proposed removals, the target authority-reference schema, and future evidence-stamp
-  consumers remain in the design plan until implemented.
+- Live removals and future evidence-stamp consumers remain in the design plan until
+  deployed. The source candidate, authority-record verifier, action mappings, and project
+  integration gate are implemented in the working tree but do not establish deployment.
 - Marketplace ordering and catalogue presentation do not define this system boundary.
 - Model weights and vendor instruction resolution internals are external.
 - The crash-recovery database is documented separately in

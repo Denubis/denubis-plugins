@@ -32,8 +32,8 @@ in `CODEX-CRITIQUE-2026-07-26-impl-plan-decision-discipline.md`, so read those b
 - **The Haiku judgement claim is strengthened, not retired.** The original plan proposed retiring
   it in Phase 2 (`model-tier-notes.md`) and Phase 3 (`testing-skills-with-subagents`). Operator
   rulings on 2026-07-25 and 2026-07-26 settled it in the opposite direction, and Sonnet is now
-  the floor across the suite. Recorded in `.notes/feedback_haiku-no-judgement.md` and shipped in
-  `58e4dd5`.
+  the floor across the suite. The current contract and authority records live in
+  `plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md`.
 - **Jones is settled.** The source-type grade lives in `absencejudgement-citations.md`.
 - **Codex won't-fixes** are recorded in `RESUME-PROMPT-fable-skill4.md`. Do not reopen one
   without genuinely new evidence.

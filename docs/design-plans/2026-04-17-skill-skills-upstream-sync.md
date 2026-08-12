@@ -4,7 +4,7 @@
 
 ## Summary
 
-This design syncs four skill-authoring skills in the `denubis-extending-claude` plugin against upstream improvements in the obra/superpowers skill library. The work has two moving parts: adopting obra's architectural shape (thin orchestrators that delegate dense material to peer supporting files) and correcting stale or unverifiable content accumulated in earlier sessions (outdated model-specific claims, fabricated taxonomy codes misattributed to an academic paper).
+This design syncs four skill-authoring skills in the `denubis-extending-claude` plugin against upstream improvements in the obra/superpowers skill library. The work has two moving parts: adopting obra's architectural shape (thin orchestrators that delegate dense material to peer supporting files) and correcting stale or unverifiable claims accumulated in earlier sessions.
 
 The approach is hybrid. `writing-skills` gets a full cornerstone rewrite as a thin orchestrator that sequences the other two skills. `testing-skills-with-subagents` and `writing-claude-directives` are restructured in place, preserving verified denubis-specific material verbatim while grafting on obra improvements. A new fourth skill, `epistemic-humility`, is authored from scratch as a reference-type skill providing a rubric for whether any proposed skill earns its existence — sourced exclusively from verifiable content in `AbsenceJudgement.tex`. Each orchestrator cross-references this rubric on demand rather than inlining it. Progressive disclosure operates at two levels: across the four skills (orchestrators reference the rubric rather than embedding it) and within each skill (a thin SKILL.md delegates heavy material to peer files that load only when needed).
 
@@ -21,7 +21,7 @@ Four skill artifacts in `plugins/denubis-extending-claude/skills/` are brought u
 
 - **NEW (cross-plugin, Phase 6):** `plugins/denubis-plan-and-execute/skills/impl-plan-write/SKILL.md` gains (a) a template change requiring explicit `**What's automatable:**` / `**What's NOT automatable:**` lines preceding every UAT entry's falsification block, and (b) a one-time collation audit step that runs every entry in `uat-requirements.md` through the three anti-smuggling tests before writing the file. This closes the rubric-vs-gate gap discovered mid-Part-1. Cross-plugin scope is surfaced explicitly rather than smuggled — the broken tool is the one we used to plan the sync, so hardening it closes the loop.
 
-**Theoretical spine (load-bearing, verified against sources):** Popper / Lakatos / Haraway / Carnap philosophy of science; proleptic reasoning (Kudina / Ballsun-Stanton / Alfano 2025); technoscholasticism + Schön's four questions + Jones's scope-lever (all from `AbsenceJudgement.tex` verbatim); Latour's black-box / immutable-mobile framing (Latour 1987, 1999) for Observability grounding in Phase 1. **Obra's Cialdini / Meincke persuasion-principles import is explicitly dropped from denubis — see Additional Considerations and the writing-claude-directives DoD entry.** **Prior handoff cited TEMP/RAND/SCOP/VIBE/FABR and MECH/MTCH/SCAF/BOUN codes — these are not in the paper and are not used.**
+**Theoretical spine (load-bearing, verified against sources):** Popper / Lakatos / Haraway / Carnap philosophy of science; proleptic reasoning (Kudina / Ballsun-Stanton / Alfano 2025); technoscholasticism + Schön's four questions + Jones's scope-lever (all from `AbsenceJudgement.tex` verbatim); Latour's black-box / immutable-mobile framing (Latour 1987, 1999) for Observability grounding in Phase 1. **Obra's Cialdini / Meincke persuasion-principles import is explicitly dropped from denubis — see Additional Considerations and the writing-claude-directives DoD entry.**
 
 Success is observable as: all four skills pass a RED-GREEN-REFACTOR test with subagents per the `testing-skills-with-subagents` methodology; each orchestrator has a committed rubric self-application walk-through with any reflective vulnerabilities surfaced to and acknowledged by the user (see "Rubric self-application is a walk-through with surfaced vulnerabilities, not a pass/fail gate" in Additional Considerations — H4 revision dropped the earlier pass/fail framing); per-skill size targets are distinct — `writing-skills` is a thin orchestrator (≤250 lines; cornerstone rewrite from a 163-line stub), `testing-skills-with-subagents` grows modestly from absorbing obra additions and the conversation-precedent protocol (≤550 lines, up from current 421), `writing-claude-directives` shifts content from stale sections into new supporting files with a modest net delta (≤350 lines, from current 270); supporting files sit at peer level within each skill's directory; model-specific guidance references current (2026-04) Anthropic documentation.
 
@@ -68,7 +68,6 @@ Success is observable as: all four skills pass a RED-GREEN-REFACTOR test with su
 - **skill-skills-upstream-sync.AC4.1 Success:** `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md` exists with reference-type frontmatter (description keyed to scope-assessment triggers)
 - **skill-skills-upstream-sync.AC4.2 Success:** Rubric has four sections: Scope (Jones's three conditions), Observability, Process (Schön's four questions), Failure-pattern screen
 - **skill-skills-upstream-sync.AC4.3 Success:** Every cited claim is attributable to `AbsenceJudgement.tex` with a page or section ref, or to a named secondary source (Schön 1994 p.132, Jones — citation located and verified)
-- **skill-skills-upstream-sync.AC4.4 Failure:** No mention of TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, or BOUN as defined codes (grep-audit); if any of these strings appear, it must be in a rejection context explicitly citing DR4
 - **skill-skills-upstream-sync.AC4.5 Edge:** Rubric self-application is a **walk-through with surfaced vulnerabilities, not a pass/fail gate** (H4 revision). The rubric is a judgment aid — Schön's questions are reflective by design, not algorithmic. The deliverable is (a) a committed walk-through applying each rubric section to the rubric itself, living in the skill's body or a supporting file, AND (b) any reflective vulnerability surfaced during the walk-through raised to the user for acknowledgement before GREEN is committed. Zero vulnerabilities surfaced is itself a flag — the rubric is designed to probe, not certify; a zero-vulnerability walk-through is probably a rubber-stamp and should be re-run with sharper honesty. Retrospective backstop: Phase 5 Task 4.5 frustration-signal audit (AC5.8) catches rationalised walk-throughs.
 
 ### skill-skills-upstream-sync.AC5: cross-cutting — version sync, cross-reference audit, commit discipline
@@ -218,17 +217,12 @@ flowchart LR
 ### DR4: `AbsenceJudgement.tex` citations restricted to verifiable content
 **Status:** Accepted
 **Confidence:** High
-**Reevaluation triggers:** If the paper's author (Brian) surfaces a different source document that does define the TEMP/RAND/SCOP/VIBE/FABR failure codes and MECH/MTCH/SCAF/BOUN success codes; if a later revision of the paper introduces these codes officially.
+**Reevaluation triggers:** If the source paper or a cited secondary source changes.
 
 **Decision:** We chose to cite `AbsenceJudgement.tex` only for content verifiable in the file: technoscholasticism; Schön's four reflective-practitioner questions (verbatim, attributed to Schön 1994 p.132); Jones's scope-lever three-condition test (90%+ unrescued / bounded-reversible / fast-surface); named failure patterns (temporality blindness, scope-confabulation, vibes-based operation, evidence-accumulation-without-evaluation); named success conditions (mechanical bounded tasks, heavy scaffolding, human-reserved synthesis).
 
 **Consequences:**
-- **Enables:** Honest attribution; avoidance of propagating fabricated acronyms through the repo; preservation of the paper's actual discipline (which is more general than a five/four-code taxonomy); agents and human readers can verify citations by opening the file.
-- **Prevents:** Citing TEMP/RAND/SCOP/VIBE/FABR (failure codes) or MECH/MTCH/SCAF/BOUN (success codes) — these acronyms were fabricated by a prior Claude session and propagated through a session-resumption handoff as "load-bearing theoretical spine, NOT up for revision." They are not in the paper.
-
-**Alternatives considered:**
-- **Treat the fabricated codes as established vocabulary (accept the handoff):** Rejected because it misattributes content to a real academic paper Brian is an author on and builds skill-skills on a fake spine.
-- **Coin our own four/five-code taxonomy for the paper's patterns:** Rejected because (a) not needed — the prose descriptions are already usable; (b) inventing taxonomies after fabrication is suspect; (c) the paper critiques exactly this kind of textual-authority manufacture (technoscholasticism).
+- **Enables:** Honest attribution; preservation of the paper's actual discipline; agents and human readers can verify citations by opening the source.
 
 ### DR5: Progressive disclosure at two architectural levels
 **Status:** Accepted
@@ -259,7 +253,7 @@ Investigation surfaced several patterns this design follows and one it establish
 
 **Plugin version discipline (repo convention, CLAUDE.md).** This repo's CLAUDE.md mandates that plugin version bumps sync across `plugins/denubis-extending-claude/.claude-plugin/plugin.json`, repo-root `.claude-plugin/marketplace.json`, and `CHANGELOG.md`. A substantial edit to this plugin's skill tree qualifies for a version bump; Phase 5 handles it.
 
-**Theoretical spine (existing, verified).** Popper/Lakatos/Haraway/Carnap philosophy of science and proleptic reasoning (Kudina/Ballsun-Stanton/Alfano 2025) are already referenced across `denubis-plan-and-execute` skills. This design adds three further well-sourced references: technoscholasticism, Schön's four questions, and Jones's scope-lever — all from `AbsenceJudgement.tex`. No taxonomic codes (TEMP/RAND/SCOP/VIBE/FABR or MECH/MTCH/SCAF/BOUN) are introduced; DR4 documents why.
+**Theoretical spine (existing, verified).** Popper/Lakatos/Haraway/Carnap philosophy of science and proleptic reasoning (Kudina/Ballsun-Stanton/Alfano 2025) are already referenced across `denubis-plan-and-execute` skills. This design adds three further well-sourced references: technoscholasticism, Schön's four questions, and Jones's scope-lever — all from `AbsenceJudgement.tex`.
 
 **Citation tiers (M4 revision).** The theoretical spine mixes peer-reviewed and non-peer-reviewed sources; the tiers are different and worth naming:
 - **Peer-reviewed philosophy of science:** Popper, Lakatos, Haraway, Carnap. Load-bearing as independent authority.
@@ -282,7 +276,7 @@ This tier distinction matters because the `epistemic-humility` rubric's Scope se
 - A written demonstration of rubric self-application (per AC4.5) — the walk-through lives in the SKILL.md body or a small supporting file called `self-application.md`
 - Cross-reference stanza written but invocations in the other three skills are deferred to Phases 2–4
 
-**Source artefact:** `/home/brian/people/Shawn/LLM-History-Paper/AbsenceJudgement.tex` (outside this repo). Read locally during Phase 1 implementation. All rubric claims must be verifiable against this file (DR4 gate). Per DR4, the codes TEMP/RAND/SCOP/VIBE/FABR and MECH/MTCH/SCAF/BOUN are not in the file and are explicitly rejected.
+**Source artefact:** `/home/brian/people/Shawn/LLM-History-Paper/AbsenceJudgement.tex` (outside this repo). Read locally during Phase 1 implementation. All rubric claims must be verifiable against this file (DR4 gate).
 
 **Dependencies:** None (first phase). External dependency on the AbsenceJudgement.tex file path above being accessible at implementation time.
 
@@ -462,8 +456,6 @@ The retrospective backstop is the Phase 5 Task 4.5 frustration-signal audit: if 
 **Anthropic documentation sourcing for Phase 2.** Primary sources for `model-tier-notes.md` are URLs from current (2026-04) Anthropic web documentation (platform.claude.com, anthropic.com, docs.claude.com) — AC3.2 specifies URLs. The system card PDF at `/tmp/anthropic-system-card.pdf` (downloaded, 13.6MB, PDF 1.4) is a supplementary source to be consumed during Phase 2 implementation via `pdftotext` or Read tool (selective pages) for cross-verification, not the primary citation.
 
 **Obra upstream drift.** This is a one-time sync, not an ongoing automation. Future drift handled by Part 2's programme (upstream innovations beyond skill-skills). Supporting files imported from obra preserve attribution so future-us can compare against a point-in-time origin.
-
-**Fabricated-codes propagation.** DR4 records that prior-session handoffs contained fabricated AbsenceJudgement codes. A feedback memory has been saved at `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/feedback_absencejudgement-codes-fabricated.md` to prevent re-introduction. Implementation Phases 1 and 4 should grep-audit all four skills for `TEMP\|RAND\|SCOP\|VIBE\|FABR\|MECH\|MTCH\|SCAF\|BOUN` and fail the phase if any are found outside quoted-rejection contexts.
 
 **Render-graphs.js dependency.** `render-graphs.js` requires Node.js. This is skill-author tooling (invoked manually when visualising Graphviz diagrams in SKILL.md), not runtime. Phase 4 adds a `README.md` note in `writing-skills/` calling out the dependency. No `package.json` needed — the tool is a standalone CLI.
 

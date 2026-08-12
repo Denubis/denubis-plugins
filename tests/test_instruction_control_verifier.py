@@ -7,6 +7,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_PATH = (
     REPO_ROOT / "deployment" / "instruction-control" / "verify_candidate.py"
@@ -17,6 +19,24 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 verifier = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verifier)
+
+
+def test_manifest_loader_rejects_duplicate_keys(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        '{"schema_version": 1, "schema_version": 2}', encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="duplicate JSON key: schema_version"):
+        verifier._load_manifest(manifest)
+
+
+def test_manifest_loader_rejects_unknown_schema(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"schema_version": 2}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unsupported manifest schema_version: 2"):
+        verifier._load_manifest(manifest)
 
 
 def _write_fixture(tmp_path: Path, *, role: str = "user") -> Path:
@@ -43,14 +63,28 @@ def _write_fixture(tmp_path: Path, *, role: str = "user") -> Path:
         + "\n",
         encoding="utf-8",
     )
+    authority_text = "authority"
     manifest = {
         "schema_version": 1,
-        "authority": {"human_source": str(source), "human_source_lines": [1]},
+        "authority": {
+            "records": {
+                "A1": {
+                    "path": str(source),
+                    "line": 1,
+                    "format": "codex_user_text",
+                    "text_sha256": hashlib.sha256(
+                        authority_text.encode()
+                    ).hexdigest(),
+                }
+            },
+            "actions": {"test-change": {"records": ["A1"]}},
+        },
         "candidates": {
             "global_claude": {
                 "path": "candidate.md",
                 "bytes": candidate.stat().st_size,
                 "sha256": verifier.sha256_file(candidate),
+                "authority_actions": ["test-change"],
             }
         },
         "plugin_releases": {
@@ -60,6 +94,7 @@ def _write_fixture(tmp_path: Path, *, role: str = "user") -> Path:
                     "version": "1.2.3",
                     "source": "plugins/example",
                     "tree_sha256": verifier.sha256_tree(plugin),
+                    "authority_actions": ["test-change"],
                 }
             ],
             "retire": [],
@@ -91,43 +126,169 @@ def test_source_verification_rejects_wrong_authority_role(tmp_path: Path) -> Non
 
     errors = verifier.verify_source(tmp_path, manifest)
 
-    assert errors == ["authority line 1 is not one non-empty user input_text record"]
+    assert errors == [
+        "authority record A1 line 1 is not one non-empty Codex user input_text record"
+    ]
 
 
-def test_source_verification_checks_additional_authority_source(
+def test_source_verification_checks_claude_authority_source(
     tmp_path: Path,
 ) -> None:
     manifest_path = _write_fixture(tmp_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     additional = tmp_path / "additional-session.jsonl"
+    authority_text = "additional authority"
     additional.write_text(
         json.dumps(
             {
-                "type": "response_item",
-                "payload": {
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [{"type": "input_text", "text": "not authority"}],
-                },
+                "type": "user",
+                "message": {"role": "user", "content": authority_text},
             }
         )
         + "\n",
         encoding="utf-8",
     )
-    manifest["authority"]["additional_human_sources"] = [
-        {"path": str(additional), "lines": [1]}
+    manifest["authority"]["records"]["A2"] = {
+        "path": str(additional),
+        "line": 1,
+        "format": "claude_user_text",
+        "text_sha256": hashlib.sha256(authority_text.encode()).hexdigest(),
+    }
+    manifest["authority"]["actions"]["test-change"]["records"].append(
+        "A2"
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == []
+
+
+def test_source_verification_rejects_authority_text_substitution(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    source = tmp_path / "session.jsonl"
+    record = json.loads(source.read_text(encoding="utf-8"))
+    record["payload"]["content"][0]["text"] = "different authority"
+    source.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == ["authority record A1 text sha256 does not match"]
+
+
+def test_source_verification_rejects_unknown_authority_action(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["candidates"]["global_claude"]["authority_actions"] = [
+        "missing-action"
     ]
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     errors = verifier.verify_source(tmp_path, manifest_path)
 
     assert errors == [
-        f"additional authority {additional} line 1 is not one non-empty user "
-        "input_text record"
+        "candidate global_claude names unknown authority action missing-action"
     ]
 
 
-def test_baseline_verification_checks_git_binding() -> None:
+def test_source_verification_requires_candidate_authority_mapping(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del manifest["candidates"]["global_claude"]["authority_actions"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == ["candidate global_claude has no authority action"]
+
+
+def test_source_verification_rejects_forbidden_settings_env(tmp_path: Path) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({"env": {"BLOCKED": "1"}}), encoding="utf-8")
+    manifest["candidates"]["settings"] = {
+        "path": settings.name,
+        "bytes": settings.stat().st_size,
+        "sha256": verifier.sha256_file(settings),
+        "authority_actions": ["test-change"],
+    }
+    manifest["settings_contract"] = {
+        "candidate": "settings",
+        "forbidden_env": ["BLOCKED"],
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == [
+        "settings candidate contains forbidden environment variable BLOCKED"
+    ]
+
+
+def _add_codex_history_contract(
+    manifest_path: Path,
+    config_path: Path,
+) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["codex_history_contract"] = {
+        "path": str(config_path),
+        "persistence": "save-all",
+        "forbid_max_bytes": True,
+        "authority_actions": ["test-change"],
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_source_verification_rejects_disabled_codex_history(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    config = tmp_path / "config.toml"
+    config.write_text('[history]\npersistence = "none"\n', encoding="utf-8")
+    _add_codex_history_contract(manifest_path, config)
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == ["Codex history persistence is none, expected save-all"]
+
+
+def test_source_verification_rejects_codex_history_size_cap(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[history]\npersistence = "save-all"\nmax_bytes = 1024\n',
+        encoding="utf-8",
+    )
+    _add_codex_history_contract(manifest_path, config)
+
+    errors = verifier.verify_source(tmp_path, manifest_path)
+
+    assert errors == ["Codex history max_bytes must remain unset"]
+
+
+def test_source_verification_accepts_uncapped_saved_codex_history(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[history]\npersistence = "save-all"\n', encoding="utf-8"
+    )
+    _add_codex_history_contract(manifest_path, config)
+
+    assert verifier.verify_source(tmp_path, manifest_path) == []
+
+
+def test_baseline_verification_rejects_historical_git_binding() -> None:
     manifest = {
         "baselines": {
             "project_claude": {
@@ -139,8 +300,7 @@ def test_baseline_verification_checks_git_binding() -> None:
     }
 
     assert verifier.verify_baselines(manifest, repo_root=REPO_ROOT) == [
-        "live baseline project_claude bytes changed",
-        "live baseline project_claude sha256 changed",
+        "live baseline project_claude has unsupported binding: git:HEAD:CLAUDE.md"
     ]
 
 
@@ -225,6 +385,25 @@ def test_settings_transition_rejects_unowned_change(tmp_path: Path) -> None:
     assert errors == [
         "settings transition changes values outside its declared ownership"
     ]
+
+
+def test_project_integration_requires_exact_candidate_at_live_path(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_fixture(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    live = tmp_path / "live-project-CLAUDE.md"
+    live.write_text("old\n", encoding="utf-8")
+    manifest["candidates"]["global_claude"]["live_path"] = str(live)
+    manifest["project_integration"] = {"candidate": "global_claude"}
+
+    assert verifier.verify_project_integration(manifest) == [
+        "project integration global_claude bytes do not match",
+        "project integration global_claude sha256 does not match",
+    ]
+
+    live.write_bytes((tmp_path / "candidate.md").read_bytes())
+    assert verifier.verify_project_integration(manifest) == []
 
 
 def test_deployed_verification_compares_live_files_and_cache(tmp_path: Path) -> None:

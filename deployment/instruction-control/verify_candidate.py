@@ -7,7 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
-import subprocess
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -43,8 +43,27 @@ def sha256_tree(root: Path) -> str:
     return digest.hexdigest()
 
 
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def _load_manifest(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    manifest = json.loads(
+        path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object
+    )
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest root must be an object")
+    schema_version = manifest.get("schema_version")
+    if schema_version != 1:
+        raise ValueError(
+            f"unsupported manifest schema_version: {schema_version}"
+        )
+    return manifest
 
 
 def _candidate_errors(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
@@ -65,64 +84,187 @@ def _candidate_errors(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _authority_source_errors(
-    source: Path, wanted: set[int], *, label: str
+def _jsonl_record(path: Path, line_number: int) -> dict[str, Any] | None:
+    if not path.is_file() or line_number < 1:
+        return None
+    with path.open(encoding="utf-8") as stream:
+        for current_line, raw_line in enumerate(stream, start=1):
+            if current_line != line_number:
+                continue
+            try:
+                value = json.loads(raw_line)
+            except json.JSONDecodeError:
+                return None
+            return value if isinstance(value, dict) else None
+    return None
+
+
+def _codex_user_text(record: dict[str, Any] | None) -> str | None:
+    if not isinstance(record, dict) or record.get("type") != "response_item":
+        return None
+    payload = record.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    content = payload.get("content")
+    if (
+        payload.get("type") != "message"
+        or payload.get("role") != "user"
+        or not isinstance(content, list)
+    ):
+        return None
+    text_items = [
+        item.get("text")
+        for item in content
+        if isinstance(item, dict) and item.get("type") == "input_text"
+    ]
+    if len(text_items) != 1 or not isinstance(text_items[0], str):
+        return None
+    return text_items[0] or None
+
+
+def _claude_user_text(record: dict[str, Any] | None) -> str | None:
+    if not isinstance(record, dict) or record.get("type") != "user":
+        return None
+    message = record.get("message")
+    if not isinstance(message, dict) or message.get("role") != "user":
+        return None
+    content = message.get("content")
+    return content if isinstance(content, str) and content else None
+
+
+def _authority_record_errors(
+    record_id: str, binding: dict[str, Any]
 ) -> list[str]:
-    found: dict[int, Any] = {}
-    if not source.is_file():
-        return [f"{label} source is missing: {source}"]
+    path = Path(binding["path"])
+    line_number = binding["line"]
+    if not path.is_file():
+        return [f"authority record {record_id} source is missing: {path}"]
 
-    with source.open(encoding="utf-8") as stream:
-        for line_number, raw_line in enumerate(stream, start=1):
-            if line_number in wanted:
-                try:
-                    found[line_number] = json.loads(raw_line)
-                except json.JSONDecodeError:
-                    found[line_number] = None
-
-    errors: list[str] = []
-    for line_number in sorted(wanted):
-        record = found.get(line_number)
-        payload = record.get("payload", {}) if isinstance(record, dict) else {}
-        content = payload.get("content", [])
-        input_text = [
-            item.get("text")
-            for item in content
-            if isinstance(item, dict) and item.get("type") == "input_text"
-        ]
-        valid = (
-            isinstance(record, dict)
-            and record.get("type") == "response_item"
-            and payload.get("type") == "message"
-            and payload.get("role") == "user"
-            and len(input_text) == 1
-            and isinstance(input_text[0], str)
-            and bool(input_text[0])
+    record = _jsonl_record(path, line_number)
+    record_format = binding.get("format")
+    if record_format == "codex_user_text":
+        text = _codex_user_text(record)
+        invalid = (
+            f"authority record {record_id} line {line_number} is not one "
+            "non-empty Codex user input_text record"
         )
-        if not valid:
-            errors.append(
-                f"{label} line {line_number} is not one non-empty user "
-                "input_text record"
-            )
+    elif record_format == "claude_user_text":
+        text = _claude_user_text(record)
+        invalid = (
+            f"authority record {record_id} line {line_number} is not one "
+            "non-empty Claude user text record"
+        )
+    else:
+        return [
+            f"authority record {record_id} has unsupported format: {record_format}"
+        ]
+
+    if text is None:
+        return [invalid]
+    if hashlib.sha256(text.encode()).hexdigest() != binding.get("text_sha256"):
+        return [f"authority record {record_id} text sha256 does not match"]
+    return []
+
+
+def _authority_mapping_errors(
+    manifest: dict[str, Any], actions: dict[str, Any]
+) -> list[str]:
+    errors: list[str] = []
+
+    def check(label: str, record: dict[str, Any]) -> None:
+        selected = record.get("authority_actions")
+        if not isinstance(selected, list) or not selected:
+            errors.append(f"{label} has no authority action")
+            return
+        for action in selected:
+            if action not in actions:
+                errors.append(f"{label} names unknown authority action {action}")
+
+    for name, record in manifest.get("candidates", {}).items():
+        check(f"candidate {name}", record)
+    releases = manifest.get("plugin_releases", {})
+    for release in releases.get("install", []):
+        check(f'plugin release {release["name"]}@{release["version"]}', release)
+    for release in releases.get("retire", []):
+        check(f'retired plugin {release["name"]}', release)
+    transition = manifest.get("settings_transition")
+    if transition:
+        check("settings transition", transition)
+    history_contract = manifest.get("codex_history_contract")
+    if history_contract:
+        check("Codex history contract", history_contract)
     return errors
 
 
 def _authority_errors(manifest: dict[str, Any]) -> list[str]:
     authority = manifest.get("authority", {})
-    errors = _authority_source_errors(
-        Path(authority["human_source"]),
-        set(authority["human_source_lines"]),
-        label="authority",
-    )
-    for record in authority.get("additional_human_sources", []):
-        source = Path(record["path"])
-        errors.extend(
-            _authority_source_errors(
-                source,
-                set(record["lines"]),
-                label=f"additional authority {source}",
-            )
+    records = authority.get("records", {})
+    actions = authority.get("actions", {})
+    errors: list[str] = []
+    for record_id, binding in records.items():
+        errors.extend(_authority_record_errors(record_id, binding))
+    for action_name, action in actions.items():
+        selected = action.get("records")
+        if not isinstance(selected, list) or not selected:
+            errors.append(f"authority action {action_name} has no records")
+            continue
+        for record_id in selected:
+            if record_id not in records:
+                errors.append(
+                    f"authority action {action_name} names unknown record {record_id}"
+                )
+    errors.extend(_authority_mapping_errors(manifest, actions))
+    return errors
+
+
+def _settings_contract_errors(
+    repo_root: Path, manifest: dict[str, Any]
+) -> list[str]:
+    contract = manifest.get("settings_contract")
+    if not contract:
+        return []
+
+    candidate_name = contract.get("candidate")
+    candidate = manifest.get("candidates", {}).get(candidate_name)
+    if not candidate:
+        return ["settings contract names an unknown candidate"]
+
+    path = (repo_root / candidate["path"]).resolve()
+    if not path.is_relative_to(repo_root.resolve()) or not path.is_file():
+        return []  # `_candidate_errors` reports the binding failure.
+
+    settings = json.loads(path.read_text(encoding="utf-8"))
+    env = settings.get("env", {})
+    forbidden = set(contract.get("forbidden_env", []))
+    return [
+        f"settings candidate contains forbidden environment variable {name}"
+        for name in sorted(forbidden & set(env))
+    ]
+
+
+def _codex_history_contract_errors(manifest: dict[str, Any]) -> list[str]:
+    contract = manifest.get("codex_history_contract")
+    if not contract:
+        return []
+
+    path = Path(contract["path"])
+    if not path.is_absolute() or not path.is_file():
+        return [f"Codex history config is missing: {path}"]
+    try:
+        config = tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as error:
+        return [f"Codex history config is invalid TOML: {error}"]
+
+    history = config.get("history", {})
+    expected = contract.get("persistence", "save-all")
+    actual = history.get("persistence")
+    errors: list[str] = []
+    if actual != expected:
+        errors.append(
+            f"Codex history persistence is {actual}, expected {expected}"
         )
+    if contract.get("forbid_max_bytes") and "max_bytes" in history:
+        errors.append("Codex history max_bytes must remain unset")
     return errors
 
 
@@ -172,28 +314,10 @@ def verify_source(repo_root: Path, manifest_path: Path) -> list[str]:
     return [
         *_candidate_errors(repo_root, manifest),
         *_authority_errors(manifest),
+        *_settings_contract_errors(repo_root, manifest),
+        *_codex_history_contract_errors(manifest),
         *_plugin_source_errors(repo_root, manifest),
     ]
-
-
-def _git_binding_content(
-    repo_root: Path, binding: str
-) -> tuple[bytes | None, str | None]:
-    parts = binding.split(":", maxsplit=2)
-    if len(parts) != 3 or parts[0] != "git" or not all(parts[1:]):
-        return None, f"unsupported binding: {binding}"
-
-    revision, relative_path = parts[1:]
-    completed = subprocess.run(
-        ["git", "show", "--no-ext-diff", f"{revision}:{relative_path}"],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.decode(errors="replace").strip()
-        return None, f"cannot resolve {binding}: {detail}"
-    return completed.stdout, None
 
 
 def _apply_enabled_plugin_changes(
@@ -286,14 +410,6 @@ def verify_baselines(
                 errors.append(f"live baseline {name} is missing: {path}")
                 continue
             content = path.read_bytes()
-        elif binding.startswith("git:"):
-            content, binding_error = _git_binding_content(repo_root, binding)
-            if binding_error is not None:
-                errors.append(f"live baseline {name} {binding_error}")
-                continue
-            if content is None:
-                errors.append(f"live baseline {name} returned no content")
-                continue
         else:
             errors.append(
                 f"live baseline {name} has unsupported binding: {binding}"
@@ -305,6 +421,30 @@ def verify_baselines(
         if hashlib.sha256(content).hexdigest() != record["sha256"]:
             errors.append(f"live baseline {name} sha256 changed")
     errors.extend(_settings_transition_errors(manifest, repo_root=repo_root))
+    return errors
+
+
+def verify_project_integration(manifest: dict[str, Any]) -> list[str]:
+    """Require the project-owned live file to equal its reviewed candidate."""
+    integration = manifest.get("project_integration")
+    if not integration:
+        return ["manifest has no project integration contract"]
+    candidate_name = integration.get("candidate")
+    candidate = manifest.get("candidates", {}).get(candidate_name)
+    if not candidate:
+        return ["project integration names an unknown candidate"]
+    live_path_value = candidate.get("live_path")
+    if not live_path_value:
+        return [f"project integration {candidate_name} has no live_path"]
+    live_path = Path(live_path_value)
+    if not live_path.is_file():
+        return [f"project integration {candidate_name} is missing: {live_path}"]
+
+    errors: list[str] = []
+    if live_path.stat().st_size != candidate["bytes"]:
+        errors.append(f"project integration {candidate_name} bytes do not match")
+    if sha256_file(live_path) != candidate["sha256"]:
+        errors.append(f"project integration {candidate_name} sha256 does not match")
     return errors
 
 
@@ -330,7 +470,10 @@ def verify_deployed(
     manifest: dict[str, Any], *, cache_root: Path
 ) -> list[str]:
     """Compare live files and installed plugin trees with the source candidate."""
-    errors = _deployed_candidate_errors(manifest)
+    errors = [
+        *_deployed_candidate_errors(manifest),
+        *_codex_history_contract_errors(manifest),
+    ]
 
     releases = manifest.get("plugin_releases", {})
     installs = releases.get("install", [])
@@ -377,7 +520,9 @@ def verify_deployed(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("source", "baseline", "deployed"))
+    parser.add_argument(
+        "mode", choices=("source", "baseline", "project", "deployed")
+    )
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--repo-root", type=Path)
     parser.add_argument(
@@ -404,6 +549,8 @@ def main() -> int:
         errors = verify_source(repo_root, manifest_path)
     elif args.mode == "baseline":
         errors = verify_baselines(manifest, repo_root=repo_root)
+    elif args.mode == "project":
+        errors = verify_project_integration(manifest)
     else:
         errors = verify_deployed(manifest, cache_root=args.cache_root)
 

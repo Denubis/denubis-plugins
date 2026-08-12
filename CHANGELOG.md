@@ -3,25 +3,57 @@
 ## Instruction-control source candidate
 
 **Fixed:**
-- Deployment verification now resolves declared Git baselines and rejects unsupported
-  bindings or candidates without live targets instead of silently skipping them
+- Deployment verification binds mutable absolute baselines, rejects historical Git
+  bindings, and requires the reviewed project candidate at its live path before user-level
+  mutation
 - The settings candidate preserves the current model, output style, and date hook. Its
   remaining diff is limited to explicitly retired or replaced plugins and permissions
 - `denubis-project-notes` installation is split from the core candidate until
   cross-vendor exact source resolution is available; direct `.notes/` inspection does
   not depend on PostgreSQL receipt correlation
+- The source candidate now includes the global Codex `AGENTS.md`. Its verifier parses the
+  live Codex config and requires uncapped `save-all` history while rollout records are
+  cited as human authority
+- Accepted ADRs now expose the resolvable human source that selected each decision; the
+  three pre-existing omissions were repaired without copying chat prose into the records
+
+## [denubis-external-agents] 0.15.3
+
+**Changed:**
+- `supervising-codex` now carries the clear/compact cadence with exact human-source
+  locators; code and tests own the slash-command mechanism without a duplicate project note
+- The Fable consultation skill now disables model invocation at the Claude Code metadata
+  boundary while retaining explicit human invocation. The pane launcher describes its
+  deny list as a checked, moving boundary rather than structural isolation, and no longer
+  prescribes a stale fallback model when Fable is unavailable
+
+## [denubis-research-agents] 1.3.2
+
+**Changed:**
+- Research-agent routing now carries resolvable dispatch-floor authority rather than the
+  retired Haiku incident narrative
 
 ## [denubis-extending-claude] 1.10.1
 
 **Changed:**
 - `writing-claude-directives` now owns the Claude Task-invocation XML format that was
   removed from the project-wide instructions
+- Skill authoring no longer treats model compliance in a prompt campaign as code TDD.
+  Executable properties use independent checks; prose claims use falsifiable review
+  rubrics, and separate-model review is optional
+- Long-running work now persists only unrecoverable state in an existing owner. It no
+  longer mandates orchestration-only sessions, checkpoint commits, or model-memory files
+- `model-tier-notes.md` now owns the current Fable 5, Opus 5, Sonnet 5, and Haiku 4.5
+  roster plus the dispatch floor, Fable cost gate, and advisor selection with resolvable
+  human records; previous-generation notes and their supersession log are removed
 
 ## [denubis-basic-agents] 2.2.1
 
 **Changed:**
 - Removed the generic SessionStart reminder. `using-generic-agents` now appears only when
   agent selection is actually needed
+- Haiku remains a legacy callable definition but has no sanctioned dispatch; generic
+  routing carries the resolvable dispatch-floor authority without repeating the incident
 
 ## [denubis-plan-and-execute] 4.0.0
 
@@ -32,13 +64,26 @@
   review, or human UAT must invoke that boundary explicitly
 
 **Changed:**
-- `impl-plan-write` integrates the reviewed decision-discipline work from branch
-  `impl-plan-decision-discipline` at `a724452`. It has one review route: only choices
+- Non-trivial task entry now states the goal, inspects relevant memory, feedback,
+  decisions, and constraints, and recursively settles decision-bearing sub-goals before
+  mutation
+- `impl-plan-write` semantically incorporates the one-route change from `aa41464` and the
+  filesystem-derived reference check from `b8ca31b`; `a724452` is only the branch's
+  release-metadata tip, not proof that every branch decision landed. The planner has one
+  route: only choices
   that survive the restatement, invented-alternative, and obvious-default filters reach
   the human
+- Every implementation plan now records its meaningful data/control-flow boundary.
+  Applicable work gets a breadth-first predicted DFD with inter-phase seams; other work
+  names the specific preserved boundary. Execution inventories the complete bounded
+  implementation change before comparing it with the prediction, living architecture
+  records what was made only when its owned claims change, and an accepted load-bearing
+  change in what the system does requires an ADR carrying why
 - Test and UAT requirements each have one unconditional generation route. UAT collation
   consumes both phase decisions and acceptance criteria not mapped to automated tests;
-  zero UAT entries remains valid
+  zero UAT entries remains valid. Its source now also requires agent-authored probes of
+  wanted and plausible unwanted behavior across the built surface and existing-system
+  seams
 - Implementation planning now permits direct repository inspection and optional
   delegation. It no longer requires self-certifying stamps, forced coordination or
   review ceremonies, artificial two-to-five-minute tasks, unauthorised commit steps, or
@@ -79,20 +124,19 @@
   requiring an interactive preparatory-refactor decision
 - Added structural tests that reject unresolved plugin-qualified skill references and
   missing dispatched agents
-- Added a family-graph gate and explicit callers for internal review, conformance,
-  refactoring, and branch-finish procedures
 - Restored lean separation, reduction, and disagreement checks that keep deterministic
   assertions out of UAT without restoring stamps or duplicated prose
 - Replaced exact-string tests that merely froze instruction wording with a review rubric.
-  An AST-based test-quality gate now rejects raw documentation wording assertions while
-  allowing behaviour checks and genuinely parsed structures
+  A positively controlled AST lint catches supported raw-Markdown wording assertions
+  without claiming exhaustive prose-test detection
 
 ## [denubis-project-notes] 0.1.0
 
 **New:**
-- `scanning-project-notes` is direct main-session task-entry retrieval. It resolves the
-  main repository's `.notes/`, inventories every Markdown note, reads every frontmatter
-  block, opens relevant bodies, and resolves relevant chat messages before use
+- `scanning-project-notes` provides a direct retrieval procedure when selected. It resolves
+  the main repository's `.notes/`, inventories every Markdown note, reads every
+  frontmatter block, opens relevant bodies, and resolves relevant chat messages before
+  use. Notes carry memory and feedback but do not create authority or decisions
 
 **Retired:**
 - `denubis-notes-advisory` 0.2.1. Its SessionStart request, fire telemetry, and delegated
@@ -200,10 +244,10 @@ with counts instead of impressions.
   the rest of the report suspect, rather than a formatting slip to look past
 
 **Known gap:** there is still no valid evidence the SessionStart trigger changes
-behaviour. The three-arm test of 2026-08-09 produced one void arm, one that could
-not be certified clean, and one confirmed fabrication. The log exists so that gap
-can be closed with data. See `.notes/project_notes-advisory-pressure-test-2026-08-09.md`
-and `.notes/reference_did-the-notes-hook-work.md` for the queries.
+behaviour. The three-arm test of 2026-08-09 produced no valid comparison; its
+behavioural arm was contaminated and the advisor pinpoint resolves. The surviving
+evidence and its limits are recorded in
+`docs/audits/2026-08-12-cross-check-of-instruction-control-review.md`.
 
 ## [denubis-external-agents] 0.15.0
 

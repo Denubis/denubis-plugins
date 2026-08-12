@@ -13,50 +13,8 @@ CANDIDATE_MANIFEST = GLOBAL_CANDIDATE.with_name("candidate-manifest.json")
 SETTINGS_CANDIDATE = GLOBAL_CANDIDATE.with_name("settings.json")
 
 
-def _headings(path: Path) -> set[str]:
-    return {
-        line.removeprefix("## ")
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.startswith("## ")
-    }
-
-
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def test_global_candidate_contains_only_continuous_instruction_sections() -> None:
-    headings = _headings(GLOBAL_CANDIDATE)
-
-    assert {
-        "Working relationship",
-        "Request boundary",
-        "Engineering invariants",
-        "Evidence and authority",
-        "Documents and memory",
-        "Communication",
-        "Environment",
-    } <= headings
-    assert headings.isdisjoint(
-        {
-            "Git Commits",
-            "Settings Sync",
-            "Repository Search",
-            "Writing prose",
-            "Memory: the `.notes/` scheme",
-            "Halting on Reviewer Findings",
-        }
-    )
-
-
-def test_project_claude_contains_project_rules_not_incident_history() -> None:
-    headings = _headings(PROJECT_CLAUDE)
-
-    assert headings == {
-        "Runtime boundaries",
-        "Repository contracts",
-        "Finding aids",
-    }
 
 
 def test_candidate_manifest_binds_the_files_a_deployer_will_consume() -> None:

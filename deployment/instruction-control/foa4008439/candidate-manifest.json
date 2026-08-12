@@ -2,39 +2,278 @@
   "schema_version": 1,
   "host": "foa4008439",
   "state": "source-candidate",
-  "prepared_on": "2026-08-11",
+  "prepared_on": "2026-08-12",
   "catalogue_path": ".claude-plugin/marketplace.json",
   "plugin_registry_path": "/home/brian/.claude/plugins/installed_plugins.json",
   "authority": {
     "design": "docs/design-plans/2026-08-11-instruction-control-system.md",
-    "human_source": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
-    "human_source_lines": [126, 227, 304, 314, 324, 334, 352, 362, 383, 403, 423, 433, 7809],
-    "additional_human_sources": [
-      {
+    "records": {
+      "IC01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 126,
+        "format": "codex_user_text",
+        "text_sha256": "610829a602b0da9fc1e1b050d006b913d869a5da611e99ece541d4e03b19c477"
+      },
+      "IC02": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 227,
+        "format": "codex_user_text",
+        "text_sha256": "0587f0425ebbfb45d0fa859338706cd45f8627bb5b3b6f215102c67287650559"
+      },
+      "IC03": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 304,
+        "format": "codex_user_text",
+        "text_sha256": "42c12f0f4e7e9cb2d784091124da3167bd9722301ce323bd50116f7ac8ffcad2"
+      },
+      "IC04": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 314,
+        "format": "codex_user_text",
+        "text_sha256": "685f001f0f72e3398b27183a258c2fb3b0914cf51f530fb3e0c0a97e22c08438"
+      },
+      "IC05": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 324,
+        "format": "codex_user_text",
+        "text_sha256": "313343cb89f07c9dc2b4961aee9cd71702e9c2c3ade9c14c342750a5389785f3"
+      },
+      "IC06": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 334,
+        "format": "codex_user_text",
+        "text_sha256": "2dd52cbc1d338c8ad09e05b1ba686ba3a6950805ccecdeb3bd83e13735ed20ba"
+      },
+      "IC07": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 352,
+        "format": "codex_user_text",
+        "text_sha256": "fb0b0287a51a5acf4333b56f5bd52d0c16b68c1338d98a639c9c65f9352479fb"
+      },
+      "IC08": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 362,
+        "format": "codex_user_text",
+        "text_sha256": "32c8bc08096e1d9e033bf21e0bd564eb989edb098c029b67422f77bdee6d487c"
+      },
+      "IC09": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 383,
+        "format": "codex_user_text",
+        "text_sha256": "55b6d9c95647ff89bad66aa8cf177136dba2d8319c1393b7ff0e48bba4aa12bb"
+      },
+      "IC10": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 403,
+        "format": "codex_user_text",
+        "text_sha256": "0865175397e1fe2770979094c5748127003842faa454dd63be27ef70fd7f5995"
+      },
+      "IC11": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 423,
+        "format": "codex_user_text",
+        "text_sha256": "ec35c4847ef4004e3dd129169b7218c0da4e8ab03cf1af2b8785a76e8254a75a"
+      },
+      "IC12": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 433,
+        "format": "codex_user_text",
+        "text_sha256": "4c9d108ef559b7722fec068fb70651c328f7cc8cc5aaed0bcba7c81f1b97c31a"
+      },
+      "SEARCH01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 7809,
+        "format": "codex_user_text",
+        "text_sha256": "16bcd56e5a90130fd249e53cefcded9d8bb61d12f5446dadab3e1126d19d3c3e"
+      },
+      "SYNC01": {
         "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T16-44-15-019fea6a-2e86-7931-ad4d-e6b25bfa666a.jsonl",
-        "lines": [358]
+        "line": 358,
+        "format": "codex_user_text",
+        "text_sha256": "b8d0fbead46665cf773228eeb49aa7f8e46200588dc240e86afa74cf06357b49"
+      },
+      "UV01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/64611e50-8793-451a-82ca-0b4fc5264e02.jsonl",
+        "line": 58,
+        "format": "claude_user_text",
+        "text_sha256": "2fd51e62789064a08d2adae5d5b989484064513a443fb5c44591776e4e895958"
+      },
+      "UV02": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/64611e50-8793-451a-82ca-0b4fc5264e02.jsonl",
+        "line": 69,
+        "format": "claude_user_text",
+        "text_sha256": "ff340d456a300a15ca42299d618d616ce9bf1b0bfc76afe12e175108f4a48f78"
+      },
+      "CADENCE01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/494077d8-3c4e-49eb-ba60-beb1ba5f38fe.jsonl",
+        "line": 1347,
+        "format": "claude_user_text",
+        "text_sha256": "4e5cfd21d48dd791cc4a3000073bcbbb6cf7261cc3dffec2bfb03a228ffc4fe3"
+      },
+      "CADENCE02": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/494077d8-3c4e-49eb-ba60-beb1ba5f38fe.jsonl",
+        "line": 1375,
+        "format": "claude_user_text",
+        "text_sha256": "1538c784d63d74991b03c9a9a98e8127982c1d8ae1312d91dc1d5160f870088c"
+      },
+      "MODEL01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/f7df1451-ba25-41cb-a76b-6deb33e53dad.jsonl",
+        "line": 329,
+        "format": "claude_user_text",
+        "text_sha256": "4e9bfc4a230deca769ea2a6d4a05c56444911559c9fed0388a0e5aa5095d904d"
+      },
+      "MODEL02": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl",
+        "line": 916,
+        "format": "claude_user_text",
+        "text_sha256": "18d94f1ca26fb93635b845aa9c886a4ad3c4ff80eb83de2c888add013ffb91b0"
+      },
+      "MODEL03": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl",
+        "line": 1116,
+        "format": "claude_user_text",
+        "text_sha256": "626b6dd63c8bac0ae83f59ef1f4b73cbcd288a3e9c01492185e1530867c9323c"
+      },
+      "COST01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/e4421bb3-2615-4b37-944c-86e5dd65eccc.jsonl",
+        "line": 12,
+        "format": "claude_user_text",
+        "text_sha256": "fb0c077bc090b9f0efd53a3f97b73a0b23289fb473a496cebaa50abb146a20a3"
+      },
+      "ADVISOR01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/3c2ab09a-2af3-4252-9dc6-5d7d7b449b8d.jsonl",
+        "line": 225,
+        "format": "claude_user_text",
+        "text_sha256": "6aa20ad6a6845e1e02557cc88a538334125421ae7921393b08f8254419fe58e0"
+      },
+      "TEST01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 9797,
+        "format": "codex_user_text",
+        "text_sha256": "b08826b05532311aabd9f6f7b430cac80edc4c8c2f35d6cd5100a3b3f22afbdf"
+      },
+      "REQUEST01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 13071,
+        "format": "codex_user_text",
+        "text_sha256": "73fe8530566869c49c0cf107f02684f6c8fed0cc06513e67bd2962b6fa792de3"
+      },
+      "RETENTION01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 13297,
+        "format": "codex_user_text",
+        "text_sha256": "86a780440d6fc762e6f2cb9f5a800de88648871e236c5443d8aee8e99856d7d5"
+      },
+      "NOTES01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 11105,
+        "format": "codex_user_text",
+        "text_sha256": "bfc44ba844f4489e3c497909cfaba81867089bf999fa3358fd6804201c1243a8"
+      },
+      "DFD01": {
+        "path": "/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl",
+        "line": 14052,
+        "format": "codex_user_text",
+        "text_sha256": "2d72b949aa8c5aac0756db68ef6a0374ea5b208a5dea7dcb29a5ec3743bade4c"
+      },
+      "PLAN01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-impl-plan-decision-discipline/1bbd42e5-3ec5-4deb-8002-334332edffaa.jsonl",
+        "line": 508,
+        "format": "claude_user_text",
+        "text_sha256": "c4f46c136d714ca9e668ca0c4fde9bc31ab42f9cb7e5504e28f66d11120f07ea"
+      },
+      "PLAN02": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-impl-plan-decision-discipline/1bbd42e5-3ec5-4deb-8002-334332edffaa.jsonl",
+        "line": 514,
+        "format": "claude_user_text",
+        "text_sha256": "e42630de92d252fd4aeac820b8e718988a8c8817267a2e05e2a5e2a2e42ec1fc"
+      },
+      "PLAN03": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-impl-plan-decision-discipline/1bbd42e5-3ec5-4deb-8002-334332edffaa.jsonl",
+        "line": 542,
+        "format": "claude_user_text",
+        "text_sha256": "10846f3540cf76794a260a8f206a85c5d37c05137241d4dd7b82da908c6f412d"
+      },
+      "PLAN04": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-impl-plan-decision-discipline/1bbd42e5-3ec5-4deb-8002-334332edffaa.jsonl",
+        "line": 556,
+        "format": "claude_user_text",
+        "text_sha256": "67003be2c2081983215269d2222cf9c43c5cc6984c8c44e78ef952ade2a97be2"
+      },
+      "UAT01": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/ffb5f905-06db-4e41-8c36-e5ca981120e2.jsonl",
+        "line": 294,
+        "format": "claude_user_text",
+        "text_sha256": "fa1163460eb2e7c82a9072359cd658dec746d1ff5ecf4134b75b936931b8f9d7"
+      },
+      "UAT02": {
+        "path": "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/ffb5f905-06db-4e41-8c36-e5ca981120e2.jsonl",
+        "line": 313,
+        "format": "claude_user_text",
+        "text_sha256": "67a86b0a7e5616524fd436f297910a164af7daf2490987f24e0e72ddb956599d"
       }
-    ]
+    },
+    "actions": {
+      "global_instruction_control": {
+        "records": ["IC01", "IC02", "IC03", "IC04", "IC05", "IC06", "IC07", "IC08", "IC09", "IC10", "IC11", "IC12"]
+      },
+      "cross_vendor_search_boundary": {"records": ["SEARCH01"]},
+      "retire_claude_sync": {"records": ["SYNC01"]},
+      "project_uv_execution": {"records": ["UV01", "UV02"]},
+      "codex_context_cadence": {"records": ["CADENCE01", "CADENCE02"]},
+      "model_dispatch_floor": {"records": ["MODEL01", "MODEL02", "MODEL03"]},
+      "fable_cost_gate": {"records": ["COST01"]},
+      "advisor_selection": {"records": ["ADVISOR01"]},
+      "test_evidence_boundary": {"records": ["TEST01"]},
+      "request_boundary_expansion": {"records": ["REQUEST01"]},
+      "codex_history_retention": {"records": ["REQUEST01", "RETENTION01"]},
+      "project_note_cleanup": {"records": ["NOTES01"]},
+      "implementation_plan_reconciliation": {"records": ["PLAN01", "PLAN02", "PLAN03", "PLAN04", "DFD01"]},
+      "uat_boundary_coverage": {"records": ["UAT01", "UAT02"]}
+    }
   },
   "candidates": {
     "global_claude": {
       "path": "deployment/instruction-control/foa4008439/CLAUDE.md",
       "live_path": "/home/brian/.claude/CLAUDE.md",
-      "bytes": 6134,
-      "sha256": "f990d99f8272390ad17b45213ce79184a91c8301defb37cb48e164e45dd9039a"
+      "bytes": 8479,
+      "sha256": "2e6a5ed5071c5be192217e1a8827f1a903e21371f6e4c582d21e7a910edc0718",
+      "authority_actions": ["global_instruction_control", "test_evidence_boundary", "request_boundary_expansion"]
+    },
+    "global_codex": {
+      "path": "deployment/instruction-control/foa4008439/AGENTS.md",
+      "live_path": "/home/brian/.codex/AGENTS.md",
+      "bytes": 18210,
+      "sha256": "8f8505b58b253210244a246d1a5c1f679386305f856eb9fead3acd25aba44eec",
+      "authority_actions": ["global_instruction_control", "request_boundary_expansion"]
     },
     "project_claude": {
       "path": "CLAUDE.md",
       "live_path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
-      "bytes": 2165,
-      "sha256": "811a61decf7323d0ae6ef5fe99fcec78aa0c2b856210b032765150c9e2b12862"
+      "bytes": 2775,
+      "sha256": "fa562d7746a8cb5680c81b4b5fd6ef897c6b862e93a5040fa20bf548e962e062",
+      "authority_actions": ["global_instruction_control", "project_uv_execution"]
     },
     "settings": {
       "path": "deployment/instruction-control/foa4008439/settings.json",
       "live_path": "/home/brian/.claude/settings.json",
       "bytes": 6432,
-      "sha256": "b29aec688241f90c3df535e486b61e5030495a6fbb7beb9b386b7ea25af049c1"
+      "sha256": "b29aec688241f90c3df535e486b61e5030495a6fbb7beb9b386b7ea25af049c1",
+      "authority_actions": ["global_instruction_control", "retire_claude_sync"]
     }
+  },
+  "settings_contract": {
+    "candidate": "settings",
+    "forbidden_env": [
+      "CLAUDE_CODE_SUBAGENT_MODEL",
+      "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"
+    ]
+  },
+  "codex_history_contract": {
+    "path": "/home/brian/.codex/config.toml",
+    "persistence": "save-all",
+    "forbid_max_bytes": true,
+    "authority_actions": ["codex_history_retention"]
   },
   "plugin_releases": {
     "install": [
@@ -42,37 +281,56 @@
         "name": "denubis-basic-agents",
         "version": "2.2.1",
         "source": "plugins/denubis-basic-agents",
-        "tree_sha256": "794aa7fbd5af1d6390276292d48f9ce1955b994134a61c1b562fb56e1c5aa1f7"
+        "tree_sha256": "da3d20b25b737c1e4c3399494371a20c8c9f4a11a21708f97a053951fb68eb01",
+        "authority_actions": ["global_instruction_control", "model_dispatch_floor"]
       },
       {
         "name": "denubis-extending-claude",
         "version": "1.10.1",
         "source": "plugins/denubis-extending-claude",
-        "tree_sha256": "7458066d666b5b1642b9239a678fb9a786c8fcfcfa8a33eaa8c32bcd939000cf"
+        "tree_sha256": "1c3a43129e030824947f908aeca2b0d178a312ad0a95766aa734d2eb69b7f1f9",
+        "authority_actions": ["global_instruction_control", "model_dispatch_floor", "fable_cost_gate", "advisor_selection", "test_evidence_boundary"]
+      },
+      {
+        "name": "denubis-external-agents",
+        "version": "0.15.3",
+        "source": "plugins/denubis-external-agents",
+        "tree_sha256": "1effdca3426eeb65517c445340abf181cbb199d78fc748adf616eba4a694d5a6",
+        "authority_actions": ["global_instruction_control", "codex_context_cadence", "fable_cost_gate", "advisor_selection"]
       },
       {
         "name": "denubis-git-commit",
         "version": "1.2.2",
         "source": "plugins/denubis-git-commit",
-        "tree_sha256": "ec752e011c195999fcd7e3eed78fe3ef921b22f4f92c6cd8767bc3310dc15e7e"
+        "tree_sha256": "ec752e011c195999fcd7e3eed78fe3ef921b22f4f92c6cd8767bc3310dc15e7e",
+        "authority_actions": ["global_instruction_control"]
       },
       {
         "name": "denubis-hook-branch-bg",
         "version": "0.2.6",
         "source": "plugins/denubis-hook-branch-bg",
-        "tree_sha256": "3552bc6984ba2514b9851025a6742183533ac75e8c67f67773f5f6d10f7abd86"
+        "tree_sha256": "3552bc6984ba2514b9851025a6742183533ac75e8c67f67773f5f6d10f7abd86",
+        "authority_actions": ["global_instruction_control"]
       },
       {
         "name": "denubis-plan-and-execute",
         "version": "4.0.0",
         "source": "plugins/denubis-plan-and-execute",
-        "tree_sha256": "fc2aa95841ff5c431805a4659e0ad8aea6823c615545ce3a36dd6f87038baf84"
+        "tree_sha256": "af05a4877b19fc36b4cb852c5fe3dddfa0e200578c66a8b4a6c52894baa43bff",
+        "authority_actions": ["global_instruction_control", "test_evidence_boundary", "request_boundary_expansion", "implementation_plan_reconciliation", "uat_boundary_coverage"]
+      },
+      {
+        "name": "denubis-research-agents",
+        "version": "1.3.2",
+        "source": "plugins/denubis-research-agents",
+        "tree_sha256": "5ff6b448252874d880062e9525b5c400e7a230649e26f67283de6b9921287d88",
+        "authority_actions": ["model_dispatch_floor"]
       }
     ],
     "retire": [
-      {"name": "denubis-hook-skill-reinforcement", "last_version": "1.2.0"},
-      {"name": "denubis-hook-claudemd-reminder", "last_version": "1.1.4"},
-      {"name": "denubis-notes-advisory", "last_version": "0.2.1"}
+      {"name": "denubis-hook-skill-reinforcement", "last_version": "1.2.0", "authority_actions": ["global_instruction_control"]},
+      {"name": "denubis-hook-claudemd-reminder", "last_version": "1.1.4", "authority_actions": ["global_instruction_control"]},
+      {"name": "denubis-notes-advisory", "last_version": "0.2.1", "authority_actions": ["global_instruction_control"]}
     ]
   },
   "baselines": {
@@ -81,8 +339,13 @@
       "bytes": 21369,
       "sha256": "9140934f252ec41ce931958111391c562c53fb8eb99c1958ca9b6713aea700dc"
     },
+    "global_codex": {
+      "path": "/home/brian/.codex/AGENTS.md",
+      "bytes": 16904,
+      "sha256": "b8da6bbd28aeb02d7568cc2f911333f2af0ad70bafa8e7aa95e3f1ae40ced688"
+    },
     "project_claude": {
-      "path": "git:c6882d2:CLAUDE.md",
+      "path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
       "bytes": 8017,
       "sha256": "36a786ee807be7dbafb8ef1ec6531be221b67c6ffffdc57ff26d030ba26bc720"
     },
@@ -100,6 +363,7 @@
   "settings_transition": {
     "baseline": "settings",
     "candidate": "settings",
+    "authority_actions": ["global_instruction_control", "retire_claude_sync"],
     "enabled_plugins": {
       "remove": [
         "denubis-bibliography@denubis-plugins",
@@ -118,6 +382,9 @@
         "Skill(denubis-academic:*)"
       ]
     }
+  },
+  "project_integration": {
+    "candidate": "project_claude"
   },
   "deployment_contract": {
     "require_candidate_digest_match": true,

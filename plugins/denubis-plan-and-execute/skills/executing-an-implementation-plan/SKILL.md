@@ -31,8 +31,10 @@ Before editing:
 1. Resolve both paths and confirm the plan directory belongs to the intended project.
 2. Read the project `AGENTS.md` or `CLAUDE.md`, tool and test configuration, and any
    implementation guidance named by the plan.
-3. Inventory `phase_##.md`, `test-requirements.md`, and `uat-requirements.md`. Confirm task
-   markers are balanced and every acceptance criterion has an owner.
+3. Inventory `phase_##.md`, `flow-boundaries.md`, `test-requirements.md`, and
+   `uat-requirements.md`. Confirm task markers are balanced and every acceptance criterion
+   has an owner. Open the predicted flow or its non-applicability boundary before loading
+   the first phase.
 4. Inspect repository status and the files the current phase will touch. Preserve
    pre-existing changes; do not overwrite, revert, include, or certify them as this work.
 5. Confirm the requested operations fit the authority already granted.
@@ -153,6 +155,46 @@ Do not mark a phase complete while one of its owned criteria is failing, unobser
 blocked. Record the exact unresolved condition in the current phase file or existing
 project tracker and leave later dependent work pending.
 
+## Reconcile boundary flows
+
+After implementation, audit the implemented boundary whether the plan predicted a DFD or
+said it was not applicable. Start from the bounded implementation change, not the
+prediction: inventory every changed code, schema, configuration, generated, and runtime
+surface; trace the actors, components, processes, stores, and consumers each can affect;
+then derive the implemented-state flow map from those sources, tests, and operational
+evidence. Account for every changed surface, including one that preserves its boundary.
+An empty diff or search is not coverage without a positive control and stated exclusions.
+
+Only after that implementation-first inventory is complete, compare it with
+`flow-boundaries.md`. Do not edit the prediction to make it agree. Compare participants,
+inputs, outputs, transformations, ordering, persistence, side effects, control signals,
+failure routes, and consumers.
+
+If `flow-boundaries.md` says the map is not applicable but implementation changed one of
+those boundary properties, treat that as a plan defect. Restore the accepted boundary or
+return to planning; do not silently replace the applicability result.
+
+For an applicable map:
+
+- A difference in internal **how** that preserves the mapped boundary is implementation
+  detail. Let living architecture state the implemented mechanism without a comparison
+  narrative.
+- A difference in **what** crosses a boundary is load-bearing. Adding, removing, rerouting,
+  or changing the meaning, consumer, observable effect, persistence, ordering, control, or
+  failure behavior must either be brought back to the accepted prediction or resolved as
+  a design change.
+- A design change requires its why, exact human authority when human judgment selected it,
+  an updated accepted design, and an ADR for the load-bearing divergence. Do not create an
+  Accepted ADR from implementation drift or model agreement.
+
+Living architecture owns what was made; the plan retains what should have been made; an
+ADR owns the why for an accepted load-bearing divergence. Invoke
+`denubis-plan-and-execute:maintain-architecture` with the prediction, implementation-first
+map, and exact evidence only when reconciliation identifies an architecture-owned claim,
+relationship, source pointer, or decision record that needs creation, change, or removal.
+Do not manufacture an architecture edit merely to show reconciliation occurred. An
+unresolved load-bearing mismatch blocks completion.
+
 ## Finish the plan
 
 After the final phase:
@@ -160,7 +202,8 @@ After the final phase:
 1. Run the complete verification set from `test-requirements.md` plus the project's
    ordinary whole-repository gates appropriate to the change.
 2. Recompute final acceptance-criterion coverage from the design through the phase files
-   to current evidence. Missing or duplicate ownership is a defect, not a paperwork gap.
+   and boundary-flow reconciliation to current evidence. Missing or duplicate ownership
+   is a defect, not a paperwork gap.
 3. Confirm every required UAT entry has the human's actual observation; do not infer
    acceptance from silence or from a model summary.
 4. Inspect the final diff and repository status. Separate pre-existing changes from this
@@ -168,8 +211,9 @@ After the final phase:
 5. When the plan is verified and no owned criterion remains open, invoke
    `denubis-plan-and-execute:finishing-a-development-branch` to report the branch state and
    route only the integration action already authorised or selected by the human.
-6. Check living architecture, ADRs, notes, and runbooks touched by the change for current
-   truth and resolvable source pointers. Do not append correction narratives.
+6. Confirm the predicted/implemented boundary comparison is settled, then check living
+   architecture, ADRs, notes, and runbooks touched by the change for current truth and
+   resolvable source pointers. Do not append correction narratives.
 7. Re-run any check affected by the final cleanup.
 
 Report the implemented outcomes, changed-file scope, exact verification commands and

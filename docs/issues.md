@@ -83,32 +83,9 @@ Entry context for that session:
 
 ---
 
-### ISSUE-02: Agent teams integration design paused at Phase 2 — Zendo experiment invalidated core assumption
-
-- **Status:** open
-- **Opened:** 2026-04-19 (thread origin: 2026-03-12 Zendo experiment, captured as WIP from that date)
-- **Origin:** `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/project_agent-teams-design-wip.md`; chat sessions 3734fee0, 446ec08a, 21a34e92 (all 2026-03-12).
-
-**Description:**
-
-The agent-teams integration design (team code-review, team proleptic-challenge, team systematic-debugging, team three-lens) was paused mid-Phase-2-Clarification for a Zendo experiment that would test whether agent teams could collaborate adversarially. The experiment ran and returned failure: inter-agent messaging produced convergence/groupthink, not adversarial collaboration. The assistant's own 2026-03-12 summary: *"Team debugging | Dangerous — exact Zendo failure | High — proven by experiment."*
-
-The WIP memory flags the mechanism question as open: team-with-inter-agent-messaging vs parallel-subagents-with-lead-synthesis. Phases 3–6 of the design are PENDING. No subsequent session has decided to abandon or pivot.
-
-**Proposed approach:**
-
-Start with a one-page decision record (halt-or-pivot), not a full design plan. The pointed question: does Zendo invalidate team-with-messaging universally, or only for adversarial patterns? If universally, the four team skills should not be built. If only adversarial, parallel-subagents-with-lead-synthesis may be the right mechanism for the four proposed skills.
-
-**Related:**
-
-- `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/project_agent-teams-design-wip.md`
-- Chat sessions 3734fee0 (Zendo experiment), 446ec08a (Zendo team), 21a34e92 (student-alpha's hypotheses)
-
----
-
 ### ISSUE-03: Parts 2–4 of the upstream sync programme — design sessions not yet started
 
-- **Status:** open (blocked on ISSUE-06 for Part 2; Part 3 further blocked on ISSUE-02)
+- **Status:** open (blocked on ISSUE-06 for Part 2)
 - **Opened:** 2026-04-19 (thread origin: 2026-04-17 design plan scope exclusions)
 - **Origin:** `docs/design-plans/2026-04-17-skill-skills-upstream-sync.md` DoD section ("Explicitly out of scope for Part 1") + Handoff section.
 
@@ -117,7 +94,7 @@ Start with a one-page decision record (halt-or-pivot), not a full design plan. T
 The skill-skills upstream sync is Part 1 of a planned multi-part upstream alignment programme. The three follow-on parts are named but undefined:
 
 - **Part 2 — Other upstream innovations beyond skill-skills.** Includes the four skill-skills deferred from Part 1 (`writing-claude-md-files`, `maintaining-project-context`, `creating-a-plugin`, `creating-an-agent`) plus any other innovations obra has produced. Part 2's design also owns the "obra upstream drift" question (one-time sync vs ongoing automation).
-- **Part 3 — Critique skills / agents.** Named but undefined. Likely depends on ISSUE-02 resolving — critique patterns are exactly where Zendo failure is most dangerous.
+- **Part 3 — Critique skills / agents.** Named but undefined.
 - **Part 4 — PromptGrimoireTool / MELICA tuning.** Named but undefined; "MELICA" has no explanation in any accessible session.
 
 **Proposed approach:**
@@ -125,13 +102,12 @@ The skill-skills upstream sync is Part 1 of a planned multi-part upstream alignm
 Sequence, do NOT batch:
 1. Part 1 execution (ISSUE-06) lands
 2. Part 2 design via `/starting-a-design-plan`
-3. Part 3 design (after ISSUE-02 resolved)
+3. Part 3 design
 4. Part 4 via `/flesh-it-out` first (to define what it is), then design
 
 **Related:**
 
 - `docs/design-plans/2026-04-17-skill-skills-upstream-sync.md`
-- ISSUE-02 (blocker for Part 3)
 - ISSUE-06 (blocker for Part 2)
 
 ---
@@ -157,29 +133,6 @@ Could skip a full design plan — `/flesh-it-out` + `/writing-skills` may suffic
 **Related:**
 
 - `docs/design-plans/2026-04-17-skill-skills-upstream-sync.md` Additional Considerations
-
----
-
-### ISSUE-05: AbsenceJudgement fabricated-codes repo-wide audit
-
-- **Status:** open
-- **Opened:** 2026-04-19 (thread origin: 2026-04-17 DR4 + feedback memory)
-- **Origin:** `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/feedback_absencejudgement-codes-fabricated.md`; design plan Additional Considerations ("Fabricated-codes propagation").
-
-**Description:**
-
-The AbsenceJudgement paper taxonomy codes (TEMP/RAND/SCOP/VIBE/FABR failure codes; MECH/MTCH/SCAF/BOUN success codes) are fabricated — not in the paper. A prior session invented them; they spread via handoff prompts. The upstream-sync plan's Phases 1 and 4 grep-audit the four touched skills specifically. A broader repo-wide audit (all `SKILL.md`, design plans, `CLAUDE.md`, memory files, plan phase files) has not been run.
-
-**Proposed approach:**
-
-Two paths (preference: first):
-1. **Add as a check pattern within ISSUE-01's xref-audit tool.** Natural fit — "forbidden tokens that should not appear" is the inverse of "references that should resolve." When the tool is built, a `--check-forbidden-tokens` mode lists patterns (starting with the AbsenceJudgement codes) and flags any occurrence.
-2. **Standalone one-off audit.** Run now, before or after Part 1 execution, as a Bash grep across the repo.
-
-**Related:**
-
-- `~/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/memory/feedback_absencejudgement-codes-fabricated.md`
-- ISSUE-01 (proposed fold target)
 
 ---
 
@@ -387,27 +340,43 @@ Small. Likely a short addition to `writing-skills` (cross-referenced from `writi
 
 ---
 
-### ISSUE-13: Denubis-native worked example to replace obra's CLAUDE_MD_TESTING as primary imitation target
+### ISSUE-14: Codex supervisor suppresses or invents actionable pane states
 
 - **Status:** open
-- **Opened:** 2026-07-10 (intent first recorded 2026-07-05 in the example file's Denubis note)
-- **Origin:** Fable-pass skill-3 review of `writing-skills` (finding Minor 2). The promissory sentence "a denubis-native worked example … is queued to replace this" was scar tissue in `examples/CLAUDE_MD_TESTING.md`; the intent moves here with its state.
+- **Opened:** 2026-08-12
+- **Origin:** Current-source reproduction during the instruction-control note-integrity
+  audit. Report leads resolve with
+  `cc-search-chats context d2930fa5-b92a-43a6-8ba3-cc55f3448897 --json`,
+  `cc-search-chats context a1573684-64ee-4ce5-8099-372e37bfcb94 --json`, and
+  `cc-search-chats context 819d74c4-0fa8-41b6-84a4-3d33e6032d25 --json`.
 
 **Description:**
 
-`writing-skills/examples/CLAUDE_MD_TESTING.md` is the plugin's only worked example of pressure-testing documentation. It is obra-authored (upstream commit `6fd4507`, imported 2026-06-11), and its scenarios were invented by the campaign's own author — which the denubis checklist forbids for RED baselines (the conversation-precedent protocol in `testing-skills-with-subagents`: source the RED baseline from an independent session). The file models variant-testing mechanics well but models RED-baseline sourcing wrongly; its in-file doctrinal caveat says imitate the mechanics, source scenarios independently.
+Three failures reproduce against
+`plugins/denubis-external-agents/scripts/codex_supervisor.py` on 2026-08-12:
 
-State at capture (2026-07-10): no denubis-native replacement exists or is drafted. The raw material the original intent named — "real campaign evidence" — now exists in-repo: the skill-skills branch's RED/GREEN records are independently-sourced pressure evidence from actual campaigns (`phase_02_red_evidence.md`, `phase_03_red_evidence.md`, `phase_05_announce_trigger_red_evidence.md` in `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/`).
+1. `classify_snapshot("Ready", <fresh splash without an assistant bullet>)` returns
+   `done`; `_assistant_message` falls back to normalising the entire pane, so the caller
+   cannot distinguish “no assistant turn” from a completed turn.
+2. After one approval emits, a `Working` frame preserves `last_correlation_key`; an
+   identical later approval then returns no action at `advance()` lines 629–630. Repeated
+   commands in a red-green loop can block without a notification.
+3. `weekly_quota()` parses a current panel, but `_confirm_quota()` requires a literal
+   `/status` echo that current Codex does not leave on screen. The same panel therefore
+   changes from `(87, "14:41")` to no reading when the anchor is applied.
 
 **Proposed approach:**
 
-Assemble a worked example from one recorded campaign — the 2026-07-09 announce-and-temper trigger test is a complete two-round RED story with transcript evidence. Author it through writing-skills' own workflow (scope-check first). Decide at authoring time whether the obra file stays as a secondary mechanics reference or is deleted on replacement.
+Fix each behavior independently with a failing test from the current rendered pane shape.
+Do not preserve the old screen assumptions as wording locks: parse assistant-turn identity,
+approval occurrence identity, and panel freshness as separate observable structures.
 
 **Related:**
 
-- `plugins/denubis-extending-claude/skills/writing-skills/examples/CLAUDE_MD_TESTING.md`
-- `plugins/denubis-extending-claude/skills/testing-skills-with-subagents/SKILL.md` (conversation-precedent protocol)
-- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05_announce_trigger_red_evidence.md`
+- `tests/test_codex_supervisor.py`
+- `tests/test_codex_supervisor_classify.py`
+- `tests/test_codex_supervisor_slash.py`
+- `plugins/denubis-external-agents/skills/supervising-codex/SKILL.md`
 
 ---
 

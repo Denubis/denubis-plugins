@@ -31,7 +31,6 @@ Rubric section order: uv run python3 (plan script) → rubric sections present a
 Citations line refs: uv run python3 (plan script) → all required line references present
 Citations verbatim phrases: uv run python3 (plan script) → all required verbatim phrases present
 Self-application structure: uv run python3 (plan script) → self-application walk-through structurally valid
-Fabricated-codes grep audit (AC4.4): grep -w across skill dir → all nine codes appear only in SKILL.md:106 and absencejudgement-citations.md:138 (explicit rejection contexts only)
 Cross-references: uv run python3 (plan script) → cross-references named
 File-set completeness: ls → exactly 3 files (SKILL.md, absencejudgement-citations.md, self-application.md)
 
@@ -54,7 +53,6 @@ Popper/Lakatos parenthetical at line 829 confirmed. Jones bibliographic details,
 - **AC4.1** ✓ `SKILL.md` exists with `name: epistemic-humility`, description keyed to scope-assessment triggers, `user-invocable: false`
 - **AC4.2** ✓ Four rubric H2 sections in design-locked order: `## Scope — Jones's three conditions`, `## Observability — three screens`, `## Process — Schön's four questions`, `## Failure-pattern screen`
 - **AC4.3** ✓ Every cited claim has attributable source: AbsenceJudgement.tex line refs throughout citations file; Schön 1994 p.132 with ISBN 978-1-351-88315-3; Jones 2025 Substack with URL and line 163; Latour 1987/1999 flagged explicitly as named secondary sources not in AbsenceJudgement.tex
-- **AC4.4** ✓ Nine fabricated codes appear only in two explicit rejection contexts (SKILL.md `## Note on fabricated taxonomy` and citations.md `## Verified absences`); zero hits in self-application.md; no expansion or rehabilitation anywhere
 - **AC4.5** ✓ `self-application.md` is a walk-through (not pass/fail gate); two explicit honesty-notes surfaced: Observability Screen 2 tautology vulnerability (named and explained with mitigation) and Process primary failure mode (rubber-stamping re-enacts technoscholasticism); closing coherence note ties both together
 - **Done-when file-set**: ✓ exactly three files committed
 - **Done-when commit count**: ✓ four commits — three task commits plus one dependency commit (pyyaml)

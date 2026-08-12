@@ -48,12 +48,16 @@ After it returns, inspect the artifacts rather than trusting its report:
 1. Resolve the implementation-plan directory under the selected working root.
 2. Confirm every `phase_##.md` has a phase type, scoped acceptance-criteria coverage, and
    balanced task/subcomponent markers.
-3. Confirm `test-requirements.md` accounts for automated and operational criteria.
-4. Confirm `uat-requirements.md` contains only human-judgment entries or explicitly states
+3. Open `flow-boundaries.md`. Confirm its applicability decision is supported by current
+   evidence. When applicable, trace every producer, consumer, changed data or control flow,
+   failure route, and inter-phase seam into an owning phase; when not applicable, confirm
+   the named boundary is actually preserved.
+4. Confirm `test-requirements.md` accounts for automated and operational criteria.
+5. Confirm `uat-requirements.md` contains only human-judgment entries or explicitly states
    that there are none.
-5. Open every source pointer on which the plan relies. Missing, ambiguous, stale, or
+6. Open every source pointer on which the plan relies. Missing, ambiguous, stale, or
    wrong-role authority is an integrity defect and blocks the dependent task.
-6. Run any repository structural checks that validate plan or reference shape. A model
+7. Run any repository structural checks that validate plan or reference shape. A model
    review may identify candidates; it is not evidence that these checks passed.
 
 If verification finds a defect, repair that artifact and rerun the failed check. Ask the

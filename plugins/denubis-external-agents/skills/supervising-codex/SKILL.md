@@ -130,18 +130,13 @@ most damage.
 `tmux send-keys`, a `tmux paste-buffer`, or anything else aimed at the pane by hand is
 out of bounds, whatever it is for and however small it looks.
 
-The verbs are not a convenience wrapper over the tmux calls. Each one carries guards
-that the raw call does not, and every guard is there because its absence cost a session:
-the pane is resolved rather than remembered, an approval dialog is refused rather than
-answered by accident, a half-typed slash command is caught before Enter takes the
-neighbouring entry, and the effect is confirmed by evidence rather than assumed from a
-keypress landing. Reaching past the tool discards all of that at once.
+The verbs are not a convenience wrapper over the tmux calls. They resolve the pane,
+refuse approval dialogs, catch half-typed slash commands before Enter takes a neighbouring
+entry, and confirm the effect from the resulting pane state.
 
 **When the tool cannot do what you need, that is a bug report, not an invitation to
 improvise.** Tell the human what you were about to type and why the verbs did not cover
-it, and let them rule on whether the tool grows a verb. An improvised `send-keys` works
-often enough to look fine and fails in exactly the ways nobody is watching for, which is
-how `/clear` and `/compact` came to be delivered as prose that codex read as work.
+it, and let them rule on whether the tool grows a verb.
 
 There is no exception. Every slash command this skill needs has a verb, and the last one
 without one, the `/status` quota panel, became `--quota` on 2026-08-01 rather than being
@@ -329,12 +324,8 @@ can move the figure a long way in one turn.
 ## Context hygiene: clear between prompts
 
 **Compacting the pane is `/compact`, and nothing else is. Clearing it is `/clear`.** Type
-the slash command into the composer. Prose asking codex to "compress your context
-deliberately" does the opposite: it is a task, so codex reads files to answer it and the
-meter goes **down**. Observed 2026-07-28 with a carefully written compression brief naming
-what to keep and what to drop, which moved the meter from 21% to 18% and ended with codex
-reporting **"Context compressed as specified"** while nothing had been compacted. The
-self-report is confident and wrong, so read the meter rather than the claim.
+the slash command into the composer. A prose request is a task, not a compaction, and a
+self-report is not evidence that the TUI command ran. Read the meter through the verb.
 
 **Cadence (Brian, 2026-07-28): aggressively, between tasks, rather than once the meter has
 run low.**
@@ -348,10 +339,12 @@ run low.**
   2026-07-28). A clear starts from a known-empty state, whereas a compaction leaves behind
   a summary whose fidelity nothing checks.
 
-The judgement about what a compaction should preserve is still worth having. Deliver it
-the way the tool actually accepts, which is the slash command first and then a fresh
-self-contained prompt restating what matters, rather than a brief asking codex to do the
-preserving itself.
+Authority records:
+
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/494077d8-3c4e-49eb-ba60-beb1ba5f38fe.jsonl:1347`
+  (`cc-search-chats context d7875278-05ce-42e4-bf7f-7ff42f6a06d0 --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/494077d8-3c4e-49eb-ba60-beb1ba5f38fe.jsonl:1375`
+  (`cc-search-chats context 64d0c6c7-eebf-4d4c-b8b8-c9d3428209f4 --json`)
 
 Both are verbs, and neither is a message:
 
@@ -379,13 +372,11 @@ Ready | brian-ed3d-plugins | main | weekly 99% left | 019fbc8c-ac0b-79d3-… | g
 ```
 
 So a clear that ran leaves a different id there from the one that was there before, and
-`--clear` reads it either side and reports both. Nothing else changes it, which is what
-makes it proof rather than a plausible sign.
+`--clear` reads it either side and reports both.
 
 `/compact` keeps the same session and the same transcript, so its id is unchanged and
 cannot say anything. What moves instead is the context meter, and `--compact` reports it
-either side and refuses when the figure has fallen. Measured on 2026-08-01: a clear ran
-`019fbc8c…` to `019fbc8f…`, and a compaction moved 96% to 100% with its id standing still.
+either side and refuses when the figure has fallen.
 
 The confirmations cannot be shared, and that is what makes them worth having. Codex's
 completion list puts `/compact` first on the prefix `/c`, so a `/clear` typed one

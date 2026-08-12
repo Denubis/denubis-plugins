@@ -1,6 +1,5 @@
 ---
 name: impl-plan-write
-family: starting-an-implementation-plan
 description: Use when an accepted design needs executable implementation phases with exact files, dependencies, verification ownership, and only genuine open decisions raised to the human
 user-invocable: false
 ---
@@ -65,6 +64,8 @@ leave the conversation as its only durable owner.
 Write to `docs/implementation-plans/YYYY-MM-DD-<slug>/`:
 
 - one `phase_##.md` per design phase;
+- `flow-boundaries.md`, containing the predicted boundary flow or the bounded reason it
+  does not apply;
 - `test-requirements.md`, mapping automated and operational checks to acceptance criteria;
   and
 - `uat-requirements.md`, containing only irreducible human-judgment checks. A zero-entry
@@ -73,6 +74,41 @@ Write to `docs/implementation-plans/YYYY-MM-DD-<slug>/`:
 Do not create model-authored approval certificates, transition ledgers, or review receipts.
 A review file may record findings when an actual review occurs, but it does not prove the
 plan is correct.
+
+## Boundary-flow contract
+
+Decide applicability from the behavior being changed, not the file type or size. A
+predicted DFD is required when the implementation changes what crosses a boundary between
+an actor, external system, runtime component, process, or durable store. This includes
+adding, removing, or rerouting a flow; changing its meaning, owner, ordering, persistence,
+transformation, side effect, or failure route; or changing a control signal that permits,
+blocks, retries, or terminates downstream work. Plan phases are delivery boundaries, not
+DFD participants; a multi-phase plan does not become applicable for that reason alone.
+
+It is not required for an internal change in how one component performs its responsibility
+when the boundary participants, inputs, outputs, effects, ordering, and failure behavior
+remain unchanged. A refactor, dependency substitution, test repair, or prose edit is not
+automatically exempt: use its observable boundary effect.
+
+Always create `flow-boundaries.md`. Start it with an applicability result and the current
+design, architecture, or source evidence that supports that result. When it does not
+apply, give one specific sentence naming the preserved boundary; do not add an empty
+diagram or generic “no architecture change” claim.
+
+When it applies, map breadth-first before elaborating phases:
+
+- the system or feature boundary and external actors;
+- processes, components, and durable stores that own a transformation or decision;
+- each data or control flow's source, destination, payload or signal, contract or
+  transformation, ordering or persistence when material, and failure behavior;
+- separately, the delivery phase that creates each runtime producer and consumer, plus
+  every inter-phase construction seam; and
+- downstream consumers and exclusions needed to prevent an adjacent system from being
+  silently pulled into scope.
+
+Use stable flow identifiers that phase tasks can cite. Decompose only where another phase,
+consumer, or failure boundary needs the detail. The artifact predicts what should be made;
+it is not living architecture and must not describe planned state as implemented.
 
 ## Phase contract
 
@@ -162,6 +198,14 @@ UAT collation consumes two inputs:
 - **Input 2, the acceptance criteria no decision covered.** Inspect every unmapped
   criterion and add a human check only when judgment is irreducible.
 
+Before retaining individual entries, map the human-visible boundaries of the built
+surface breadth-first. Include the intended workflow, relevant failure paths, and seams
+with existing systems. Design one or more actions that let the human encounter both the
+wanted result and plausible unwanted behavior. The agent supplies the actions; the human
+does not have to invent the experiment. Coverage is incomplete when it probes only literal
+acceptance-criterion success while leaving said-versus-wanted, said-versus-built, adjacent
+system, regression, or side-effect boundaries unexamined.
+
 Each UAT entry states what the human does with the built surface, what they judge, and the
 specific experience that would falsify the design. A phase that produced zero entries is normal,
 and an entirely empty UAT plan is valid. Do not pad deterministic assertions with words such
@@ -191,6 +235,10 @@ Before handoff, verify directly that:
 - every acceptance criterion has one primary owner and no criterion silently disappears;
 - every phase leaves the repository in a runnable, testable state;
 - dependencies and consumers precede the tasks that require them;
+- `flow-boundaries.md` has a supported applicability result; when applicable, every
+  inter-phase producer/consumer seam has one owner on each side and every changed flow is
+  covered by a task and either an existing acceptance criterion or an explicit design
+  invariant. Do not invent an acceptance criterion solely to satisfy flow bookkeeping;
 - each negative result states its search or check coverage and has a positive control;
 - open decisions are resolved or marked as blockers; and
 - the plan requests no commit, publication, deployment, credential, or human ceremony

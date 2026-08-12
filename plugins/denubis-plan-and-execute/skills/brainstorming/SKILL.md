@@ -1,6 +1,5 @@
 ---
 name: brainstorming
-family: starting-a-design-plan
 description: Use after design intent is clear - investigates current constraints, tests genuine alternatives, and returns one recommended design with explicit tradeoffs
 user-invocable: false
 ---

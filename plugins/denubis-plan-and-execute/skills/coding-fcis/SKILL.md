@@ -1,6 +1,5 @@
 ---
 name: coding-fcis
-family: coding-effectively
 description: Use when business decisions are entangled with I/O or nondeterminism - separates pure transformations from a thin imperative boundary where that improves testability
 ---
 

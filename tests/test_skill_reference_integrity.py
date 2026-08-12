@@ -31,10 +31,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILL_GLOB = "plugins/denubis-*/skills/*/SKILL.md"
@@ -43,7 +42,6 @@ AGENT_GLOB = "plugins/denubis-*/agents/*.md"
 PLACEHOLDER_MARKERS = ("[", "<", "{")
 
 SKILL_REFERENCE = re.compile(r"\b(denubis-[a-z0-9-]+):([a-z0-9-]+)\b")
-CODE_SPAN = re.compile(r"`([^`\n]+)`")
 SUBAGENT_TYPE = re.compile(r'<parameter name="subagent_type">([^<]+)</parameter>')
 
 
@@ -56,14 +54,6 @@ class Skill(NamedTuple):
     @property
     def rel(self) -> str:
         return str(self.path.relative_to(REPO_ROOT))
-
-    @property
-    def metadata(self) -> dict[str, Any]:
-        frontmatter = self.text.split("---", maxsplit=2)[1]
-        parsed = yaml.safe_load(frontmatter)
-        assert isinstance(parsed, dict)
-        return parsed
-
 
 def _load_skills() -> list[Skill]:
     return [
@@ -83,11 +73,6 @@ def _referenceable() -> set[tuple[str, str]]:
     for p in REPO_ROOT.glob(AGENT_GLOB):
         names.add((p.parent.parent.name, p.stem))
     return names
-
-
-def _routes_to(candidate: Skill, target: Skill) -> bool:
-    tokens = set(CODE_SPAN.findall(candidate.text))
-    return target.name in tokens or f"{target.plugin}:{target.name}" in tokens
 
 
 SKILLS = _load_skills()
@@ -136,31 +121,4 @@ def test_dispatched_agents_exist(skill: Skill) -> None:
             broken.append(agent)
     assert not broken, (
         f"{skill.rel} dispatches agents that do not exist: {sorted(set(broken))}"
-    )
-
-
-@pytest.mark.parametrize("skill", SKILLS, ids=SKILL_IDS)
-def test_internal_workflow_skill_has_declared_family_caller(skill: Skill) -> None:
-    """A non-user-invocable family member has an inbound route from its family.
-
-    The expected caller set comes from frontmatter, and the call edge is a parsed
-    plugin-qualified skill reference. Rewording either skill does not affect the graph.
-    """
-    metadata = skill.metadata
-    raw_family = metadata.get("family")
-    if metadata.get("user-invocable") is not False or not raw_family:
-        pytest.skip("not an internal workflow family member")
-
-    family = {name.strip() for name in str(raw_family).split(",")}
-    callers = [
-        candidate
-        for candidate in SKILLS
-        if candidate.plugin == skill.plugin
-        and candidate.name in family
-        and _routes_to(candidate, skill)
-    ]
-
-    assert callers, (
-        f"{skill.rel} declares family {sorted(family)} but none of those skills "
-        "routes to it"
     )

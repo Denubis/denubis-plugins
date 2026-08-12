@@ -16,6 +16,12 @@
 - Path: /home/brian/.volta/bin/codex
 - Notes: emitted commands must match this CLI
 
+## cc-search-chats
+- Invocation: `cc-search-chats`
+- Version: 2.0.0a5
+- Path: /home/brian/.local/bin/cc-search-chats
+- Notes: exact transcript resolution uses `cc-search-chats context <message-uuid> --json`
+
 ## fish
 - Invocation: `fish`
 - Version: 4.8.1

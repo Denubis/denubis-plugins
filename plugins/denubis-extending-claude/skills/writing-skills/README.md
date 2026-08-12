@@ -24,6 +24,8 @@ Extracts all ` ```dot ` code blocks from the target `SKILL.md` and renders them 
 
 Anthropic-authored skill-authoring best practices, imported from obra with attribution (source commit and import date in its frontmatter). The obra body is byte-identical; the file carries a dated denubis live-docs spot-check appendix at the end. Denubis-specific guidance lives in `SKILL.md` and the sub-skills it references.
 
-## `./examples/CLAUDE_MD_TESTING.md` — worked pressure-testing example (light-touch adapted)
+## `./examples/CLAUDE_MD_TESTING.md` — historical prompt-variant example
 
-Example pressure-scenario campaign for testing CLAUDE.md documentation. Imported from obra with light denubis-voice adaptation. Illustrative, not discipline-enforcing.
+Imported from obra with light denubis-voice adaptation. It illustrates prompt variants,
+but its model responses are observations rather than executable acceptance gates. Current
+verification guidance lives in `../testing-skills-with-subagents/SKILL.md`.

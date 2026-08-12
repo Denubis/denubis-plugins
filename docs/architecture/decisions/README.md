@@ -21,6 +21,17 @@ Four-digit zero-padded, in the order ADRs were authored. Numbers are never reuse
 means that Git or an explicit archive holds a retired decision; it is not an invitation
 to reconstruct the old argument in the living set.
 
+## Decision-source integrity
+
+Every accepted ADR identifies what selected the decision. When a human instruction or
+approval selected it, include the raw source path and line plus an exact resolver
+invocation that opens the original human message. Do not substitute a quotation,
+paraphrase, model summary, or bare session identifier. When current technical evidence
+determines the decision, label and cite that evidence without inventing human approval.
+
+A missing, stale, ambiguous, or wrong-role source is an integrity defect. Repair it when
+found or return the ADR to Proposed until a focused human invocation resolves it.
+
 ## When to write an ADR vs. a constraint row
 
 - **Constraint row** (in `../constraints.md`): an enforced invariant the

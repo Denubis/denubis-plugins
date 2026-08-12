@@ -11,10 +11,19 @@ catalogue is the index; this skill does not repeat each procedure.
 
 ## Task entry
 
-1. Identify whether the request is design, implementation planning, execution,
-   debugging, review, acceptance, or branch lifecycle work.
-2. Invoke the most specific applicable skill.
-3. Follow that skill's evidence and exit conditions.
+1. State the requested goal and action boundary. For an open-ended request, recursively
+   separate components that protect materially different decisions. Resolve the current
+   component's goal and mechanism before opening the next one.
+2. Inspect project instructions, relevant project memory and feedback through the
+   project's retrieval procedure, and accepted decisions and constraints that govern the
+   boundary. Say which findings change the work; do not silently consume or ignore them.
+3. Identify whether the request is design, implementation planning, execution, debugging,
+   review, acceptance, or branch lifecycle work.
+4. Invoke the most specific applicable skill and follow its evidence and exit conditions.
+
+If intent, scope, authority, target, or consequences remain materially unclear, stop before
+mutation and ask one pointed question. Resolve it before opening another question or
+dependent sub-goal.
 
 Routine answers and already-grounded lookups do not need workflow ceremony.
 

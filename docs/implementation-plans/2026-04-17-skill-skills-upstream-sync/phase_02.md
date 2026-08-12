@@ -74,7 +74,8 @@ Record the obra SHA used in the phase's first commit message so a later reviewer
 **Anthropic-docs guidance crystallised (2026-04):**
 - Opus 4.7: literal instruction-following ("will not silently generalize"), new `xhigh` effort level ("Start with xhigh for coding and agentic use cases"), uses tools less / reasoning more than 4.6, long-horizon agentic focus.
 - Sonnet 4.6: more steerable than Opus 4.6, proactive default, parallel tool-calling at ~100% with prompting guidance, agentic overtriggering possible in GUI but steerable.
-- Haiku 4.5: Anthropic's 2026-04 description is "more consistent instruction following for nuanced tasks", 200k context / 128k extended-thinking budget, statistically safest among recent models for misaligned behaviours (vs Sonnet 4.5, Opus 4.1). **Operator-empirical position (2026-04-22 plan-amendment pass): Haiku 4.5 is unsuitable for any task requiring judgement, regardless of the Anthropic marketing framing. The project's Haiku-no-judgement guidance is retained and strengthened (not retired). Phase 2 Task 3 documents the operator-empirical position in `model-tier-notes.md`; Phase 3 Task 2 reframes the corresponding passage in `testing-skills-with-subagents/SKILL.md` with the same framing rather than removing it. See `feedback_haiku-no-judgement.md` in project-local memory for the standing operator position.**
+- Haiku 4.5: vendor specifications remain in `model-tier-notes.md`; the current dispatch
+  floor and its raw human authority records are owned there as well.
 - **Aggressive language guidance has EVOLVED but still applies.** Direct quote from current prompting best practices: *"The fix is to dial back any aggressive language. Where you might have said 'CRITICAL: You MUST use this tool when...', you can use more normal prompting like 'Use this tool when...'"* Our existing claim (lines 96, 237) is directionally correct but needs the anchor updated from generic "Claude 4.x" to "Opus 4.7 / Sonnet 4.6 / Haiku 4.5" with the current source URL.
 
 **Current file state (Phase 2B investigator; long-running-state-patterns.md assessment updated during H6 revision):**
@@ -110,7 +111,7 @@ Read the current `writing-claude-directives/SKILL.md` and its supporting files. 
 
 The 2026-04-22 independent-session search (orchestrator plus dispatched subagent) covered:
 
-- FTS5-safe single-term queries including `directive`, `Opus`, `Sonnet`, `Haiku`, `judgement`, `aggressive`, `overtriggering`, `CRITICAL`, `rationalize`, `rationalise`, `bypass`, `loophole`, `YOU`, `MUST`, `Sensitivity`, `think`, `mate`, `fuck` (the last two as frustration-signal proxies per `feedback_haiku-no-judgement.md` + project-wide memory).
+- FTS5-safe single-term queries including `directive`, `Opus`, `Sonnet`, `Haiku`, `judgement`, `aggressive`, `overtriggering`, `CRITICAL`, `rationalize`, `rationalise`, `bypass`, `loophole`, `YOU`, `MUST`, `Sensitivity`, `think`, `mate`, `fuck`.
 - 6+ projects with meaningful chat indices: `brian-ed3d-plugins`, `PromptGrimoireTool`, `marketplaces/denubis-plugins`, `pretix`, `INTS1301`, `LLM-History-Paper`.
 - 0 qualifying transcripts — no session was observed failing at directive-authoring in a way traceable to the deficiencies listed in Step 1.
 

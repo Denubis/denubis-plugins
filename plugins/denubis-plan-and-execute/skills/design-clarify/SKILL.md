@@ -1,6 +1,5 @@
 ---
 name: design-clarify
-family: starting-a-design-plan
 description: Use when a design request contains unresolved intent, scope, constraints, or contradictions that repository and external evidence cannot settle
 user-invocable: false
 ---
@@ -28,6 +27,11 @@ Map:
 - technical, policy, compatibility, and operational constraints;
 - acceptance judgments the human must make; and
 - contradictions between the request and current evidence.
+
+When an open-ended request contains components governed by different actors, consumers,
+or protected decisions, decompose it recursively. Settle the current component's goal and
+mechanism before asking about or designing the next one. Do not turn recursion into a
+batch questionnaire.
 
 Resolve contradictions first because later questions may disappear once the governing
 goal is clear. Distinguish a genuine conflict from different requirements applying at

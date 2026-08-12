@@ -1,6 +1,5 @@
 ---
 name: coding-good-tests
-family: coding-effectively
 description: Use when writing or reviewing tests - covers pytest patterns, mock strategy, condition-based waiting, and test isolation with focus on testing behavior not implementation
 ---
 

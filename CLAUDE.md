@@ -11,6 +11,11 @@ Claude Code plugins for design, implementation, and development workflows.
   newer. Keep annotations runtime-safe with `from __future__ import annotations` and
   use portable exception clauses. Hooks run through the caller's resolved Python, not a
   PEP 723 script environment.
+- In this uv project, invoke repository Python and tools through `uv run`; prefer console
+  entry points over `python -m`. Packaged hooks follow the runtime exception above.
+  Authority: `cc-search-chats context e3d35d8d-bfe1-4677-adc1-e92ef3ad6e9d --json`
+  and `cc-search-chats context 8fc827c0-b9d3-4e7d-8f92-268a7743e930 --json` (raw
+  records: `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/64611e50-8793-451a-82ca-0b4fc5264e02.jsonl:58` and `:69`).
 
 ## Repository contracts
 
@@ -37,5 +42,7 @@ Claude Code plugins for design, implementation, and development workflows.
   `denubis-extending-claude:writing-claude-directives`.
 - Repository search flags, scope, and negative-result handling:
   `denubis-plan-and-execute:using-code-search`.
+- Reviews of instruction, skill, hook, evidence, or deployment-control changes:
+  `docs/review-rubrics/instruction-control.md`.
 - Main-repository memory: resolve the Git common directory, inventory its parent's
   `.notes/` including hidden and ignored files, and open relevant bodies and sources.
