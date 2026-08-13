@@ -25,8 +25,8 @@ def _unescape_biblatex_colons(s: str) -> str:
     return s.replace("\\:", ":")
 
 
-def parse_pdf_paths(bib: str) -> list[Path]:
-    """Extract PDF paths from a BibLaTeX entry's `file = {...}` field.
+def parse_attachment_paths(bib: str) -> list[Path]:
+    """Extract renderable attachment paths from a BibLaTeX `file` field.
 
     BBT format per entry: `<label>:<path>:<mime>`, entries `;`-separated.
     On Windows the path contains a drive-letter colon (`C:\\Users\\...`)
@@ -34,7 +34,7 @@ def parse_pdf_paths(bib: str) -> list[Path]:
     middle tokens whenever the first middle token looks like a drive
     letter (`^[A-Za-z]:[\\/]?`).
 
-    Returns paths whose extension is `.pdf` (case-insensitive).
+    PDFs are preferred; otherwise Zotero HTML snapshots are returned.
     """
     m = _FILE_FIELD_RE.search(bib)
     if not m:
@@ -50,9 +50,20 @@ def parse_pdf_paths(bib: str) -> list[Path]:
             continue
 
         path_str = _extract_path(tokens)
-        if path_str and path_str.lower().endswith(".pdf"):
+        if path_str:
             paths.append(Path(path_str))
-    return paths
+    return sorted(
+        paths,
+        key=lambda path: (
+            path.suffix.lower() != ".pdf",
+            path.suffix.lower() not in {".html", ".htm"},
+        ),
+    )
+
+
+def parse_pdf_paths(bib: str) -> list[Path]:
+    """Backward-compatible PDF-only view of :func:`parse_attachment_paths`."""
+    return [p for p in parse_attachment_paths(bib) if p.suffix.lower() == ".pdf"]
 
 
 def _extract_path(tokens: list[str]) -> str:

@@ -681,8 +681,14 @@ def enrich_paper(paper: Paper, library_map: dict[str, int]) -> dict:
             pdf_paths = [
                 Path(a["path"])
                 for a in attachments
-                if a.get("path", "").lower().endswith(".pdf")
+                if a.get("path")
             ]
+            pdf_paths.sort(
+                key=lambda path: (
+                    path.suffix.lower() != ".pdf",
+                    path.suffix.lower() not in {".html", ".htm"},
+                )
+            )
             pdf_path = pdf_paths[0] if pdf_paths else None
             pdf_status = "present" if pdf_path is not None else "none"
         except Exception:
@@ -955,18 +961,18 @@ def print_match(info: dict, state: str) -> None:
     status = info.get("pdf_status", "none")
     if status == "unknown":
         print(
-            "  pdf:        (could not check — library name unresolved "
+            "  attachment: (could not check — library name unresolved "
             "or attachment lookup failed)",
             flush=True,
         )
     elif pdf is not None:
         exists = info["pdf_exists"]
         print(
-            f"  pdf:        {pdf}  [{'EXISTS' if exists else 'MISSING ON DISK'}]",
+            f"  attachment: {pdf}  [{'EXISTS' if exists else 'MISSING ON DISK'}]",
             flush=True,
         )
     else:
-        print("  pdf:        (no PDF attachment)", flush=True)
+        print("  attachment: (no PDF or HTML snapshot)", flush=True)
     print(f"  state:      {state}", flush=True)
     # Only advertise a render dir when a render actually exists there.
     if state == "rendered" and info.get("out_dir"):

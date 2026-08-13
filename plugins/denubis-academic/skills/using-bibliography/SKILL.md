@@ -564,18 +564,23 @@ bib = requests.post(
   returns "not found" even with a valid cite key.
 - The directory name in `~/Zotero/storage/<KEY>/` is the **attachment** key,
   not the parent item key. Don't try to look items up by storage dir name.
-- Some items may have multiple `file` entries (`Full Text:/path.pdf;` + a
-  snapshot). Filter to paths ending `.pdf`. The format is
-  `<label>:<path>:<mime>` separated by `;`.
+- Some items have multiple `file` entries (`Full Text:/path.pdf;` + a snapshot).
+  Prefer `.pdf`; when there is no PDF, use the `.html`/`.htm` snapshot. The
+  format is `<label>:<path>:<mime>` separated by `;`.
 
-### 2. Render PDF → per-page markdown (auto-escalating cascade)
+### 2. Render attachment → markdown
 
 Use the bundled `render.py`:
 
 ```bash
 uv run --with pymupdf4llm --with docling --with easyocr \
-    python render.py "<absolute-pdf-path>" ~/zettelkasten/papers/<citekey>/
+    python render.py "<absolute-attachment-path>" ~/zettelkasten/papers/<citekey>/
 ```
+
+PDFs use the auto-escalating cascade below. Zotero HTML snapshots use Python's
+standard HTML parser and become one searchable `pages/001.md`; scripts, styles,
+SVG, and templates are omitted. Other attachment formats are passed to Pandoc
+and likewise become one searchable page; an unsupported format fails clearly.
 
 > **PDF → text is ALWAYS this Python cascade. Never improvise.** Do not call
 > `pdftotext`, `pdf2txt`, `tesseract`, `ocrmypdf`, hand-run `pymupdf4llm`/docling,
@@ -629,7 +634,7 @@ Output (verified on 28-page Yim 2024 via pymupdf4llm and 16-page Schraw
 ├── pages/
 │   ├── 001.md
 │   └── ... (one per page)
-└── meta.json          # page_count, sha256_prefix, source_pdf, renderer,
+└── meta.json          # page_count, sha256_prefix, source_pdf/source_attachment, renderer,
                        # ocr, and renderer_note when escalation fired
 ```
 

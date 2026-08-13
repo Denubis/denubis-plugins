@@ -25,7 +25,7 @@ import tomllib
 from contextlib import nullcontext
 from pathlib import Path
 
-from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback
+from renderer import NeedsMocr, mocr_server, render_attachment
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 
@@ -85,7 +85,7 @@ def main() -> int:
 
     try:
         with ctx as session:
-            meta = render_pdf_with_fallback(
+            meta = render_attachment(
                 pdf, out, allow_mocr=args.allow_mocr, mocr_session=session
             )
     except NeedsMocr as e:

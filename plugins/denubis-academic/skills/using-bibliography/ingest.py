@@ -33,8 +33,8 @@ from pathlib import Path
 # this module stays importable without the PEP 723 deps, which is what lets the
 # unit tests load it. Mirrors resolve.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bbt import parse_pdf_paths
-from renderer import NeedsMocr, mocr_server, render_pdf_with_fallback
+from bbt import parse_attachment_paths
+from renderer import NeedsMocr, mocr_server, render_attachment
 from zotero_local_api import search_doi_field
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
@@ -139,7 +139,7 @@ def resolve_pdf(item: dict, library_map: dict[str, int]) -> Path | None:
         )
     bibs = rpc("item.export", [[citekey], "Better BibLaTeX", library_id])
     bib = bibs[0] if isinstance(bibs, list) else bibs
-    paths = parse_pdf_paths(bib)
+    paths = parse_attachment_paths(bib)
     return paths[0] if paths else None
 
 
@@ -158,14 +158,13 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
 def render_pdf(
     pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_session=None
 ) -> dict:
-    """Render PDF -> markdown with auto-escalation (pymupdf4llm -> docling ->
-    +OCR -> mocr when allowed).
+    """Render an attachment; PDFs escalate through OCR, snapshots use HTML text.
 
     Returns the meta dict written to meta.json. Raises NeedsMocr if the cascade
     is exhausted and mocr is not enabled; RuntimeError if a render genuinely
     fails (including mocr).
     """
-    return render_pdf_with_fallback(
+    return render_attachment(
         pdf, out_dir, allow_mocr=allow_mocr, mocr_session=mocr_session
     )
 
@@ -243,7 +242,7 @@ def main() -> int:
                 print(f"  library:  {library}", flush=True)
                 pdf = resolve_pdf(item, library_map)
                 if pdf is None:
-                    print("  no PDF attachment in this item", flush=True)
+                    print("  no PDF or HTML snapshot attachment in this item", flush=True)
                     failures += 1
                     continue
                 if not pdf.is_file():

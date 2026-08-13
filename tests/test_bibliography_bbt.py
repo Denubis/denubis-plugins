@@ -146,6 +146,20 @@ def test_only_non_pdf_entry_returns_empty():
     assert bbt.parse_pdf_paths(bib) == []
 
 
+def test_snapshot_is_used_when_there_is_no_pdf():
+    bib = _wrap("Snapshot:/home/u/Zotero/storage/B/index.html:text/html")
+    assert bbt.parse_attachment_paths(bib) == [
+        Path("/home/u/Zotero/storage/B/index.html")
+    ]
+
+
+def test_pdf_is_preferred_over_snapshot():
+    bib = _wrap(
+        "Snapshot:/z/index.html:text/html;Full Text:/z/paper.pdf:application/pdf"
+    )
+    assert bbt.parse_attachment_paths(bib)[0] == Path("/z/paper.pdf")
+
+
 # --- Regression: 0.2.1 reference bib in this repo -------------------------
 
 

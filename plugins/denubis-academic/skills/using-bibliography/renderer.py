@@ -31,8 +31,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from collections.abc import Callable
 from contextlib import contextmanager
+from html.parser import HTMLParser
 from pathlib import Path
 
 EMPTY_PAGE_CHAR_THRESHOLD = 50
@@ -54,6 +56,76 @@ _PYMUPDF_PICTURE_MARKER_RE = re.compile(
 )
 
 Progress = Callable[[str], None]
+
+
+class _SnapshotText(HTMLParser):
+    """Small HTML-to-text reader for Zotero snapshots; scripts stay out."""
+
+    BLOCKS = {
+        "article", "blockquote", "br", "div", "h1", "h2", "h3", "h4",
+        "h5", "h6", "li", "main", "p", "section", "tr",
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self.hidden = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in {"script", "style", "svg", "template"}:
+            self.hidden += 1
+        elif not self.hidden and tag in self.BLOCKS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "svg", "template"}:
+            self.hidden = max(0, self.hidden - 1)
+        elif not self.hidden and tag in self.BLOCKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.hidden:
+            self.parts.append(data)
+
+
+def render_snapshot(snapshot: Path, out_dir: Path) -> dict:
+    """Render a Zotero HTML snapshot as one searchable markdown page."""
+    parser = _SnapshotText()
+    parser.feed(snapshot.read_text(encoding="utf-8", errors="replace"))
+    text = "\n\n".join(
+        line
+        for line in (
+            " ".join(part.split()) for part in "".join(parser.parts).splitlines()
+        )
+        if line
+    )
+    if not text:
+        raise RuntimeError(f"snapshot contains no readable text: {snapshot}")
+    return _write_outputs(
+        [text], snapshot, out_dir, "html.parser", False, []
+    )
+
+
+def render_attachment(source: Path, out_dir: Path, **pdf_options) -> dict:
+    """Render PDF/HTML natively; let Pandoc handle every other attachment."""
+    suffix = source.suffix.lower()
+    if suffix == ".pdf":
+        return render_pdf_with_fallback(source, out_dir, **pdf_options)
+    if suffix in {".html", ".htm"}:
+        return render_snapshot(source, out_dir)
+    try:
+        result = subprocess.run(
+            ["pandoc", str(source), "-t", "gfm", "--wrap=none"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", "") or str(error)
+        raise RuntimeError(f"pandoc could not render {source}: {detail.strip()}") from error
+    if not result.stdout.strip():
+        raise RuntimeError(f"pandoc produced no readable text for {source}")
+    return _write_outputs([result.stdout.strip()], source, out_dir, "pandoc", False, [])
 
 
 def _strip_structural_markers(page_text: str) -> str:
@@ -166,7 +238,7 @@ def fold_mocr_markdown(nohf_text: str) -> list[str]:
 
 def _write_outputs(
     pages: list[str],
-    pdf: Path,
+    source: Path,
     out_dir: Path,
     renderer: str,
     ocr: bool,
@@ -184,12 +256,15 @@ def _write_outputs(
     (out_dir / "full.md").write_text("".join(full_parts), encoding="utf-8")
 
     meta: dict = {
-        "source_pdf": str(pdf),
         "page_count": len(pages),
-        "sha256_prefix": hashlib.sha256(pdf.read_bytes()).hexdigest()[:16],
+        "sha256_prefix": hashlib.sha256(source.read_bytes()).hexdigest()[:16],
         "renderer": renderer,
         "ocr": ocr,
     }
+    if source.suffix.lower() == ".pdf":
+        meta["source_pdf"] = str(source)  # compatibility with existing renders
+    else:
+        meta["source_attachment"] = str(source)
     if len(attempts) > 1:
         chain = " -> ".join(
             f"{a['renderer']}{'+ocr' if a['ocr'] else ''}({a['verdict']})"
