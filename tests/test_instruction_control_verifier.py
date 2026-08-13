@@ -21,6 +21,30 @@ verifier = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verifier)
 
 
+def test_tree_digest_ignores_virtual_environments(tmp_path: Path) -> None:
+    plugin = tmp_path / "plugin"
+    plugin.mkdir()
+    (plugin / "SKILL.md").write_text("procedure\n", encoding="utf-8")
+    expected = verifier.sha256_tree(plugin)
+    environment_file = plugin / "tools" / ".venv" / "lib" / "runtime.py"
+    environment_file.parent.mkdir(parents=True)
+    environment_file.write_text("runtime residue\n", encoding="utf-8")
+
+    assert verifier.sha256_tree(plugin) == expected
+
+
+def test_tree_digest_binds_virtual_environment_near_miss(tmp_path: Path) -> None:
+    plugin = tmp_path / "plugin"
+    plugin.mkdir()
+    (plugin / "SKILL.md").write_text("procedure\n", encoding="utf-8")
+    expected = verifier.sha256_tree(plugin)
+    source_file = plugin / "tools" / ".venv-source" / "runtime.py"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_text("authoritative source\n", encoding="utf-8")
+
+    assert verifier.sha256_tree(plugin) != expected
+
+
 def test_manifest_loader_rejects_duplicate_keys(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.json"
     manifest.write_text(

@@ -12,7 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-_IGNORED_TREE_PARTS = {".in_use", ".pytest_cache", "__pycache__"}
+# Exact components below are generated runtime state, not release source.
+_IGNORED_TREE_PARTS = {".in_use", ".pytest_cache", ".venv", "__pycache__"}
 
 
 def sha256_file(path: Path) -> str:
