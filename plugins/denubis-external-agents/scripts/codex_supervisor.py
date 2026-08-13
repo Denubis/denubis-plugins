@@ -1835,9 +1835,6 @@ def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
 def run_slash_command(command: str) -> str:
     """Type one slash command into the joined composer and confirm what it did.
 
-    This exists because the supervisor kept delivering `/clear` and `/compact` as
-    prose or through `--message`, and Codex reads either as a task: it goes off and
-    reads files to answer you, and the context you were reclaiming grows instead.
     The command goes in the way the composer accepts it, as keystrokes on their own
     line, typed and confirmed before Enter is a separate call.
     """

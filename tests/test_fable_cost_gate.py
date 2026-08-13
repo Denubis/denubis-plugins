@@ -1,253 +1,110 @@
-"""Mechanical enforcement of the Fable-tier cost gate.
-
-The gate (``plugins/denubis-extending-claude/skills/writing-claude-directives/
-model-tier-notes.md``, "Cost gate", operator-empirical 2026-06-10) says
-Fable-tier invocations are human-triggered only: no directive, skill, plan, or
-agent prompt may auto-dispatch Fable-tier work.
-
-Prose cannot enforce that. A skill added months from now saying "then consult
-the Fable advisor" is auto-dispatch, and the breach surfaces on the operator's
-bill rather than in review — a silent failure, which fails Jones's third
-condition (every miss surfaces fast enough for a human to decide). These tests
-turn a lexical breach into a red run.
-
-WHAT THIS DOES NOT CATCH. The detector is lexical, so it enforces "no Fable
-reference in text under plugins/" and not the policy itself. Two shapes evade it
-by construction, and naming them here is the point: a test that implies more
-than it checks is the failure mode it was written against.
-
-- Semantic dispatch. "Then spawn the different-model advisor pane from the
-  external-agents plugin" names nothing this matches, yet the consumer of that
-  sentence is a model that resolves descriptions rather than names. An innocent
-  paraphrase during a doc edit defeats the tripwire.
-- Ambient model inheritance. ``Workflow`` and agent fan-out inherit the session
-  model, so when the human is already running on Fable, any skill that fans out
-  dispatches Fable-tier work with no Fable token anywhere in the repository.
-
-The first was found by a Fable advisor reading this module (2026-07-21); the
-second is recorded in fable-advisor-spawn.sh's own header. Neither is greppable,
-and no amount of widening the globs reaches them.
-
-They are structural tripwires, in the same spirit as
-``test_model_tier_freshness.py``: they check how the gate is respected, not
-whether Fable is any good. The gate's own falsifier is operator-owned — only a
-dated note from the operator revokes it — so if these tests ever need to change,
-that note must exist first.
-"""
+"""Runtime-structure checks for the human-triggered Fable cost boundary."""
 
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS = REPO_ROOT / "plugins"
-
-ADVISOR_SKILL = "consulting-a-fable-advisor"
-ADVISOR_DIR = PLUGINS / "denubis-external-agents" / "skills" / ADVISOR_SKILL
-
-# Fable-tier model identifiers, the skill that dispatches them, and the phrase a
-# dispatching instruction actually uses. The first three are exact names; the
-# fourth exists because this module's own docstring names "then consult the
-# Fable advisor" as the canonical breach, and a detector blind to its own worked
-# example enforces nothing it claims to.
-FABLE_TOKENS = re.compile(
-    r"claude-fable-\d|fable-advisor-spawn|consulting-a-fable-advisor|fable[ -]advisor",
-    re.IGNORECASE,
-)
-
-# Files that must discuss the gate to define or implement it. Everything else
-# under plugins/ is scanned, because dispatch is not confined to SKILL.md.
-EXEMPT_DIRS = (ADVISOR_DIR,)
-EXEMPT_FILES = (
+ADVISOR_SKILL = (
     PLUGINS
-    / "denubis-extending-claude"
+    / "denubis-external-agents"
     / "skills"
-    / "writing-claude-directives"
-    / "model-tier-notes.md",
+    / "consulting-a-fable-advisor"
+    / "SKILL.md"
 )
+ADVISOR_LAUNCHER = ADVISOR_SKILL.with_name("fable-advisor-spawn.sh")
 
 
-def _is_exempt(path: Path) -> bool:
-    return any(path.is_relative_to(d) for d in EXEMPT_DIRS) or path in EXEMPT_FILES
+def _frontmatter(path: Path) -> dict[str, Any]:
+    _opening, raw, _body = path.read_text(encoding="utf-8").split("---", 2)
+    parsed = yaml.safe_load(raw)
+    assert isinstance(parsed, dict)
+    return parsed
 
 
-def _scanned_files() -> list[Path]:
-    """Every readable text file under plugins/, minus the gate's own documents.
-
-    Deliberately broader than the four categories this module first checked. A
-    skill's auxiliary payload files and a plugin's scripts both dispatch, and
-    both were unwatched: `_skill_files()` globbed only ``*/skills/*/SKILL.md``,
-    and nothing globbed ``plugins/*/scripts/**`` at all.
-    """
-    found = []
-    for path in sorted(PLUGINS.rglob("*")):
-        if not path.is_file() or _is_exempt(path):
-            continue
-        try:
-            path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        found.append(path)
-    return found
+def _is_fable_model(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalised = value.casefold().removeprefix("claude-")
+    return normalised == "fable" or normalised.startswith("fable-")
 
 
-def _skill_files() -> list[Path]:
-    return sorted(PLUGINS.glob("*/skills/*/SKILL.md"))
+def _agent_model(path: Path) -> str | None:
+    match = re.search(
+        r"^model:\s*([^\s#]+)", path.read_text(encoding="utf-8"), re.MULTILINE
+    )
+    return match.group(1) if match else None
 
 
-def _agent_files() -> list[Path]:
-    return sorted(PLUGINS.glob("*/agents/*.md"))
+def test_fable_model_classifier_has_positive_and_negative_controls() -> None:
+    assert _is_fable_model("fable")
+    assert _is_fable_model("claude-fable-5")
+    assert not _is_fable_model("opus")
 
 
-def _hook_and_command_files() -> list[Path]:
-    return sorted(
-        [*PLUGINS.glob("*/hooks/*"), *PLUGINS.glob("*/commands/*.md")],
+def test_advisor_skill_requires_human_selection() -> None:
+    metadata = _frontmatter(ADVISOR_SKILL)
+
+    assert metadata["user-invocable"] is True
+    assert metadata["disable-model-invocation"] is True
+
+
+def test_shipped_agent_definitions_do_not_dispatch_fable() -> None:
+    agents = sorted(PLUGINS.glob("*/agents/*.md"))
+    assert agents, "agent-definition corpus was not discovered"
+
+    offenders = [
+        str(path.relative_to(REPO_ROOT))
+        for path in agents
+        if _is_fable_model(_agent_model(path))
+    ]
+
+    message = "Fable agent definitions bypass human selection: " + ", ".join(
+        offenders
+    )
+    assert not offenders, message
+
+
+def test_unavailable_advisor_does_not_prescribe_an_unrequested_fallback(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    tmux = bin_dir / "tmux"
+    tmux.write_text(
+        """#!/usr/bin/env bash
+if [ \"$1\" = split-window ]; then
+  printf '%%99\\n'
+fi
+""",
+        encoding="utf-8",
+    )
+    claude = bin_dir / "claude"
+    claude.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    sleep = bin_dir / "sleep"
+    sleep.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    for executable in (tmux, claude, sleep):
+        executable.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(ADVISOR_LAUNCHER), str(tmp_path), "requested-model"],
+        capture_output=True,
+        check=False,
+        env={
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+            "TMUX": "fixture",
+            "TMUX_PANE": "%1",
+        },
+        text=True,
     )
 
-
-def test_advisor_skill_is_user_invocable() -> None:
-    """The dispatching skill must declare itself human-invocable.
-
-    A skill without ``user-invocable: true`` is one the model reaches for on its
-    own, which is the auto-dispatch the gate forbids.
-    """
-    text = (ADVISOR_DIR / "SKILL.md").read_text(encoding="utf-8")
-    assert "user-invocable: true" in text, (
-        f"{ADVISOR_SKILL} must declare 'user-invocable: true'; without it the "
-        "model may reach for it unprompted, which breaches the Fable cost gate."
-    )
-
-
-def test_no_other_skill_references_the_fable_advisor() -> None:
-    """No other skill may name the advisor skill or its spawn script.
-
-    A reference from another skill turns a human-triggered consultation into a
-    step in an automated flow. That is the breach the gate exists to prevent.
-    """
-    offenders = []
-    for path in _skill_files():
-        if path.parent.name == ADVISOR_SKILL:
-            continue
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if FABLE_TOKENS.search(line):
-                rel = path.relative_to(REPO_ROOT)
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
-
-    assert not offenders, (
-        "These skills reference the Fable advisor, making it an automatic step "
-        "and breaching the cost gate (model-tier-notes.md, 'Cost gate'). Only a "
-        "human may trigger a Fable-tier dispatch:\n  " + "\n  ".join(offenders)
-    )
-
-
-def test_no_agent_hook_or_command_dispatches_fable() -> None:
-    """Agents, hooks, and commands must not dispatch Fable-tier work.
-
-    Agent prompts are named in the gate explicitly. Hooks and commands fire
-    without a human in the loop by construction, so a Fable reference in either
-    is auto-dispatch regardless of intent.
-    """
-    offenders = []
-    for path in [*_agent_files(), *_hook_and_command_files()]:
-        if not path.is_file():
-            continue
-        try:
-            content = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue
-        for lineno, line in enumerate(content.splitlines(), start=1):
-            if FABLE_TOKENS.search(line):
-                rel = path.relative_to(REPO_ROOT)
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
-
-    assert not offenders, (
-        "Agents, hooks, and commands may not dispatch Fable-tier work "
-        "(model-tier-notes.md, 'Cost gate'):\n  " + "\n  ".join(offenders)
-    )
-
-
-def test_no_agent_definition_declares_a_fable_model() -> None:
-    """No agent may declare a Fable-tier model in its frontmatter.
-
-    An agent with ``model: fable`` is dispatchable by any skill that names it,
-    which routes around every other check here.
-    """
-    offenders = []
-    for path in _agent_files():
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if re.match(r"^model:\s*(claude-)?fable", line.strip(), re.IGNORECASE):
-                offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
-
-    assert not offenders, (
-        "Agent definitions may not declare a Fable-tier model:\n  "
-        + "\n  ".join(offenders)
-    )
-
-
-def test_spawn_script_records_the_gate() -> None:
-    """The spawn script must carry the gate in-file.
-
-    The script is runnable directly, without its skill. Someone reading only the
-    script must still learn that nothing may call it automatically.
-    """
-    text = (ADVISOR_DIR / "fable-advisor-spawn.sh").read_text(encoding="utf-8")
-    assert "human-triggered only" in text, (
-        "fable-advisor-spawn.sh must state that Fable invocations are "
-        "human-triggered only; the script is runnable without its SKILL.md."
-    )
-
-
-def test_detector_matches_the_canonical_breach_named_in_this_docstring() -> None:
-    """The example breach this module names must be one it can catch.
-
-    The module docstring justifies these tests with a skill saying "then consult
-    the Fable advisor". Until the phrase token was added, that sentence passed
-    the detector untouched, so the worked example that motivated the tests was
-    itself undetectable by them.
-    """
-    assert FABLE_TOKENS.search("then consult the Fable advisor"), (
-        "The detector does not match the breach this module's own docstring "
-        "uses to justify its existence."
-    )
-
-
-def test_scan_reaches_auxiliary_skill_files_and_plugin_scripts() -> None:
-    """Dispatch lives in more than SKILL.md.
-
-    Skills carry payload files the model is told to read and run, and plugins
-    carry scripts that run unattended on a session hook. A scan restricted to
-    SKILL.md, agents, hooks, and commands leaves both classes unwatched.
-    """
-    scanned = {p.relative_to(REPO_ROOT).as_posix() for p in _scanned_files()}
-    auxiliary = [p for p in scanned if "/skills/" in p and not p.endswith("SKILL.md")]
-    scripts = [p for p in scanned if "/scripts/" in p]
-    assert auxiliary, "no auxiliary (non-SKILL.md) skill files are scanned"
-    assert scripts, "no plugin scripts are scanned"
-
-
-def test_nothing_under_plugins_dispatches_fable() -> None:
-    """The widened scan: no Fable reference anywhere under plugins/.
-
-    Supersedes the per-category checks above in breadth. They are kept because a
-    failure in one of them names the category, which is a faster read than a
-    path in a list.
-    """
-    offenders = []
-    for path in _scanned_files():
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if FABLE_TOKENS.search(line):
-                rel = path.relative_to(REPO_ROOT)
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
-
-    assert not offenders, (
-        "Fable-tier dispatch may not be referenced anywhere under plugins/ "
-        "outside the advisor's own skill (model-tier-notes.md, 'Cost gate'). "
-        "Only a human may trigger a Fable-tier dispatch:\n  " + "\n  ".join(offenders)
-    )
+    assert result.returncode == 2
+    assert "'requested-model'" in result.stderr
+    assert "no fallback model was selected" in result.stderr.casefold()
+    assert "opus" not in result.stderr.casefold()

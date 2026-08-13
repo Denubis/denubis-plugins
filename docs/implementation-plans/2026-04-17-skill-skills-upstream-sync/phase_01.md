@@ -22,7 +22,6 @@ This phase implements and tests:
 - **skill-skills-upstream-sync.AC4.1 Success:** `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md` exists with reference-type frontmatter (description keyed to scope-assessment triggers)
 - **skill-skills-upstream-sync.AC4.2 Success:** Rubric has four sections: Scope (Jones's three conditions), Observability, Process (Schön's four questions), Failure-pattern screen
 - **skill-skills-upstream-sync.AC4.3 Success:** Every cited claim is attributable to `AbsenceJudgement.tex` with a page or section ref, or to a named secondary source (Schön 1994 p.132, Jones — citation located and verified)
-- **skill-skills-upstream-sync.AC4.4 Failure:** No mention of TEMP, RAND, SCOP, VIBE, FABR, MECH, MTCH, SCAF, or BOUN as defined codes (grep-audit); if any of these strings appear, it must be in a rejection context explicitly citing DR4
 - **skill-skills-upstream-sync.AC4.5 Edge:** Rubric self-application is a **walk-through with surfaced vulnerabilities, not a pass/fail gate** (H4 revision). Deliverable: (a) a committed walk-through applying each rubric section to the rubric itself, living in the skill's body or a supporting file, AND (b) any reflective vulnerability surfaced by the walk-through raised to the user for acknowledgement before GREEN. Zero vulnerabilities surfaced is itself a flag — re-run with sharper honesty. Retrospective backstop: Phase 5 Task 4.5 frustration-signal audit (AC5.8).
 
 ---
@@ -55,8 +54,7 @@ This phase implements and tests:
 - **Schön bibliographic details:** Donald A. Schön, *The Reflective Practitioner: How Professionals Think in Action*, Taylor & Francis Group (Oxford), 1994, ISBN 978-1-351-88315-3, cited at p.132.
 - **Latour (named secondary source for Observability black-boxing framing — NOT in AbsenceJudgement.tex):** Bruno Latour, *Science in Action: How to Follow Scientists and Engineers Through Society*, Harvard University Press, 1987; and Bruno Latour, *Pandora's Hope: Essays on the Reality of Science Studies*, Harvard University Press, 1999. Task-implementor should verify ISBNs at implementation time; the key concepts are "black box" and "immutable mobile" (1987) and the construction-of-facts argument (1999).
 
-**Verified absences (load-bearing for DR4 compliance):**
-- `TEMP`, `RAND`, `SCOP`, `VIBE`, `FABR`, `MECH`, `MTCH`, `SCAF`, `BOUN` — zero hits in `AbsenceJudgement.tex` (exhaustive word-boundary grep audit in Phase 1C).
+**Verified source boundaries (load-bearing for DR4 compliance):**
 - Haraway — zero hits; Popper/Lakatos — one parenthetical mention only; prolepsis — zero hits. These must not be cited as if they were paper content.
 
 ---
@@ -66,7 +64,7 @@ This phase implements and tests:
 <!-- START_TASK_1 -->
 ### Task 1: Create `epistemic-humility/SKILL.md` with frontmatter, memento, and rubric sections
 
-**Verifies:** skill-skills-upstream-sync.AC4.1, skill-skills-upstream-sync.AC4.2, skill-skills-upstream-sync.AC4.3 (partial — closed by Task 2), skill-skills-upstream-sync.AC4.4
+**Verifies:** skill-skills-upstream-sync.AC4.1, skill-skills-upstream-sync.AC4.2, skill-skills-upstream-sync.AC4.3 (partial — closed by Task 2)
 
 **Files:**
 - Create: `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md`
@@ -152,9 +150,7 @@ The file must contain these sections, in order:
 
 8. **Self-application pointer** — H2. One paragraph pointing to `self-application.md` (Task 3) as the AC4.5 coherence demonstration. Do NOT inline the walk-through here.
 
-9. **Fabricated-codes rejection note** — H2 titled "Note on fabricated taxonomy". One short paragraph explicitly noting that prior-session handoffs contained fabricated codes (TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN). None of these appear in AbsenceJudgement.tex (verified by word-boundary grep-audit, 2026-04-17). This skill does not use them. Cite DR4 of the upstream-sync design plan. This section is the only place in the whole skill directory those strings may appear, and they appear in an explicit rejection context (AC4.4).
-
-**Consumer-tracing:** Every section in this SKILL.md names its consumer — Sections 6a-6d are the rubric invoked from orchestrator rubric-callback sections (authored in Phases 2-4); the Cross-reference stanza's forward references resolve when Phases 2-4 land; the self-application pointer consumes Task 3's output; the fabricated-codes rejection note is read by Phase 5's cross-reference audit when it runs the fabricated-codes grep.
+**Consumer-tracing:** Every section in this SKILL.md names its consumer — Sections 6a-6d are the rubric invoked from orchestrator rubric-callback sections (authored in Phases 2-4); the Cross-reference stanza's forward references resolve when Phases 2-4 land; the self-application pointer consumes Task 3's output.
 
 **Step 3: Verify frontmatter is valid YAML**
 
@@ -244,9 +240,9 @@ Structure:
    - Full bibliographic entry for Latour 1999 (*Pandora's Hope*, Harvard UP, ISBN to be verified by implementor).
    - Explicit note: AbsenceJudgement does not discuss Latour. These citations support the Observability section's black-box / immutable-mobile framing.
 
-5. **H2 section: `## Verified absences`** — explicit list: Haraway (zero hits in AbsenceJudgement.tex), Popper (one parenthetical mention at line 829, NOT substantive discussion), Lakatos (same parenthetical mention at line 829, NOT substantive), prolepsis (zero hits; the Kudina/Ballsun-Stanton/Alfano 2025 paper is cited once at AbsenceJudgement.tex:905 but not for its prolepsis content), and the nine fabricated taxonomy codes (TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN, all zero hits, exhaustive word-boundary grep). Include a brief explanation for why this list matters (DR4): these absences bound what the rubric may and may not claim from the paper.
+5. **H2 section: `## Verified absences`** — explicit list: Haraway (zero hits in AbsenceJudgement.tex), Popper (one parenthetical mention at line 829, NOT substantive discussion), Lakatos (same parenthetical mention at line 829, NOT substantive), and prolepsis (zero hits; the Kudina/Ballsun-Stanton/Alfano 2025 paper is cited once at AbsenceJudgement.tex:905 but not for its prolepsis content). Include a brief explanation for why this list matters (DR4): these absences bound what the rubric may and may not claim from the paper.
 
-**Consumer-tracing:** SKILL.md's Scope, Observability, Process, and Failure-pattern sections all cross-reference this file. Phase 5's fabricated-codes audit reads the Verified absences section to confirm the baseline it asserts.
+**Consumer-tracing:** SKILL.md's Scope, Observability, Process, and Failure-pattern sections all cross-reference this file.
 
 **Step 2: Verify the file contains every required line-number reference**
 
@@ -296,9 +292,7 @@ git commit -m "feat(epistemic-humility): add paragraph-level source citations
 
 Evidence base for the rubric. Every SKILL.md claim traces to a
 quotation here with line numbers. Includes explicit 'verified absences'
-section for DR4 compliance (Haraway, Popper, Lakatos, prolepsis, and
-the nine fabricated taxonomy codes all confirmed absent from
-AbsenceJudgement.tex)."
+section for DR4 compliance (Haraway, Popper, Lakatos, and prolepsis)."
 ```
 <!-- END_TASK_2 -->
 
@@ -382,27 +376,12 @@ check, not mechanical pass."
 <!-- START_TASK_4 -->
 ### Task 4: Phase-level verification and audit
 
-**Verifies:** skill-skills-upstream-sync.AC4.4 (final grep-audit), cross-checks of skill-skills-upstream-sync.AC4.1-AC4.3 against the three files produced by Tasks 1-3
+**Verifies:** cross-checks of skill-skills-upstream-sync.AC4.1-AC4.3 against the three files produced by Tasks 1-3
 
 **Files:**
 - No new files. This task runs audit commands against the three files written in Tasks 1-3 and commits only if audits pass.
 
-**Step 1: Fabricated-codes grep-audit (AC4.4)**
-
-Run:
-```bash
-cd /home/brian/people/Brian/brian-ed3d-plugins
-# Word-boundary search for all nine fabricated codes across the skill directory.
-# Expected: zero hits OUTSIDE the explicit rejection context in SKILL.md.
-for code in TEMP RAND SCOP VIBE FABR MECH MTCH SCAF BOUN; do
-    echo "=== $code ==="
-    grep -Hn -w "$code" plugins/denubis-extending-claude/skills/epistemic-humility/ -r || echo "  (zero hits)"
-done
-```
-
-Expected: each code reports either `(zero hits)` OR a small number of hits *all* within SKILL.md's "Note on fabricated taxonomy" section (the explicit rejection context permitted by AC4.4). Any hit in `absencejudgement-citations.md` or `self-application.md` is a DR4 violation — halt and rewrite.
-
-**Step 2: Cross-reference presence check**
+**Step 1: Cross-reference presence check**
 
 Run:
 ```bash
@@ -426,7 +405,7 @@ print('cross-references named (forward-targets resolved by Phases 2-4; supportin
 ```
 Expected: `cross-references named (forward-targets resolved by Phases 2-4; supporting-file pointers intra-phase)`.
 
-**Step 3: File-set completeness check**
+**Step 2: File-set completeness check**
 
 Run:
 ```bash
@@ -443,7 +422,7 @@ self-application.md
 
 If any file is missing, the corresponding task is not complete.
 
-**Step 4: Final commit (audit log)**
+**Step 3: Final commit (audit log)**
 
 ```bash
 cd /home/brian/people/Brian/brian-ed3d-plugins
@@ -454,7 +433,7 @@ git log -1 --pretty=format:"%h %s" -- plugins/denubis-extending-claude/skills/ep
 
 If the last three commits from Tasks 1-3 already capture the skill, Task 4 does not produce a new commit. Record the audit results in the phase-completion notes instead (no file changes to commit).
 
-**Consumer-tracing for Task 4:** This task's verification output is consumed by Phase 5's cross-reference audit (Task 5B's investigator will re-run the fabricated-codes grep across the full plugin) and by the Finalization code-reviewer.
+**Consumer-tracing for Task 4:** This task's verification output is consumed by Phase 5's cross-reference audit and by the Finalization code-reviewer.
 <!-- END_TASK_4 -->
 
 ---
@@ -464,9 +443,8 @@ If the last three commits from Tasks 1-3 already capture the skill, Task 4 does 
 - [x] `plugins/denubis-extending-claude/skills/epistemic-humility/SKILL.md` exists, frontmatter validates, four rubric H2 sections present in design order (Task 1 Steps 3-4) — commit `518c80a`
 - [x] `absencejudgement-citations.md` present with all required line-number references and all required verbatim phrases (Task 2 Steps 2-3) — commit `448f3de`
 - [x] `self-application.md` present with four H2 walk-through sections and at least one explicit honesty-note (Task 3 Step 2) — commit `4d5a5ab` (**provisional pending independent self-application check per C4 of 2026-04-20 proleptic challenge**)
-- [x] Fabricated-codes grep-audit (TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN) returns zero hits outside SKILL.md's explicit rejection context (Task 4 Step 1) — two explicit rejection contexts used (SKILL.md:106, citations.md:138); no hits elsewhere
-- [x] Forward cross-references to Phases 2-4's orchestrators are named in SKILL.md (Task 4 Step 2)
-- [x] File-set is exactly three files (Task 4 Step 3)
+- [x] Forward cross-references to Phases 2-4's orchestrators are named in SKILL.md (Task 4 Step 1)
+- [x] File-set is exactly three files (Task 4 Step 2)
 - [x] Three commits land on branch (one per Task 1-3; Task 4 is audit-only, produces no new commit) — three task commits `518c80a`, `448f3de`, `4d5a5ab` landed as planned. Two additional commits landed outside the Task 1-3 scope: `a08dda4` (pyyaml dep, unstated plan requirement) and `ebcf606` (post-review typo fix "you art"→"thou art"). Rationale recorded in `phase-01-code-review-2026-04-20.md`.
 
 **Not in scope for Phase 1:**

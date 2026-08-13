@@ -1,134 +1,92 @@
 # denubis-plan-and-execute — Context (Level 0)
 
-> System boundary: the largest plugin in the marketplace. It ships the design → plan → execute workflow stack (skills, agents, commands), the `code-quality-guard` and `using-plan-and-execute` hooks, the `workflow_statusline` Python package that emits the tmux statusline string, and the `claude-wrapper.sh` shell entry-point that runs `claude` with disabled tools and agent teams enabled.
+> System boundary: the design, implementation, verification, and branch-lifecycle
+> procedures; the agents they delegate to; two Claude Code hook programs; the
+> workflow statusline; and the Claude wrapper.
 
-## Diagram
+## Context
 
 ```mermaid
 flowchart LR
-    User[Human user]
-    CC[Claude Code host]
-    Claude[claude binary]
-    Tmux[tmux / terminal]
-    Sibling[Sibling plugins\n(denubis-basic-agents,\ndenubis-research-agents)]
-    GitHub[git / gh CLI]
-    FS@{ shape: das, label: "Project filesystem\n(docs/design-plans/,\ndocs/implementation-plans/,\ndocs/test-plans/,\ndocs/architecture/,\nCLAUDE.md, AGENTS.md,\npyproject.toml, .claude/settings.json)" }
+    H[Human]
+    C[Claude Code host]
+    P[Plan-and-execute plugin]
+    F[Project files and Git]
+    A[Bundled and sibling agents]
+    T[Terminal and tmux]
+    R[Crash-recovery plugin]
 
-    Plugin((0.0\ndenubis-plan-and-execute))
-
-    User -->|"claudew (wrapper);\nslash commands;\nskill invocations"| CC
-    User -->|"shell invocation"| Plugin
-    Plugin -->|"exec claude\n--disallowedTools=...\nCLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"| Claude
-    Claude -->|"statusline tick\n(every prompt)"| Plugin
-    Plugin -->|"statusline string\n(branch, tokens, rate-limit,\nskills-active bar)"| Tmux
-    CC -->|"SessionStart event"| Plugin
-    Plugin -->|"using-plan-and-execute\nSKILL.md as additionalContext"| CC
-    CC -->|"PreToolUse:Write|Edit"| Plugin
-    Plugin -->|"deny / additionalContext\nbased on code-quality-guard rules"| CC
-    CC -->|"loads SKILL.md /\nagent .md /\ncommand .md"| Plugin
-    Plugin <-->|"Task dispatch to\nbasic-agents +\nresearch-agents"| Sibling
-    CC <-->|"reads / writes"| FS
-    CC -->|"git commit / merge / pr"| GitHub
+    H -->|request or command| C
+    C -->|load skill, agent, or command| P
+    P -->|PreToolUse decision or warning| C
+    C <-->|plans, code, tests, branches| F
+    P <-->|delegated work and review| A
+    P -->|statusline| T
+    P -->|live marker| R
 ```
 
-## External Entities
+## What the plugin ships
 
-| Entity | Description | Inputs to System | Outputs from System |
-|--------|-------------|------------------|---------------------|
-| Human user | Invokes `claudew` (the wrapper), slash commands, and skill workflows. Author of this marketplace. | Shell invocation of `claudew`; `/<command>` invocations; conversational prompts | Wrapped `claude` process; statusline content on every prompt; behavioural workflows in the conversation |
-| Claude Code host | Loads skills/agents/commands; fires `SessionStart` and `PreToolUse:Write|Edit` events into this plugin's hooks; runs `Task` dispatches naming this plugin's agents. | Events: `SessionStart` (matcher `startup|resume|clear|compact`) and `PreToolUse:Write|Edit` (`plugins/denubis-plan-and-execute/hooks/hooks.json`, `d57ffb0`); skill/agent/command load requests | `additionalContext` from `SessionStart` injecting the `using-plan-and-execute` skill body (`plugins/denubis-plan-and-execute/hooks/session-start.py`, `d57ffb0`); deny/warn JSON from `code-quality-guard.py` (`plugins/denubis-plan-and-execute/hooks/code-quality-guard.py`, `9bac7ed`); skill/agent prompts injected into model context |
-| `claude` binary | The underlying Claude Code CLI binary. Wrapped by `claude-wrapper.sh` which applies `--disallowedTools` and sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` before exec (`plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh`, `31e42d0`). | All `claudew` invocations | A `claude` process with `NotebookEdit`, `EnterPlanMode`, `ExitPlanMode`, `EnterWorktree`, `ExitWorktree`, `ListMcpResourcesTool`, `ReadMcpResourceTool`, `RemoteTrigger`, `CronCreate/Delete/List` disabled (`claude-wrapper.sh`, `31e42d0`) |
-| tmux / terminal | Consumer of the statusline string. The `workflow_statusline` Python package is invoked by Claude Code on every prompt and emits a one-line summary (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/`, `4359ab2`). | Statusline tick events (each Claude Code prompt) | Status line text rendered by Claude Code in its UI (and reflected into tmux if configured) |
-| `denubis-basic-agents` + `denubis-research-agents` | Sibling plugins whose agents this plugin's skills dispatch via the `Task` tool — typically `sonnet-general-purpose`, `opus-general-purpose`, `codebase-investigator`, `internet-researcher`. | `Task` dispatches | Subagent returns |
-| git / gh CLI | Used by the worktree, PR, merge, and commit skills/agents to manage version control. | `git status/diff/log/worktree add/commit/merge/push`; `gh pr create` | Worktrees, commits, PRs |
-| Project filesystem | Where the workflows read and write: `docs/design-plans/<date>-<slug>.md`, `docs/implementation-plans/<plan>/`, `docs/test-plans/`, `docs/architecture/` (this directory), `CLAUDE.md`, `AGENTS.md`, `pyproject.toml`, `.claude/settings.json`. | Reads by skills/agents (Read, Grep, Glob); edits by `task-implementor`, `refactoring-executor`, etc. | Design plans, implementation plans, test plans, architecture docs, commits, configuration changes |
+| Component | Current surface | Responsibility |
+|---|---:|---|
+| Skills | 34 | Design discovery, planning, implementation discipline, review, verification, Git lifecycle, and supporting procedures (`plugins/denubis-plan-and-execute/skills/`, `c6882d2`). |
+| Agents | 10 | Implementation, bug fixing, review, coherence, database review, proleptic challenge, refactoring, smell assessment, and test analysis (`plugins/denubis-plan-and-execute/agents/`, `c6882d2`). |
+| Commands | 2 | `/flesh-it-out` and `/how-to-customize` are thin command entry points (`plugins/denubis-plan-and-execute/commands/`, `c6882d2`). |
+| Hook programs | 2 | Live-transcript marker update and pre-write quality guard (`plugins/denubis-plan-and-execute/hooks/hooks.json`). |
+| Statusline | 1 package | Renders branch, context, rate-limit, and active-workflow state for the Claude Code statusline (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/pyproject.toml`, `898504f`). |
+| Wrapper | 1 script | Starts Claude with the configured tool restrictions and team mode, and maintains liveness state consumed by crash recovery (`plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh`, `8cd6825`). |
 
-## System Boundary
+## Skill groups
 
-**In scope:**
-- The disciplined workflow: brainstorm → clarify → design → proleptic-challenge → impl-plan → execute → review → uat → merge (`plugins/denubis-plan-and-execute/skills/`, manifest `1ef36f5`).
-- Code-quality enforcement at write time: `code-quality-guard.py` denies or warns on patterns the user has banned (`plugins/denubis-plan-and-execute/hooks/code-quality-guard.py`, `9bac7ed`).
-- Statusline rendering: `workflow_statusline` is a uv-managed Python package with `[project.scripts] workflow-statusline = "workflow_statusline.__main__:main"` (`pyproject.toml`, `4359ab2`); modules `cache.py`, `bar.py`, `colours.py`, `ratelimit.py`, `tmux.py`, `git.py`, `__main__.py` (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/src/workflow_statusline/`).
-- Wrapping `claude` with the user's standing tool-disable policy and the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` env var (`scripts/claude-wrapper.sh`, `31e42d0`).
-- Multi-agent code review, coherence review, refactoring, debugging, and bug-fix loops driven by the 10 agents in `agents/`.
+| Group | Skills |
+|---|---|
+| Workflow entry and lifecycle | `using-plan-and-execute`, `starting-a-design-plan`, `starting-an-implementation-plan`, `executing-an-implementation-plan`, `finishing-a-development-branch` |
+| Design and architecture | `brainstorming`, `design-clarify`, `design-write`, `impl-plan-write`, `proleptic-challenge`, `maintain-architecture`, `architecture-update` |
+| Coding and debugging | `coding-tdd`, `coding-effectively`, `coding-fcis`, `coding-good-tests`, `coding-property-testing`, `coding-python-idioms`, `coding-verify`, `defense-in-depth`, `systematic-debugging`, `howto-develop-with-postgres` |
+| Review and acceptance | `requesting-code-review`, `critical-peer-review`, `exec-coherence-review`, `exec-uat-gate`, `exec-refactoring-rubric` |
+| Git lifecycle | `using-git-worktrees`, `make-pr`, `merge-to-main` |
+| Supporting procedures | `controlled-dependency-upgrade`, `exec-session-naming`, `restate-our-assumptions`, `using-code-search` |
 
-**Out of scope:**
-- The model itself — this plugin ships behavioural prompts and tooling, not model weights.
-- Hosting the marketplace remote or shipping non-Brian plugins.
-- Running outside Linux + fish + tmux + ghostty assumptions encoded in the wrapper and statusline (`scripts/claude-wrapper.sh`, `scripts/workflow_statusline/src/workflow_statusline/tmux.py`).
-- Database hosting (the `dba-reviewer` agent reviews PostgreSQL schemas but the plugin does not host or migrate a database itself).
+The grouping is an index over the 34 source directories at `c6882d2`; the individual
+skill bodies own their entry and exit contracts.
 
-## What This Plugin Ships
+Implementation planning and execution inspect the repository directly by default.
+Delegated agents and review skills are optional bounded tools, not mandatory transition
+stages. Tests, operational commands, and irreducible human UAT own completion evidence.
+Design follows the same boundary: direct clarification and inspection are normal,
+proleptic challenge is targeted to a named uncertainty, and design writing causes no Git
+or GitHub side effect.
 
-### Skills (`plugins/denubis-plan-and-execute/skills/`, **34 total**)
+## Hook boundaries
 
-Counts and groupings (each is a `<name>/SKILL.md`). Manifest commit `1ef36f5`.
+| Program | Event | Current effect |
+|---|---|---|
+| `update-live-marker.py` | `SessionStart`, matcher `startup|resume|clear|compact` | Updates the wrapper's live marker with the current transcript identity when the wrapper supplied `CR_LIVE_FILE` (`plugins/denubis-plan-and-execute/hooks/update-live-marker.py`, `5412160`). |
+| `code-quality-guard.py` | `PreToolUse:Write|Edit` | Returns deny or advisory output for selected banned write patterns (`plugins/denubis-plan-and-execute/hooks/code-quality-guard.py`, `2f8be5c`). |
 
-| Group | Count | Skills |
-|-------|------:|--------|
-| Workflow orchestration | 5 | `using-plan-and-execute`, `starting-a-design-plan`, `starting-an-implementation-plan`, `executing-an-implementation-plan`, `finishing-a-development-branch` |
-| Design / brainstorm | 7 | `brainstorming`, `design-clarify`, `design-write`, `impl-plan-write`, `proleptic-challenge`, `maintain-architecture`, `architecture-update` |
-| Implementation discipline | 10 | `coding-tdd`, `coding-effectively`, `coding-fcis`, `coding-good-tests`, `coding-property-testing`, `coding-python-idioms`, `coding-verify`, `defense-in-depth`, `systematic-debugging`, `howto-develop-with-postgres` |
-| Review / verification | 5 | `requesting-code-review`, `critical-peer-review`, `exec-coherence-review`, `exec-uat-gate`, `exec-refactoring-rubric` |
-| Git + branch lifecycle | 3 | `using-git-worktrees`, `make-pr`, `merge-to-main` |
-| Misc utilities | 4 | `controlled-dependency-upgrade`, `exec-session-naming`, `restate-our-assumptions`, `using-code-search` |
+The live-marker updater performs a side effect. The quality guard controls only patterns
+implemented in its checks and only at its registered write boundary. Workflow procedures
+and the two task-entry gates remain in skills and are not repeated at SessionStart.
 
-### Agents (`plugins/denubis-plan-and-execute/agents/`, **10 total**)
+## External boundaries and failure modes
 
-| Agent | Description (frontmatter, abbreviated) |
-|-------|----------------------------------------|
-| `code-reviewer` | Reviews completed plan steps against the plan; blocks merges for Minor/Important/Critical issues. |
-| `coherence-reviewer` | Reviews whether implementation coheres with design intent and supports future human UAT. |
-| `critical-peer-review` | Falsification-first audit of debugging analyses, postmortems, design plans, technical reasoning. |
-| `dba-reviewer` | Reviews PostgreSQL schemas + migrations; validates and updates `docs/architecture/database.md`. |
-| `proleptic-challenger` | Generates counterarguments before phase transitions; based on Kudina, Ballsun-Stanton & Alfano (2025), DOI 10.1007/s44204-025-00247-1. |
-| `refactoring-executor` | Applies reviewed refactoring prescriptions one finding at a time, prefers ast-grep, reverts on test failure. |
-| `smell-assessor` | Assesses code for refactoring opportunities using Mantyla smell taxonomy. Read-only. |
-| `task-bug-fixer` | Fixes issues identified by `code-reviewer` and triggers re-review. |
-| `task-implementor` | Implements individual tasks from plans with TDD and halt-on-failure. |
-| `test-analyst` | After code-review passes, validates test coverage and generates a human test plan. |
+- The human owns decisions, acceptance, and commits. Skills and agents propose or carry
+  out work within that authority.
+- Project files and Git hold plans, implementation, tests, and history. A skill's report
+  that work was completed is not a repository result.
+- Sibling agent plugins supply optional delegated workers. Their availability and model
+  tier are deployment concerns outside this plugin's source boundary and do not block
+  direct execution.
+- The wrapper writes liveness evidence; `denubis-crash-recovery` interprets it. Either
+  side can drift independently, so their file contract is cross-plugin.
+- The statusline displays observed state. It is not an execution gate.
+- SessionStart owns transcript-marker maintenance only; ordinary success supplies no
+  workflow prose to the model.
 
-(Descriptions from frontmatter at manifest commit `1ef36f5`; individual agent files visible under `agents/`.)
+## Cross-references
 
-### Commands (`plugins/denubis-plan-and-execute/commands/`, **6 total**)
-
-| Command | Purpose |
-|---------|---------|
-| `/starting-a-design-plan` | Invokes the design-plan workflow. |
-| `/starting-an-implementation-plan` | Invokes the implementation-plan workflow. |
-| `/executing-an-implementation-plan` | Drives execution of an existing implementation plan. |
-| `/maintain-architecture` | Runs an architecture-doc maintenance pass. |
-| `/flesh-it-out` | Expands a thin sketch into a fuller description. |
-| `/how-to-customize` | Explains how to customise design + implementation plans with project-specific guidance. |
-
-### Hooks (`plugins/denubis-plan-and-execute/hooks/`, registered in `hooks.json` at `d57ffb0`)
-
-| Hook | Event | Behaviour |
-|------|-------|-----------|
-| `session-start.py` (`d57ffb0`) | `SessionStart` (matcher `startup|resume|clear|compact`), `suppressOutput: true` | Reads `skills/using-plan-and-execute/SKILL.md` and emits its contents as `additionalContext` so every new session loads the meta-skill that announces all other skills. |
-| `update-live-marker.py` | `SessionStart` (matcher `startup|resume|clear|compact`), `suppressOutput: true` — a *second* command in the same matcher block, after `session-start.py` | Stdlib-Python hook that rewrites **only** the `session_id=` line of the wrapper's `~/.claude/run/$$.live` marker to `basename(transcript_path)` read from the SessionStart payload, keeping it on the *live* transcript across `/clear` rotation (ADR 0003). Reads `CR_LIVE_FILE` from the env the wrapper exports; no-ops with exit 0 unless that var is set and the marker exists, so non-claudew sessions are untouched and session start is never blocked. UUID-regex-gated; atomic temp+`os.replace` preserving mode and every non-`session_id` line. Pinned by `tests/test_update_live_marker.bats`. |
-| `code-quality-guard.py` (`9bac7ed`) | `PreToolUse:Write|Edit`, timeout 5s | Inspects the file path + new content; denies or warns on patterns the user has banned (`check_e2e_js_injection`, `check_create_all`, `check_migration_edit`, `check_debug_statements`, `check_easy_mode`, `check_spec_weakening` — module-level functions in `code-quality-guard.py`, `9bac7ed`). Outputs deny JSON with `systemMessage` or warn JSON with `additionalContext`. |
-
-### Scripts (`plugins/denubis-plan-and-execute/scripts/`)
-
-| Script | Form | Purpose |
-|--------|------|---------|
-| `workflow_statusline/` (`4359ab2`) | uv-managed Python package (project name `workflow-statusline`, version 0.1.0, `requires-python >=3.12`). Modules in `src/workflow_statusline/`: `cache.py`, `bar.py`, `colours.py`, `ratelimit.py`, `tmux.py`, `git.py`, `__main__.py`. Tests in `tests/`. | Generates the statusline string Claude Code renders on every prompt — branch, token usage, rate-limit, active skill bar. Invoked as `uv run --project <path>/workflow_statusline workflow-statusline`. |
-| `claude-wrapper.sh` (`31e42d0` baseline; Phase 8 liveness patch in 2.32.2) | Bash script | The user's primary entry point. Foreground-runs `claude` with a list of `--disallowedTools` (`NotebookEdit`, `EnterPlanMode`, `ExitPlanMode`, `EnterWorktree`, `ExitWorktree`, `ListMcpResourcesTool`, `ReadMcpResourceTool`, `RemoteTrigger`, `CronCreate`, `CronDelete`, `CronList`), exports `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, and uses `teammate-mode=auto` (detects `$TMUX` for split-pane teaming). **Phase 8 / 2.32.2 addition** — also writes a per-PID liveness file at `~/.claude/run/$$.live` atomically at startup and removes it conditionally on `claude` exit code 0 or 130. Any other exit retains the file as crash evidence. The marker carries the four base keys `cwd`, `started`, `argv`, `boot_id`, plus (Phase 2) a bootstrap `session_id` and a comm-safe `start_time`. The wrapper **`export`s `CR_LIVE_FILE`** (the marker path) so the `update-live-marker.py` `SessionStart` hook can rewrite `session_id` to the live transcript on each `/clear`/`compact`/`resume` (ADR 0003) — the wrapper bootstraps the field once, the hook is the steady-state authoritative writer. The contract is consumed by the sibling `denubis-crash-recovery` plugin (≥ 1.0.0) — see `docs/architecture/constraints.md` § "Writer-side liveness lifecycle (Phase 8)" and § "Live-transcript marker maintenance (ADR 0003)". A separate exit-0 gate wraps the transcript-archive prompt so abnormal exits skip it (preserves pre-Phase-8 effective behaviour). |
-
-### Docs (`plugins/denubis-plan-and-execute/docs/`, 2 files)
-
-| Doc | Hash | Purpose |
-|-----|------|---------|
-| `coding-effectively-design.md` | `b9bed28` | Design notes underpinning the `coding-effectively` skill family. |
-| `workflow-status-line.md` | `24a7848` | Documentation for the statusline tool. |
-
-## Cross-References
-
-- **Plugin manifest:** `plugins/denubis-plan-and-execute/.claude-plugin/plugin.json`, version 2.32.2 (bumped from 2.32.1 in Phase 8 of the crash-recovery implementation for the wrapper liveness patch). Manifest description: *"Planning and execution workflows for Claude Code. Slow and steady. Based on obra/superpowers."*
-- **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
-- **README:** `plugins/denubis-plan-and-execute/README.md` (`894c66b`).
-- **Sibling plugins this plugin dispatches:** `denubis-basic-agents`, `denubis-research-agents`.
-- **Sibling hook that reminds about this plugin's `project-claude-librarian` agent:** `denubis-hook-claudemd-reminder` (the agent itself lives in `denubis-extending-claude`, not here).
-- **Sibling plugin coupled via wrapper liveness contract:** `denubis-crash-recovery` consumes the `~/.claude/run/$$.live` files this plugin's wrapper writes. Cross-plugin contract is the source of truth in `docs/architecture/constraints.md` § "Writer-side liveness lifecycle (Phase 8)".
-- **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.
+- **Plugin manifest:** `plugins/denubis-plan-and-execute/.claude-plugin/plugin.json`,
+  version 4.0.0.
+- **Crash recovery:** [`../denubis-crash-recovery/0-context.md`](../denubis-crash-recovery/0-context.md).
+- **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).
+- **Shared constraints:** [`../../constraints.md`](../../constraints.md).

@@ -41,7 +41,23 @@ From the gathered state:
 3. **Identify the nature of changes:** new feature, enhancement, bug fix, refactor, test, docs, etc.
 4. **Group changes by concern** for potential multi-commit splitting.
 
-### Step 3: Run Fast Tests
+### Step 3: Check Context Documentation
+
+Use the diff already gathered in Step 1 to determine whether the changes alter
+contracts, APIs, domain structure, or agent instructions documented in a
+`CLAUDE.md` or `AGENTS.md` file.
+
+- If no context document is affected, continue.
+- If a context document is affected, invoke
+  `denubis-extending-claude:maintaining-project-context` and update the affected
+  current document. Do not proceed to commit while the implementation and its
+  context documentation disagree.
+
+This check belongs here because commit preparation has both the complete diff and a
+real transition to gate. Read-only `git status` and `git log` commands are not evidence
+that a commit is imminent.
+
+### Step 4: Run Fast Tests
 
 Before committing, run lightweight test gates to catch obvious breakage.
 
@@ -72,9 +88,9 @@ Stop. Do not proceed to commit.
 
 **If no fast test suites are discovered and no test directory exists:** Skip this step. Not every project has tests.
 
-**If fast tests pass:** Continue to Step 4.
+**If fast tests pass:** Continue to Step 5.
 
-### Step 4: Plan Commits
+### Step 5: Plan Commits
 
 Split by **logical concern**, not by file count. One concern, one commit — even when the diff touches many files. A 30-file refactor that does one thing is one commit. Two unrelated fixes in the same file are two commits.
 
@@ -85,7 +101,7 @@ Split by **logical concern**, not by file count. One concern, one commit — eve
 - For genuinely mixed changes (bug fix + unrelated feature in the same diff), split by concern
 - When in doubt, ask the user how to split
 
-### Step 5: Match Commit Style
+### Step 6: Match Commit Style
 
 From `git log` output, detect the repository's convention:
 
@@ -95,9 +111,9 @@ From `git log` output, detect the repository's convention:
 
 Match whatever the repo uses.
 
-### Step 6: Draft and Confirm
+### Step 7: Draft and Confirm
 
-**If `-m` was provided:** Use that message. Skip to Step 7.
+**If `-m` was provided:** Use that message. Skip to Step 8.
 
 **Otherwise:** Draft a concise commit message (1-2 sentences) focusing on the **why** not the **what**.
 
@@ -114,7 +130,7 @@ Proceed?
 
 Wait for confirmation. If the user adjusts, incorporate their feedback.
 
-### Step 7: Execute Commits
+### Step 8: Execute Commits
 
 For each commit:
 
@@ -155,7 +171,7 @@ git status
 
 Verify clean working tree (or expected remaining changes).
 
-### Step 8: Report
+### Step 9: Report
 
 State what was committed. If there are remaining uncommitted changes, mention them.
 

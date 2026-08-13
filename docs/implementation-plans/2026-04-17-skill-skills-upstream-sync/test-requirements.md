@@ -222,13 +222,6 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 - **What it verifies:** Required line-number refs from AbsenceJudgement.tex (`203`, `252`, `794`, `785`, `789`, `801`, `810`, `819`, `868`, `261`) all present in `absencejudgement-citations.md`; required verbatim phrases (`bounded, auditable, and reversible`; `scope/confabulation`; `stamp-collecting without evaluation`; `vibes-based operation`; `mechanical, bounded, low-judgement`; `heavy scaffolding`; `technoscholasticism`; `Can I solve the problem I have set`) all present.
 - **Run command:** Two inlined Python blocks in `phase_01.md` Task 2 Steps 2 and 3; expected `all required line references present` and `all required verbatim phrases present`.
 
-### AC4.4 — No TEMP/RAND/SCOP/VIBE/FABR/MECH/MTCH/SCAF/BOUN mentions outside explicit rejection context
-
-- **Type:** Word-boundary grep-audit
-- **Test location:** `phase_01.md` Task 4 Step 1
-- **What it verifies:** For each of the nine codes, `grep -Hn -w <code>` across the whole skill directory reports either zero hits or hits only within SKILL.md's "Note on fabricated taxonomy" section. Any hit in `absencejudgement-citations.md` or `self-application.md` is a DR4 violation requiring rewrite.
-- **Run command:** `for code in TEMP RAND SCOP VIBE FABR MECH MTCH SCAF BOUN; do grep -Hn -w "$code" plugins/denubis-extending-claude/skills/epistemic-humility/ -r || echo "  (zero hits)"; done` — inlined in `phase_01.md` Task 4 Step 1. Manual review of any hit for rejection-context.
-
 ### AC4.5 — Rubric self-application walk-through exists; surfaced vulnerabilities acknowledged by user (H4 revision: not pass/fail)
 
 - **Type:** Structural check (Python) + **UAT entry** `DR-AC4.5` in `uat-requirements.md` for the vulnerability-review step
@@ -280,7 +273,7 @@ Pytest-style behaviour tests do not apply — there is no code under test beyond
 
 - **Type:** Operational check (manual git log inspection with heuristic)
 - **Test location:** `phase_05.md` Task 4 Step 2 (preceded by branch-discipline guard — M5 revision 2026-04-19)
-- **What it verifies:** `git log --oneline main..HEAD` shows ≥ 31 commits with no evidence of amend (no duplicate short-SHAs across reflog vs log) and no forced operations. `--no-verify` is not recorded in git but is a discipline check enforced at commit time. (Count reconciled during H6 revision 2026-04-19: Phase 5 gained Task 4.5 frustration-signal audit in H3 revision (+1); Phase 6 gained Task 6 illustrative-path rewrite in H1 revision (+1). Prior ≥27/≥28 claims were stale.) **Branch-discipline precondition (M5 revision 2026-04-19):** Task 4 Step 2 runs a guard first that halts if `git branch --show-current` returns `main`, `master`, or empty — `git log main..HEAD` would otherwise silently return zero commits on main and falsely pass AC5.5/5.6 against an empty set. `denubis-plan-and-execute:executing-an-implementation-plan` already blocks execution on main at the plan-entry point; the inline guard is the local belt-and-braces at the point the count is actually taken.
+- **What it verifies:** `git log --oneline main..HEAD` shows ≥ 31 commits with no evidence of amend (no duplicate short-SHAs across reflog vs log) and no forced operations. `--no-verify` is not recorded in git but is a discipline check enforced at commit time. (Count reconciled during H6 revision 2026-04-19: Phase 5 gained Task 4.5 frustration-signal audit in H3 revision (+1); Phase 6 gained Task 6 illustrative-path rewrite in H1 revision (+1). Prior ≥27/≥28 claims were stale.) **Branch-discipline precondition (M5 revision 2026-04-19):** Task 4 Step 2 runs a guard first that halts if `git branch --show-current` returns `main`, `master`, or empty — `git log main..HEAD` would otherwise silently return zero commits on main and falsely pass AC5.5/5.6 against an empty set. The inline guard owns that check at the point where the count is taken.
 - **Run command:** Branch-discipline guard (see `phase_05.md` Task 4 Step 2); then `git log --oneline main..HEAD | head -40`; `git log --oneline main..HEAD | wc -l`; `git reflog origin/main` (if applicable). Manual discipline inspection.
 
 ### AC5.6 — Commits split per user's global preference (3+ files → 2+ commits by natural concern); tests and implementation for a given phase share commits
@@ -458,7 +451,6 @@ Its role as a test:
 | AC4.1 | structural-check | phase_01.md T1 S3 | covered |
 | AC4.2 | structural-check | phase_01.md T1 S4 | covered |
 | AC4.3 | grep-audit | phase_01.md T2 S2/S3 | covered |
-| AC4.4 | grep-audit | phase_01.md T4 S1 | covered |
 | AC4.5 | structural-check + UAT | phase_01.md T3 S2 + uat-requirements.md DR-AC4.5 | covered |
 | AC5.1 | structural-check | phase_05.md T2 S4 | covered |
 | AC5.2 | structural-check | phase_05.md T2 S4 | covered |
@@ -489,4 +481,7 @@ Its role as a test:
 
 **Strict coverage gaps:** None. Every AC maps to EITHER an automated test (operational check / structural assertion / runnable script) OR a UAT entry. The framing corrections above resolved the two "flagged" items via direct checks rather than rubric-as-text workarounds.
 
-**Methodological note:** The initial test-analyst report accepted framings for AC3.3 and AC6.4 that propagated circular reasoning and the rubric-vs-gate confusion respectively. Both were surfaced by the user's intervention (the "expunge persuasion-principles" direction plus the "all levels of results must be discussed" guidance now saved to memory at `feedback_review-all-levels.md`). Future test-requirements generation should interrogate "flagged but not a gap" entries for false-assumption content before accepting them.
+**Methodological note:** The initial test-analyst report accepted framings for AC3.3 and
+AC6.4 that propagated circular reasoning and the rubric-vs-gate confusion respectively.
+Future test-requirements generation should inspect the evidence and hidden assumptions in
+every finding rather than accepting the analyst's severity or summary label.

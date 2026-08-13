@@ -1,275 +1,113 @@
 ---
 name: architecture-update
-family: maintain-architecture
-description: Use when design or implementation work may affect architecture documentation - reads current docs, detects contradictions, and proposes changes for human approval before writing
+description: Use when updating living architecture from an implemented-state map - writes current truth, repairs reference defects, and verifies each changed claim against its source
 user-invocable: false
 ---
 
-# Update Architecture Docs
-
-## Overview
-
-Read current state, detect contradictions, propose changes, write approved changes.
-
-This skill operates on concrete artifacts only: a design plan file path (sub-skill mode) or git diff output (wrapper mode). It never operates on conversation context alone.
-
-**Announce at start:** "I'm using the architecture-update skill to assess architecture documentation."
-
-## Input Modes
-
-| Mode | Input | Called by |
-|------|-------|----------|
-| Sub-skill | Design plan file path | `design-write` after proleptic challenge |
-| Wrapper | Git diff output (from baseline) | `maintain-architecture` during maintenance |
-
-**Sub-skill mode:** Read the design plan at the given file path and extract architecture-relevant content — entities, processes, data flows, constraints, terms, actors, and state transitions.
-
-**Wrapper mode:** Receive pre-computed git diff output and extract what changed — new files, modified code, renamed components, changed schemas.
-
-Both modes proceed to the same flow: read current state, detect contradictions, propose changes, write approved changes.
-
-## Directory Convention
-
-Architecture documentation lives in `docs/architecture/` with this structure:
-
-```
-docs/architecture/
-  dfd/
-    0-context-diagram.md          # Level 0: system boundary
-    1-subsystem-name.md           # Level 1: major subsystems
-    1.1-sub-process.md            # Level 2: decomposition
-    1.1.1-detail.md               # Level 3: further decomposition
-    2-another-subsystem.md
-  states/
-    order-lifecycle.md            # Entity state diagrams
-    user-account-lifecycle.md
-  database.md                     # ERD, data dictionary, design decisions
-  personae.md                     # User types and access patterns
-  glossary.md                     # Ubiquitous language
-  constraints.md                  # Measurable quality attributes
-```
-
-### DFD Numbering Scheme
-
-DFD files use hierarchical numbering: `0`, `1`, `1.1`, `1.1.1`. Each level decomposes a process from the level above.
-
-| Level | Scope | Example File |
-|-------|-------|-------------|
-| 0 | System boundary (context diagram) | `0-context-diagram.md` |
-| 1 | Major subsystem | `1-authentication.md` |
-| 2 | Subsystem decomposition | `1.1-token-service.md` |
-| 3 | Further detail | `1.1.1-jwt-generation.md` |
-
-**Numbering stability:** Numbers are stable identifiers. Once a process is assigned a number, it keeps that number even if adjacent processes are removed. Gaps are acceptable. Periodic cleanup is handled by the wrapper skill during maintenance sessions.
-
-### Cross-Reference Format
-
-DFD files cross-reference each other:
-- **Parent:** `0-context-diagram.md` (the diagram this decomposes from)
-- **Children:** `1.1-sub-process.md`, `1.2-other.md` (diagrams that decompose this)
-- **Related issues:** GitHub issue references
-- **Related commits:** Commit SHAs where this was established or modified
-
-### Template Files
-
-See `template-dfd-context.md`, `template-dfd-process.md`, `template-database.md`, `template-personae.md`, `template-glossary.md`, `template-constraints.md`, and `template-state.md` in this skill directory for document templates.
-
-### Design Decisions (ADR Fields)
-
-The `template-database.md` Design Decisions section uses ADR-style fields. When populating these fields:
-
-**Status values:**
-- **Proposed:** Decision under discussion, not yet approved.
-- **Accepted:** Decision is active and governs current implementation.
-- **Superseded by [link]:** A new decision replaces this one. The old record stays immutable; the new record references what it supersedes. Accepted decisions are never reopened or edited — to change a decision, create a new entry that supersedes the old one.
-- **Deprecated:** Decision is no longer relevant (e.g., feature removed) but was never formally replaced.
-
-**Confidence levels:**
-- **High:** Strong evidence, well-understood domain, clear consensus.
-- **Medium:** Reasonable choice but alternatives were close, or domain has unknowns.
-- **Low:** Best guess given constraints; expect to revisit.
-
-**Consequences:** Use **Enables** for what the decision unlocks and **Prevents** for what it forecloses. These help future readers assess whether the decision still serves its purpose.
-
-## Assessment Framework
-
-For each doc type, scan the input artifact for context signals. If a signal is found, check the corresponding atomic units against existing docs. If a contradiction pattern matches, HALT before proceeding.
-
-| Doc Type | Atomic Unit | Context Signal | Contradiction Pattern |
-|----------|-------------|----------------|----------------------|
-| DFD | Process (numbered) | New data transformation, renamed component, changed data flow | Process duplicates existing responsibility; data flow contradicts existing diagram |
-| Database | Table/relationship | New entity, changed schema, new FK | Entity in design doesn't match existing ERD; relationship contradicts existing constraints |
-| Personae | User type | New actor, changed access pattern | New persona overlaps existing one; access pattern contradicts constraints |
-| Glossary | Term | New domain concept, renamed entity | Term defined differently than existing entry; synonym collision |
-| Constraints | Quality attribute | New SLA, performance target, capacity requirement | New constraint contradicts existing one |
-| States | Entity lifecycle | New status, state transition, terminal state | State transition contradicts existing lifecycle; new state unreachable from existing graph |
-
-### How to Use This Table
-
-1. For each doc type, scan the input artifact (design plan or diff) for context signals
-2. If a signal is found, read the existing architecture doc for that type and check the corresponding atomic units
-3. If a contradiction pattern matches, HALT immediately — do not continue to the proposal step
-
-## Citation Requirement
-
-Every factual claim about the system in architecture documentation must include a parenthetical citation: `(file::symbol, commit_hash)`.
-
-**Format:** `(path/to/file.py::SymbolName, abc1234)` where:
-- `file::symbol` identifies the source — file path and class, function, or variable name
-- `commit_hash` is the short SHA where the cited content was established or last verified
-- No line numbers — they shift. File + symbol is durable and greppable
-
-**Examples:**
-- "Orders transition from pending to confirmed when payment succeeds (`src/models/order.py::Order.confirm`, `a1b2c3d`)"
-- "The authentication middleware validates JWT tokens (`src/auth/middleware.py::require_login`, `f4e5d6c`)"
-- "User profiles will include avatar support (`docs/design-plans/profile-redesign.md`, `b7a8c9d`)" — prospective content cites the design plan
-
-**Status is implicit in the citation:**
-- Cites code, migration, or config -> exists in the system now
-- Cites a design plan -> planned, not yet implemented
-- No citation -> the claim must gain a citation or be removed
-
-**Applies to:** DFD docs, database docs, state lifecycle docs. Does not apply to glossary, personae, or constraints (these are conceptual, not implementation claims).
-
-**When writing or updating:** Before writing any factual claim, verify the cited file and symbol exist (for code citations) or the design plan exists (for prospective citations). Use `git log --oneline -1 -- <file>` to get the current commit hash for that file.
-
-**When reviewing:** A claim without a citation is an unverified claim. Flag it. A claim citing a design plan in a doc that should reflect implemented code is stale — flag it for update or removal.
-
-## Contradiction Detection
-
-Finding contradictions is more important than updating. If in doubt about whether something is a contradiction, HALT. False positives are cheap; missed contradictions are expensive.
-
-When a contradiction is detected, present it using this format:
-
-```markdown
-## Architecture Documentation HALT: [Brief description]
-
-**What I see:** [Describe the contradiction — new content vs existing content]
-**Existing doc:** [Quote the relevant section from the existing architecture doc]
-**New content:** [Quote the relevant section from the design plan or diff]
-**Why it matters:** [Impact if this contradiction goes unresolved]
-**What I need from you:** Choose one:
-1. Update the existing architecture doc (the new design supersedes)
-2. Revise the design (the existing architecture is correct)
-3. Acknowledge the divergence (both are valid in different contexts)
-
-I will not proceed past this point until you respond.
-```
-
-After HALT resolution, continue from step 4 (identify affected docs) with the resolution incorporated. If the human chose option 1, treat the new content as authoritative. If option 2, adjust the proposal to match existing docs. If option 3, document the divergence in both the architecture doc and the design plan.
-
-## Proposing Changes
-
-After the contradiction check passes (no contradictions found, or all contradictions resolved), group proposed changes by doc type.
-
-### When No Changes Are Detected
-
-If the artifact contains no architecture-relevant content (e.g., a pure refactor, a test-only change, or a dependency update), report:
-
-"No architecture changes detected. The design plan does not introduce new processes, entities, terms, constraints, actors, or state transitions."
-
-Exit without proposing.
-
-### Presenting Proposals
-
-Before asking for approval, output the complete proposal:
-
-```
-**Proposed architecture documentation changes:**
-
-### DFD
-- Create: `docs/architecture/dfd/1.3-new-process.md` (new process from design)
-- Modify: `docs/architecture/dfd/1-subsystem.md` (add reference to new child)
-
-### Database
-- Modify: `docs/architecture/database.md` (add new_table to ERD and data dictionary)
-
-### Glossary
-- Add term: "Widget" — [definition from design context]
-
-### Personae
-- Add persona: "Auditor" — [role description from design]
-
-[Continue for each affected doc type...]
-```
-
-Then ask for approval using AskUserQuestion:
-
-```
-Question: "Review proposed architecture documentation changes:"
-Options:
-  - "Approve all" (write all proposed changes)
-  - "Approve with modifications" (I'll describe what to change)
-  - "Reject" (no architecture doc changes)
-```
-
-### Writing Approved Changes
-
-Write only approved changes. Use the templates from this skill directory (`template-dfd-context.md`, `template-dfd-process.md`, etc.) as the starting structure for new files. For modifications to existing files, preserve existing content and add or update the affected sections.
-
-**Citation enforcement:** Every factual claim in written content must include a parenthetical citation. Before writing, verify that cited files and symbols exist (for code) or that the design plan exists (for prospective content). Use `git log --oneline -1 -- <file>` to obtain the commit hash. Claims without citations must not be written.
-
-## Bootstrap and Greenfield
-
-### Bootstrap Mode
-
-Triggered when `docs/architecture/` does not exist AND a design plan is provided.
-
-Bootstrap requires a design document. If there is no design plan, there is nothing to bootstrap from — the project needs brainstorming first.
-
-**Bootstrap steps:**
-
-1. Scaffold directory structure: create `docs/architecture/dfd/` and `docs/architecture/states/`
-2. Create `docs/architecture/dfd/0-context-diagram.md` from the design plan's Architecture section (system boundary, external entities, top-level data flows) using `template-dfd-context.md`
-3. Populate `docs/architecture/glossary.md` from the design plan's Glossary section using `template-glossary.md`
-4. Populate `docs/architecture/personae.md` from the design plan's actors and user types using `template-personae.md`
-5. Create `docs/architecture/constraints.md` from the design plan's quality constraints (if any) using `template-constraints.md`
-6. If `docs/database.md` exists, move it to `docs/architecture/database.md`
-7. Present all created files to human for approval before writing
-
-### Greenfield Mode
-
-Triggered when `docs/architecture/` does not exist AND the design plan is the first for a new project.
-
-Same as bootstrap, but also creates `docs/architecture/database.md` from `template-database.md` if the design plan includes database schema.
-
-## Skill Flow
-
-The complete flow tying all sections together:
-
-1. **Read current state** — load all files under `docs/architecture/`. If the directory does not exist, enter bootstrap mode.
-2. **Parse artifact** — extract entities, processes, data flows, constraints, terms, actors, and state transitions from the design plan or diff.
-3. **Detect contradictions** — for each doc type where context signals are found, check for contradiction patterns against existing docs. HALT if a contradiction is found.
-4. **Identify affected docs** — determine which files need creation or modification, organised by doc type.
-5. **Propose changes** — present grouped proposals to the human for approval.
-6. **Write approved changes** — apply using templates from this skill directory.
-
-## Common Rationalizations - STOP
-
-| Excuse | Reality |
-|--------|---------|
-| "No contradictions possible, it's a new feature" | New features can duplicate existing responsibilities. Check the DFD. |
-| "Glossary update is obvious, don't need approval" | Never write blind updates. Always present proposals. |
-| "Bootstrap is simple, skip the approval" | Bootstrap creates many files. Human must approve the initial structure. |
-| "Design plan doesn't mention architecture" | Check anyway. Context signals may be implicit. |
-| "I'll update docs after the code is written" | Architecture docs are updated from the design plan, before implementation. |
-| "I'll add citations later" | Citations are verified at write time. A claim without a citation is an unverified claim. |
-
-**All of these mean: STOP. Follow the requirements exactly.**
-
-## Integration
-
-Where this skill sits in the broader workflow:
-
-```
-design-write (after proleptic challenge)
-  -> calls architecture-update with design plan path
-  -> proposals presented to human
-  -> approved changes written
-  -> changes included in design plan commit
-
-maintain-architecture (standalone sessions)
-  -> calls architecture-update with git diff output
-  -> proposals presented to human
-  -> approved changes committed separately
-```
+# Update Architecture Documentation
+
+## Purpose
+
+Write current architecture from a bounded map of implemented state and evidence. Living
+architecture describes implemented state. It does not approve a design, predict future
+topology, preserve correction history, or certify work merely because documentation was
+generated.
+
+## Input boundary
+
+Require the working root, implementation change boundary, implemented-state map, relevant
+document paths, exact source pointers, confirmed defects, and any applicable predicted
+boundary map and reconciliation result from the caller. Open the supplied evidence rather
+than trusting its summary.
+
+Before reading the prediction, independently enumerate every code, schema, configuration,
+generated, and runtime surface in the supplied change boundary and derive its implemented
+boundary consequence. Account for each surface, including one that preserves its boundary.
+Then compare that implementation-first inventory with the caller's map and prediction. If
+the change boundary is unavailable or the caller's map omits a changed surface, return an
+input defect rather than writing architecture from an incomplete account.
+
+Do not project a future design into living architecture. A design plan may reveal that a
+current document is already false, but unimplemented components, flows, schemas, and
+constraints remain in the design plan until source or runtime evidence makes them real.
+
+The planner's boundary map says what should be made. The implemented-state map and its
+sources say what was made. Use the former to detect divergence and the latter to write
+living architecture; never copy the prediction into current topology without implemented
+evidence.
+
+Inventory the architecture directory before creating a document. Follow the repository's
+current organization where it has a clear semantic owner; do not create a second taxonomy
+or a new file merely to narrate the update.
+
+## Document ownership
+
+Place each claim with its owner:
+
+| Claim | Living owner |
+|---|---|
+| System boundary, components, flows, consumers | Context or component architecture |
+| Implemented invariant and how it is checked | Constraints |
+| Current database shape and transaction boundary | Database architecture |
+| Decision with continuing consequences | ADR or decision record |
+| Actor goals and access patterns | Personae |
+| Project-specific term | Glossary |
+| Historical dispute, superseded wording, incident narrative | Git or explicit archive |
+
+Update an existing owner instead of duplicating the claim. Remove a retired entity from
+living indexes and relationships in the same coherent change that removes its source.
+
+## Boundary divergence
+
+Classify a predicted/implemented difference before writing:
+
+- An internal change in **how** preserves the boundary participants, inputs, outputs,
+  semantics, consumers, observable effects, ordering, persistence, control, and failure
+  behavior. Write the implemented current truth without preserving the comparison.
+- A load-bearing change in **what** changes at least one of those properties. If it is an
+  accepted design change, update the accepted design and create or supersede an ADR that
+  records what changed and why, with exact authority. If it lacks that decision, return an
+  integrity blocker; implementation drift and model agreement cannot create an Accepted
+  ADR.
+
+Living architecture still states observable implemented truth. It does not disguise an
+unresolved design mismatch as agreement, and the caller must not claim completion while a
+load-bearing mismatch remains unresolved.
+
+## Evidence and authority
+
+Every technical claim points to the exact current implementation source: file and symbol,
+test, generated manifest, schema, log, or operational observation capable of supporting
+it. State the relevant boundary and do not generalize beyond what the source observed.
+
+When a decision depends on a human instruction, human authority uses an exact source
+locator and resolver selecting one human message. A quotation, paraphrase, model-authored
+note, session UUID without a message locator, or review status does not create authority.
+Repair an unresolved reference before writing a dependent current claim; if repair is not
+possible, obtain a focused human invocation.
+
+## Update
+
+Apply factual corrections directly within the requested architecture-maintenance scope.
+Ask the human only when the evidence leaves a genuine architecture or authority decision;
+ask one pointed question at a time and record its exact source if the answer is memorialized.
+
+No palimpsests: write what the system is now. Do not retain “previously,” “corrected,”
+review dialogue, phase narration, or explanations aimed at a superseded version in living
+sections. Git already preserves the older text.
+
+Keep diagrams and tables only when they make relationships easier to inspect. Update every
+edge affected by a renamed, moved, added, or retired entity. Do not preserve a marketplace
+or directory grouping as the primary architecture axis unless it represents an actual
+runtime boundary.
+
+## Verify and return
+
+Verify every link and source pointer. Re-read each changed paragraph against its source,
+run repository documentation or reference-integrity checks, and search the bounded living
+architecture for the retired or corrected claim. A negative search is useful only after
+its scope and exclusions are known.
+
+Return the changed paths, evidence checked, removed stale claims, and unresolved defects.
+Do not commit, publish, or modify remote systems; the caller's maintenance authority does
+not imply release authority.

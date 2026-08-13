@@ -5,7 +5,7 @@
 **Restructured skill SHA (post-Task-2, pre-GREEN-REFACTOR):** `6a297608de50f836dbe5d88c8e0dd18e3e61a7c9`
 **Restructured skill SHA (post-GREEN-REFACTOR Gap-2 fix):** `3af9968` (commit tip at time of writing)
 **Orchestrator:** executing-an-implementation-plan, session `ed3:exec-skills:P2`
-**Subagent tier for pressure scenarios:** `denubis-basic-agents:sonnet-general-purpose` (Sonnet 4.6 — judgement-heavy, not Haiku per `feedback_haiku-no-judgement.md`)
+**Subagent tier for pressure scenarios:** `denubis-basic-agents:sonnet-general-purpose`
 
 ## Pressure scenarios
 

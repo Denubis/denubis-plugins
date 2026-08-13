@@ -107,9 +107,6 @@ Commands actually run and relevant real output:
 - `rg -n "epistemic-humility|Rubric Callback|rubric callback" ...`
   Output included `writing-skills/SKILL.md:42`, `testing-skills-with-subagents/SKILL.md:36`, and `writing-claude-directives/SKILL.md:135`.
 
-- `for code in TEMP RAND SCOP VIBE FABR MECH MTCH SCAF BOUN; do ... rg -n -w "$code" ...; done`
-  Output showed each code appears only in `SKILL.md:106` and `absencejudgement-citations.md:138`, both rejection contexts.
-
 ## Strongest Hypothesis
 
 The strongest hypothesis is that the target is a useful but unfinished screening rubric. The evidence is convergent: the orchestrators integrate it, the citation support file is careful, and the self-application names real vulnerabilities; but the target weakens a hard threshold, overextends its scope examples, and lacks an internal remediation path.

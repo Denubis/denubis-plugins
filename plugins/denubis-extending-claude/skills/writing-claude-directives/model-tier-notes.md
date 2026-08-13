@@ -1,140 +1,110 @@
 ---
 name: model-tier-notes
-description: Per-model behavioural specifics for Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5 — referenced from writing-claude-directives SKILL.md
-last-verified: 2026-07-02
+description: Current Claude model roster, dispatch boundaries, and directive-writing differences
+last-verified: 2026-08-12
 ---
 
-_Last verified: 2026-07-02 (Sonnet 5 release pass; prior passes 2026-06-10/12)_
+# Current Claude model guidance
 
-This file carries per-model behavioural specifics (effort levels, steerability notes, instruction-following characteristics, extended-thinking behaviour) for the current Claude tier: Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5. Opus 4.7 and Sonnet 4.6 are retained below as previous-generation models (Sonnet 5 shipped 2026-06-30). It is a supporting file for [`SKILL.md`](SKILL.md) in this skill — refresh cycles for model-specific claims decouple from the orchestrator file so model notes can be updated without touching the directive-writing guidance itself. The header date marks the most recent verification pass, not a re-verification of every claim: previous-generation sections (Opus 4.7, Sonnet 4.6, Haiku 4.5) retain their earlier inline verification dates. If the dated header above is more than one model release behind current, treat every claim below as unverified and re-verify against the cited URLs.
+This is the current reference for model-dependent directive choices. Recheck the linked
+vendor pages when a model alias or product surface changes.
 
-## Current tier (single source of truth)
+## Current roster
 
-Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5 — the models currently accessible. Other files in this skill — including its `SKILL.md` — reference this roster rather than naming versions inline, so a model release is a one-place update. Per-model behavioural specifics are in the sections below.
+| Role | Model | API ID |
+|---|---|---|
+| Highest available capability | Fable 5 | `claude-fable-5` |
+| Complex agentic and judgement work | Opus 5 | `claude-opus-5` |
+| Default dispatch tier | Sonnet 5 | `claude-sonnet-5` |
+| Fastest tier; unsanctioned here | Haiku 4.5 | `claude-haiku-4-5-20251001` |
 
-| Tier | Current | Model ID (alias) | Previous generation |
-|------|---------|------------------|---------------------|
-| Most capable | Fable 5 | `claude-fable-5` | — |
-| Opus | Opus 4.8 | `claude-opus-4-8` | Opus 4.7 |
-| Sonnet | Sonnet 5 | `claude-sonnet-5` | Sonnet 4.6 |
-| Haiku | Haiku 4.5 | `claude-haiku-4-5` | — |
+Source: <https://platform.claude.com/docs/en/about-claude/models/overview> (verified
+2026-08-12).
 
-## Fable 5
+## Operator boundaries
 
-These are vendor-guidance summaries, except the cost gate below, which is an operator-empirical rule.
+### Dispatch floor
 
-**Over-prescription degrades output:** Skills written for prior models are often too prescriptive for Fable 5. Anthropic's guidance: *"Skills developed for prior models are often too prescriptive for Claude Fable 5 and can degrade output quality."* A brief instruction steers Fable 5 as well as an enumerated list — reviewing and removing older step-by-step instructions can raise output quality rather than lower it. Directive authors targeting Fable 5 should prefer intent + constraints + trigger conditions over mechanical enumerations. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+Sonnet is the lowest sanctioned dispatch tier. Default agents and subagents to Sonnet;
+use Opus when the task needs deeper judgement. Haiku has no sanctioned dispatch site.
+`haiku-general-purpose` remains a legacy callable definition and requires a new human
+ruling before use.
 
-**Reasoning-echo refusal risk:** Instructions that tell the model to echo, transcribe, or explain its internal reasoning as response text can trigger the `reasoning_extraction` refusal category on Fable 5, causing elevated fallbacks to Opus 4.8. Ask for evidence and justification *in the output*; do not ask the model to reproduce its thinking. If reasoning visibility is needed, read the structured `thinking` blocks instead. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+Authority records:
 
-**Longer turns by default:** Individual requests on hard tasks can run for many minutes at higher effort; autonomous runs can extend for hours. Directive authors should account for this in client timeouts, streaming, and progress-indicator expectations, and should not write directives that assume a short turn. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/f7df1451-ba25-41cb-a76b-6deb33e53dad.jsonl:329`
+  (`cc-search-chats context 0f4e9cd4-8cbd-4e40-866e-d7a69a35731c --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:916`
+  (`cc-search-chats context ece0feb2-ffbd-4f4e-a466-1a5120d1ce46 --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:1116`
+  (`cc-search-chats context 4766cd4c-359f-4644-a9b9-6baae0e43796 --json`)
 
-**Parallel-subagent affinity:** Fable 5 dispatches parallel subagents more readily than prior models and manages long-running subagents reliably. Directives can lean on delegation; provide explicit guidance about when delegation is appropriate and prefer asynchronous orchestration over blocking. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+### Fable cost gate
 
-**Memory-system affinity:** Fable 5 performs particularly well when it can record and reference lessons across runs. Directives for long-horizon work should provide a place to write notes — one lesson per file with a one-line summary at the top works well. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
+Fable work is human-triggered only. No skill, agent, hook, command, or unattended run may
+auto-dispatch it. The Fable consultation skill therefore disables model invocation.
 
-**Cost gate (operator-empirical, 2026-06-10):** Fable-tier invocations are human-triggered only. No directive, skill, plan, or agent prompt may auto-dispatch Fable-tier subagents or schedule unattended Fable runs — they burn real money. Automated work routes to Sonnet/Opus (Haiku was dropped from this list by the 2026-07-25 floor ruling, see the Haiku 4.5 section); Fable verification appears in test plans as a manual checkpoint. Falsifier (operator-owned): only a dated operator note revoking the gate — e.g. after a Fable price drop or an explicit budget decision — overturns this rule; no model release, doc change, or pricing page does so on its own.
+Authority record:
 
-**Advisor pairing and the cost gate (beta surface — re-verify independently of model releases):** The advisor tool (beta `advisor-tool-2026-03-01`, tool type `advisor_20260301`) lets a cheaper main model consult a stronger advisor mid-task. Observed (operator-empirical, 2026-06-10, in session): a Fable 5 main model rejects an Opus 4.8 advisor — verbatim API error: `400 tools.30.model: 'claude-opus-4-8' cannot be used as an advisor when the request model is 'claude-fable-5'`. Documented (not independently observed): a Fable 5 main accepts only a Fable advisor; a Mythos 5 main accepts only a Mythos advisor. Both sources agree (verified 2026-07-02) that Fable 5 and Mythos 5 are accepted advisors for Haiku 4.5, Sonnet 4.6, Sonnet 5, and all Opus 4.6+ executors. One discrepancy is live, recorded per convention (both **documented**, fetched 2026-07-02, unresolved): Claude Code's table accepts a Sonnet 5 advisor for Sonnet 5, Sonnet 4.6, and Opus 4.6 mains, while the platform API table lists no Sonnet 5 advisor row for any executor — gate conservatively and do not rely on Sonnet-5-as-advisor pairings. **Operator rule (operator-empirical, 2026-07-02): do not configure Sonnet as an advisor at any tier** — operator experience is that Sonnet-advisor guidance is worthless, so the Sonnet-as-advisor rows are moot in practice regardless of how the doc discrepancy resolves. Advisors route to Opus 4.8 for automated work and Fable for human-triggered work only. Falsifier (operator-owned): a dated operator note after a documented trial in which a Sonnet advisor materially improved an outcome; doc-table changes never overturn this on their own. **Cost-gate consequence: advisor calls are model-triggered, so a Fable advisor on an automated run is auto-dispatched Fable spend. The cost gate covers advisor configuration — unattended or automated work must not set a Fable advisor; route advisors to Opus 4.8.** This consequence extends to fan-out: subagents inherit the configured advisor (see Cross-model patterns), so a Fable advisor on a session that dispatches subagents multiplies Fable spend across every subagent that passes the pairing check. Because this is a beta API surface, it can change without a model release; the header-date staleness tripwire does not cover it — re-verify both sources before relying on any pairing claim. Sources: <https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool> (verified 2026-07-02), <https://code.claude.com/docs/en/advisor> (verified 2026-07-02).
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/e4421bb3-2615-4b37-944c-86e5dd65eccc.jsonl:12`
+  (`cc-search-chats context 0a1beea2-2d45-455f-9ced-9ec278afb8e8 --json`)
 
-**Availability (operator-observed, 2026-07-02):** Fable-tier access is intermittent — it lapsed during June 2026 and is currently available again ("briefly back"). Directives and plans must not assume Fable availability: anything that hard-requires Fable needs a documented fallback (Opus 4.8), and Fable-dependent verification steps in test plans should note the availability precondition.
+### Advisor selection
 
-**Model ID (API):** `claude-fable-5`
+Do not configure Sonnet as an advisor. Use Opus when an automated advisor is warranted.
+Fable remains subject to the human-triggered cost gate.
 
-## Opus 4.8
+Authority record:
 
-These are vendor-guidance summaries; no operator-empirical override is active for this model tier. Opus 4.8 keeps the same API surface as Opus 4.7 (adaptive thinking only; sampling parameters and `budget_tokens` removed) and performs well out of the box on existing Opus 4.7 prompts.
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/3c2ab09a-2af3-4252-9dc6-5d7d7b449b8d.jsonl:225`
+  (`cc-search-chats context c23e1e60-9f9b-4169-8399-eda3d29c073f --json`)
 
-**Conservative tool/subagent/memory triggering:** Opus 4.8 favours reasoning over tool calls and spawns fewer subagents by default; it under-reaches for tools, subagents, and file-based memory unless reasonably sure they are needed. The fix is prescriptive trigger conditions in the description — state *when* to call a capability ("call this when the user asks about X"), not just what it does. This gives measurable should-call lift; louder language does not, and overtriggers other tiers (see Cross-model patterns). Raising effort is a secondary lever. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
+The Claude Code advisor is experimental. It currently does not offer Fable as an advisor,
+and subagents inherit the configured advisor subject to their own model-pairing check.
+Recheck the table before changing configuration. Source:
+<https://code.claude.com/docs/en/advisor> (verified 2026-08-12).
 
-**Literal severity-filter following:** Opus 4.8 follows severity and confidence filters literally. In review harnesses, "only report high-severity issues" or "be conservative" makes it investigate just as thoroughly but report fewer findings — precision rises, measured recall can fall. For review harnesses, instruct it to report everything with confidence + severity and filter downstream (report-everything-filter-downstream), rather than self-filtering at the finding stage. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
+## Directive-writing differences
 
-**Increased default narration:** Opus 4.8 provides more regular, higher-quality user-facing updates throughout long agentic traces. Forced-progress scaffolding ("after every N tool calls, summarize progress") is now counterproductive — remove it. If narration length or content is miscalibrated, describe the desired updates explicitly rather than forcing cadence. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
+### Fable 5
 
-**Literal instruction-following:** Opus 4.8 interprets prompts literally and explicitly, particularly at lower effort levels — it does not silently generalize an instruction from one item to another. If an instruction should apply broadly, state the scope explicitly ("apply this to every section, not just the first"). Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
+- Prefer intent, boundaries, and success conditions over inherited step-by-step
+  scaffolding. Ground progress claims in tool results.
+- Do not ask it to reproduce internal reasoning; ask for evidence and conclusions in the
+  output.
+- It delegates readily. State when delegation is appropriate and cap it where cost or
+  ownership matters.
 
-**Effort levels:** Opus 4.8 supports `low`, `medium`, `high`, `xhigh`, `max`. Anthropic's guidance: start at `xhigh` for coding and agentic use cases, minimum `high` for intelligence-sensitive work. It respects effort levels strictly, especially at the low end. Effort matters more here than on any prior Opus — re-tune it deliberately and run long-horizon work at `high`/`xhigh` with the full task spec given up front. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
+Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5>
+(verified 2026-08-12).
 
-**Model ID (API):** `claude-opus-4-8`
+### Opus 5
 
-## Opus 4.7 (previous-generation Opus)
+- Do not request generic self-critique, double-checking, or a separate verification
+  performance. Bind completion to external evidence and ask for a correction only when it
+  changes the user's code, conclusion, or decision.
+- Constrain scope and delegation explicitly. Calibrate visible response length directly;
+  effort controls thinking cost, not prose length.
+- Default effort is `high`; use `xhigh` for demanding coding or agentic work after a real
+  need is established.
 
-Retained as previous-generation Opus. Same API surface as Opus 4.8 (adaptive thinking only; sampling parameters and `budget_tokens` removed); 4.8 inherits these behaviours and re-tunes them. These are vendor-guidance summaries; no operator-empirical override is active for this model tier.
+Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5>
+(verified 2026-08-12). The operator observation about performative self-critique is bound
+as `IC04` in `deployment/instruction-control/foa4008439/candidate-manifest.json`; inspect
+that raw record with the manifest's source verifier.
 
-**Literal instruction-following:** Opus 4.7 interprets prompts more literally than Opus 4.6, particularly at lower effort levels. It will not silently generalize an instruction from one item to another — if the directive says "for tool X, do Y", the model will not extend "do Y" to tool Z without being told. Authors must enumerate cases explicitly rather than rely on the model to infer intent. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+### Sonnet 5
 
-**Effort levels (first-class control):** Opus 4.7 supports five effort levels: `low`, `medium`, `high`, `xhigh` (new in 4.7), and `max`. Anthropic's current guidance: "Start with the new `xhigh` effort level for coding and agentic use cases." At `low` and `medium` the model scopes tightly and finishes sooner; at `xhigh` and `max` it reasons more, explores more alternatives, and uses tools less per unit of work. Directive authors writing prompts for Opus 4.7 should pick an effort level deliberately rather than leaving it to the default — the behavioural spread between `low` and `xhigh` is large enough to change how a directive reads in practice. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+- State scope explicitly: at lower effort it follows the literal request rather than
+  silently generalising it.
+- Default effort is `high`; use `xhigh` for the hardest coding and agentic tasks.
+- Review prompts should request coverage and attach confidence/severity as metadata; vague
+  instructions to be conservative can suppress reported findings.
 
-**Tool-use vs reasoning tradeoff:** Opus 4.7 uses tools less than Opus 4.6 and reasons more. Increasing the effort setting increases tool-use to a degree, but the default behaviour is reasoning-weighted. For agentic workflows that depend on tool-call cadence (e.g. Claude Code loops), authors should verify cadence empirically rather than assume parity with 4.6. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
+Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5>
+(verified 2026-08-12).
 
-**Agentic focus:** Opus 4.7 is designed for long-horizon agentic work. It is better at refusing malicious agentic requests and at resisting prompt injection in Claude Code and computer-use settings than prior Opus releases. For directive authors, this means safety-framing instructions in directives ("refuse if X") are more reliable on 4.7 than on 4.6. Source: <https://www.anthropic.com/news/claude-opus-4-7> (verified 2026-04-17).
+### Haiku 4.5
 
-**Model ID (API):** `claude-opus-4-7`
-
-## Sonnet 5
-
-Released 2026-06-30. These are vendor-guidance summaries except the hallucination caution, which is an operator-empirical rule. Drop-in upgrade for Sonnet 4.6 at the same price ($3/$15 per million tokens; introductory $2/$10 through 2026-08-31); the largest gains are in coding and agentic tasks. Source: <https://platform.claude.com/docs/en/about-claude/models/whats-new-sonnet-5> (verified 2026-07-02).
-
-**Hallucination caution (operator-directed, 2026-07-02):** Treat Sonnet 5 output with heightened hallucination suspicion. The vendor pages fetched 2026-07-02 make no factuality claim either way; this is operator precaution, not vendor guidance. Directives that route factual, evidential, or citation-bearing work to Sonnet 5 must build in verification — quote-checking against sources, test-backed claims, or independent review — rather than trusting fluent output. Falsifier (operator-owned): a dated operator note relaxing the caution after documented trial experience; vendor benchmark claims never relax it on their own.
-
-**More agentic by default; tool-use tied to thinking:** Sonnet 5 reaches for tools and runs self-verification loops more readily than Sonnet 4.6. With thinking disabled it is *less* likely to reach for tools — directives that rely on tool calls with thinking off need an explicit nudge in the system prompt. `high`/`xhigh` effort shows substantially more tool usage in agentic search and coding. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5> (verified 2026-07-02).
-
-**Effort levels and adaptive thinking default:** Effort defaults to `high`; raise to `xhigh` for the hardest coding and agentic tasks. Sonnet 5 respects effort strictly, especially at the low end — at `low`/`medium` it scopes work to exactly what was asked. Cross-model mapping for migration: Sonnet 5 at `medium` ≈ Sonnet 4.6 at `high`; Sonnet 5 at `high` ≈ Sonnet 4.6 at `max`. Adaptive thinking is on by default (requests without a `thinking` field now think); manual extended thinking (`budget_tokens`) is removed and returns a 400. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5> (verified 2026-07-02).
-
-**Literal instruction-following:** Sonnet 5 interprets prompts literally and explicitly, particularly at lower effort — it does not silently generalize an instruction from one item to another or infer requests you didn't make. State scope explicitly ("apply this to every section, not just the first"). This matches the Opus 4.8 / Fable 5 pattern; Sonnet now needs the same explicit-scope discipline. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5> (verified 2026-07-02).
-
-**Review-harness recall (report-everything-filter-downstream):** Like Opus 4.8, Sonnet 5 follows severity/confidence filters faithfully — "only report high-severity issues" converts fewer investigations into reported findings; precision rises, measured recall can fall. Instruct it to report everything with confidence + severity and filter downstream. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5> (verified 2026-07-02).
-
-**Narration and verbosity:** Provides regular, higher-quality progress updates on long agentic traces — remove forced-progress scaffolding ("after every N tool calls, summarize"). Response length calibrates to task complexity; tune verbosity with positive examples rather than prohibitions. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5> (verified 2026-07-02).
-
-**API surface and token budgeting:** New tokenizer produces ~30% more tokens for the same text — token counts, `max_tokens` limits, and context-capacity estimates tuned for Sonnet 4.6 do not carry over; recount. 1M-token context window (default and maximum), 128k max output. Sampling parameters (`temperature`, `top_p`, `top_k`) at non-default values return a 400 — new for Sonnet-class. Assistant-message prefill remains unsupported. Task budgets are **not supported** on Sonnet 5 (see Cross-model patterns). First Sonnet-tier model with real-time cybersecurity safeguards: prohibited-topic requests return HTTP 200 with `stop_reason: "refusal"`. Source: <https://platform.claude.com/docs/en/about-claude/models/whats-new-sonnet-5> (verified 2026-07-02).
-
-**Model ID (API):** `claude-sonnet-5`
-
-## Sonnet 4.6 (previous-generation Sonnet)
-
-Retained as previous-generation Sonnet (superseded by Sonnet 5, 2026-06-30). These are vendor-guidance summaries; no operator-empirical override is active for this model tier as of 2026-04-22.
-
-**Steerability:** Sonnet 4.6 is more steerable than Opus 4.6. Corrective instructions — "do not do X", "always do Y after Z" — are more effective than on prior Sonnets. Directive authors can lean on corrective phrasing rather than scaffolding elaborate workarounds. Source: <https://www.anthropic.com/news/claude-sonnet-4-6> (verified 2026-04-17).
-
-**Proactive default and GUI overtriggering:** Sonnet 4.6 has a proactive default: in GUI / browser-use settings it may show overly agentic behaviour (taking unsanctioned actions, clicking through flows the user did not authorise). Anthropic's framing: "aggressive behavior is much more steerable by prompting than Opus 4.6's equivalent" — so the mitigation is prompt-side, not a model-swap. Directive authors for GUI workflows should include an explicit "ask before acting" clause. Source: <https://www.anthropic.com/news/claude-sonnet-4-6> (verified 2026-04-17).
-
-**Parallel tool-calling:** Sonnet 4.6 achieves parallel tool calling at roughly 100% with prompting guidance. Directives that benefit from parallel calls should explicitly invite them ("call these tools in parallel where possible") rather than assume the default. Source: <https://www.anthropic.com/news/claude-sonnet-4-6> (verified 2026-04-17).
-
-**Adaptive thinking:** Sonnet 4.6 supports extended thinking and adaptive thinking (adaptive thinking is the recommended mode). Source: <https://platform.claude.com/docs/en/about-claude/models/overview> (verified 2026-04-17).
-
-**Aggressive-language guidance:** Dial back "CRITICAL / YOU MUST" phrasing. See the aggressive-language section in [`SKILL.md`](SKILL.md) for the primary discussion and the before/after example. Anthropic's current position: *"The fix is to dial back any aggressive language. Where you might have said 'CRITICAL: You MUST use this tool when...', you can use more normal prompting like 'Use this tool when...'"* Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-04-17).
-
-**Model ID (API):** `claude-sonnet-4-6`
-
-## Haiku 4.5
-
-**Instruction-following for mechanical tasks:** Claude Haiku 4.5 follows detailed mechanical instructions well — data extraction, structured output generation, tool-call loops, summarisation. Anthropic's 2026-04 announcement describes it as *"more consistent instruction following for nuanced tasks"*; the Anthropic framing is cited here as the upstream claim, but the scope under which that framing applies is bounded by the operator-empirical note below. Source: <https://www.anthropic.com/news/claude-haiku-4-5> (verified 2026-04-17).
-
-**Context and extended thinking:** 200k total context, up to 128k extended-thinking budget, up to 64k output tokens. Directives for long-input summarisation or structured-output extraction can rely on this envelope. Source: <https://platform.claude.com/docs/en/build-with-claude/extended-thinking> (verified 2026-04-17).
-
-**Safety profile:** Haiku 4.5 shows a statistically lower rate of misaligned behaviours than Sonnet 4.5 or Opus 4.1 per Anthropic's announcement. Source: <https://www.anthropic.com/news/claude-haiku-4-5> (verified 2026-04-17).
-
-**Operator-empirical note on judgement (2026-04-22 plan-amendment pass):** Haiku 4.5 is unsuitable for any task requiring judgement. This is the project's empirical position based on operator experience, and it overrides Anthropic's 2026-04 marketing framing of *"more consistent instruction following for nuanced tasks"* — that framing describes mechanical instruction-following, not evaluative or reflective judgement. Route judgement-heavy work (code review, proleptic challenge, coherence review, rubric application, scope decisions) to Sonnet 5 or Opus 4.8. Haiku 4.5 is appropriate for mechanical, bounded, low-judgement tasks only — which aligns with AbsenceJudgement.tex:868's three success conditions for AI-assisted work. The same principle is encoded structurally in `denubis-extending-claude:testing-skills-with-subagents`. Falsifier (operator-owned): overturned only by operator-run evidence — a dated, documented trial in which Haiku-tier output passes the judgement tasks that grounded this position; vendor framing or benchmark claims never overturn it on their own.
-
-**Operator ruling escalating the above (2026-07-25):** Sonnet 5 is the floor, not merely "no judgement work". Operator statement: *"haiku is unacceptable for internet research. Honestly it's unacceptable for most things, and we should just make sonnet 5 the floor for almost everything. the hallucination rate is unacceptable."* This extends the 2026-04-22 position rather than replacing it, so both falsifiers stand. Internet research is the sharpest case, because judging whether a source is credible and whether a page says what it appears to say is judgement work rather than mechanical retrieval. The concrete failure was a Haiku research pass that returned real arXiv identifiers and real titles alongside fabricated author lists, recycling plausible names from the field, so the identifiers were retrieved while the authors were synthesised. Consequences for directive authors: default a new agent definition to `sonnet` or `opus`; treat Haiku-returned citation or author metadata as unverified until checked against the source; and give any surviving Haiku dispatch a positive justification naming a bounded mechanical task. Falsifier (operator-owned): Haiku 5 shipping plus a dated operator trial on it, and no vendor benchmark or announcement overturns this alone.
-
-**Model ID (API):** `claude-haiku-4-5-20251001`
-
-## Cross-model patterns
-
-The current models (Fable 5, Opus 4.8, Sonnet 5, Haiku 4.5) share several characteristics that matter for directive authoring:
-
-- **Extended / adaptive thinking:** all support adaptive thinking; it is the recommended mode where applicable.
-- **Prompting responsiveness:** all are highly responsive to prompting. Aggressive-language patterns (`CRITICAL:`, `YOU MUST`, `NEVER`) stacked on ordinary instructions can overtrigger these models — they read the urgency markers as content-signals rather than emphasis. Dial the tone back to direct-declarative phrasing. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices> (verified 2026-06-10).
-- **Trigger explicitness beats emphasis:** the correct fix for under-triggering on Opus 4.8 and Fable 5 is plain, specific when-to-use conditions in the description ("Use when X", "call this when the user asks about Y"), which give measurable should-call lift — not louder language, which overtriggers Sonnet 4.6 and the Opus 4.6 tier. Put the trigger condition in the capability's own description, not just the surrounding prose. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
-- **Explicit-over-implicit:** all prefer explicit enumeration over implicit generalisation. Opus 4.8 and Fable 5 follow instructions literally and will not silently generalize from one item to another — state the scope explicitly. Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8> (verified 2026-06-10).
-- **Fable cost gate (operator-empirical, 2026-06-10):** Fable-tier invocations are human-triggered only. No directive, skill, plan, or agent prompt may auto-dispatch Fable-tier subagents or schedule unattended Fable runs — they burn real money. Automated work routes to Sonnet/Opus (Haiku was dropped from this list by the 2026-07-25 floor ruling, see the Haiku 4.5 section); Fable verification appears in test plans as a manual checkpoint. Falsifier (operator-owned): only a dated operator note revoking the gate — e.g. after a Fable price drop or an explicit budget decision — overturns this rule; no model release, doc change, or pricing page does so on its own.
-- **Advisor pairing for automated work (inside the cost gate):** the sanctioned quality lift for automated runs is pairing a Haiku 4.5, Sonnet 4.6, or Sonnet 5 main model with an Opus 4.8 advisor (beta `advisor-tool-2026-03-01`, tool type `advisor_20260301`). The advisor reads the full transcript mid-generation and returns a plan; it is billed at advisor rates per sub-inference, typically 1,400–1,800 tokens including thinking — cap it with `max_tokens: 2048` on the tool definition. This stays within the Fable cost gate (no Fable tier is touched); do not set a Fable advisor on automated runs — advisor calls are model-triggered Fable spend (see the Fable 5 section). **Subagents inherit the session's configured advisor** (verified 2026-07-02): Claude Code's advisor docs state *"Subagents inherit the configured advisor and apply the same pairing check against their own model"*. The agent-definition frontmatter field set remains closed (no per-agent advisor field, confirmed 2026-06-12 against the sub-agents page), so inheritance cannot be overridden per-dispatch; a subagent whose `model` fails the pairing check runs without the advisor. Cost consequence: advisor spend propagates to every subagent dispatch that passes the pairing check — audit the session advisor before fan-out, and never fan out subagents under a Fable advisor on automated work. Sources: <https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool> (verified 2026-07-02), <https://code.claude.com/docs/en/advisor> (verified 2026-07-02), <https://code.claude.com/docs/en/sub-agents> (verified 2026-06-12).
-- **Task budgets (cumulative cost bound):** for long agentic runs, `output_config.task_budget` (beta `task-budgets-2026-03-13`, minimum 20,000 tokens) gives the model a running token countdown it self-moderates against — a model-aware advisory cumulative bound, distinct from `max_tokens` (an enforced per-response ceiling the model does not see). Feature-support table (verified 2026-07-02): beta on Fable 5, Mythos 5, Opus 4.8, Opus 4.7; **not supported** on Sonnet 5, Opus 4.6, Sonnet 4.6, or Haiku 4.5, and not supported on Claude Code or Cowork surfaces — Messages API only. Source: <https://platform.claude.com/docs/en/build-with-claude/task-budgets> (verified 2026-07-02).
-- **Effort parameter (per-turn cost lever):** `output_config.effort` (`low`/`medium`/`high`/`xhigh`/`max`) trades intelligence against latency and token spend, and matters more on the Opus 4.8 / Fable 5 tier than on prior generations — re-tune it deliberately. `xhigh` is Claude Code's default for coding and agentic use cases; a minimum of `high` suits most intelligence-sensitive work. Claude Code agent definitions accept an `effort` frontmatter field, so per-subagent effort can be pinned in the agent file. Sources: <https://platform.claude.com/docs/en/build-with-claude/effort> (verified 2026-06-10), <https://code.claude.com/docs/en/sub-agents> (verified 2026-06-11).
-- **Overengineering tendency (Opus 4.8 and Fable 5, especially at higher effort):** Both models may add extra files, abstractions, or defensive error handling beyond what was asked — the tendency grows at `high`/`xhigh`/`max` effort. Anthropic's vendor migration guidance (verified 2026-06-10): *"Both models may add extra files, abstractions, or defensive error handling beyond what was asked"* with the recommended mitigation *"prompt for minimal changes"*. For directive authors: include an explicit minimal-scope instruction when targeting Opus 4.8 or Fable 5 at elevated effort (see `## Overengineering Prevention` in [`SKILL.md`](SKILL.md)). Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5> (verified 2026-06-10).
-
----
-
-_When Anthropic releases new models or updated prompting guidance, re-verify each citation URL and update the dated header. Superseded claims and dissolved doc conflicts move to [`model-tier-notes-log.md`](model-tier-notes-log.md); this file carries current facts only._
+No local directive should route work to Haiku while the dispatch-floor decision remains
+active. Vendor capability claims do not revise that human boundary.

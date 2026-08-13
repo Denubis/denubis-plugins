@@ -1,47 +1,38 @@
 # denubis-plugins
 
-Claude Code plugins for Python/SQL/LaTeX development workflows, customized for academic research.
+A Claude Code plugin marketplace for design, implementation, Python, SQL, LaTeX, and
+academic-research work. It is forked from
+[ed3d-plugins](https://github.com/ed3dai/ed3d-plugins).
 
-Forked from [ed3d-plugins](https://github.com/ed3dai/ed3d-plugins) and adapted for:
-- **Python 3.14+** with t-strings, deferred annotations, and modern idioms
-- **Academic workflows** with proper citations, LaTeX conventions, and scholarly rigor
-- **Quality over velocity** - Opus for implementation, halt-on-failure policy
+`denubis-plan-and-execute` supplies the main design → implementation-plan → execution
+workflow through the user-invocable `starting-a-design-plan`,
+`starting-an-implementation-plan`, and `executing-an-implementation-plan` skills. It
+does not commit or publish work without an explicit request.
 
-## The Big Stick: `denubis-plan-and-execute`
+Project-specific design and implementation guidance lives in
+`.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md`. Run
+`/how-to-customize` for the supported shape.
 
-An RPI (research-plan-implement) loop that avoids hallucination by separating design from implementation:
+The catalogue below is an installation view. The
+[architecture index](docs/architecture/README.md) describes behaviour by system boundary
+before showing subsidiary plugin packaging views.
 
-```
-Rough Idea
-    │
-    ▼
-/start-design-plan  ──────► Design Document (committed to git)
-    │
-    ▼
-/start-implementation-plan ──► Implementation Plan (phase files)
-    │
-    ▼
-/execute-implementation-plan ──► Working Code (reviewed & committed)
-```
+## Installation catalogue
 
-Key philosophy changes from upstream:
-- **Opus for task implementation** (not Haiku) - fewer mistakes, fewer review cycles
-- **Halt on non-obvious failures** - don't grind for 30 minutes working around problems
-- **Block on ALL severities** - quality over velocity
-
-**Customization:** Create `.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md` in your project to provide project-specific constraints, terminology, and standards. Run `/how-to-customize` for details.
-
-## Plugin Catalogue
-
-### Core — install these first
-
-These are the foundation. Other plugins depend on them.
+### Main workflow
 
 | Plugin | What it does |
 |--------|-------------|
 | **`denubis-plan-and-execute`** | Three-phase workflow: design → plan → execute. The main event. |
-| **`denubis-basic-agents`** | Generic agents (haiku/sonnet/opus) plus `python-developer` and `academic-researcher`. Other plugins expect this. |
-| **`denubis-research-agents`** | Codebase investigation and internet research agents. Other plugins expect this. |
+
+### Optional agent libraries
+
+The main workflow works without these. Install them when their specialist roles are useful.
+
+| Plugin | What it does |
+|--------|-------------|
+| **`denubis-basic-agents`** | Generic agents (haiku/sonnet/opus) plus `python-developer` and `academic-researcher`. |
+| **`denubis-research-agents`** | Optional codebase investigation and internet research agents. |
 
 ### Recommended — quality of life
 
@@ -49,10 +40,9 @@ These make Claude Code noticeably better to work with.
 
 | Plugin | What it does |
 |--------|-------------|
-| **`denubis-hook-skill-reinforcement`** | Reminds Claude to actually use its skills (you'd be surprised how often it forgets). |
 | **`denubis-extending-claude`** | Meta-skills for writing plugins, agents, skills, CLAUDE.md maintenance, and syncing with upstream. |
 | **`denubis-git-commit`** | `/commit` as a proper skill with multi-commit support. |
-| **`denubis-hook-claudemd-reminder`** | Reminds Claude to update CLAUDE.md before committing when things have changed. |
+| **`denubis-project-notes`** | Reads project-owned notes and relevant chat history directly when a task begins. |
 
 ### Infrastructure hooks — Linux/macOS only
 
@@ -87,6 +77,15 @@ These bash-heavy hooks do not work on Windows (even with Git Bash). Skip them on
 - Proper citations and source attribution
 - LaTeX conventions (environments, BibTeX)
 - Scholarly argument structure
+
+### Optional specialist plugins
+
+| Plugin | What it does |
+|--------|-------------|
+| **`denubis-academic`** | Academic writing, manuscript review, and Zotero-backed bibliography workflows. |
+| **`denubis-crash-recovery`** | Deterministic classification and triage of interrupted Claude sessions. |
+| **`denubis-external-agents`** | Procedures for Codex review/supervision and Fable consultation. |
+| **`denubis-token-estimator`** | Read-only token and context estimates over Claude and Codex logs. |
 
 ### Transcript Archiving
 
@@ -124,10 +123,9 @@ Inside Claude Code:
 /plugin install denubis-plan-and-execute@denubis-plugins
 /plugin install denubis-basic-agents@denubis-plugins
 /plugin install denubis-research-agents@denubis-plugins
-/plugin install denubis-hook-skill-reinforcement@denubis-plugins
 /plugin install denubis-extending-claude@denubis-plugins
 /plugin install denubis-git-commit@denubis-plugins
-/plugin install denubis-hook-claudemd-reminder@denubis-plugins
+/plugin install denubis-project-notes@denubis-plugins
 ```
 
 **Add infrastructure hooks** (Linux/macOS only):
@@ -217,8 +215,11 @@ denubis-plugins/
 │   ├── denubis-research-agents/
 │   ├── denubis-extending-claude/
 │   ├── denubis-git-commit/
-│   ├── denubis-hook-skill-reinforcement/
-│   ├── denubis-hook-claudemd-reminder/
+│   ├── denubis-project-notes/
+│   ├── denubis-academic/
+│   ├── denubis-crash-recovery/
+│   ├── denubis-external-agents/
+│   ├── denubis-token-estimator/
 │   ├── denubis-hook-pretooluse-dispatcher/
 │   ├── denubis-hook-gh-fork-guard/
 │   └── denubis-hook-branch-bg/

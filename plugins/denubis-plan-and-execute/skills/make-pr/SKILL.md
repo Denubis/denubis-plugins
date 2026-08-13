@@ -1,243 +1,69 @@
 ---
 name: make-pr
-description: Use when creating a pull request from a feature branch - discovers project test commands, runs all gates, pushes branch, and creates PR via gh; blocks on test failure to prevent broken PRs
+description: Use when the human requests a pull request - verifies the exact branch, runs project gates, pushes it, creates one PR, and verifies the resulting remote record
 user-invocable: true
 disable-model-invocation: true
 ---
 
-# Make PR
+# Create a Pull Request
 
-Create a pull request from the current branch after verifying all test gates pass.
+## Authority
 
-**Core principle:** Never push a broken branch. Discover what tests exist, run them all, block on failure.
+Invoking this skill authorises pushing the current feature branch and creating one pull
+request against the resolved base. It does not authorise rebasing, force-pushing, editing
+issues or labels, deleting branches or worktrees, merging the PR, or changing unrelated
+repository state.
 
-**Announce at start:** "I'm using the make-pr skill to create a pull request."
+## Preflight
 
-## Step 1: Preflight Checks
+Resolve the repository root, current branch, `origin` URL, intended base branch, existing
+upstream, and any existing PR for the branch. Confirm the remote is the intended fork or
+repository. If a PR already exists, report its URL and do not create another.
 
-Verify the branch is ready for a PR:
+Require a clean working tree: no staged, unstaged, or in-scope untracked changes. A PR
+contains commits, not the current model's intention. If changes remain, ask whether the
+human wants the separate commit workflow; do not create a commit here.
 
-```bash
-# Must not be on main/master
-current=$(git branch --show-current)
+Fetch remote references, then compare the feature branch with the actual remote base. If
+the branch is behind or diverged, report the ahead/behind counts and ask one pointed
+question about the intended integration method. Do not rewrite history or merge the base
+without that answer. Never force-push unless the human separately names that action.
 
-# Must have commits ahead of base
-git log main..HEAD --oneline
-```
+## Discover and run gates
 
-**If on main/master:** Stop. "You're on the main branch. Switch to a feature branch first."
+Read project instructions and explicit test guidance first. Then inspect configured task
+runners and CI definitions (`pyproject.toml`, `package.json`, `Makefile`, `justfile`, and
+workflow files as applicable) for the gates that protect this change. Use the project's
+own commands and configured environment.
 
-**If no commits ahead:** Stop. "No commits ahead of main. Nothing to PR."
+Do not fall back blindly to a language-default command. If no required gate can be
+established, report the inspected sources and ask one pointed question rather than
+pretending an unrelated command is sufficient.
 
-## Step 2: Sync with Remote
+Run every discovered required gate on the exact commit to be pushed. Record command, exit
+status, target exercised, and positive result. Any failure blocks the push. Investigate a
+possibly pre-existing or intermittent failure; do not hide it with a stash, retry-until-
+green, or “mostly passing” summary.
 
-Ensure main is up to date and the feature branch is rebased on top of it.
+Review is optional when requested, required by project policy, or aimed at a concrete
+risk. A model review does not replace the gates.
 
-```bash
-# Fetch latest from remote
-git fetch origin
+## Draft from the diff
 
-# Check if local main is ahead of remote (unusual — warn)
-local_main=$(git rev-parse main)
-remote_main=$(git rev-parse origin/main)
-if [ "$(git merge-base "$local_main" "$remote_main")" = "$remote_main" ] && [ "$local_main" != "$remote_main" ]; then
-  echo "WARNING: local main is ahead of origin/main"
-fi
-```
+Read all commits and the complete diff from remote base to `HEAD`. Draft a concise title
+and body describing current behavior and why it changed. Include exact verification
+commands and any genuine human testing still pending. Do not paste model review status or
+claim that unrun checks passed.
 
-**If local main is ahead of remote:** Warn the user. "Local main has commits not on remote. Push main first, or confirm this is intentional."
+## Push, create, verify
 
-```bash
-# Update local main (without switching branches)
-git fetch origin main:main
+Push the current branch without force and create one PR against the resolved base. Use the
+repository's PR template when present. Then read the created PR back and verify its URL,
+head repository and branch, base branch, title, and draft state against the request.
 
-# Rebase feature branch onto updated main
-git rebase main
-```
+If push succeeds but PR creation fails, report the pushed ref and error; retry only the PR
+operation after correcting the demonstrated cause. If the returned PR targets the wrong
+repository or base, stop and report the mismatch before any further remote mutation.
 
-**If rebase has conflicts:**
-```
-Rebase conflicts detected:
-
-[list conflicting files]
-
-Resolve conflicts with `git rebase --continue`, then run /make-pr again.
-```
-
-Stop. Do not auto-resolve.
-
-**If rebase succeeds:** Continue to Step 3.
-
-## Step 3: Discover Test Commands
-
-Check sources in priority order. Use the **first source that provides test commands**:
-
-### Priority 1: `.ed3d/testing-guidance.md`
-
-Read `.ed3d/testing-guidance.md` if it exists. Parse all `### Heading (required)` sections under `## Test Suites` and extract fenced code blocks as commands.
-
-See `testing-guidance-format.md` in this skill directory for the format specification.
-
-Also read any `## Pre-PR Gate` section for additional constraints.
-
-### Priority 2: CLAUDE.md test commands
-
-Read the project's `CLAUDE.md`. Look for test commands in sections like `## Testing`, `## Commands`, `## Development`, or similar. Extract any commands that run tests, linters, or type-checkers.
-
-### Priority 3: `.ed3d/implementation-plan-guidance.md`
-
-Read `.ed3d/implementation-plan-guidance.md` if it exists. Look for pre-PR gates or test commands.
-
-### Priority 4: Fallback
-
-If none of the above exist or provide test commands:
-
-```bash
-pytest
-```
-
-**Report what was discovered:**
-```
-Test discovery: found [source]
-Gates to run:
-  1. [name]: [command]
-  2. [name]: [command]
-  ...
-```
-
-## Step 4: Run All Test Gates
-
-Run each discovered test command sequentially. Capture the output and exit code.
-
-```
-Running gate 1/N: [name]...
-  [command]
-  → PASSED / FAILED (exit code X)
-
-Running gate 2/N: [name]...
-  [command]
-  → PASSED / FAILED (exit code X)
-```
-
-**If ANY gate fails:**
-
-```
-Gate "[name]" failed (exit code X).
-
-[Show relevant failure output]
-
-Cannot create PR with failing tests. Fix the failures and try again.
-```
-
-Stop. Do not proceed to push or PR creation.
-
-**If ALL gates pass:** Continue to Step 5.
-
-## Step 5: Determine Base Branch and PR Details
-
-```bash
-# Find base branch (test branch existence, not ancestry)
-git rev-parse --verify main 2>/dev/null && echo "main" || echo "master"
-```
-
-Analyse the branch commits to draft PR title and body:
-
-```bash
-git log main..HEAD --oneline
-git diff main..HEAD --stat
-```
-
-**Draft a PR title:** Under 70 characters. Focus on what changed, not how.
-
-**Draft a PR body:** Use this structure:
-
-```markdown
-## Summary
-- [2-3 bullets of what changed and why]
-
-## Test Plan
-- [What was verified]
-- [How to test manually if applicable]
-```
-
-## Step 6: Push and Create PR
-
-```bash
-# Push branch
-git push -u origin $(git branch --show-current)
-
-# Create PR
-gh pr create --title "<title>" --body "$(cat <<'EOF'
-## Summary
-<bullets>
-
-## Test Plan
-<verification steps>
-EOF
-)"
-```
-
-**Report the PR URL when done.**
-
-## Step 7: Post-PR Checks
-
-After PR creation:
-
-1. **Worktree cleanup check:** If in a worktree, report the worktree path but do NOT clean it up — the user may need it for review feedback.
-
-2. **Issue label cleanup:** If a design plan in `docs/design-plans/` references a GitHub issue with `implementation-planned` label, remove it:
-   ```bash
-   gh issue edit <number> --remove-label "implementation-planned"
-   ```
-   Best-effort — warn and continue if this fails.
-
-3. **Test plan reminder:** If `docs/test-plans/` contains a test plan, remind:
-   ```
-   Human test plan available at: docs/test-plans/<name>.md
-   Review before considering this work fully complete.
-   ```
-
-## Quick Reference
-
-| Step | Action | Blocks on failure |
-|------|--------|-------------------|
-| 1 | Preflight (branch, commits) | Yes |
-| 2 | Sync with remote, rebase on main | Yes (conflicts, local ahead) |
-| 3 | Discover test commands | No (fallback to pytest) |
-| 4 | Run all test gates | Yes |
-| 5 | Draft PR title/body | No |
-| 6 | Push and create PR | Yes (push/gh failure) |
-| 7 | Post-PR cleanup | No (best-effort) |
-
-## Common Mistakes
-
-**Skipping test discovery**
-- Problem: Running only `pytest` when project has additional gates (e2e, docs build, linting)
-- Fix: Always check `.ed3d/testing-guidance.md` first
-
-**Creating PR with failing tests**
-- Problem: "Tests mostly pass" or "that failure is unrelated"
-- Fix: ALL gates must pass. No exceptions. If a failure is genuinely unrelated, the user can tell you to skip it explicitly.
-
-**Pushing to wrong remote**
-- Problem: Fork vs upstream confusion
-- Fix: Use `origin` and let the gh-fork-guard hook catch mistakes
-
-## Red Flags — STOP
-
-If you find yourself reasoning any of these, you're rationalising:
-- "That test failure is pre-existing" — verify with `git stash && pytest && git stash pop`
-- "Tests mostly pass" — mostly ≠ all
-- "I'll create the PR and fix it after" — broken PRs waste reviewer time
-- "The test is flaky" — run it again to confirm; if it passes on retry, it passes
-
-All mean: run the tests, respect the results.
-
-## Integration
-
-**Pairs with:**
-- **finishing-a-development-branch** — Option 2 delegates here
-- **merge-to-main** — alternative path when PR isn't needed
-- **requesting-code-review** — run before make-pr for thorough review
-
-**Test discovery convention:** See `testing-guidance-format.md` in this skill directory.
+Return the PR URL and fresh gate evidence. Do not mutate issue labels, merge the PR, or
+remove the branch or worktree as post-processing.

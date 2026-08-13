@@ -177,7 +177,8 @@ Phase 2.5's refactor created a basic-baseline-checklist H3 subsection within the
 
 At the current lines 59-60 (or wherever Phase 2.5's refactor left them), the existing passage reads: *"The weakest model that can follow the skill is the strongest test of whether the skill is clear. Haiku follows detailed instructions well but struggles with judgement calls — if your skill keeps Haiku on-rails, Sonnet and Opus will follow it easily. If Haiku can't follow the skill, your instructions aren't explicit enough."*
 
-**Amended 2026-04-22 plan-amendment pass:** the original Phase 3 edit removed the Haiku-judgement specific claim on the basis that current Anthropic docs don't support it. That framing is reversed. The operator-empirical position (user-stated 2026-04-22, captured in project-local memory `feedback_haiku-no-judgement.md`) is that Haiku 4.5 is unsuitable for any task requiring judgement, regardless of Anthropic's 2026-04 marketing description of "more consistent instruction following for nuanced tasks." That marketing describes mechanical instruction-following, not evaluative judgement. The passage is retained and strengthened, not removed.
+The current dispatch floor and its raw human authority records live in
+`plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md`.
 
 Target result (edit-in-place, preserving the surrounding paragraph shape):
 
@@ -243,7 +244,7 @@ git commit -m "refactor(testing-skills-with-subagents): prepend conversation-pre
 
 Part of skill-skills upstream sync (Phase 3).
 Refs: docs/design-plans/2026-04-17-skill-skills-upstream-sync.md (DR3, DR1);
-feedback_haiku-no-judgement.md (project-local memory)"
+plugins/denubis-extending-claude/skills/writing-claude-directives/model-tier-notes.md"
 ```
 <!-- END_TASK_2 -->
 

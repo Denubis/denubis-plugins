@@ -120,7 +120,7 @@ The rubric screens; it does not decide for you.
 This rubric is invoked from:
 
 - `denubis-extending-claude:writing-skills` (rubric-callback at the scope-check step)
-- `denubis-extending-claude:testing-skills-with-subagents` (rubric-callback at the red-phase review)
+- `denubis-extending-claude:testing-skills-with-subagents` (scope and observability check before defining verification)
 - `denubis-extending-claude:writing-claude-directives` (rubric-callback at the directive-scope step)
 
 *If any of these cross-references fails to resolve, that is a cross-reference regression to fix in the referring skill.*

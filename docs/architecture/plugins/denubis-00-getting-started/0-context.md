@@ -1,52 +1,49 @@
 # denubis-00-getting-started — Context (Level 0)
 
-> System boundary: a commands-only plugin that wires `/getting-started` and `/setup` slash commands to onboarding and post-install verification flows.
+> System boundary: onboarding commands plus the machine's npm install-script policy
+> procedure.
 
-## Diagram
+## Context
 
 ```mermaid
 flowchart LR
-    User[Human user]
-    CC[Claude Code host]
-    Repo@{ shape: das, label: "Repo / installed plugins\n(README.md, plugin.json,\nmarketplace.json,\nsettings files)" }
+    H[Human]
+    C[Claude Code host]
+    P[Plugin]
+    R[Repository and installed plugins]
+    N[npm configuration and package tree]
 
-    Plugin((0.0\ndenubis-00-getting-started))
-
-    User -->|"/getting-started\n/setup"| CC
-    CC -->|"loads command .md\ninto model context"| Plugin
-    Plugin -.->|"behavioural prompt\n(reads files / runs setup checks)"| CC
-    CC -->|"reads / edits"| Repo
+    H -->|/getting-started or /setup| C
+    C -->|loads command| P
+    P -->|onboarding procedure| C
+    C <-->|inspect or configure| R
+    H -->|npm policy question or blocked install| C
+    C -->|loads skill| P
+    C <-->|inspect and approve exact scripts| N
 ```
 
-## External Entities
+## What the plugin ships
 
-| Entity | Description | Inputs to System | Outputs from System |
-|--------|-------------|------------------|---------------------|
-| Human user | Invokes the slash commands. | `/getting-started`, `/setup` typed at the prompt | (the model's reply, driven by the command's body) |
-| Claude Code host | Resolves slash commands by loading the command markdown file as a behavioural prompt for the next turn. | The `/<command>` invocation | Command markdown content injected into model context |
-| Repo / installed plugins | The artifacts the commands inspect or modify: top-level `README.md`, `plugin.json` files, `marketplace.json`, status-line settings, plugin-enablement state. | Reads + occasional edits via Claude Code's `Read`, `Edit`, `Write`, `Bash`, `Glob`, `Grep`, `AskUserQuestion` tools (declared in `plugins/denubis-00-getting-started/commands/setup.md::allowed-tools`, `c44693d`) | Edits to user settings / `plugin.json` versions during setup |
+| Component | Responsibility |
+|---|---|
+| `/getting-started` | Shows the opening sections of the repository README (`plugins/denubis-00-getting-started/commands/getting-started.md`, `6eb8e31`). |
+| `/setup` | Inspects and configures statusline, plugin enablement, and version consistency (`plugins/denubis-00-getting-started/commands/setup.md`, `199ccdc`). |
+| `npm-install-script-policy` | Explains the observed npm install-script controls and the inspect-before-approval procedure for blocked lifecycle scripts (`plugins/denubis-00-getting-started/skills/npm-install-script-policy/SKILL.md`, `583ec14`). |
 
-## System Boundary
+## Boundary and failure modes
 
-**In scope:**
-- `/getting-started` — show the first two sections of `@../../README.md` to the user, stopping before `Installation` (`plugins/denubis-00-getting-started/commands/getting-started.md`, `6eb8e31`).
-- `/setup` — verify and configure denubis-plugins setup: status line, plugin enablement, and version sync. Declares the full edit toolset (`Read, Edit, Write, Bash, Glob, Grep, AskUserQuestion`) in its `allowed-tools` frontmatter (`plugins/denubis-00-getting-started/commands/setup.md`, `c44693d`).
+- The commands are one-shot procedures. Nothing in this plugin continuously detects
+  configuration drift.
+- `/setup` can inspect and edit configuration through the Claude Code tools it declares;
+  the command body is advice, not a mechanical guarantee that each check ran.
+- The npm skill documents a machine policy verified against named npm versions. It does
+  not control npm by being loaded; npm configuration and package-level approvals do.
+- Package-install approval requires reading the exact script and approving an exact
+  version. A name-only future approval crosses the boundary the policy is intended to
+  preserve.
 
-**Out of scope:**
-- Skills, agents, hooks, scripts — none ship in this plugin.
-- Continuous validation — the commands are one-shot; nothing watches for drift after `/setup` completes.
+## Cross-references
 
-## What This Plugin Ships
-
-### Commands (`plugins/denubis-00-getting-started/commands/`)
-
-| Command | Description (frontmatter) |
-|---------|---------------------------|
-| `/getting-started` | Show the denubis-plugins README and getting-started information (`getting-started.md`, `6eb8e31`). |
-| `/setup` | Verify and configure denubis-plugins setup — status line, plugin enablement, version sync (`setup.md`, `c44693d`). |
-
-## Cross-References
-
-- **Plugin manifest:** `plugins/denubis-00-getting-started/.claude-plugin/plugin.json` (`78d0568`), version 1.4.0. Manifest description: *"Getting started guide and onboarding for denubis-plugins."*
-- **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
-- **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.
+- **Plugin manifest:** `plugins/denubis-00-getting-started/.claude-plugin/plugin.json`,
+  version 1.5.0 (`583ec14`).
+- **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

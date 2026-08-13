@@ -8,7 +8,12 @@ adaptation: light-touch — denubis voice tweaks and one cross-reference annotat
 
 # Testing CLAUDE.md Skills Documentation
 
-> **Denubis note:** Worked example imported from obra/superpowers (commit `6fd4507659784c351abbd2bc264c7162cfd386dc`, 2026-05-29) on 2026-06-11. The scenarios and documentation variants below are obra-authored and kept as-is; they are illustrative, not discipline-enforcing. The example CLAUDE.md variants point at `skills/using-skills` _(obra reference; the denubis equivalent is `denubis-plan-and-execute:using-plan-and-execute`, which covers the check-for-skills-before-working workflow)_ and assume a flat `~/.claude/skills/` layout rather than denubis's plugin-namespaced skills — both are obra's example framing, left unedited inside the scenario blocks. **Doctrinal caveat:** the scenarios below were invented by the campaign's own author, which the denubis checklist forbids for RED baselines ("source the RED baseline from an independent session, not invented by this executor" — the conversation-precedent protocol in `denubis-extending-claude:testing-skills-with-subagents`). Imitate this file's variant-testing mechanics and result-reading; source your scenarios independently.
+> **Denubis note:** Historical worked example imported from obra/superpowers (commit
+> `6fd4507659784c351abbd2bc264c7162cfd386dc`, 2026-05-29) on 2026-06-11. The scenarios,
+> layouts, and documentation variants are upstream material. They illustrate prompt
+> comparison, but their model responses are observations rather than acceptance gates.
+> Current verification guidance lives in
+> `denubis-extending-claude:testing-skills-with-subagents`.
 
 Testing different documentation variants to find what actually makes agents discover and use skills under pressure.
 

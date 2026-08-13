@@ -1,6 +1,5 @@
 ---
 name: coding-python-idioms
-family: coding-effectively
 description: Use when writing Python code - covers Python 3.14+ patterns, t-strings, ty, uv, ruff, typer, pydantic-settings, and security practices
 ---
 

@@ -154,6 +154,23 @@ XML also works as format indicators:
 <structured_data>JSON or tables here</structured_data>
 ```
 
+### Task invocations
+
+When documenting a Task invocation in a skill or agent prompt, use an XML invocation
+block. The structure keeps the agent type, description, and prompt as distinct fields:
+
+```xml
+<invoke name="Task">
+<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
+<parameter name="description">Short task description</parameter>
+<parameter name="prompt">
+The complete task, evidence boundary, and expected return shape.
+</parameter>
+</invoke>
+```
+
+If the Task tool is unavailable, the directive must name its fallback explicitly.
+
 In long prompts, XML tags tend to preserve rules more reliably than markdown, JSON, or YAML.
 
 ### Match Prompt Style to Desired Output
@@ -251,26 +268,13 @@ Per-model behavioural specifics (effort levels, steerability, instruction-follow
 
 ## Anti-Rationalization
 
-For discipline-enforcing directives, anticipate excuses:
-
-```markdown
-## Red Flags - STOP
-If you find yourself reasoning any of these, you're rationalizing:
-- "This is simple enough to skip"
-- "I already tested manually"
-- "The spirit not the letter"
-- "This case is different"
-
-All mean: Follow the process.
-```
-
 ## Testing Directives
 
-Directives are pressure-tested the same way skills are — baseline first, then close loopholes. The steps below are the short form; for the full method (independent-session RED sourcing, model-tier choice, edit-scoped re-testing), use `denubis-extending-claude:testing-skills-with-subagents`.
-
-1. **Baseline:** Run scenario WITHOUT directive, document failures
-2. **Apply:** Add directive, verify compliance
-3. **Iterate:** Find new loopholes → add counters → re-test
+Use `denubis-extending-claude:testing-skills-with-subagents` to separate executable
+checks from prose review. Verify metadata, references, helper behavior, and real runtime
+boundaries mechanically. Put non-mechanical expectations in a falsifiable rubric. A model
+following a directive in one prompt is an observation about that invocation, not a
+compliance gate.
 
 ## Long-Running Tasks
 

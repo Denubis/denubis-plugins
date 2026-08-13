@@ -15,11 +15,16 @@ user-invocable: false
 | `combined-researcher` | Sonnet | Need both external and local info together (e.g. "do we use Stripe? what's the current API?") |
 | `remote-code-researcher` | Sonnet | Need to read actual source code of external libraries. Clones repos to temp dir |
 
-All four ran on Haiku until 2026-07-25, when the operator ruled Sonnet the floor. Research is
-the sharpest case for that floor, because judging whether a source is credible and whether a
-page says what it appears to say is judgement work rather than mechanical retrieval. A Haiku
-research pass returned real arXiv identifiers and real titles alongside fabricated author
-lists, which is the failure this floor exists to prevent.
+Research requires source evaluation, so every research agent uses Sonnet or above.
+
+Dispatch authority:
+
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/f7df1451-ba25-41cb-a76b-6deb33e53dad.jsonl:329`
+  (`cc-search-chats context 0f4e9cd4-8cbd-4e40-866e-d7a69a35731c --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:916`
+  (`cc-search-chats context ece0feb2-ffbd-4f4e-a466-1a5120d1ce46 --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:1116`
+  (`cc-search-chats context 4766cd4c-359f-4644-a9b9-6baae0e43796 --json`)
 
 **Decision flow:**
 

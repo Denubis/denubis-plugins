@@ -62,11 +62,8 @@ All four are members of the `15:14:32.95–.97 AEST` fsync cluster (within 6 s o
 - **Last write (mtime):** `2026-05-20T15:14:32.9605 AEST`, 363 407 bytes (157 JSONL records).
 - **Tail kind:** **mid_tool_call** — last substantive record is a `tool_result` (audit-writing subagent reported success); assistant never replied to consume it.
 - **Last substantive event (idx 150, `2026-05-20T02:46:28 UTC` = `12:46:28 AEST`):**
-  - `user` (tool_result wrapper) carrying:
-    `"audit written for feedback_honour-prior-architectural-decisions: 5 evidence lines, 3 code-artefact entries. The origin session (cc926ca0) is present in the transcript window. Both trigger instances d…"`
-  - Prior tool_result: `"audit written for feedback_absencejudgement-codes-fabricated: 5 evidence lines, 5 code-artefact entries agentId: a2c64a2cdccb0eafc"`
 - **Why HIGH:** REASONED-UNVERIFIED. VERIFIED mid_tool_call tail (tool_result received, no follow-up assistant turn — assistant was preparing to consume the audit result when the crash hit) + confirmed dead in post-reboot `ps -ef` cross-check; cluster signature (5-file 11 ms fsync cluster ~5 s before crash boundary) is the discovery anchor that surfaced this candidate. The mtime gap between last substantive event 12:46 and final fsync 15:14 indicates an idle/save state before the kill.
-- **Suggested action:** `crash-recovery note 6ec92e86-0c6f-4090-8979-71695d0760ee "killed by 2026-05-20 15:14:38 AEST crash; was mid-audit consumption of feedback_honour-prior-architectural-decisions"`
+- **Suggested action:** `crash-recovery note 6ec92e86-0c6f-4090-8979-71695d0760ee "killed by 2026-05-20 15:14:38 AEST crash; was mid-audit consumption"`
 
 ### `28d8e6cc-9ff1-4dbe-bdb1-0defe289a03b`
 
@@ -141,7 +138,7 @@ These three UUIDs are currently running (cross-checked against `ps -ef`); they a
 
 ## Notes on evidence discipline
 
-Per the user's `feedback_no-unverified-capability-claims`:
+Evidence classification:
 
 - **VERIFIED** statements in this report: filesystem mtimes (from `find -printf`), JSONL record contents (read directly with `python3 -c "json.loads(line)"`), live PIDs (from `ps -ef`).
 - **REASONED-UNVERIFIED** statements: every "killed by crash" attribution. The cluster signature is empirically strong (5-file 11 ms fsync window co-located with crash boundary − 6 s), but no single observable fact in any JSONL says "I was killed by a crash". The inference comes from cluster + temporal + tail.

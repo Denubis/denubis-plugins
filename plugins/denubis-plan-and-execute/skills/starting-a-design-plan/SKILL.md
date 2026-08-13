@@ -1,484 +1,67 @@
 ---
 name: starting-a-design-plan
-description: Use when beginning any design process - orchestrates context gathering, clarification, brainstorming, and design documentation
+description: Use when beginning a non-trivial feature or change - resolves intent and evidence, explores the design, writes the accepted design, and hands off to implementation planning
 user-invocable: true
+argument-hint: "[request or design topic]"
 ---
 
 # Starting a Design Plan
 
-## Overview
+## Purpose
 
-Orchestrate the complete design workflow from initial idea to implementation-ready documentation through six structured phases: context gathering, clarification, definition of done, brainstorming, design documentation, and planning handoff.
+Turn a non-trivial request into one current, evidence-grounded design before implementation
+planning begins. Clarification discovers intent; brainstorming selects a design; the design
+document owns the resulting boundaries and acceptance criteria.
 
-**Core principle:** Progressive information gathering -> clear understanding -> creative exploration -> validated design -> documented plan.
+This workflow does not implement the design or certify that it is correct.
 
-**Announce at start:** "I'm using the starting-a-design-plan skill to guide us through the design process."
+At the start, use `denubis-plan-and-execute:exec-session-naming` so concurrent terminal
+sessions expose this work's repository and purpose to the human.
 
-## Data Flow: Context Diagram (Level 0)
+## Resolve the boundary
 
-```mermaid
-flowchart LR
-    User([User])
-    CB[(Codebase)]
-    Web([Internet])
-    Git[(Git)]
+Use the current workspace unless the human requested isolation, project instructions
+require it, or existing changes overlap the design documents. Do not create a worktree or
+branch merely because design work began. If isolation is needed and its base cannot be
+resolved safely, ask one pointed question.
 
-    User -->|"idea, constraints,<br>feedback, approval"| DP(("Design<br>Pipeline"))
-    DP -->|"questions, options,<br>design sections"| User
-    CB -->|"patterns,<br>existing code"| DP
-    Web -->|"API docs,<br>best practices"| DP
-    DP -->|"design document,<br>implementation plan"| Git
+Read project `AGENTS.md` or `CLAUDE.md`, the named request, relevant `.notes/` through the
+project's retrieval procedure, accepted decision records and constraints, current
+architecture, design guidance, and two or three nearby implementations. Inventory the
+relevant entities, consumers, external systems, and known exclusions before asserting that
+something is absent. Say which retrieved memory, feedback, or decision changes the design
+boundary.
+
+Resolve the initiating human request to an exact human source locator and resolver. A
+session identifier without a message locator, model summary, quotation, or paraphrase is
+not authority evidence. If no exact source can be resolved, repair the reference or obtain
+a focused human invocation before the design becomes current.
+
+## Workflow
+
+1. Invoke `denubis-plan-and-execute:design-clarify` with the request, inspected project
+   context, and authority source. It asks only about intent or consequential tradeoffs that
+   inspection cannot answer.
+2. Invoke `denubis-plan-and-execute:brainstorming` with the settled context. It inspects
+   current patterns, compares only genuine alternatives, and recommends one design.
+3. Invoke `denubis-plan-and-execute:design-write` with the chosen design, exact evidence
+   pointers, and working root. It writes and verifies the design document, runs any
+   targeted proleptic challenge warranted by a named risk, and obtains the human judgment
+   needed to make the design current.
+
+At every step, resolve technical facts from code, tests, logs, or current external
+documentation. When a materially different design choice remains, ask one pointed question
+at a time and state what each viable answer changes. Do not invent choices to demonstrate
+that consultation occurred.
+
+## Handoff
+
+Return the absolute design path and working directory, plus any unresolved blocker. When
+the design is current and its authority sources resolve, provide:
+
+```text
+/denubis-plan-and-execute:starting-an-implementation-plan <absolute-design-path>
 ```
 
-## Data Flow: Pipeline Decomposition (Level 1)
-
-```mermaid
-flowchart TD
-    User([User])
-    CB[(Codebase)]
-    Web([Internet])
-    Git[(Git)]
-    DD[(Design Document)]
-
-    P1["1.0 Context Gathering"]
-    G1{"GATE:<br>context collected?"}
-    P2["2.0 Clarification"]
-    G2{"GATE:<br>requirements<br>disambiguated?"}
-    P3["3.0 Definition of Done"]
-    G3{"GATE:<br>DoD confirmed<br>by user?"}
-    P4["4.0 Brainstorming"]
-    G4{"GATE:<br>design approved<br>by user?"}
-    P5["5.0 Design Documentation"]
-    P6["6.0 Planning Handoff"]
-
-    User -->|"idea, constraints, URLs"| P1
-    CB -->|"project state"| P1
-    P1 --> G1 --> P2
-
-    User -->|answers| P2
-    P2 -->|"clarifying questions"| User
-    P2 --> G2 --> P3
-
-    User -->|confirmation| P3
-    P3 -->|"DoD for confirmation"| User
-    P3 -->|"DoD stub"| DD
-    P3 --> G3 --> P4
-
-    CB -->|patterns| P4
-    Web -->|"docs, practices"| P4
-    User -->|"feedback, approval"| P4
-    P4 -->|"options, design sections"| User
-    P4 --> G4 --> P5
-
-    P5 -->|"completed design"| DD
-    DD -->|commit| Git
-    P5 --> P6
-    P6 -->|"next steps"| User
-```
-
-Each gate is a hard checkpoint — the process cannot advance until the gate condition is met. See the brainstorming skill for further decomposition of Process 4.0.
-
-## Quick Reference
-
-| Phase | Key Activities | Output |
-|-------|---------------|--------|
-| **1. Context Gathering** | Ask for freeform description, constraints, goals, URLs, files | Initial context bundle |
-| **2. Clarification** | Invoke design-clarify skill | Disambiguated requirements |
-| **3. Definition of Done** | Synthesize and confirm deliverables before brainstorming | Confirmed success criteria |
-| **4. Brainstorming** | Invoke brainstorming skill | Validated design (in conversation) |
-| **5. Design Documentation** | Invoke design-write skill | Committed design document |
-| **6. Planning Handoff** | Offer to invoke starting-an-implementation-plan skill | Implementation plan (optional) |
-
-## The Process
-
-**REQUIRED: Create task tracker at start**
-
-Use TaskCreate to create todos for each phase:
-
-- Phase 1: Context Gathering (initial information collected)
-- (conditional) Read project design guidance (if `.ed3d/design-plan-guidance.md` exists)
-- Phase 2: Clarification (requirements disambiguated)
-- Phase 3: Definition of Done (deliverables confirmed)
-- Phase 4: Brainstorming (design validated)
-- Phase 5: Design Documentation (design written to docs/design-plans/)
-- Phase 6: Planning Handoff (implementation plan offered/created)
-
-Use TaskUpdate to mark each phase as in_progress when working on it, completed when finished.
-
-### Phase 1: Context Gathering
-
-**Never skip this phase.** Even if the user provides detailed information, ask for anything missing.
-
-Use TaskUpdate to mark Phase 1 as in_progress.
-
-**Ask the user to provide (freeform, not AskUserQuestion):**
-
-"I need some information to start the design process. Please provide what you have:
-
-**What are you designing?**
-- High-level description of what you want to build
-- Goals or success criteria
-- Any known constraints or requirements
-
-**Context materials (very helpful if available):**
-- URLs to relevant documentation, APIs, or examples
-- File paths to existing code or specifications in this repository
-- Any research you've already done
-
-**Project state:**
-- Are you starting fresh or extending existing functionality?
-- Are there existing patterns in the codebase I should follow?
-- Any architectural decisions already made?
-
-**GitHub issue (optional):**
-- If this is linked to a GitHub issue, provide the reference (`#123`, `org/repo#123`, or full URL)
-
-Share whatever details you have. We'll clarify anything unclear in the next step."
-
-**Progressive prompting:** If user already provided some of this information, acknowledge what you have and ask only for what's missing.
-
-**Example:**
-"You mentioned OAuth2 integration. I have the high-level goal. To help design this effectively, I need:
-- Any constraints (regulatory, existing auth system, etc.)
-- URLs to the OAuth2 provider's documentation (if you have them)
-- Whether this is for human users, service accounts, or both"
-
-Mark Phase 1 as completed when you have initial context.
-
-**Session naming:** After completing Phase 1, invoke `denubis-plan-and-execute:exec-session-naming` to generate a domain-specific session name from the gathered context.
-
-### Between Phase 1 and Phase 2: Check for Project Guidance
-
-Before clarification, check for project-specific design guidance.
-
-**Check if `.ed3d/design-plan-guidance.md` exists:**
-
-Use the Read tool to check if `.ed3d/design-plan-guidance.md` exists in the session's working directory.
-
-**If the file exists:**
-
-1. Use TaskCreate to add: "Read project design guidance from [absolute path to .ed3d/design-plan-guidance.md]"
-   - Set this task as blocked by Phase 1 (Context Gathering)
-   - Update Phase 2 (Clarification) to be blocked by this new task
-2. Mark the task in_progress
-3. Read the file and incorporate the guidance into your understanding
-4. Mark the task completed
-5. Proceed to Phase 2
-
-**If the file does not exist:**
-
-Proceed directly to Phase 2. Do not create a task or mention the missing file.
-
-**What project guidance provides:**
-- Domain-specific terminology to use in clarification
-- Architectural constraints or preferences
-- Technologies that are required, preferred, or forbidden
-- Stakeholders and their priorities
-- Project conventions that designs must follow
-
-The guidance informs what questions you ask during clarification.
-
-### Phase 2: Clarification
-
-Use TaskUpdate to mark Phase 2 as in_progress.
-
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:design-clarify
-
-Announce: "I'm using the design-clarify skill to make sure I understand your requirements correctly."
-
-The clarification skill will:
-- Use subagents to try to disambiguate before raising questions to the user
-- Disambiguate technical terms ("OAuth2" -> which flow?)
-- Identify scope boundaries ("users" -> humans? services? both?)
-- Clarify assumptions ("integrate with X" -> which version?)
-- Understand constraints ("must use Y" -> why?)
-
-**Output:** Clear understanding of what user means, ready to confirm Definition of Done.
-
-Mark Phase 2 as completed when requirements are disambiguated.
-
-### Phase 3: Definition of Done
-
-Before brainstorming the *how*, lock in the *what*. Brainstorming explores texture and approach — it assumes the goal is already clear.
-
-Use TaskUpdate to mark Phase 3 as in_progress.
-
-**Synthesize the Definition of Done from context gathered so far:**
-
-From Phases 1-2 (Context Gathering and Clarification), you should be able to infer or extract:
-- What the deliverables are (what gets built/changed)
-- What success looks like (how we know it's done)
-- What's explicitly out of scope
-
-**If the Definition of Done is clear:**
-
-State it back to the user and confirm using AskUserQuestion:
-
-```
-Question: "Before we explore approaches, let me confirm what success looks like:"
-Options:
-  - "Yes, that's right" (Definition of Done is accurate)
-  - "Needs adjustment" (User will clarify what's missing or wrong)
-```
-
-Present the Definition of Done as a brief statement covering:
-- Primary deliverable(s)
-- Success criteria
-- Key exclusions (if any were discussed)
-
-**Every DoD entry must pass three tests** (derived from Scrum Guide's "formal description of Done" requirement, Schwaber & Sutherland 2020; Rubin's *Essential Scrum* quality criteria for sprint goals; Cohn's INVEST criteria adapted from user stories to deliverables):
-
-1. **Observable** — describes something a person can see, use, or demonstrate. Not internal state, not "code is clean." (Cohn: "Testable" — if you can't observe it, you can't test it.)
-   - Good: "User can upload a CSV and see parsed results"
-   - Bad: "CSV parsing is implemented correctly"
-
-2. **Falsifiable** — there is a concrete experience that would prove it's *not* done. This is how DoD feeds UAT: the falsification becomes the acceptance criterion. (Popper: a claim that cannot be falsified is not a claim.)
-   - Good: "Search returns results within 2 seconds for 10k records"
-   - Bad: "Search performs well"
-
-3. **Scoped** — draws a boundary. Says what's included *and* what's excluded. If nothing is excluded, the scope is suspect. (Rubin: unbounded work items are unestimable and unplannable.)
-   - Good: "Supports CSV and TSV. Excel files are out of scope."
-   - Bad: "Supports file uploads"
-
-**Anti-patterns — reject DoD entries that match these:**
-
-| Pattern | Problem |
-|---------|---------|
-| "X is implemented" | Implementation is the means, not the goal. What can the user *do*? |
-| "X works correctly" | Unfalsifiable — what does "correctly" look like? |
-| "All tests pass" | That's coding-verify's job, not DoD |
-| No exclusions mentioned | Scope will creep during brainstorming |
-
-**Carve-outs — these pass the rubric despite looking implementation-level:**
-
-| Pattern | Why it's valid |
-|---------|---------------|
-| Test baselines with specific counts ("12 existing tests stay green") | Falsifiable — run the suite, count passes. The number is the observable. |
-| Migration DoDs naming mechanisms ("alembic migration adds column X") | Observable via `alembic history` or schema inspection. The mechanism is the deliverable. |
-| Performance/regression claims ("P95 latency stays under 200ms") | Falsifiable with a benchmark. The threshold is the observable. |
-
-The common thread: these are falsifiable with a specific command or measurement, even though they describe technical artifacts rather than user-facing behaviour.
-
-**How later phases consume the DoD:**
-
-- **Brainstorming (Phase 4):** DoD constrains exploration — proposals must deliver what DoD promises
-- **Writing design plans:** Each DoD entry generates acceptance criteria (AC) with success + failure cases
-- **Implementation planning:** ACs become test-requirements.md entries
-- **UAT:** DoD entries requiring human judgment become uat-requirements.md entries
-
-**If the Definition of Done is unclear:**
-
-Ask targeted questions to nail it down. Use AskUserQuestion when there are discrete options, or open-ended questions when you need the user to describe their vision.
-
-Examples of clarifying questions:
-- "What's the primary deliverable here — is it [X] or [Y]?"
-- "How will you know this is done? What would you test or demonstrate?"
-- "You mentioned [feature]. Is that in scope for this design, or a future addition?"
-
-**Quality gate — reject vague DoD before confirmation:**
-
-If any DoD entry fails the three tests above, do not present it for confirmation. State which test it fails and ask the user to revise. Example: "This entry fails the Falsifiable test — what specific outcome would prove it's not done?" Loop until every entry passes all three tests, then present for confirmation.
-
-**Do not proceed to brainstorming until Definition of Done is confirmed.**
-
-#### Create Design Document Immediately After Confirmation
-
-**REQUIRED:** Once the user confirms the Definition of Done, create the design document file immediately. This captures the DoD at full fidelity before brainstorming begins.
-
-##### Step 1: Get Design Plan Name
-
-The slug becomes part of all acceptance criteria identifiers (e.g., `my-feature.AC1.1`) and appears in test names. Ask the user to choose it explicitly.
-
-**Generate 2-3 suggested slugs** based on the conversation context. Good slugs are:
-- Lowercase with hyphens (no spaces, underscores, or special characters)
-- **Terse but unambiguous** — prefer short forms that don't create confusion (e.g., `authn` not `authentication`, but not `auth` since that's ambiguous with `authz`)
-- Recognizable months later
-- **If a GitHub issue is linked:** append the issue number at the end (e.g., `oauth2-svc-authn-42`, not `42-oauth2-svc-authn`)
-
-**Use AskUserQuestion:**
-
-```
-Question: "What should we call this design plan? The name becomes the prefix for all acceptance criteria (e.g., `{slug}.AC1.1`) and appears in test names.
-
-If you have a ticketing system, you can use the ticket name (e.g., PROJ-1234)."
-
-Options:
-  - "[auto-generated-slug-1]" (e.g., "oauth2-svc-authn-42")
-  - "[auto-generated-slug-2]" (e.g., "svc-authn-42")
-  - "[auto-generated-slug-3]" (if meaningfully different)
-```
-
-**If user selects "Other":** They can provide any name. Normalize it:
-- Ticket names (pattern: `UPPERCASE-DIGITS`, e.g., `PROJ-1234`): keep as-is
-- Descriptive names: lowercase, hyphens for spaces, strip invalid characters (e.g., "My Cool Feature" → `my-cool-feature`)
-
-##### Step 2: Create File
-
-**File location:** `docs/design-plans/YYYY-MM-DD-{slug}.md`
-
-Use today's date and the user-chosen slug.
-
-**Initial file contents:**
-
-```markdown
-# [Feature Name] Design
-
-**GitHub Issue:** [#123 | org/repo#123 | None]
-
-## Summary
-<!-- TO BE GENERATED after body is written -->
-
-## Definition of Done
-[The confirmed Definition of Done - copy exactly as confirmed with user]
-
-## Acceptance Criteria
-<!-- TO BE GENERATED and validated before glossary -->
-
-## Glossary
-<!-- TO BE GENERATED after body is written -->
-```
-
-The `GitHub Issue` field records the linked issue reference from Phase 1. Use `None` if no issue was provided. This field is read by downstream skills to track plan lifecycle labels on the issue.
-
-**Why write immediately:**
-- Captures Definition of Done at peak resolution (right after user confirmation)
-- Prevents fidelity loss during brainstorming conversation
-- Creates working document that grows incrementally
-- Acceptance Criteria, Summary, and Glossary filled in later by design-write skill
-
-Mark Phase 3 as completed when user confirms the Definition of Done AND the file is created.
-
-### Phase 4: Brainstorming
-
-With clear understanding from Phases 1-3, explore design alternatives and validate the approach.
-
-Use TaskUpdate to mark Phase 4 as in_progress.
-
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:brainstorming
-
-Announce: "I'm using the brainstorming skill to explore design alternatives and validate the approach."
-
-**Pass context to brainstorming:**
-- Information gathered in Phase 1
-- Clarifications from Phase 2
-- Confirmed Definition of Done from Phase 3
-- This reduces Phase 1 of brainstorming (Understanding) since much is already known
-
-The brainstorming skill will:
-- Complete any remaining understanding gaps (Phase 1)
-- Propose 2-3 architectural approaches (Phase 2)
-- Present design incrementally for validation (Phase 3)
-- Use research agents for codebase patterns and external knowledge
-
-**Output:** Validated design held in conversation context.
-
-Mark Phase 4 as completed when design is validated.
-
-### Phase 5: Design Documentation
-
-Append the validated design to the document created in Phase 3.
-
-Use TaskUpdate to mark Phase 5 as in_progress.
-
-**REQUIRED SUB-SKILL:** Use denubis-plan-and-execute:design-write
-
-Announce: "I'm using the design-write skill to complete the design document."
-
-**Important:** The design document already exists from Phase 3 with:
-- Title
-- Summary placeholder
-- Confirmed Definition of Done
-- Acceptance Criteria placeholder
-- Glossary placeholder
-
-The design-write skill will:
-- Append body sections (Architecture, Existing Patterns, Implementation Phases, Additional Considerations) to the existing file
-- Structure with implementation phases (<=8 recommended)
-  - DO NOT pad out phases in order to reach the number of 8. 8 is the maximum, not the target.
-- Document existing patterns followed
-- Generate Acceptance Criteria (success + failure cases for each DoD item), get human validation
-- Generate Summary and Glossary to replace placeholders
-- Commit to git
-
-**Output:** Committed design document ready for implementation planning.
-
-Mark Phase 5 as completed when design document is committed.
-
-### Phase 6: Planning Handoff
-
-After design is documented, guide user to create implementation plan in fresh context.
-
-Use TaskUpdate to mark Phase 6 as in_progress.
-
-**Do NOT create implementation plan directly.** The user needs to /clear context first.
-
-Announce design completion and provide next steps:
-
-```
-Design complete! Design document committed to `docs/design-plans/[filename]`.
-
-Ready to create the implementation plan? This requires fresh context to work effectively.
-
-**IMPORTANT: Copy the command below BEFORE running /clear (it will erase this conversation).**
-
-(1) Copy this command now:
-```
-/denubis-plan-and-execute:starting-an-implementation-plan @docs/design-plans/[full-filename].md .
-```
-(the `.` at the end is necessary or else Claude Code will eat the command and do the wrong thing.)
-
-(2) Clear your context:
-```
-/clear
-```
-
-(3) Paste and run the copied command.
-
-The start-implementation-plan command will create detailed tasks, set up a branch, and prepare for execution.
-```
-
-**Why /clear instead of continuing:**
-- Implementation planning needs fresh context for codebase investigation
-- Long conversations accumulate context that degrades quality
-- /clear gives the next phase a clean slate
-
-Mark Phase 6 as completed after providing instructions.
-
-## When to Revisit Earlier Phases
-
-You can and should go backward when:
-- Phase 2 reveals fundamental gaps -> Return to Phase 1
-- Phase 3 reveals unclear deliverables -> Return to Phase 2 for more clarification
-- Phase 4 uncovers new constraints -> Return to Phase 1, 2, or 3
-- User questions approach during Phase 4 -> Return to Phase 2
-- Phase 4 changes the Definition of Done -> Return to Phase 3 to reconfirm
-- Design documentation reveals missing details -> Return to Phase 4
-
-**Don't force forward linearly** when going backward gives better results.
-
-## Common Rationalizations - STOP
-
-| Excuse | Reality |
-|--------|---------|
-| "User provided details, can skip context gathering" | Always run Phase 1. Ask for what's missing. |
-| "Requirements are clear, skip clarification" | Clarification prevents misunderstandings. Always run Phase 2. |
-| "I know what done looks like, skip confirmation" | Confirm Definition of Done explicitly. Always run Phase 3. |
-| "Simple idea, skip brainstorming" | Brainstorming explores alternatives. Always run Phase 4. |
-| "Design is in conversation, don't need documentation" | Documentation is contract with impl-plan-write. Always run Phase 5. |
-| "Can invoke implementation planning directly" | Must /clear first. Provide copy-then-clear workflow. |
-| "I can combine phases for efficiency" | Each phase has distinct purpose. Run all six. |
-| "User knows what they want, less structure needed" | Structure ensures nothing is missed. Follow all phases. |
-
-**All of these mean: STOP. Run all six phases in order.**
-
-## Key Principles
-
-| Principle | Application |
-|-----------|-------------|
-| **Never skip brainstorming** | Even with detailed specs, always run Phase 4 (may be shorter) |
-| **Progressive prompting** | Ask for less if user already provided some context |
-| **Clarify before ideating** | Phase 2 prevents building the wrong thing |
-| **Lock in the goal before exploring** | Phase 3 confirms what "done" means before brainstorming the how |
-| **All brains in skills** | This skill orchestrates; sub-skills contain domain expertise |
-| **Task tracking** | YOU MUST create todos with TaskCreate and update with TaskUpdate for all phases |
-| **Flexible progression** | Go backward when needed to fill gaps |
+Do not commit, publish, label an issue, or begin implementation unless separately
+authorised. The existence of the design document grants none of those permissions.

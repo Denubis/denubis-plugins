@@ -1,11 +1,7 @@
 """Slash commands are typed into the composer, never handed to codex as work.
 
-`/clear` and `/compact` had no verb, so the supervisor improvised each time: prose
-asking codex to compress its own context, or a `--message` that pastes the text
-through `load-buffer`. Both are read by codex as a *task*, so it reads files to
-answer them and the meter goes down. `.notes/feedback_compact-idle-external-sessions.md`
-records a keep/drop brief moving a live meter from 21% to 18% while codex reported
-"Context compressed as specified".
+The supervisor exposes dedicated verbs for slash commands. A message containing a
+slash command is still a message, so it cannot establish that the TUI ran the command.
 
 Every fixture below was captured from pane %55 on 2026-08-01, codex v0.144.5, at 90
 columns. Three properties of the real TUI drive the design:
@@ -450,11 +446,7 @@ def test_a_compaction_that_cost_context_is_reported_as_a_failure(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The documented failure: codex says it compacted while the meter falls.
-
-    21% to 18% is the field record in
-    `.notes/feedback_compact-idle-external-sessions.md`.
-    """
+    """A falling meter disproves compaction even when Codex acknowledges it."""
     worse = _pane(
         percent=18,
         body=["• acknowledged", "", "• Context compacted"],

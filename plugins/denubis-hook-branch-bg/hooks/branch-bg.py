@@ -10,10 +10,8 @@ from __future__ import annotations  # keep PEP 604 annotations runtime-free on <
 
 import colorsys
 import hashlib
-import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -117,17 +115,6 @@ def main() -> None:
     if repo_id and branch:
         colour = git_info_to_colour(repo_id, branch)
         set_terminal_bg(colour)
-
-    # Hook JSON output
-    json.dump(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": "Success",
-            },
-        },
-        sys.stdout,
-    )
 
 
 if __name__ == "__main__":

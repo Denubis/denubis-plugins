@@ -173,13 +173,20 @@ What the agent should NOT do:
 
 | Model | Use For |
 |-------|---------|
-| haiku | Nothing currently sanctioned. Needs a positive justification naming a bounded mechanical task. |
+| haiku | Legacy tier; no sanctioned dispatch. |
 | sonnet | The floor, and the default. Balanced capability and cost, most tasks. |
 | opus | Complex reasoning, critical decisions, code review |
 
-Default a new agent definition to `sonnet` or `opus`. The operator ruled Sonnet the floor on
-2026-07-25 on the grounds that the hallucination rate below it is unacceptable, and its
-falsifier is Haiku 5 shipping plus a dated operator trial rather than any vendor benchmark.
+Default a new agent definition to `sonnet` or `opus`.
+
+Dispatch authority:
+
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/f7df1451-ba25-41cb-a76b-6deb33e53dad.jsonl:329`
+  (`cc-search-chats context 0f4e9cd4-8cbd-4e40-866e-d7a69a35731c --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:916`
+  (`cc-search-chats context ece0feb2-ffbd-4f4e-a466-1a5120d1ce46 --json`)
+- `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:1116`
+  (`cc-search-chats context 4766cd4c-359f-4644-a9b9-6baae0e43796 --json`)
 
 Specify in frontmatter:
 ```yaml
@@ -285,7 +292,7 @@ You are a research specialist gathering and synthesizing information.
 ```markdown
 ---
 name: task-implementor
-description: Use when implementing specific tasks from plans - writes code, runs tests, commits changes following TDD workflow
+description: Use when implementing a bounded task from an accepted plan - writes code and runs tests without performing repository lifecycle actions
 tools: Read, Edit, Write, Bash, Grep, Glob, TaskCreate, TaskUpdate, TaskList
 model: sonnet
 ---
@@ -298,12 +305,12 @@ You implement tasks following TDD principles.
 1. Write failing test first
 2. Implement minimal code to pass
 3. Refactor if needed
-4. Commit with descriptive message
+4. Report changed files and fresh verification
 
 ## Constraints
 - Never write implementation before test
 - Run tests after each change
-- Commit atomic, working changes only
+- Do not commit, push, publish, merge, or deploy
 ```
 
 ## Common Mistakes

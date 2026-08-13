@@ -1,58 +1,16 @@
 #!/usr/bin/env bash
-# Spawn a Fable advisor in a tmux pane beside the caller's.
+# Launch a human-triggered Fable consultation beside the caller's tmux pane.
 #
-# The advisor is a full Claude Code session on a different model, briefed to
-# advise and denied the tools to implement. That claim is EMPIRICALLY VERIFIED,
-# not asserted: the last verification (2026-07-21, second run) confirmed a
-# callable surface of Glob, Grep, Read, ReportFindings and EndConversation, with
-# Write returning "No such tool available: Write. Write exists but is not
-# enabled in this context." Two earlier versions of this header made the same
-# claim while it was false.
+# Authority:
+# /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/e4421bb3-2615-4b37-944c-86e5dd65eccc.jsonl:12
+# Resolve with:
+# cc-search-chats context 0a1beea2-2d45-455f-9ced-9ec278afb8e8 --json
 #
-# EndConversation is deliberately available: an advisor that cannot end its own
-# session is worse than one that can, so it is a hard include on safety grounds
-# (operator ruling, 2026-07-21) and is absent from the deny list below.
-#
-# The first run of that same verification found EndConversation present in the
-# advisor's schema WHILE the deny list still named it — the harness re-injects
-# deferred tools, and no flag on the command line governs that. The list had not
-# been edited; the surface had moved underneath it. So re-verification cannot be
-# keyed to changes in this list, because upstream renames never touch it:
-# RE-VERIFY AT THE START OF EACH CONSULTATION. See VERIFY below.
-#
-# Two mechanisms carry it:
-#
-#   --disallowed-tools   DENIES the named tools. This is the only flag that
-#                        restricts; --allowed-tools means "pre-approve these
-#                        without prompting" and does NOT hide anything else.
-#                        Getting that backwards was tried, and an advisor under
-#                        the resulting "allowlist" wrote a file on its first
-#                        attempt.
-#   --append-system-prompt  carries the role brief.
-#
-# This was a blocklist until a Fable advisor, consulted under it, demonstrated
-# it was theatre (2026-07-21). It kept Bash, so shell writes succeeded with no
-# prompt, and it named twelve tools while missing Workflow (which spawns agents
-# inheriting the session model, so both fan-out AND Fable spend multiplication),
-# CronCreate and ScheduleWakeup (unattended Fable runs, which the cost gate
-# forbids in terms), Skill, DesignSync, and the worktree tools. Four of the
-# names it did block do not exist in the advisor's surface at all. A name-based
-# blacklist against a moving namespace fails open on every rename and addition.
-#
-# Bash is NOT granted. The advisor grounds findings with Read and Grep, and its
-# output is recovered from its session transcript under ~/.claude/projects/,
-# never from the pane: the Claude Code TUI redraws in place, so capture-pane
-# yields the viewport and not the transcript, even with `-S -` (verified).
-#
-# Fable-tier access is intermittent (it lapsed through June 2026), so this
-# script never silently substitutes a fallback: if Fable does not come up, it
-# says so and exits non-zero, and choosing Opus 4.8 instead is the operator's
-# call, taken knowingly. A silently-substituted advisor is worthless, because
-# the entire value of the consultation is that it is a different model.
-#
-# COST: Fable-tier invocations are human-triggered only (the cost gate in
-# writing-claude-directives/model-tier-notes.md). This script is invoked by a
-# human through its skill. Nothing may call it automatically.
+# The deny list removes the known mutation, orchestration, network, and MCP
+# surfaces. It is not a permanent proof because the upstream tool namespace can
+# change. Verify the observed tool surface before giving the advisor repository
+# work. Read the response from the JSONL transcript, not the TUI viewport. No
+# fallback model is selected automatically.
 #
 # Usage: fable-advisor-spawn.sh [cwd] [model]
 #          cwd    directory the advisor starts in (default: $PWD)
@@ -69,16 +27,8 @@ model="${2:-claude-fable-5}"
 [ -n "${TMUX:-}" ] || { echo "not inside tmux — the advisor needs a pane" >&2; exit 1; }
 command -v claude >/dev/null 2>&1 || { echo "claude not on PATH" >&2; exit 1; }
 
-# Deny list, derived from an advisor enumerating its own loaded schema
-# (2026-07-21) rather than from memory. A blacklist fails open on renames and
-# additions, so this is re-verified empirically on every material change: spawn
-# an advisor and ask it to enumerate its surface and attempt a write. That
-# consultation IS the test, and it has caught two wrong mechanisms already.
-#
-# KNOWN RESIDUAL HOLE: a PreToolUse hook approver in the advisor's session
-# auto-approved a Bash call ("approver: pipeline_safe") independently of these
-# flags. Denying Bash outright closes that path here, but the hook pipeline
-# remains a second surface no flag on this line controls.
+# This list fails open when upstream adds or renames a tool. The launcher's
+# verification prompt is therefore part of the boundary.
 DENIED=(Bash BashOutput KillShell
         Write Edit NotebookEdit
         Task Agent Workflow
@@ -89,37 +39,18 @@ DENIED=(Bash BashOutput KillShell
         Monitor PushNotification TaskOutput TaskStop
         WebFetch WebSearch
         TodoWrite TaskCreate TaskUpdate
-        # MCP: the auth stubs are callable, and their own descriptions say a
-        # completed OAuth makes "the server's real tools become available
-        # automatically" — tools a static name list could never have anticipated.
-        # context7 is an outbound channel: query text leaves the machine, which
-        # is a disclosure surface when the advisor is reading a private repo.
+        # MCP tools can disclose repository content or expose new callable tools.
         "mcp__*"
-        # Generic MCP resource tools are built-in, so they do NOT match
-        # "mcp__*" and still reach an attached server. An advisor found
-        # this residual after the wildcard landed.
+        # Built-in MCP resource tools do not match the mcp__* namespace.
         ListMcpResourcesTool ReadMcpResourceTool ReadMcpResourceDirTool)
 
-BRIEF="You are a consulted advisor in a supervised loop, running on a different model from the session that dispatched you. You are neither the implementer nor the verifier; both have already had their turn, and their output is what you are being asked about.
+BRIEF="You are a consulted advisor, not the implementer. Advise; do not modify files, run commands, delegate work, or broaden the task. The operator will verify your callable tool surface before substantive work.
 
-Advise. Do not implement. You have read and search tools only; there is no write or shell surface to work around.
+Review the supplied question against the repository as it exists now. Treat agent statements as claims to test. Treat a human ruling as authority to act, but return contradictions or ambiguity to the human instead of silently working around them.
 
-Everything you are told carries provenance, and all of it may be questioned. What differs is how a challenge resolves. A supervisor assertion is a claim to test, not a fact to build on: the supervisor's searches stop one level short routinely, grepping one file instead of following the call chain, or matching its own vocabulary instead of the repository's, so if the repository disagrees the repository wins and finding an assertion wrong is the job. A human ruling is the human's judgement: if it looks unwise, contradicts something else, or is unclear, say so plainly and let it go back to them rather than working around it. Nothing here is beyond question; the human is the source of judgement, not the source of facts.
+Report only findings that could change the decision. For each, state the consequence, cite the exact file and line, and distinguish direct observation from inference. If the evidence is sufficient and no finding changes the decision, say so plainly. Do not narrate your reasoning or perform generic self-critique."
 
-Ground every finding in the repository as it exists now: cite file:line and quote verbatim. A finding whose citation cannot be resolved will be discarded, so cite precisely rather than broadly. Where you are inferring rather than reading, say so.
-
-Report everything you find, each with a severity and your confidence. Do not filter to what you judge important; filtering happens downstream, and a finding dropped here is not recoverable.
-
-Stay in scope. Do not propose refactors, redesigns, or improvements beyond what you were asked about. 'This is fine' is a complete answer.
-
-Give the findings and the evidence for them. Do not narrate your reasoning process."
-
-# Split the CALLER's pane, not tmux's active one. Without -t, tmux splits
-# whatever window is currently active, which is the window the operator happens
-# to be looking at rather than the one that ran this script. Since the caller is
-# normally a Claude Code session in a background window, the advisor landed on
-# top of unrelated work (observed 2026-07-21). $TMUX_PANE is set by tmux in
-# every pane, so it names the caller precisely.
+# Target the caller's pane; tmux's active window may be unrelated.
 pane="$(tmux split-window -h -c "$cwd" -P -F '#{pane_id}' \
   ${TMUX_PANE:+-t "$TMUX_PANE"} \
   claude --model "$model" \
@@ -133,9 +64,8 @@ pane="$(tmux split-window -h -c "$cwd" -P -F '#{pane_id}' \
 sleep 6
 if ! tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qx -- "$pane"; then
   echo "advisor pane died on startup — '$model' is likely unavailable" >&2
-  echo "Fable access is intermittent. Falling back to Opus 4.8 is the operator's" >&2
-  echo "call: re-run as 'fable-advisor-spawn.sh \"$cwd\" claude-opus-4-8' and" >&2
-  echo "label the consultation as the fallback model, never as Fable." >&2
+  echo "No fallback model was selected. Choose one explicitly, re-run with its" >&2
+  echo "model identifier, and label the consultation with the model used." >&2
   exit 2
 fi
 
@@ -144,8 +74,7 @@ echo "model:    $model"
 echo "cwd:      $cwd"
 echo "denied:   ${#DENIED[@]} tools incl. Bash/Write/Edit/Workflow/Cron*/Skill"
 echo "VERIFY:   ask the advisor to enumerate its surface and attempt a write."
-echo "          Do this EVERY consultation, not only when the list changes:"
-echo "          the harness has re-injected a denied tool with no edit here."
+echo "          Continue only when the observed surface matches the boundary."
 echo
 echo "drive it with the bundled sender:"
 echo "  $SCRIPT_DIR/advisor-send.sh $pane 'your consultation'"

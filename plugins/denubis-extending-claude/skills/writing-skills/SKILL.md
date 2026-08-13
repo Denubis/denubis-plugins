@@ -1,156 +1,111 @@
 ---
 name: writing-skills
-description: Use when creating or editing skills - applies TDD with subagent testing to find rationalisation loopholes
+description: Use when creating or editing skills to scope the responsibility, write the procedure, and define honest verification.
 user-invocable: false
 ---
 
-# Writing Skills
+# Writing skills
 
-Writing skills IS Test-Driven Development applied to process documentation. This cornerstone orchestrator sequences three sub-skills: `denubis-extending-claude:epistemic-humility` (should this skill exist?), `denubis-extending-claude:testing-skills-with-subagents` (does it fail without the skill, and survive pressure with it?), `denubis-extending-claude:writing-claude-directives` (how should it be phrased?). Iron Law: no skill without a failing test first.
+A skill owns one situational procedure or reference. Make the trigger discoverable, the
+body useful when loaded, and every verification claim proportionate to what can actually
+be observed.
 
-## Core Principle
+The verification boundary is authorised by
+`/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl:9797`
+and bound as `TEST01` in the instruction-control candidate manifest.
 
-**Writing skills IS Test-Driven Development applied to process documentation.**
+## Decide whether a skill is the right owner
 
-Write test cases (pressure scenarios), watch them fail (baseline behaviour), write the skill, watch tests pass, refactor (close loopholes).
+Create or extend a skill when the content is reusable across tasks and should load only in
+a named situation. Use another owner when the responsibility is different:
 
-**Iron Law:** No skill without a failing test first. Same as TDD for code.
+| Content | Owner |
+|---|---|
+| Continuous cross-project invariant | Global instructions |
+| Continuous project boundary | Project instructions |
+| Project-specific memory or preference | Human-approved `.notes/` record |
+| Mechanical prohibition or state transition | Executable gate or hook |
+| Current decision and consequences | ADR or decision record |
+| Historical argument | Git or an explicit archive |
 
-## TDD Mapping
+Apply `denubis-extending-claude:epistemic-humility` when the proposed skill changes scope,
+claims a new capability, or automates judgment. A narrower procedure is usually better
+than a broad skill defended by more instructions.
 
-| TDD Concept | Skill Creation |
-|-------------|----------------|
-| Test case | Pressure scenario with subagent |
-| Production code | SKILL.md document |
-| RED | Agent violates rule without skill |
-| GREEN | Agent complies with skill present |
-| Refactor | Close loopholes, re-test |
+## Skill shape
 
-## When to Create a Skill
-
-**Create when:**
-- Technique wasn't intuitively obvious
-- You'd reference this across projects
-- Pattern applies broadly
-- Others would benefit
-
-**Don't create for:**
-- One-off solutions
-- Standard practices documented elsewhere
-- Project-specific conventions (use CLAUDE.md)
-
-**Before committing to creation — or to an edit that changes a skill's scope — apply the rubric:** run the artefact-under-consideration through `denubis-extending-claude:epistemic-humility`. If it fails Scope (Jones's three conditions), Observability (three screens), Process (Schön's four questions), or the Failure-pattern screen, the right next step is to re-scope, not to author. Directive-writing is a protective belt around a scope decision, not a substitute for it.
-
-## Skill Types
-
-**Technique:** Concrete method with steps (condition-based-waiting, root-cause-tracing).
-
-**Pattern:** Mental model for problems (flatten-with-flags, test-invariants).
-
-**Reference:** API docs, syntax guides, tool documentation.
-
-**Discipline:** Enforces a rule under pressure (TDD, verification). Tested with combined-stressor pressure scenarios; success is following the rule when the agent wants to break it. This is the type that most needs `denubis-extending-claude:testing-skills-with-subagents`.
-
-## Directory Structure
-
-```
+```text
 skills/
   skill-name/
-    SKILL.md              # Main reference (required)
-    supporting-file.*     # Peer reference or tool, loaded on demand
-    examples/             # Optional: worked examples
+    SKILL.md
+    supporting-reference.md
+    examples/
       worked-example.md
 ```
 
-A skill directory holds `SKILL.md` plus optional peer supporting files and an optional `examples/` subdirectory. This shape follows obra/superpowers' `writing-skills` layout, which this skill imports from (see Supporting Files).
+`SKILL.md` contains the trigger, boundary, core procedure, failure handling, and pointers
+to material needed only sometimes. Keep a supporting file only when it has a distinct
+consumer or materially reduces the loaded body. Do not split a short procedure merely to
+claim progressive disclosure.
 
-**Separate files for:** Heavy reference (100+ lines), reusable tools/scripts, worked examples.
+Frontmatter:
 
-**Keep inline:** Principles, code patterns (<50 lines), everything else.
-
-## SKILL.md Template
-
-```markdown
+```yaml
 ---
 name: skill-name-with-hyphens
-description: Use when [triggers/symptoms] - [what it does, third person]
-user-invocable: false  # true only when users should invoke it directly
+description: Use when <observable triggers or symptoms> to <specific responsibility>.
+user-invocable: false
 ---
-
-# Skill Name
-
-## Overview
-Core principle in 1-2 sentences.
-
-## When to Use
-Symptoms and use cases. When NOT to use.
-
-## Core Pattern
-Before/after comparison or key technique.
-
-## Quick Reference
-Table or bullets for scanning.
-
-## Common Mistakes
-What goes wrong + fixes.
 ```
 
-## Workflow
+The description says when selection is appropriate. It does not promise outcomes the body
+or runtime cannot guarantee. Add platform metadata only when the platform consumes it.
 
-Authoring a skill runs the three sub-skills in TDD order — the failing test comes before the skill body. Each owns a phase; this orchestrator sequences them.
+## Authoring workflow
 
-1. **Scope check** — `denubis-extending-claude:epistemic-humility`. Apply the rubric before committing to a skill. A skill that fails Scope, Observability, Process, or the Failure-pattern screen wants re-scoping, not authoring.
-2. **RED baseline** — `denubis-extending-claude:testing-skills-with-subagents`. Watch the agent fail the pressure scenario *without* the skill; source the baseline from an independent session. This is where the Iron Law's "failing test first" becomes operational — it precedes authoring.
-3. **Write and phrase** — `denubis-extending-claude:writing-claude-directives`. Author the skill against the documented baseline failures: token efficiency, skill discovery optimisation, aggressive-language dial-back, and the per-model behavioural specifics.
-4. **GREEN / REFACTOR** — `denubis-extending-claude:testing-skills-with-subagents`. Re-run the scenarios *with* the skill present; close loopholes and re-test until no new rationalisations surface (the "When Skill is Bulletproof" signs in that skill).
+1. **Map the consumer.** Identify what selects the skill, what it acts on, and the action
+   its instructions are meant to change.
+2. **State the boundary.** Name in-scope work, exclusions, authority requirements, and the
+   observable failure the skill handles.
+3. **Inspect current evidence.** Read relevant current skills, platform documentation, and
+   executable consumers before borrowing a pattern.
+4. **Write the smallest complete procedure.** Put one current path through the task in the
+   body. Remove incident dialogue, self-critique, and rebuttals to earlier versions.
+5. **Phrase for the target surface.** Use
+   `denubis-extending-claude:writing-claude-directives` for metadata and directive details.
+6. **Define honest checks.** Use
+   `denubis-extending-claude:testing-skills-with-subagents` to separate executable checks
+   from a falsifiable review rubric.
+7. **Verify references and mechanics.** Run the repository's actual parsers, reference
+   checks, helper tests, and plugin validation where applicable.
+8. **Review the prose against its rubric.** The main agent may do this directly. Use a
+   separate reviewer only when authorised and likely to add signal.
 
-**Editing an existing skill re-enters this sequence, scoped to the change.** A scope-changing edit (new triggers, new verdict space, different audience) re-runs step 1. A phrasing edit runs step 3 on the touched sections. Any edit that could weaken compliance re-runs the pressure scenarios it could plausibly weaken (steps 2 and 4). "I'm only editing, not creating" is not an exit — an edit that skips re-testing ships an untested change to a tested skill.
+Editing an existing skill re-enters only the affected steps. A wording-only correction
+does not require a staged failure performance; a changed helper still follows code TDD.
 
-## Supporting Files
+## Review questions
 
-Three files imported from obra/superpowers ship alongside this skill. See `README.md` for dependencies and invocation.
+- Does the description identify selection conditions without encoding the entire body?
+- Does the procedure change one named action at one intelligible boundary?
+- Can a reader distinguish requirements, references, examples, and optional advice?
+- Does each current factual or authority claim point to a resolvable source?
+- Do executable checks observe a consumer-owned property rather than chosen wording?
+- Are judgment expectations written as falsifiable scenarios rather than approval labels?
+- Can old arguments be removed without losing a current instruction or decision?
 
-- `anthropic-best-practices.md` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Anthropic-authored reference on skill structure, discovery optimisation, and anti-patterns. Reference material, not denubis-authored guidance.
-- `render-graphs.js` (obra verbatim, pinned `6fd4507`, imported 2026-06-11) — Node + graphviz skill-author tool for rendering process-flow diagrams from `dot` blocks in a SKILL.md. Dev-only tooling, not runtime: run it by hand when a SKILL.md you are authoring has `dot` blocks you want rendered to SVG for review.
-- `./examples/CLAUDE_MD_TESTING.md` (obra adapted, source pin `6fd4507`, imported 2026-06-11) — worked example of pressure-testing CLAUDE.md documentation.
+## Supporting files
 
-## Anti-Patterns
+- `anthropic-best-practices.md` is a pinned upstream reference. Recheck current official
+  documentation before relying on volatile platform details.
+- `render-graphs.js` renders Graphviz blocks for human review; it is author tooling, not a
+  runtime requirement.
+- `examples/CLAUDE_MD_TESTING.md` is a historical upstream example of prompt variants. It
+  may suggest scenarios, but its model responses are observations rather than gates.
 
-- **Narrative example:** "In session 2025-10-03, we found..." (too specific, not reusable)
-- **Multi-language dilution:** example-js.js, example-py.py (mediocre quality, maintenance burden)
-- **Code in flowcharts:** Can't copy-paste, hard to read
-- **Generic labels:** helper1, step3 (labels need semantic meaning)
+## Completion boundary
 
-## Skill Creation Checklist
-
-Use TaskCreate to track each item, and mirror decisions and completion state to a checklist file on disk so the worklog survives session interruption. If TaskCreate is unavailable, the checklist file is the tracker.
-
-"Too simple to test" and "no time to test" are the rationalisations this checklist exists to overrule.
-
-**Editing instead of creating?** Run the items your change touches. The REFACTOR re-test items are never skippable: name which pressure scenarios the edit could weaken and re-run them.
-
-**Scope:**
-- [ ] Run the artefact through `denubis-extending-claude:epistemic-humility`
-- [ ] If it fails any screen, re-scope rather than author
-
-**RED Phase:**
-- [ ] Source the RED baseline from an independent session (not invented by this executor)
-- [ ] Run WITHOUT skill - document baseline failures verbatim
-- [ ] Identify rationalisation patterns
-
-**GREEN Phase:**
-- [ ] Name uses letters, numbers, hyphens only
-- [ ] Description starts with "Use when...", third person
-- [ ] Address specific baseline failures
-- [ ] One excellent example (not multi-language)
-- [ ] Run WITH skill - verify compliance
-
-**REFACTOR Phase:**
-- [ ] Identify new rationalisations
-- [ ] Add explicit counters
-- [ ] Re-test until a pressure run surfaces no new rationalisations (the "When Skill is Bulletproof" signs in `denubis-extending-claude:testing-skills-with-subagents`)
-
-**Deployment:**
-- [ ] Present GREEN/REFACTOR evidence to your human partner; explicit acceptance required
-- [ ] Commit and push (only after acceptance)
-- [ ] Consider contributing via PR
+A skill change is ready for human review when its frontmatter parses, references resolve,
+executable helpers pass their real tests, prose expectations have been reviewed against a
+falsifiable rubric, and no unresolved defect remains. Commit, publication, installation,
+and deployment are separate actions.

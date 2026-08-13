@@ -575,7 +575,7 @@ Expected: `PASS: all cross-references and supporting-file pointers resolve.` If 
 
 **Step 2: Verify git commit discipline (AC5.5, AC5.6)**
 
-**Branch-discipline guard (M5 revision 2026-04-19).** `git log main..HEAD` silently returns zero commits when run on main itself, which would give AC5.5/5.6 a false pass against an empty result. `denubis-plan-and-execute:executing-an-implementation-plan` has a precondition that blocks execution on main, but this guard is the local belt-and-braces at the point the count is actually taken. Run first:
+**Branch-discipline guard (M5 revision 2026-04-19).** `git log main..HEAD` silently returns zero commits when run on main itself, which would give AC5.5/5.6 a false pass against an empty result. This inline guard owns the check at the point where the count is taken. Run first:
 
 ```bash
 cd /home/brian/people/Brian/brian-ed3d-plugins && python3 -c "

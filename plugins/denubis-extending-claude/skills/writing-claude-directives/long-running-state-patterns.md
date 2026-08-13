@@ -1,204 +1,91 @@
-# Long-Running State Patterns
+# Long-running state patterns
 
-_Tiers here follow this project's model floor, so they are Opus and Sonnet only. Current versions, IDs, and per-model specifics live in [`model-tier-notes.md`](model-tier-notes.md), the single source of truth. The patterns themselves are model-independent, but the tier assignments below are not._
+Optional reference for work that may cross context compaction, a cleared session, or a
+handover. The goal is recoverable task state, not a second narrative of the conversation.
 
-Patterns for managing Claude agents across extended multi-context-window workflows. This is optional reference content for when you need to design long-running agent systems.
+## Choose the existing owner first
 
-## Core Challenge
+| State | Durable owner |
+|---|---|
+| Implemented behaviour | Code, tests, and current architecture |
+| Work still required by an accepted plan | Current implementation-plan phase |
+| Deferred defect with a future consumer | Existing issue tracker |
+| Project observation or preference | Human-approved project `.notes/` record |
+| Human ruling | Original transcript record plus exact resolver |
+| Verification result | Output bound to the artifact and invocation it checked |
 
-Long-running agents work in discrete sessions. Each new session starts without memory of previous sessions. Complex projects span multiple context windows. The solution: bridge gaps through structured artifacts and explicit state management.
+Do not create a generic progress file when one of these owners already exists. Do not use
+an experimental model-memory store as durable project memory.
 
-## Context Management
+## Minimal handover state
 
-### Automatic Tools
+Before a context boundary that could lose working state, record only what the next session
+cannot cheaply reconstruct:
 
-**Auto-Compact**: Triggers at ~95% context capacity. Claude Code summarizes history, preserving architectural decisions and unresolved bugs. Manually trigger with `/compact` at logical breakpoints.
+```markdown
+## Current task
 
-**Token Budget Awareness**: Current Claude models receive updates on remaining context after tool calls. Enables better task persistence and strategy adjustment.
-
-### Compression Strategies (Karpathy Framework)
-
-| Strategy | Description |
-|----------|-------------|
-| Write | Save context externally to reference later |
-| Select | Load relevant context on-demand |
-| Compress | Retain only tokens needed for current task |
-| Isolate | Split work across subagents with clean windows |
-
-**Hierarchical Summarization**: Subagents return condensed summaries (1,000-2,000 tokens) rather than full exploration context.
-
-**Just-In-Time Loading**: Maintain lightweight identifiers (file paths, queries). Load data at runtime using tools.
-
-## State Persistence
-
-### Git-Based State Tracking
-
-Anthropic recommends combining git history with structured progress files:
-
-**Two-Agent Pattern**:
-1. **Initializer Agent** (first session): Sets up environment, creates `init.sh` and `claude-progress.txt`, makes initial commit
-2. **Coding Agent** (subsequent): Reads git history + progress files, works incrementally, commits with descriptive messages
-
-**Why This Works**: Fresh agents understand state quickly from git + progress file. Commits enable recovery. Progress tracking prevents premature completion.
-
-### Structured Progress Files
-
-```
-# Project Progress Log
-
-## Current Status
-- Session: [timestamp]
-- Focus: [current task]
-- Blockers: [if any]
-
-## Completed Features
-- Feature A: ✓ (commit abc123)
-
-## In Progress
-- Feature B: [current work description]
-
-## Pending
-- Feature C: [description]
-
-## Testing Status
-- Unit: ✓
-- Integration: [status]
-- E2E: [status]
+- Goal: <current authorised outcome>
+- Repository/worktree: <absolute path and branch>
+- Current owner: <phase, issue, or source file>
+- Changed surface: <paths, not a prose replay>
+- Last verified evidence: <command, result, subject identity>
+- Unresolved blocker: <one concrete condition, or none>
+- Next action: <one executable step>
+- Exclusions: <nearby work deliberately not authorised>
 ```
 
-### JSON Feature Lists
+Put this state in the accepted implementation plan, issue, or other named owner. A
+standalone handover is temporary and should be consumed or deleted when its contents reach
+their real owners.
 
-```json
-{
-  "features": [
-    {
-      "id": "auth-login",
-      "status": "complete",
-      "tested": true,
-      "commit": "abc123"
-    }
-  ]
-}
-```
+## Crossing the boundary
 
-Explicit feature lists prevent premature completion and duplicate work.
+1. Read the current project instructions and the named state owner.
+2. Confirm the repository, worktree, branch, and dirty state rather than trusting the
+   handover's label.
+3. Re-run the smallest positive check that establishes the working baseline.
+4. Resume from the recorded next action.
+5. Update the owner when the state changes; do not append correction layers.
 
-## Failure Mode Prevention
+Use `/compact` or `/clear` only when the context boundary is useful. A clear session is not
+a completion criterion. Preserve durable state before clearing; do not ask the model to
+summarise work that the repository and tests already reveal.
 
-| Failure | Symptom | Prevention |
-|---------|---------|------------|
-| One-shotting | Runs out of context mid-implementation | Work on single feature at a time, commit frequently |
-| Premature completion | Half-implemented feature marked done | Require E2E verification before marking complete |
-| Context loss | Next session duplicates effort | Structured progress file + clear git messages |
+## Direct work and delegation
 
-## Multi-Context-Window Workflows
+Direct implementation is the default. Delegate only an independent, bounded subproblem
+when the task permits it and the separate context or expertise adds value. The main
+session keeps responsibility for scope, evidence review, and integration. A delegated
+summary is a lead, not durable state or proof of completion.
 
-### Session Initialization Ritual
+When model selection matters, consult [`model-tier-notes.md`](model-tier-notes.md) for the
+current roster and its raw authority sources. Do not copy model versions into this file.
 
-1. `pwd` - establish location
-2. `git log --oneline -20` - review recent work
-3. Read progress file and CLAUDE.md
-4. `source init.sh` - start services
-5. Run tests to verify baseline
-6. Choose single feature from pending list
+## Verification across sessions
 
-### Context Boundary Crossing
+- Bind evidence to the exact artifact, revision or full digest, command, and relevant
+  environment.
+- Rerun a check after the subject changes; do not carry a green label forward.
+- Record an expected red gate as red with its blocking condition. Do not relabel it green
+  because the failure was anticipated.
+- Keep user acceptance focused on judgment automation cannot settle.
 
-**Manual Compact** (Recommended): At logical breakpoints, `/compact` then `/clear`. Start fresh on next feature.
+## Failure modes
 
-**Memory Tool Preservation**: Before context limits, save state to memory files. Update CLAUDE.md and progress file.
-
-## Subagent Orchestration
-
-### Orchestrator-Worker Pattern
-
-```
-Orchestrator (Opus tier)
-├── Holds plan, routes tasks
-├── No implementation work
-└── Context reserved for coordination
-
-Subagents (Sonnet tier)
-├── Focused expertise
-├── Own context window
-├── Returns condensed results
-└── Task-specific configuration
-```
-
-**Why Orchestration-Only Main Agent**: When main agent implements, everything competes for same context. Subagents get clean, dedicated context.
-
-### Model Selection
-
-| Tier | Use For | Relative cost |
-|------|---------|---------------|
-| Opus | Orchestration, complex planning | Higher |
-| Sonnet | Focused implementation, and the floor for everything else | Lower |
-
-Sonnet is the cheapest sanctioned tier, so it carries the fan-out that makes multi-agent orchestration economically viable. Haiku is cheaper again and is not available for this, because an operator ruling on 2026-07-25 made Sonnet the floor on the grounds that output needing independent verification costs more to check than the cheaper tier saves (`.notes/feedback_haiku-no-judgement.md`). Current versions and IDs for each tier: see [`model-tier-notes.md`](model-tier-notes.md).
-
-## Test-Driven Long-Horizon Tasks
-
-### Why Tests Matter for Agents
-
-- Tests provide objective verification targets
-- Failing tests guide implementation
-- Multiple rounds (2-3) yield better results
-- Enable confident recovery via revert
-
-### Progressive Testing Across Sessions
-
-```
-Session 1: Unit tests + implementation
-Session 2: Integration tests
-Session 3: E2E tests
-Session 4: Deployment verification
-```
-
-## Failure Recovery
-
-### Git Recovery Strategies
-
-**Session Branches**:
-```bash
-git checkout -b claude-session/$(date +%s)
-# Merge on success, delete on failure
-```
-
-**Checkpoint Stash**:
-```bash
-git stash save "claude-checkpoint: $(date)"
-```
-
-### Claude Code Checkpoints
-
-- Esc+Esc or `/rewind` opens checkpoint menu
-- Can restore conversation, code, or both
-- Bash commands (`rm`, `mv`) are not tracked
-
-## Key Insights
-
-### What Works
-
-1. **Explicit state** beats implicit understanding
-2. **Incremental commits** beat large commits
-3. **Feature lists** prevent premature completion
-4. **Tests drive implementation**
-5. **Multi-agent** beats single-agent for complex tasks
-
-### Common Pitfalls
-
-These patterns consistently cause session failures:
-
-1. Building everything in one session → Work one feature at a time
-2. Assuming prior state → Verify with git log + progress file first
-3. Relying on conversation history alone → Use structured artifacts
-4. Vague requirements → Define explicit acceptance criteria
-5. No recovery plan → Use session branches or checkpoint stashes
+| Failure | Repair |
+|---|---|
+| Next session repeats discovery | Put the map and next action in the current owner. |
+| Handover claims work is complete | Open the artifact and rerun its verification. |
+| Progress file duplicates an issue or phase | Move the current consequence to the owner and remove the duplicate. |
+| Context clear loses an unresolved decision | Record the exact human source and dependent action before clearing. |
+| Delegated summary becomes accepted fact | Resolve its cited evidence and separate observation from inference. |
+| Checkpoint commit, stash, branch, or worktree is invented | Use only lifecycle actions already authorised by the task. |
 
 ## References
 
-- [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
-- [Claude Code Best practices](https://www.anthropic.com/engineering/claude-code-best-practices)
-- [Effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-- [claude-flow](https://github.com/ruvnet/claude-flow) - Multi-agent orchestration
-- [continuous-claude](https://github.com/AnandChowdhary/continuous-claude) - CI/CD loop pattern
+- [Anthropic: effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+- [Anthropic: effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
+
+Vendor references verified 2026-08-12. Their examples do not override project authority,
+repository lifecycle rules, or the boundary of the current request.

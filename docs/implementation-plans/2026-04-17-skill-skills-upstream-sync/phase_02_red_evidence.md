@@ -41,7 +41,8 @@ Line numbers verified against the pre-restructure SHAs above via `Read` at evide
 
 **Queries run (FTS5-safe single-term):** `directive`, `Opus`, `Sonnet`, `Haiku`, `judgement`, `aggressive`, `overtriggering`, `CRITICAL`, `rationalize`, `rationalise`, `bypass`, `loophole`, `YOU`, `MUST`, `Sensitivity`, `think`, `mate`, `fuck`.
 
-The last two (`mate`, `fuck`) are frustration-signal proxies per `feedback_haiku-no-judgement.md` and the project-wide auto-memory note that Australian-English `mate` is an escalation signal — a session where the operator used these while directive-writing would be a plausible RED candidate even if the failure itself was not explicitly model-anchored.
+The last two (`mate`, `fuck`) were frustration-signal proxies rather than model-routing terms;
+they do not establish a Haiku-specific failure.
 
 **Projects searched (chat-index paths):**
 
