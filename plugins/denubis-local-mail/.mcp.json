@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "local-mail": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--no-project",
+        "--no-config",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/mcp_server.py"
+      ],
+      "env_vars": ["LOCAL_MAIL_DATABASE_URL", "LOCAL_MAIL_SCHEMA", "LOCAL_MAIL_USERNAME"]
+    }
+  }
+}

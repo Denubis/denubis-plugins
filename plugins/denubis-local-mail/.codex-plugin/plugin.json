@@ -1,0 +1,33 @@
+{
+  "name": "denubis-local-mail",
+  "version": "0.1.0+codex.20260813080412",
+  "description": "PostgreSQL-backed mail tools for collaborating local Codex sessions.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "agents",
+    "coordination",
+    "mailbox",
+    "postgresql",
+    "hooks"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Denubis Local Mail",
+    "shortDescription": "Low-interruption mail for collaborating local agents.",
+    "longDescription": "Route durable peer messages by subject and thread, notify once at Stop, and pull bodies only when relevant while keeping supervised-agent control separate.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": "Set up local mail for the collaborating worktrees in this project."
+  }
+}

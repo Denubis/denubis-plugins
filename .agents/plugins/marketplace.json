@@ -1,0 +1,20 @@
+{
+  "name": "denubis-plugins",
+  "interface": {
+    "displayName": "Denubis Plugins"
+  },
+  "plugins": [
+    {
+      "name": "denubis-local-mail",
+      "source": {
+        "source": "local",
+        "path": "./plugins/denubis-local-mail"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

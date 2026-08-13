@@ -42,6 +42,25 @@ This is the same concern the weekly quota check answers from the other side. Rou
 to codex protects the supervisor's budget, and codex has a budget too, so check its
 headroom before handing it a long phase.
 
+## Control traffic is not peer mail
+
+Keep two channels distinct when several agent sessions collaborate:
+
+| Channel | Carries | Delivery rule |
+|---|---|---|
+| Codex supervision | lifecycle, approvals, questions, prompts, commands, done, crash | immediate through `codex_supervisor.py` and its event monitor |
+| Local peer mail | contradictions, dependencies, decision requests, corrected claims, handoffs | durable subject/thread mail; Stop-time digest; body pulled deliberately |
+
+The `denubis-local-mail:using-local-mail` skill owns the second channel. It may copy all
+peer messages to a supervising mailbox, but it does not replace the same-window Codex
+monitor and never types into the Codex pane. Conversely, do not broadcast Codex lifecycle
+events through peer mail: an approval or crash is actionable control state, not a thread
+for every worker to read.
+
+This boundary is what permits a supervisor to kick and approve the agent it supervises
+without making peer coordination an interrupt stream. A peer sends mail; the supervisor
+uses the guarded control verbs below.
+
 ## What the consuming project must provide
 
 This skill supervises codex **in someone else's repo**. Two things must exist there before

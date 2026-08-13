@@ -1,5 +1,37 @@
 # Changelog
 
+## [marketplace] 3.1.0
+
+Adds `denubis-local-mail` and publishes the peer-mail/control-channel boundary in
+`denubis-external-agents` 0.15.0.
+
+## [denubis-local-mail] 0.1.0
+
+Machine-local mail replaces shared append-only chat monitors for agent-to-agent
+coordination.
+
+**New:**
+- explicit usernames bound to their launch worktree, including multiple agents per worktree
+- subject-and-thread messages, replies, subject-only inbox digests, and body-on-pull reads
+- supervising mailboxes that receive copies of all peer traffic without broadcasting it
+- transactional PostgreSQL storage for bodies, routing, threads, and delivery state
+- a Stop hook that announces each new subject once, preserves unread mail after the
+  announcement, and respects `stop_hook_active`
+- the `using-local-mail` skill, including the boundary from active Codex supervision
+- native Claude and Codex manifests over the same plugin source and hook definition
+- shared-worktree warnings and an explicit file-ownership handshake before editing
+
+**Deferred:**
+- daemon and network transport, escalation timers, attachments, receipts, lists,
+  scheduled delivery, write locking, and an administrative TUI
+
+## [denubis-external-agents] 0.15.0
+
+**Changed:**
+- `supervising-codex` now separates immediate supervised-agent control traffic from
+  durable peer mail. Codex lifecycle, approval, question, completion, and crash events
+  stay on the guarded monitor; peer contradictions and handoffs use local mail.
+
 ## [denubis-external-agents] 0.14.0
 
 Both ponytail launchers now live in this plugin, and `codex-ponytail` is the

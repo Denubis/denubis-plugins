@@ -1,0 +1,19 @@
+{
+  "name": "denubis-local-mail",
+  "version": "0.1.0",
+  "description": "PostgreSQL-backed mail tools for collaborating local agent sessions.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "agents",
+    "coordination",
+    "mailbox",
+    "postgresql",
+    "hooks"
+  ]
+}
