@@ -98,6 +98,7 @@ Transcript archiving is provided by the separate [`transcript-archive`](https://
 | **Node.js 18+** | Claude Code itself | [nodejs.org](https://nodejs.org/) |
 | **Git** | Everything | [git-scm.com](https://git-scm.com/) |
 | **Python 3.11+** | Hook scripts | [python.org](https://www.python.org/) |
+| **Python 3.14+** | `denubis-academic` bibliography resolver | [python.org](https://www.python.org/) |
 | **uv** | Running Python hooks | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
 
 **Linux/macOS only:**
@@ -138,6 +139,15 @@ Inside Claude Code:
 ```
 /plugin install denubis-hook-branch-bg@denubis-plugins
 ```
+
+**Add academic writing, review, and Zotero bibliography workflows:**
+```
+/plugin install denubis-academic@denubis-plugins
+```
+
+If an older machine reports `denubis-bib` or still has
+`denubis-bibliography`, follow the
+[academic setup and migration runbook](plugins/denubis-academic/skills/using-bibliography/references/setup-and-migration.md).
 
 Then run `/setup` to verify everything is configured correctly.
 

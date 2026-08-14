@@ -133,7 +133,7 @@ Treat `~/zettelkasten/` as the central scholarly workspace. Rendered papers live
 - `pages/NNN.md` - per-page rendered text
 - `meta.json` - renderer, OCR, source PDF, and provenance metadata
 
-Before doing Zotero, bibliography, citation, rendered-paper, quote-verification, or literature-note work, read Claude's `using-bibliography` skill at `/home/brian/people/Brian/brian-ed3d-plugins/plugins/denubis-bibliography/skills/using-bibliography/SKILL.md` and follow its workflow. In particular: resolve papers through the provided resolver, do not construct citekeys, do not re-render or fetch papers by hand, and do not write to Zotero or the zettelkasten without explicit user confirmation where the skill requires it.
+Before doing Zotero, bibliography, citation, rendered-paper, quote-verification, or literature-note work, read Claude's `using-bibliography` skill at `/home/brian/people/Brian/brian-ed3d-plugins/plugins/denubis-academic/skills/using-bibliography/SKILL.md` and follow its workflow. In particular: resolve papers through the provided resolver, do not construct citekeys, do not re-render or fetch papers by hand, and do not write to Zotero or the zettelkasten without explicit user confirmation where the skill requires it.
 
 ## Communication Style
 
@@ -245,6 +245,8 @@ new code, search a second way first.
 
 <!-- context7 -->
 Use Context7 MCP to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service — even well-known ones like React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage. Use even when you think you know the answer — your training data may not reflect recent changes. Prefer this over web search for library docs.
+
+Invoke the authenticated Context7 MCP tools directly. Never substitute `npx ctx7`: shell subprocesses do not inherit the MCP credential and fall back to a separate unauthenticated quota.
 
 Do not use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
 

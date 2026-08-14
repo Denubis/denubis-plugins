@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-academic] 0.15.0
+
+**Changed:**
+- Reworked `using-bibliography` into a concise routing skill with focused setup,
+  resolution, reading, Zotero-write, notes, and troubleshooting runbooks.
+- Added a colleague-facing installation and retired-name migration procedure for
+  `denubis-academic@denubis-plugins`, including the repository's authoritative
+  `plugin-refresh` recovery path and positive smoke tests.
+- Anchored every documented helper command to the installed Claude plugin root,
+  so cached installations no longer depend on a source checkout or working
+  directory.
+- Corrected quotation fidelity: OCR Markdown locates candidate text, but exact
+  wording is not verified until it is visually checked against the source PDF.
+- Added marketplace and skill-name fitness tests and repaired the deployed
+  bibliography instruction path after the plugin rename.
+
 ## [denubis-academic] 0.14.1
 
 **Added:**

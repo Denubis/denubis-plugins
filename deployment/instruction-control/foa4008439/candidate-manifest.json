@@ -243,8 +243,8 @@
     "global_codex": {
       "path": "deployment/instruction-control/foa4008439/AGENTS.md",
       "live_path": "/home/brian/.codex/AGENTS.md",
-      "bytes": 18210,
-      "sha256": "8f8505b58b253210244a246d1a5c1f679386305f856eb9fead3acd25aba44eec",
+      "bytes": 18394,
+      "sha256": "dbe2c0ab3a3ebee8aa8737d72a42a8773403bd17d3d8d8f0d70cf3e139369268",
       "authority_actions": ["global_instruction_control", "request_boundary_expansion"]
     },
     "project_claude": {

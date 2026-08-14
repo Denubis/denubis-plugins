@@ -70,6 +70,12 @@ def _load_marketplace() -> dict[str, str]:
     return {p["name"]: p["version"] for p in marketplace["plugins"]}
 
 
+def _load_marketplace_entries() -> list[dict[str, object]]:
+    with _MARKETPLACE_JSON.open() as fh:
+        marketplace = json.load(fh)
+    return marketplace["plugins"]
+
+
 def test_marketplace_json_exists() -> None:
     assert _MARKETPLACE_JSON.exists(), f"missing: {_MARKETPLACE_JSON}"
 
@@ -121,3 +127,16 @@ def test_no_orphan_marketplace_entries() -> None:
     assert not orphans, (
         f"marketplace.json lists plugins with no on-disk plugin.json: {sorted(orphans)}"
     )
+
+
+def test_marketplace_names_and_sources_match_plugin_manifests() -> None:
+    """Names exposed to `/plugin install` come from the packaged manifests."""
+    entries = _load_marketplace_entries()
+    by_name = {entry["name"]: entry for entry in entries}
+    assert len(by_name) == len(entries), "marketplace contains duplicate plugin names"
+
+    for manifest_path in _plugin_json_paths():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        directory_name = _plugin_name(manifest_path)
+        assert manifest["name"] == directory_name
+        assert by_name[directory_name]["source"] == f"./plugins/{directory_name}"

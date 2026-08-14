@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_FILES = tuple(sorted(REPO_ROOT.glob("plugins/denubis-*/skills/*/SKILL.md")))
 
@@ -23,4 +22,7 @@ def test_skill_frontmatter_is_valid_yaml(skill_path: Path) -> None:
     parsed = yaml.safe_load(frontmatter_text)
     assert isinstance(parsed, dict), f"{skill_path}: frontmatter is not a mapping"
     assert parsed.get("name"), f"{skill_path}: frontmatter has no name"
-
+    assert parsed["name"] == skill_path.parent.name, (
+        f"{skill_path}: frontmatter name {parsed['name']!r} does not match "
+        f"skill directory {skill_path.parent.name!r}"
+    )

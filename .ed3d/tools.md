@@ -16,6 +16,17 @@
 - Path: /home/brian/.volta/bin/codex
 - Notes: emitted commands must match this CLI
 
+## claude
+- Invocation: `claude`
+- Version: 2.1.232
+- Path: /home/brian/.local/bin/claude
+- Notes: plugin validation and marketplace commands must match this CLI
+
+## Context7
+- Invocation: `mcp__context7__resolve_library_id`, then `mcp__context7__query_docs`
+- Prohibited: `npx ctx7`
+- Notes: use the authenticated MCP tools; shell subprocesses do not inherit the MCP credential and fall back to a separate quota
+
 ## cc-search-chats
 - Invocation: `cc-search-chats`
 - Version: 2.0.0a5
