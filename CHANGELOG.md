@@ -1,5 +1,11 @@
 # Changelog
 
+## [denubis-academic] 0.14.1
+
+**Added:**
+- Zotero HTML snapshots render to searchable Markdown when no PDF is attached.
+- Other attachment formats fall back to Pandoc while PDFs retain the existing OCR cascade.
+
 ## Instruction-control source candidate
 
 **Fixed:**
