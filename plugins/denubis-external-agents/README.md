@@ -5,17 +5,17 @@ Codex supervision monitor.
 
 | Script | What it does |
 |---|---|
-| `scripts/claude-ponytail` | Creates or reuses a worktree and prints a Claude invocation with Ponytail loaded for that session |
-| `scripts/codex-ponytail` | Creates or reuses a worktree and prints an **isolated** Codex invocation with upstream Ponytail installed |
+| `scripts/claude-ponytail` | Creates or reuses a worktree and launches Claude with Ponytail loaded for that session |
+| `scripts/codex-ponytail` | Creates or reuses a worktree and launches **isolated** Codex with upstream Ponytail installed |
 | `scripts/codex_supervisor.py` | Watches a joined Codex pane and drives it; see the `supervising-codex` skill |
 
-Both launchers **print** a command rather than running one, so you start the session in
-whatever window you want it in.
+Both launchers run the selected CLI in the current terminal. Their first argument selects
+the worktree branch; every later argument is passed to Claude or Codex unchanged.
 
 ## Isolated Codex Ponytail sessions
 
-`codex-ponytail` creates or reuses a named git worktree and prints a Codex command whose
-state is isolated beneath `~/.codex-ponytail`. These sessions carry the pinned upstream
+`codex-ponytail` creates or reuses a named git worktree and launches Codex with state
+isolated beneath `~/.codex-ponytail`. These sessions carry the pinned upstream
 Ponytail plugin and disable every user-installed skill discovered beneath
 `~/.agents/skills`.
 
@@ -23,10 +23,9 @@ Ponytail plugin and disable every user-installed skill discovered beneath
 
 1. Run `codex-ponytail <name>` from a repository whose `.worktrees/` directory is
    gitignored.
-2. Run the printed command.
-3. Complete the isolated Codex login if prompted.
-4. Open `/hooks`, review the Ponytail hooks, and trust only those you accept.
-5. Close Codex and run the printed command again, so the trusted `SessionStart` hook runs
+2. Complete the isolated Codex login if prompted.
+3. Open `/hooks`, review the Ponytail hooks, and trust only those you accept.
+4. Close Codex and run `codex-ponytail <name>` again, so the trusted `SessionStart` hook runs
    in a new thread.
 
 Login persists in `~/.codex-ponytail/auth.json`. Hook trust persists until a hook's
@@ -36,15 +35,31 @@ only when the pin is deliberately moved.
 ### Normal use
 
 ```fish
-codex-ponytail <name> [<base-ref>]
+codex-ponytail <name> [<codex-args>...]
+claude-ponytail <name> [<claude-args>...]
 ```
 
-Then run the command it prints. Each invocation verifies the Ponytail installation and
-refreshes the global-skill deny-list. It needs no new login or hook review.
+Each invocation verifies the Ponytail installation and refreshes the global-skill
+deny-list before launching the CLI. It needs no new login or hook review.
 
-An existing worktree at `.worktrees/<name>` is **reused** when its branch matches
-`<name>`, so there is no separate flag for a worktree you already have. It is refused
-when the branch differs or is checked out elsewhere.
+Fish completion offers the branches of registered worktrees beneath `.worktrees/` as the
+worktree selector, including after `--dry-run`. Install the completion files into Fish's
+autoload directory with:
+
+```fish
+plugins/denubis-external-agents/scripts/install-ponytail-fish-completions
+```
+
+The installer writes regular files rather than checkout-dependent symlinks; rerun it after
+updating these completion sources. An existing managed worktree is resolved by branch even
+when its directory spelling differs, such as branch `research/proposer/verifier` at
+`.worktrees/research-proposer-verifier`. A path at `.worktrees/<name>` is still refused when
+it contains another branch.
+
+New worktrees branch from the `HEAD` of the checkout where the launcher was invoked. This
+means invoking it from a linked worktree creates the new branch from that worktree's current
+commit. `--dry-run` is a launcher option only when it precedes the worktree name; all
+arguments after the worktree name belong to the underlying CLI.
 
 Ponytail's persistent configuration lives under `~/.codex-ponytail/xdg-config`. Normal
 Codex, Claude Ponytail, `~/.codex`, and normal XDG configuration are untouched.

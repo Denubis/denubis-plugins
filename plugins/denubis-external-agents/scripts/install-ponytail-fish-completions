@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Install regular copies of the Ponytail launcher completions into Fish's
+# autoload directory. Copies remain valid if this plugin checkout moves.
+
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+SOURCE_DIR=$(cd "$SCRIPT_DIR/../completions" && pwd -P)
+TARGET_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions"
+TEMPORARY=""
+
+cleanup() {
+    if [[ -n "$TEMPORARY" && -e "$TEMPORARY" ]]; then
+        rm -f -- "$TEMPORARY"
+    fi
+}
+trap cleanup EXIT
+
+mkdir -p "$TARGET_DIR"
+for name in codex-ponytail.fish claude-ponytail.fish; do
+    TEMPORARY=$(mktemp "$TARGET_DIR/.$name.XXXXXX")
+    cp -- "$SOURCE_DIR/$name" "$TEMPORARY"
+    chmod 0644 "$TEMPORARY"
+    mv -f -- "$TEMPORARY" "$TARGET_DIR/$name"
+    TEMPORARY=""
+done
+
+printf 'installed Ponytail Fish completions in %s\n' "$TARGET_DIR"

@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# claude-ponytail — make a worktree and print the command to open Claude in it
-# with ponytail loaded.
+# claude-ponytail — create or reuse a worktree and launch Claude in it with
+# Ponytail loaded.
 #
 # Ponytail (https://github.com/DietrichGebert/ponytail) is a "lazy senior dev"
 # persona. It is loaded with --plugin-dir, which is session-scoped: it applies to
 # the session you start and to nothing else. It is never installed, so your other
 # sessions and subagents stay unaffected by its always-on hooks.
 #
-# This does not launch anything. It prepares the worktree and hands you the
-# command, so you start it in whatever window you want it in.
-#
 # Usage:
-#   claude-ponytail <name> [<base-ref>]   worktree .worktrees/<name>, branch <name>
+#   claude-ponytail <name> [<claude-args>...]
 #
 # Flags:
 #   --dry-run   print what would happen, change nothing
@@ -196,6 +193,56 @@ is_worktree_root() {
     [ "$actual_common" = "$expected_common" ]
 }
 
+completion_worktree_names() {
+    local root field wt branch prefix
+    root=$(main_checkout 2>/dev/null) || return 0
+    prefix="$root/.worktrees/"
+    wt=""
+    branch=""
+
+    while IFS= read -r -d '' field; do
+        case "$field" in
+            worktree\ *) wt="${field#worktree }" ;;
+            branch\ refs/heads/*) branch="${field#branch refs/heads/}" ;;
+            "")
+                if [[ "$wt" == "$prefix"?* \
+                      && -d "$wt" \
+                      && ! -L "$wt" ]] \
+                   && is_worktree_root "$wt" "$root"; then
+                    printf '%s\n' "$branch"
+                fi
+                wt=""
+                branch=""
+                ;;
+        esac
+    done < <(
+        git -C "$root" worktree list --porcelain -z 2>/dev/null
+    )
+}
+
+registered_worktree_for_branch() {
+    local root="$1" target="$2" prefix field wt branch
+    prefix="$root/.worktrees/"
+    wt=""
+
+    while IFS= read -r -d '' field; do
+        case "$field" in
+            worktree\ *) wt="${field#worktree }" ;;
+            branch\ refs/heads/*)
+                branch="${field#branch refs/heads/}"
+                if [[ "$branch" == "$target" && "$wt" == "$prefix"?* ]]; then
+                    printf '%s\n' "$wt"
+                    return 0
+                fi
+                ;;
+            "") wt="" ;;
+        esac
+    done < <(
+        git -C "$root" worktree list --porcelain -z 2>/dev/null
+    )
+    return 1
+}
+
 require_worktrees_ignored() {
     local root="$1" error status
     if error=$(git -C "$root" check-ignore -q .worktrees/probe 2>&1); then
@@ -212,8 +259,9 @@ require_worktrees_ignored() {
 }
 
 main() {
-    local name="$1" base="${2:-HEAD}"
-    local root wt cmd actual_branch
+    local name="$1"
+    shift
+    local root wt cmd argument actual_branch linked_worktree base
 
     if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
        || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
@@ -221,6 +269,8 @@ main() {
     fi
 
     root=$(main_checkout)
+    base=$(git rev-parse --verify 'HEAD^{commit}') \
+        || die "could not resolve the caller checkout's HEAD"
     require_worktrees_ignored "$root"
 
     [ -x "$WRAPPER" ] || die "claude wrapper not executable at $WRAPPER"
@@ -235,40 +285,66 @@ main() {
             || die "existing worktree uses branch '${actual_branch:-detached HEAD}', expected '$name': $wt"
         printf 'reusing existing worktree %s\n' "$wt" >&2
     elif git -C "$root" show-ref --verify --quiet "refs/heads/$name"; then
-        run git -C "$root" worktree add "$wt" "$name"
+        if linked_worktree=$(registered_worktree_for_branch "$root" "$name"); then
+            if [ ! -d "$linked_worktree" ] || [ -L "$linked_worktree" ]; then
+                die "registered worktree is unavailable: $linked_worktree"
+            fi
+            is_worktree_root "$linked_worktree" "$root" \
+                || die "registered worktree is invalid: $linked_worktree"
+            wt="$linked_worktree"
+            printf 'reusing existing worktree %s\n' "$wt" >&2
+        else
+            run git -C "$root" worktree add --quiet "$wt" "$name"
+        fi
     else
-        run git -C "$root" worktree add "$wt" -b "$name" "$base"
+        run git -C "$root" worktree add --quiet "$wt" -b "$name" "$base"
     fi
     $DRY_RUN || lfs_guard "$wt"
 
-    if [ -n "$CONFIG_DIR" ]; then
-        cmd=$(printf 'env CLAUDE_CONFIG_DIR=%s %s --plugin-dir %s' \
-            "$(shell_quote "$CONFIG_DIR")" "$(shell_quote "$WRAPPER")" "$(shell_quote "$VENDOR")")
-    else
-        cmd=$(printf '%s --plugin-dir %s' "$(shell_quote "$WRAPPER")" "$(shell_quote "$VENDOR")")
+    if $DRY_RUN; then
+        if [ -n "$CONFIG_DIR" ]; then
+            cmd=$(printf 'env CLAUDE_CONFIG_DIR=%s %s --plugin-dir %s' \
+                "$(shell_quote "$CONFIG_DIR")" \
+                "$(shell_quote "$WRAPPER")" \
+                "$(shell_quote "$VENDOR")")
+        else
+            cmd=$(printf '%s --plugin-dir %s' \
+                "$(shell_quote "$WRAPPER")" "$(shell_quote "$VENDOR")")
+        fi
+        for argument in "$@"; do
+            cmd="$cmd $(shell_quote "$argument")"
+        done
+
+        printf '\nworktree : %s\n' "$wt"
+        printf 'ponytail : %s (pinned, audited)\n' "${PONYTAIL_SHA:0:12}"
+        printf 'dry run  : no cache, branch, or worktree was created; the command below is illustrative\n'
+        printf 'remove   : git -C %s worktree remove %s\n' \
+            "$(shell_quote "$root")" "$(shell_quote "$wt")"
+        printf '\nrun this in the window you want it in:\n\n  cd %s && %s\n\n' \
+            "$(shell_quote "$wt")" "$cmd"
+        return 0
     fi
 
-    printf '\nworktree : %s\n' "$wt"
-    printf 'ponytail : %s (pinned, audited)\n' "${PONYTAIL_SHA:0:12}"
-    if $DRY_RUN; then
-        printf 'dry run  : no cache, branch, or worktree was created; the command below is illustrative\n'
+    cd "$wt" || die "could not enter worktree: $wt"
+    if [ -n "$CONFIG_DIR" ]; then
+        exec env CLAUDE_CONFIG_DIR="$CONFIG_DIR" \
+            "$WRAPPER" --plugin-dir "$VENDOR" "$@"
     fi
-    printf 'remove   : git -C %s worktree remove %s\n' \
-        "$(shell_quote "$root")" "$(shell_quote "$wt")"
-    printf '\nrun this in the window you want it in:\n\n  cd %s && %s\n\n' \
-        "$(shell_quote "$wt")" "$cmd"
+    exec "$WRAPPER" --plugin-dir "$VENDOR" "$@"
 }
 
-POSITIONAL=()
 while [ $# -gt 0 ]; do
     case "$1" in
+        --complete-worktrees)
+            completion_worktree_names
+            exit 0
+            ;;
         --dry-run) DRY_RUN=true; shift ;;
         -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)        die "unknown option: $1" ;;
-        *)         POSITIONAL+=("$1"); shift ;;
+        *)         NAME="$1"; shift; break ;;
     esac
 done
 
-[ "${#POSITIONAL[@]}" -ge 1 ] || die "need a worktree name. Try --help"
-[ "${#POSITIONAL[@]}" -le 2 ] || die "too many arguments: ${POSITIONAL[*]}"
-main "${POSITIONAL[@]}"
+[ -n "${NAME:-}" ] || die "need a worktree name. Try --help"
+main "$NAME" "$@"

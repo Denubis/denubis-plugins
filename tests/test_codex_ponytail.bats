@@ -1,8 +1,13 @@
 #!/usr/bin/env bats
 # Hermetic tests for the isolated native Codex Ponytail launcher.
+# Bats runs each @test in a subshell, which ShellCheck does not model when
+# tracking exported test-fixture variables.
+# shellcheck disable=SC2030,SC2031
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 SCRIPT="$REPO_ROOT/plugins/denubis-external-agents/scripts/codex-ponytail"
+COMPLETION="$REPO_ROOT/plugins/denubis-external-agents/completions/codex-ponytail.fish"
+COMPLETION_INSTALLER="$REPO_ROOT/plugins/denubis-external-agents/scripts/install-ponytail-fish-completions"
 FAKE_CODEX_FIXTURE="$REPO_ROOT/tests/fixtures/fake_codex"
 
 make_repo() {
@@ -14,11 +19,6 @@ make_repo() {
     printf 'hello\n' > "$repo/file.txt"
     git -C "$repo" add -A
     git -C "$repo" commit -qm init
-}
-
-printed_command() {
-    local text="$1"
-    printf '%s' "${text##*$'run this in the window you want it in:\n\n  '}"
 }
 
 setup() {
@@ -66,9 +66,43 @@ teardown() {
     run bash "$SCRIPT" --help
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"codex-ponytail <name> [<base-ref>]"* ]]
+    [[ "$output" == *"codex-ponytail <name> [<codex-args>...]"* ]]
     [[ "$output" == *"CODEX_HOME"* ]]
     [[ "$output" == *"One-time setup"* ]]
+}
+
+@test "Fish completes registered worktree branches after launcher options" {
+    mkdir -p "$TEST_DIR/bin" "$WORK/.worktrees/ordinary"
+    ln -s "$SCRIPT" "$TEST_DIR/bin/codex-ponytail"
+    git -C "$WORK" branch parked
+    git -C "$WORK" worktree add -q -b research/topic "$WORK/.worktrees/feature"
+
+    run env PATH="$TEST_DIR/bin:$PATH" fish --no-config -c \
+        "source '$COMPLETION'; complete -C 'codex-ponytail --dry-run '"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = $'research/topic\tExisting worktree' ]
+}
+
+@test "Fish completion installer writes relocatable regular files" {
+    local config_home="$TEST_DIR/config"
+    mkdir -p "$config_home/fish/completions"
+    ln -s "$COMPLETION" \
+        "$config_home/fish/completions/codex-ponytail.fish"
+    ln -s "$REPO_ROOT/plugins/denubis-external-agents/completions/claude-ponytail.fish" \
+        "$config_home/fish/completions/claude-ponytail.fish"
+
+    run env XDG_CONFIG_HOME="$config_home" "$COMPLETION_INSTALLER"
+
+    [ "$status" -eq 0 ]
+    [ -f "$config_home/fish/completions/codex-ponytail.fish" ]
+    [ ! -L "$config_home/fish/completions/codex-ponytail.fish" ]
+    [ -f "$config_home/fish/completions/claude-ponytail.fish" ]
+    [ ! -L "$config_home/fish/completions/claude-ponytail.fish" ]
+    cmp "$COMPLETION" \
+        "$config_home/fish/completions/codex-ponytail.fish"
+    cmp "$REPO_ROOT/plugins/denubis-external-agents/completions/claude-ponytail.fish" \
+        "$config_home/fish/completions/claude-ponytail.fish"
 }
 
 @test "literal branch validation rejects revision syntax and HEAD" {
@@ -240,7 +274,7 @@ make_bare_main() {
         "$FAKE_CODEX_CALLS"
     grep -F -- "plugin add ponytail@ponytail --json" \
         "$FAKE_CODEX_CALLS"
-    [[ "$output" == *"run this in the window you want it in"* ]]
+    [ -f "$FAKE_CODEX_SESSION_ARGS" ]
 }
 
 @test "rerun preserves base config state while replacing only the profile" {
@@ -520,14 +554,14 @@ make_bare_main() {
         "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
 }
 
-@test "bootstrap failure creates no worktree and prints no run command" {
+@test "bootstrap failure creates no worktree and does not launch Codex" {
     export FAKE_CODEX_FAIL_PLUGIN=1
 
     run bash "$SCRIPT" feature
 
     [ "$status" -ne 0 ]
     [ ! -e "$WORK/.worktrees/feature" ]
-    [[ "$output" != *"run this in the window you want it in"* ]]
+    [ ! -e "$FAKE_CODEX_SESSION_ARGS" ]
 }
 
 @test "existing marketplace at another revision fails instead of repinning" {
@@ -552,19 +586,14 @@ make_bare_main() {
     [[ "$output" == *"CODEX_HOME"* ]]
 }
 
-@test "printed Fish command isolates config and removes inherited API keys" {
-    local apostrophe_work="$TEST_DIR/work's path" command
+@test "direct Codex launch isolates config and handles an apostrophe path" {
+    local apostrophe_work="$TEST_DIR/work's path"
     make_repo "$apostrophe_work"
     cd "$apostrophe_work"
-
-    run bash "$SCRIPT" feature
-    [ "$status" -eq 0 ]
-    command="$(printed_command "$output")"
     export OPENAI_API_KEY="normal-openai-key"
     export CODEX_API_KEY="normal-codex-key"
 
-    run fish --no-config -c "$command"
-
+    run bash "$SCRIPT" feature
     [ "$status" -eq 0 ]
     [ "$(cat "$FAKE_CODEX_SESSION_HOME")" = "$CODEX_PONYTAIL_HOME" ]
     [ "$(cat "$FAKE_CODEX_SESSION_XDG")" = "$CODEX_PONYTAIL_HOME/xdg-config" ]
@@ -576,18 +605,54 @@ make_bare_main() {
     [ "${args[1]}" = "$apostrophe_work/.worktrees/feature" ]
 }
 
-@test "printed Codex command remains valid Fish syntax for a newline path" {
-    local newline_work="$TEST_DIR/"$'work\nnewline' command
+@test "launches Codex and passes every argument after the worktree unchanged" {
+    git -C "$WORK" worktree add -q -b feature "$WORK/.worktrees/feature"
+    export OPENAI_API_KEY="normal-openai-key"
+    export CODEX_API_KEY="normal-codex-key"
+
+    run bash "$SCRIPT" feature resume --last
+
+    [ "$status" -eq 0 ]
+    mapfile -d '' args < "$FAKE_CODEX_SESSION_ARGS"
+    [ "${args[0]}" = "-C" ]
+    [ "${args[1]}" = "$WORK/.worktrees/feature" ]
+    [ "${args[2]}" = "-s" ]
+    [ "${args[3]}" = "workspace-write" ]
+    [ "${args[4]}" = "-a" ]
+    [ "${args[5]}" = "on-request" ]
+    [ "${args[6]}" = "resume" ]
+    [ "${args[7]}" = "--last" ]
+    [ "$(cat "$FAKE_CODEX_SESSION_OPENAI_KEY")" = "unset" ]
+    [ "$(cat "$FAKE_CODEX_SESSION_CODEX_KEY")" = "unset" ]
+}
+
+@test "a new worktree branches from the caller worktree HEAD" {
+    git -C "$WORK" worktree add -q -b caller "$WORK/.worktrees/caller"
+    printf 'caller commit\n' > "$WORK/.worktrees/caller/caller.txt"
+    git -C "$WORK/.worktrees/caller" add caller.txt
+    git -C "$WORK/.worktrees/caller" commit -qm caller
+    local caller_head main_head
+    caller_head="$(git -C "$WORK/.worktrees/caller" rev-parse HEAD)"
+    main_head="$(git -C "$WORK" rev-parse HEAD)"
+    [ "$caller_head" != "$main_head" ]
+    cd "$WORK/.worktrees/caller"
+
+    run bash "$SCRIPT" child
+
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$WORK/.worktrees/child" rev-parse HEAD)" = "$caller_head" ]
+}
+
+@test "direct Codex launch handles a newline worktree path" {
+    local newline_work="$TEST_DIR/"$'work\nnewline'
     make_repo "$newline_work"
     cd "$newline_work"
 
     run bash "$SCRIPT" feature
     [ "$status" -eq 0 ]
-    command="$(printed_command "$output")"
-
-    run fish --no-config -n -c "$command"
-
-    [ "$status" -eq 0 ]
+    mapfile -d '' args < "$FAKE_CODEX_SESSION_ARGS"
+    [ "${args[0]}" = "-C" ]
+    [ "${args[1]}" = "$newline_work/.worktrees/feature" ]
 }
 
 @test "registered worktree is reused but an ordinary directory is rejected" {
@@ -602,6 +667,16 @@ make_bare_main() {
     run bash "$SCRIPT" ordinary
     [ "$status" -ne 0 ]
     [[ "$output" == *"not a registered git worktree"* ]]
+}
+
+@test "a registered branch reuses its differently named worktree path" {
+    git -C "$WORK" worktree add -q -b research/topic \
+        "$WORK/.worktrees/research-topic"
+
+    run bash "$SCRIPT" research/topic
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reusing existing worktree $WORK/.worktrees/research-topic"* ]]
 }
 
 @test "normal Codex, global skills, and Claude state remain untouched" {

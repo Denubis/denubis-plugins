@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# codex-ponytail — create a worktree and print an isolated native Codex
-# invocation with upstream Ponytail installed.
+# codex-ponytail — create or reuse a worktree and launch isolated native Codex
+# with upstream Ponytail installed.
 #
 # Usage:
-#   codex-ponytail <name> [<base-ref>]
+#   codex-ponytail <name> [<codex-args>...]
 #
 # Flags:
 #   --dry-run   validate and print intended actions without changing files
@@ -43,10 +43,10 @@ die() {
 
 usage() {
     printf '%s\n' \
-        'codex-ponytail — create a worktree and print an isolated native Codex invocation' \
+        'codex-ponytail — create or reuse a worktree and launch isolated native Codex' \
         '' \
         'Usage:' \
-        '  codex-ponytail <name> [<base-ref>]' \
+        '  codex-ponytail <name> [<codex-args>...]' \
         '' \
         'Flags:' \
         '  --dry-run   validate and print intended actions without changing files' \
@@ -141,6 +141,56 @@ is_worktree_root() {
     [[ "$actual_common" == "$expected_common" ]]
 }
 
+completion_worktree_names() {
+    local root field wt branch prefix
+    root=$(main_checkout 2>/dev/null) || return 0
+    prefix="$root/.worktrees/"
+    wt=""
+    branch=""
+
+    while IFS= read -r -d '' field; do
+        case "$field" in
+            worktree\ *) wt="${field#worktree }" ;;
+            branch\ refs/heads/*) branch="${field#branch refs/heads/}" ;;
+            "")
+                if [[ "$wt" == "$prefix"?* \
+                      && -d "$wt" \
+                      && ! -L "$wt" ]] \
+                   && is_worktree_root "$wt" "$root"; then
+                    printf '%s\n' "$branch"
+                fi
+                wt=""
+                branch=""
+                ;;
+        esac
+    done < <(
+        git -C "$root" worktree list --porcelain -z 2>/dev/null
+    )
+}
+
+registered_worktree_for_branch() {
+    local root="$1" target="$2" prefix field wt branch
+    prefix="$root/.worktrees/"
+    wt=""
+
+    while IFS= read -r -d '' field; do
+        case "$field" in
+            worktree\ *) wt="${field#worktree }" ;;
+            branch\ refs/heads/*)
+                branch="${field#branch refs/heads/}"
+                if [[ "$branch" == "$target" && "$wt" == "$prefix"?* ]]; then
+                    printf '%s\n' "$wt"
+                    return 0
+                fi
+                ;;
+            "") wt="" ;;
+        esac
+    done < <(
+        git -C "$root" worktree list --porcelain -z 2>/dev/null
+    )
+    return 1
+}
+
 first_linked_worktree() {
     git -C "$1" worktree list --porcelain 2>/dev/null | awk '
         /^worktree /{ path = substr($0, 10); bare = 0; next }
@@ -185,7 +235,7 @@ require_worktrees_ignored() {
 }
 
 preflight_worktree() {
-    local name="$1" base="$2" actual_branch
+    local name="$1" base="$2" actual_branch linked_worktree
 
     if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
        || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
@@ -208,11 +258,19 @@ preflight_worktree() {
             || die "existing worktree uses branch '${actual_branch:-detached HEAD}', expected '$name': $WORKTREE"
         WORKTREE_ACTION="reuse"
     elif git -C "$ROOT" show-ref --verify --quiet "refs/heads/$name"; then
-        if git -C "$ROOT" worktree list --porcelain \
+        if linked_worktree=$(registered_worktree_for_branch "$ROOT" "$name"); then
+            [[ -d "$linked_worktree" && ! -L "$linked_worktree" ]] \
+                || die "registered worktree is unavailable: $linked_worktree"
+            is_worktree_root "$linked_worktree" "$ROOT" \
+                || die "registered worktree is invalid: $linked_worktree"
+            WORKTREE="$linked_worktree"
+            WORKTREE_ACTION="reuse"
+        elif git -C "$ROOT" worktree list --porcelain \
             | grep -Fqx "branch refs/heads/$name"; then
             die "branch '$name' is already checked out in another worktree"
+        else
+            WORKTREE_ACTION="existing-branch"
         fi
-        WORKTREE_ACTION="existing-branch"
     else
         git -C "$ROOT" rev-parse --verify --quiet "$base^{commit}" >/dev/null \
             || die "base reference does not name a commit: $base"
@@ -505,10 +563,10 @@ create_or_reuse_worktree() {
             printf 'reusing existing worktree %s\n' "$WORKTREE" >&2
             ;;
         existing-branch)
-            git -C "$ROOT" worktree add "$WORKTREE" "$name"
+            git -C "$ROOT" worktree add --quiet "$WORKTREE" "$name"
             ;;
         new-branch)
-            git -C "$ROOT" worktree add "$WORKTREE" -b "$name" "$base"
+            git -C "$ROOT" worktree add --quiet "$WORKTREE" -b "$name" "$base"
             ;;
         *)
             die "internal error: unknown worktree action '$WORKTREE_ACTION'"
@@ -517,12 +575,15 @@ create_or_reuse_worktree() {
 }
 
 print_result() {
-    local command
+    local command argument
     command=$(printf 'env -u OPENAI_API_KEY -u CODEX_API_KEY CODEX_HOME=%s XDG_CONFIG_HOME=%s %s --profile ponytail -C %s -s workspace-write -a on-request' \
         "$(shell_quote "$PONYTAIL_HOME")" \
         "$(shell_quote "$PONYTAIL_XDG_CONFIG_HOME")" \
         "$(shell_quote "$CODEX")" \
         "$(shell_quote "$WORKTREE")")
+    for argument in "$@"; do
+        command="$command $(shell_quote "$argument")"
+    done
 
     printf '\nworktree : %s\n' "$WORKTREE"
     printf 'ponytail : %s (native, pinned)\n' "${PONYTAIL_SHA:0:12}"
@@ -537,8 +598,18 @@ print_result() {
     printf '\nrun this in the window you want it in:\n\n  %s\n\n' "$command"
 }
 
+launch_codex() {
+    exec env -u OPENAI_API_KEY -u CODEX_API_KEY \
+        CODEX_HOME="$PONYTAIL_HOME" \
+        XDG_CONFIG_HOME="$PONYTAIL_XDG_CONFIG_HOME" \
+        "$CODEX" --profile ponytail \
+        -C "$WORKTREE" -s workspace-write -a on-request "$@"
+}
+
 main() {
-    local name="$1" base="${2:-HEAD}"
+    local name="$1"
+    shift
+    local base
 
     validate_environment_paths
     [[ -n "$CODEX" && -x "$CODEX" ]] \
@@ -547,6 +618,8 @@ main() {
     require_command node
     require_command flock
 
+    base=$(git rev-parse --verify 'HEAD^{commit}') \
+        || die "could not resolve the caller checkout's HEAD"
     preflight_worktree "$name" "$base"
 
     if $DRY_RUN; then
@@ -565,18 +638,21 @@ main() {
                     "$ROOT" "$WORKTREE" "$name" "$base" >&2
                 ;;
         esac
+        print_result "$@"
     else
         bootstrap_ponytail
         create_or_reuse_worktree "$name" "$base"
         exec {LOCK_FD}>&-
+        launch_codex "$@"
     fi
-
-    print_result
 }
 
-POSITIONAL=()
 while (($# > 0)); do
     case "$1" in
+        --complete-worktrees)
+            completion_worktree_names
+            exit 0
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -589,12 +665,12 @@ while (($# > 0)); do
             die "unknown option: $1"
             ;;
         *)
-            POSITIONAL+=("$1")
+            NAME="$1"
             shift
+            break
             ;;
     esac
 done
 
-((${#POSITIONAL[@]} >= 1)) || die "need a worktree name. Try --help"
-((${#POSITIONAL[@]} <= 2)) || die "too many arguments: ${POSITIONAL[*]}"
-main "${POSITIONAL[@]}"
+[[ -n "${NAME:-}" ]] || die "need a worktree name. Try --help"
+main "$NAME" "$@"

@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-external-agents] 0.16.0
+
+**Added:**
+- Fish completions for managed Ponytail worktree branches and an installer that
+  copies them into Fish's autoload directory without checkout-dependent symlinks.
+
+**Changed:**
+- `claude-ponytail` and `codex-ponytail` now launch their CLIs directly, pass
+  arguments following the worktree name through unchanged, and create new
+  branches from the invoking checkout's `HEAD`.
+- Existing managed worktrees are resolved by branch, even when the worktree
+  directory name differs from the branch name.
+
 ## [denubis-academic] 0.15.0
 
 **Changed:**

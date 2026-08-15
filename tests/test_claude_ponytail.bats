@@ -16,6 +16,8 @@
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 SCRIPT="$REPO_ROOT/plugins/denubis-external-agents/scripts/claude-ponytail"
+COMPLETION="$REPO_ROOT/plugins/denubis-external-agents/completions/claude-ponytail.fish"
+bats_require_minimum_version 1.5.0
 
 make_repo() {
     local r="$1"
@@ -49,8 +51,8 @@ setup() {
     export GIT_CONFIG_GLOBAL=/dev/null
     export GIT_CONFIG_SYSTEM=/dev/null
 
-    # The script only requires the wrapper to be executable; it embeds the path
-    # in the command it prints rather than running it.
+    # Tests that do not inspect the launched process use a wrapper that exits
+    # immediately.
     export CLAUDE_PONYTAIL_WRAPPER="$TEST_DIR/claude-wrapper"
     printf '#!/usr/bin/env bash\nexit 0\n' > "$CLAUDE_PONYTAIL_WRAPPER"
     chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
@@ -84,7 +86,20 @@ teardown() {
 @test "--help exits zero and shows the usage line" {
     run "$SCRIPT" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"claude-ponytail <name> [<base-ref>]"* ]]
+    [[ "$output" == *"claude-ponytail <name> [<claude-args>...]"* ]]
+}
+
+@test "Fish completes registered worktree branches after launcher options" {
+    mkdir -p "$TEST_DIR/bin" "$WORK/.worktrees/ordinary"
+    ln -s "$SCRIPT" "$TEST_DIR/bin/claude-ponytail"
+    git -C "$WORK" branch parked
+    git -C "$WORK" worktree add -q -b research/topic "$WORK/.worktrees/feature"
+
+    run env PATH="$TEST_DIR/bin:$PATH" fish --no-config -c \
+        "source '$COMPLETION'; complete -C 'claude-ponytail --dry-run '"
+
+    [ "$status" -eq 0 ]
+    [ "$output" = $'research/topic\tExisting worktree' ]
 }
 
 @test "no arguments refuses" {
@@ -99,10 +114,20 @@ teardown() {
     [[ "$output" == *"--bogus"* ]]
 }
 
-@test "surplus positional arguments refuse" {
+@test "positional arguments after the worktree pass through to Claude" {
+    local args_file="$TEST_DIR/claude-args"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf "%s\0" "$@" > "$CLAUDE_ARGS_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_ARGS_FILE="$args_file"
+
     run "$SCRIPT" one two three
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"too many arguments"* ]]
+
+    [ "$status" -eq 0 ]
+    mapfile -d '' args < "$args_file"
+    [ "${args[2]}" = "two" ]
+    [ "${args[3]}" = "three" ]
 }
 
 # ── Preconditions ──────────────────────────────────────────────────────────
@@ -181,56 +206,129 @@ teardown() {
     [ "$(git -C "$WORK/.worktrees/feat/thing" branch --show-current)" = "feat/thing" ]
 }
 
-@test "branches from the given base ref rather than HEAD" {
+@test "a second positional launches Claude while the worktree branches from HEAD" {
     local first
     first="$(git -C "$WORK" rev-parse HEAD)"
     echo second > "$WORK/second.txt"
     git -C "$WORK" add -A
     git -C "$WORK" commit -qm second
 
+    local args_file="$TEST_DIR/claude-args"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf "%s\0" "$@" > "$CLAUDE_ARGS_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_ARGS_FILE="$args_file"
+
     run "$SCRIPT" fromfirst "$first"
+
     [ "$status" -eq 0 ]
-    [ "$(git -C "$WORK/.worktrees/fromfirst" rev-parse HEAD)" = "$first" ]
+    [ "$(git -C "$WORK/.worktrees/fromfirst" rev-parse HEAD)" = \
+        "$(git -C "$WORK" rev-parse HEAD)" ]
+    mapfile -d '' args < "$args_file"
+    [ "${args[2]}" = "$first" ]
 }
 
-@test "prints a command naming the plugin dir and the worktree path" {
+@test "a new worktree branches from the caller worktree HEAD" {
+    git -C "$WORK" worktree add -q -b caller "$WORK/.worktrees/caller"
+    printf 'caller commit\n' > "$WORK/.worktrees/caller/caller.txt"
+    git -C "$WORK/.worktrees/caller" add caller.txt
+    git -C "$WORK/.worktrees/caller" commit -qm caller
+    local caller_head main_head
+    caller_head="$(git -C "$WORK/.worktrees/caller" rev-parse HEAD)"
+    main_head="$(git -C "$WORK" rev-parse HEAD)"
+    [ "$caller_head" != "$main_head" ]
+    cd "$WORK/.worktrees/caller"
+
+    run "$SCRIPT" child
+
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$WORK/.worktrees/child" rev-parse HEAD)" = "$caller_head" ]
+}
+
+@test "launches Claude with the plugin directory from the worktree" {
+    local args_file="$TEST_DIR/claude-args" cwd_file="$TEST_DIR/claude-cwd"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf "%s\0" "$@" > "$CLAUDE_ARGS_FILE"' \
+        'pwd -P > "$CLAUDE_CWD_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_ARGS_FILE="$args_file"
+    export CLAUDE_CWD_FILE="$cwd_file"
+
     run "$SCRIPT" feature
+
     [ "$status" -eq 0 ]
-    [[ "$output" == *"--plugin-dir"* ]]
-    [[ "$output" == *"$WORK/.worktrees/feature"* ]]
+    mapfile -d '' args < "$args_file"
+    [ "${args[0]}" = "--plugin-dir" ]
+    [ "${args[1]}" = "$XDG_CACHE_HOME/claude-ponytail/ponytail" ]
+    [ "$(<"$cwd_file")" = "$WORK/.worktrees/feature" ]
 }
 
-@test "the printed command is valid fish syntax when the checkout path has a newline" {
-    local newline_work="$TEST_DIR/"$'work\nnewline' command
+@test "launches Claude and passes every argument after the worktree unchanged" {
+    local args_file="$TEST_DIR/claude-args" cwd_file="$TEST_DIR/claude-cwd"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf "%s\0" "$@" > "$CLAUDE_ARGS_FILE"' \
+        'pwd -P > "$CLAUDE_CWD_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_ARGS_FILE="$args_file"
+    export CLAUDE_CWD_FILE="$cwd_file"
+    git -C "$WORK" worktree add -q -b feature "$WORK/.worktrees/feature"
+
+    run "$SCRIPT" feature --resume session-123
+
+    [ "$status" -eq 0 ]
+    mapfile -d '' args < "$args_file"
+    [ "${args[0]}" = "--plugin-dir" ]
+    [ "${args[1]}" = "$XDG_CACHE_HOME/claude-ponytail/ponytail" ]
+    [ "${args[2]}" = "--resume" ]
+    [ "${args[3]}" = "session-123" ]
+    [ "$(<"$cwd_file")" = "$WORK/.worktrees/feature" ]
+}
+
+@test "the launched Claude process owns stdout" {
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf "claude-output\n"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+
+    run --separate-stderr "$SCRIPT" feature -p prompt
+
+    [ "$status" -eq 0 ]
+    [ "$output" = "claude-output" ]
+}
+
+@test "direct launch handles a newline checkout path" {
+    local newline_work="$TEST_DIR/"$'work\nnewline' cwd_file="$TEST_DIR/claude-cwd"
     make_repo "$newline_work"
     cd "$newline_work"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'pwd -P > "$CLAUDE_CWD_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_CWD_FILE="$cwd_file"
 
     run "$SCRIPT" feature
-    [ "$status" -eq 0 ]
-    command="${output##*$'run this in the window you want it in:\n\n  '}"
 
-    run fish --no-config -n -c "$command"
     [ "$status" -eq 0 ]
+    [ "$(<"$cwd_file")" = "$newline_work/.worktrees/feature" ]
 }
 
-@test "the printed command round-trips an apostrophe path through fish and bash" {
-    local apostrophe_work="$TEST_DIR/work's path" command expected
+@test "direct launch handles an apostrophe checkout path" {
+    local apostrophe_work="$TEST_DIR/work's path" cwd_file="$TEST_DIR/claude-cwd"
     make_repo "$apostrophe_work"
     cd "$apostrophe_work"
-    printf '#!/usr/bin/env bash\npwd -P\n' > "$CLAUDE_PONYTAIL_WRAPPER"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'pwd -P > "$CLAUDE_CWD_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_CWD_FILE="$cwd_file"
 
     run "$SCRIPT" feature
-    [ "$status" -eq 0 ]
-    command="${output##*$'run this in the window you want it in:\n\n  '}"
-    expected="$apostrophe_work/.worktrees/feature"
 
-    run fish --no-config -c "$command"
     [ "$status" -eq 0 ]
-    [ "$output" = "$expected" ]
-
-    run bash -c "$command"
-    [ "$status" -eq 0 ]
-    [ "$output" = "$expected" ]
+    [ "$(<"$cwd_file")" = "$apostrophe_work/.worktrees/feature" ]
 }
 
 @test "rerunning with the same name reuses the worktree instead of failing" {
@@ -239,6 +337,16 @@ teardown() {
     run "$SCRIPT" feature
     [ "$status" -eq 0 ]
     [[ "$output" == *"reusing existing worktree"* ]]
+}
+
+@test "a registered branch reuses its differently named worktree path" {
+    git -C "$WORK" worktree add -q -b research/topic \
+        "$WORK/.worktrees/research-topic"
+
+    run "$SCRIPT" research/topic
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reusing existing worktree $WORK/.worktrees/research-topic"* ]]
 }
 
 @test "an ordinary directory is not reused as a git worktree" {

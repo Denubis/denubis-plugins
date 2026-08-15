@@ -293,9 +293,9 @@
       },
       {
         "name": "denubis-external-agents",
-        "version": "0.15.3",
+        "version": "0.16.0",
         "source": "plugins/denubis-external-agents",
-        "tree_sha256": "1effdca3426eeb65517c445340abf181cbb199d78fc748adf616eba4a694d5a6",
+        "tree_sha256": "a537b064ebc4c95b7e77bb60ae5d8ef45cc701a16610c7bf8b9c917a72490870",
         "authority_actions": ["global_instruction_control", "codex_context_cadence", "fable_cost_gate", "advisor_selection"]
       },
       {
