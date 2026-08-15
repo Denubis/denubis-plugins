@@ -125,7 +125,7 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"$HOME/.codex-ponytail"* ]]
     [[ "$output" == *"DietrichGebert/ponytail"* ]]
-    [[ "$output" == *"16f29800fd2681bdf24f3eb4ccffe38be3baec6b"* ]]
+    [[ "$output" == *"0a4dd63ad4541f4f655c4108a295916f3c1d8fda"* ]]
     [[ "$output" != *"$CODEX_PONYTAIL_HOME"* ]]
     [[ "$output" != *"$CODEX_PONYTAIL_MARKETPLACE"* ]]
     [[ "$output" != *"$CODEX_PONYTAIL_SHA"* ]]

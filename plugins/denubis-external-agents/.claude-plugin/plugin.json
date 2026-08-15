@@ -1,7 +1,7 @@
 {
     "name": "denubis-external-agents",
     "description": "Consult other agent sessions without merging their authority into the caller. Run Codex peer reviews, launch a human-triggered Fable consultation with an explicit tool-surface check, or supervise a Codex pane. Review findings require resolvable provenance. WIP.",
-  "version": "0.16.0",
+  "version": "0.16.1",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

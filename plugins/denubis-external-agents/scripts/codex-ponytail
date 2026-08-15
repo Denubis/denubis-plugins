@@ -19,14 +19,15 @@ if [[ "${CODEX_PONYTAIL_TESTING:-}" == "1" ]]; then
     PONYTAIL_HOME="${CODEX_PONYTAIL_HOME:-$HOME/.codex-ponytail}"
     CODEX="${CODEX_PONYTAIL_BINARY:-$(command -v codex || true)}"
     PONYTAIL_MARKETPLACE="${CODEX_PONYTAIL_MARKETPLACE:-DietrichGebert/ponytail}"
-    PONYTAIL_SHA="${CODEX_PONYTAIL_SHA:-16f29800fd2681bdf24f3eb4ccffe38be3baec6b}"
+    PONYTAIL_SHA="${CODEX_PONYTAIL_SHA:-0a4dd63ad4541f4f655c4108a295916f3c1d8fda}"
 else
-    # Production values are not environment-overridable. Moving the pin
-    # requires a fresh audit of Ponytail's Codex manifest, skills, and hooks.
+    # Production values are not environment-overridable. Pinned to v4.9.0 after
+    # the 2026-08-15 audit; moving the pin requires a fresh audit of Ponytail's
+    # Codex manifest, skills, and hooks.
     PONYTAIL_HOME="$HOME/.codex-ponytail"
     CODEX="$(command -v codex || true)"
     PONYTAIL_MARKETPLACE="DietrichGebert/ponytail"
-    PONYTAIL_SHA="16f29800fd2681bdf24f3eb4ccffe38be3baec6b"
+    PONYTAIL_SHA="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 fi
 PONYTAIL_XDG_CONFIG_HOME="$PONYTAIL_HOME/xdg-config"
 

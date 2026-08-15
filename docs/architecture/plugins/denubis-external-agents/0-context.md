@@ -67,6 +67,6 @@ flowchart LR
 ## Cross-references
 
 - **Plugin manifest:** `plugins/denubis-external-agents/.claude-plugin/plugin.json`,
-  source-candidate version 0.16.0.
+  source-candidate version 0.16.1.
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).
 - **Shared constraints:** [`../../constraints.md`](../../constraints.md).

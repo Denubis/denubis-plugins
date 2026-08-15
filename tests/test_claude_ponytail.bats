@@ -430,6 +430,21 @@ teardown() {
     [[ "$launcher_output" == *"illustrative"* ]]
 }
 
+@test "production dry-run reports the audited Ponytail v4.9.0 pin" {
+    unset CLAUDE_PONYTAIL_SHA
+
+    run "$SCRIPT" --dry-run feature
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"0a4dd63ad454"* ]]
+
+    run grep -F \
+        'PONYTAIL_SHA="${CLAUDE_PONYTAIL_SHA:-0a4dd63ad4541f4f655c4108a295916f3c1d8fda}"' \
+        "$SCRIPT"
+
+    [ "$status" -eq 0 ]
+}
+
 # ── Ponytail cache ─────────────────────────────────────────────────────────
 
 @test "an already-pinned cache is reused rather than re-cloned" {

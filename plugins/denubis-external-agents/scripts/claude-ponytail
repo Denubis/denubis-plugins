@@ -25,14 +25,15 @@ WRAPPER="${CLAUDE_PONYTAIL_WRAPPER:-$HOME/.claude/bin/claude-wrapper}"
 CONFIG_DIR="${CLAUDE_PONYTAIL_CONFIG_DIR:-}"
 PONYTAIL_URL="${CLAUDE_PONYTAIL_URL:-https://github.com/DietrichGebert/ponytail.git}"
 
-# Pinned to the commit audited on 2026-07-28 (hooks, installer and skills read in
-# full). Upstream's newest release tag v4.8.4 lags main by ~1200 lines across the
-# very files that matter, so THE TAG IS NOT THE AUDITED CODE. Moving this pin
-# obliges a fresh audit: ponytail ships always-on SessionStart/SubagentStart hooks
-# and a nudge that asks the agent to edit your settings.json.
+# Pinned to upstream v4.9.0 after audit on 2026-08-15. Relative to the prior
+# audited pin, this tag changes version metadata only. At that audit, upstream
+# main `2ed6c52` was three commits ahead, limited to Claude.ai validation, VS Code
+# Copilot, and Grok Build; the shipped skill bodies were unchanged. Moving this
+# pin obliges a fresh audit: Ponytail ships always-on SessionStart/SubagentStart
+# hooks and a nudge that asks the agent to edit your settings.json.
 # Overridable by env for testing only. Overriding it in real use defeats the
 # audit: point it somewhere unaudited and you get unaudited hooks.
-PONYTAIL_SHA="${CLAUDE_PONYTAIL_SHA:-16f29800fd2681bdf24f3eb4ccffe38be3baec6b}"
+PONYTAIL_SHA="${CLAUDE_PONYTAIL_SHA:-0a4dd63ad4541f4f655c4108a295916f3c1d8fda}"
 
 DRY_RUN=false
 PONYTAIL_STAGING=""

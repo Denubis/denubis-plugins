@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-external-agents] 0.16.1
+
+**Changed:**
+- Re-pinned the Claude and Codex Ponytail launchers to upstream v4.9.0, whose
+  release commit changes only version metadata relative to the previously
+  audited commit.
+
 ## [denubis-external-agents] 0.16.0
 
 **Added:**
