@@ -1,5 +1,12 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.0.1
+
+**Changed:**
+- `coding-effectively` now surfaces SIMD-shaped bulk-data loops without treating their
+  shape as evidence of hotness or authorising an optimization. Python guidance separates
+  API-level bulk operations from lower-level SIMD candidates.
+
 ## [denubis-external-agents] 0.16.1
 
 **Changed:**
