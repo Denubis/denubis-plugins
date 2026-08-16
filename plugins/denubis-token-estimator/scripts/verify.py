@@ -26,6 +26,8 @@ import json
 import re
 import sys
 import tomllib
+from datetime import datetime
+from itertools import pairwise
 from pathlib import Path
 
 CLAUDE_ROOT = Path.home() / ".claude" / "projects"
@@ -100,7 +102,7 @@ INVARIANT = {
     "node2_no_resumes": True,  # distinct codex ids == file count
     "node5_cross_person": 0,  # no message.id spans >1 person
     "node5_cross_person_project_max": 2,  # <=2 ids span >1 (person,project)
-    "node2_subagent_additive": True,  # every sampled sub first_out << parent_max
+    "node2_counter_boundaries": True,
 }
 # BASELINES are point-in-time snapshots; absolute counts drift UP as logs accrue.
 # Only the ratios (share %) should stay roughly constant. Recorded for reference.
@@ -272,109 +274,268 @@ def claude_pass():
 
 
 # ----------------------------------------------------------------- Codex pass
+def parse_timestamp(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _is_new_task(payload):
+    return payload.get("type") == "agent_message" and any(
+        isinstance(item, dict)
+        and item.get("type") == "input_text"
+        and "Message Type: NEW_TASK" in item.get("text", "")
+        for item in payload.get("content") or []
+    )
+
+
+def codex_threads():
+    """Return one child-owned output counter per Codex rollout thread.
+
+    Newer subagent files replay the parent's cumulative token events before the
+    first NEW_TASK message. After that boundary the child either continues the
+    replay baseline or starts a fresh counter. Older files contain no replay
+    boundary and retain the original per-file MAX rule.
+    """
+    raw_threads = []
+    for fp in codex_files():
+        thread = {
+            "id": None,
+            "parent": None,
+            "kind": "main",
+            "cwd": None,
+            "start": None,
+            "task_seq": None,
+            "events": [],
+            "user_texts": [],
+            "file": str(fp),
+        }
+        try:
+            fh = fp.open(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for seq, line in enumerate(fh):
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                record_type = record.get("type")
+                payload = record.get("payload") or {}
+                when = parse_timestamp(record.get("timestamp"))
+                if record_type == "session_meta" and thread["id"] is None:
+                    thread["id"] = payload.get("id")
+                    thread["parent"] = payload.get("parent_thread_id") or payload.get(
+                        "forked_from_id"
+                    )
+                    thread["kind"] = (
+                        "sub" if isinstance(payload.get("source"), dict) else "main"
+                    )
+                    thread["cwd"] = payload.get("cwd")
+                    thread["start"] = when
+                elif (
+                    record_type == "response_item"
+                    and thread["task_seq"] is None
+                    and _is_new_task(payload)
+                ):
+                    thread["task_seq"] = seq
+                elif (
+                    record_type == "event_msg" and payload.get("type") == "token_count"
+                ):
+                    output = (
+                        (payload.get("info") or {}).get("total_token_usage") or {}
+                    ).get("output_tokens")
+                    if isinstance(output, (int, float)):
+                        thread["events"].append((seq, when, int(output)))
+                elif (
+                    record_type == "response_item"
+                    and payload.get("type") == "message"
+                    and payload.get("role") == "user"
+                ):
+                    parts = [
+                        item.get("text", "")
+                        for item in payload.get("content") or []
+                        if isinstance(item, dict) and item.get("text")
+                    ]
+                    if parts:
+                        thread["user_texts"].append((when, "\n".join(parts)))
+        if thread["id"]:
+            raw_threads.append(thread)
+
+    by_id = {thread["id"]: thread for thread in raw_threads}
+    for thread in raw_threads:
+        values = [value for _seq, _when, value in thread["events"]]
+        raw_max = max(values, default=0)
+        parent = by_id.get(thread["parent"])
+        parent_max = (
+            max((value for _seq, _when, value in parent["events"]), default=0)
+            if parent
+            else None
+        )
+        parent_at_fork = None
+        if parent and thread["start"] is not None:
+            parent_at_fork = max(
+                (
+                    value
+                    for _seq, when, value in parent["events"]
+                    if when is not None and when <= thread["start"]
+                ),
+                default=0,
+            )
+
+        task_seq = thread["task_seq"]
+        replay_values = []
+        own_values = values
+        mode = "root"
+        if thread["kind"] == "sub" and task_seq is None:
+            mode = "legacy-independent"
+        elif thread["kind"] == "sub":
+            replay_values = [
+                value for seq, _when, value in thread["events"] if seq < task_seq
+            ]
+            own_values = [
+                value for seq, _when, value in thread["events"] if seq > task_seq
+            ]
+            mode = "fresh-counter"
+
+        replay_baseline = max(replay_values, default=0)
+        first_output = own_values[0] if own_values else None
+        own_max = max(own_values, default=0)
+        if thread["kind"] == "sub" and task_seq is not None and replay_baseline:
+            if first_output is not None and first_output >= replay_baseline:
+                mode = "continued-parent-counter"
+            else:
+                mode = "fresh-after-replay"
+        output_tokens = (
+            max(0, own_max - replay_baseline)
+            if mode == "continued-parent-counter"
+            else own_max
+        )
+        owned_events = [
+            (
+                when,
+                max(0, value - replay_baseline)
+                if mode == "continued-parent-counter"
+                else value,
+            )
+            for seq, when, value in thread["events"]
+            if task_seq is None or seq > task_seq
+        ]
+        thread.update(
+            {
+                "raw_max": raw_max,
+                "parent_max": parent_max,
+                "parent_at_fork": parent_at_fork,
+                "replay_baseline": replay_baseline,
+                "first_output": first_output,
+                "counter_mode": mode,
+                "output_tokens": output_tokens,
+                "owned_events": owned_events,
+                "own_counter_monotonic": all(
+                    previous <= current for previous, current in pairwise(own_values)
+                ),
+            }
+        )
+    return raw_threads
+
+
+def windowed_output(thread, start, end):
+    """Return a cumulative counter's output produced in ``[start, end)``."""
+
+    before_start = max(
+        (
+            value
+            for when, value in thread["owned_events"]
+            if when is not None and when < start
+        ),
+        default=0,
+    )
+    before_end = max(
+        (
+            value
+            for when, value in thread["owned_events"]
+            if when is not None and when < end
+        ),
+        default=0,
+    )
+    return max(0, before_end - before_start)
+
+
 def codex_pass():
-    """node 2 (tokens) + node 4 (human words), per rollout file."""
-    files = codex_files()
-    main_tok = sub_tok = 0
-    n_main = n_sub = 0
-    sub_independence = []  # (first_out, max_out, parent_max) sample
-    by_id = {}
-    recs = []
-    # node 4
+    """node 2 (tokens) + node 4 (human words), per rollout thread."""
+    threads = codex_threads()
+    main_tok = sum(
+        thread["output_tokens"] for thread in threads if thread["kind"] == "main"
+    )
+    sub_tok = sum(
+        thread["output_tokens"] for thread in threads if thread["kind"] == "sub"
+    )
+    n_main = sum(thread["kind"] == "main" for thread in threads)
+    n_sub = sum(thread["kind"] == "sub" for thread in threads)
     n_turns = 0
     n_words = 0
     excl_hist = collections.Counter()
-
-    for fp in files:
-        own_id = ff = None
-        seen_meta = False
-        mx = 0
-        first_out = None
-        kind = "main"
-        user_texts = []
-        with fp.open(encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                try:
-                    r = json.loads(line)
-                except ValueError:
-                    continue
-                t = r.get("type")
-                p = r.get("payload") or {}
-                if t == "session_meta" and not seen_meta:
-                    own_id = p.get("id")
-                    ff = p.get("forked_from_id")
-                    s = p.get("source")
-                    kind = "sub" if isinstance(s, dict) else "main"
-                    seen_meta = True
-                elif t == "event_msg" and p.get("type") == "token_count":
-                    o = ((p.get("info") or {}).get("total_token_usage") or {}).get(
-                        "output_tokens"
-                    )
-                    if isinstance(o, (int, float)):
-                        o = int(o)
-                        if first_out is None:
-                            first_out = o
-                        mx = max(mx, o)
-                elif (
-                    t == "response_item"
-                    and p.get("type") == "message"
-                    and p.get("role") == "user"
-                ):
-                    parts = [
-                        c.get("text", "")
-                        for c in (p.get("content") or [])
-                        if isinstance(c, dict) and c.get("text")
-                    ]
-                    if parts:
-                        user_texts.append("\n".join(parts))
-        if not own_id:
+    for thread in threads:
+        if thread["kind"] != "main":
             continue
-        recs.append(
-            {"id": own_id, "ff": ff, "kind": kind, "mx": mx, "first": first_out}
-        )
-        by_id[own_id] = recs[-1]
-        if kind == "sub":
-            sub_tok += mx
-            n_sub += 1
-        else:
-            main_tok += mx
-            n_main += 1
-        # node 4: human words from ROOT threads only, per-thread text-set dedup
-        if kind == "main":
-            # No dedup: zero resumes in the corpus and response_item carries no
-            # id, so each kept user message is a distinct human send. Repeated
-            # "yes"/"continue"/"ok" are real human turns — text-set dedup would
-            # silently delete them.
-            for tx in user_texts:
-                mk = codex_machine_marker(tx)
-                if mk:
-                    excl_hist[mk] += 1
-                    continue
-                n_turns += 1
-                n_words += len(tx.split())
+        for _when, text in thread["user_texts"]:
+            marker = codex_machine_marker(text)
+            if marker:
+                excl_hist[marker] += 1
+                continue
+            n_turns += 1
+            n_words += len(text.split())
 
-    # subagent independence — checked for ALL subagents, not a sample.
-    # parented sub: first_out must be << parent total. parentless sub (ff absent):
-    # first_out must be a fresh small start (the invariant is "counter does not
-    # begin at a parent total").
-    sub_all = []  # (first_out, own_max, parent_max_or_None)
-    for rec in recs:
-        if rec["kind"] == "sub":
-            pm = by_id[rec["ff"]]["mx"] if rec["ff"] in by_id else None
-            sub_all.append((rec["first"], rec["mx"], pm))
-            if pm is not None:
-                sub_independence.append((rec["first"], rec["mx"], pm))
+    subs = [thread for thread in threads if thread["kind"] == "sub"]
+    replay_parent_mismatches = [
+        thread["id"]
+        for thread in subs
+        if thread["replay_baseline"]
+        and thread["parent_at_fork"] is not None
+        and thread["replay_baseline"] != thread["parent_at_fork"]
+    ]
+    unresolved_replay_parents = [
+        thread["id"]
+        for thread in subs
+        if thread["replay_baseline"] and thread["parent_at_fork"] is None
+    ]
+    post_task_nonmonotonic = [
+        thread["id"]
+        for thread in subs
+        if thread["task_seq"] is not None and not thread["own_counter_monotonic"]
+    ]
+    # Old files have no NEW_TASK boundary. A large first value would mean the old
+    # independent-counter assumption can no longer distinguish replay safely.
+    legacy_large_starts = [
+        thread["id"]
+        for thread in subs
+        if thread["counter_mode"] == "legacy-independent"
+        and thread["first_output"] is not None
+        and thread["first_output"] >= 2_000
+    ]
 
     return {
-        "files": len(files),
+        "files": len(threads),
         "n_main": n_main,
         "n_sub": n_sub,
         "main_tok": main_tok,
         "sub_tok": sub_tok,
         "share": pct(sub_tok, main_tok + sub_tok),
-        "distinct_ids": len({r["id"] for r in recs}),
-        "sub_independence": sub_independence[:15],
-        "sub_all": sub_all,
+        "distinct_ids": len({thread["id"] for thread in threads}),
+        "sub_all": [
+            (thread["first_output"], thread["raw_max"], thread["parent_max"])
+            for thread in subs
+        ],
+        "counter_modes": dict(
+            collections.Counter(thread["counter_mode"] for thread in subs)
+        ),
+        "replay_parent_mismatches": replay_parent_mismatches,
+        "unresolved_replay_parents": unresolved_replay_parents,
+        "post_task_nonmonotonic": post_task_nonmonotonic,
+        "legacy_large_starts": legacy_large_starts,
         "node4_turns": n_turns,
         "node4_words": n_words,
         "node4_excl": dict(excl_hist),
@@ -416,22 +577,12 @@ def main():
         )
         return
 
-    # additive check over ALL subagents (not a sample): parented -> first << parent
-    # total; parentless -> fresh small start. A "large start" means the counter may
-    # continue a parent total (replay) -> additive model would over-count.
-    FRESH = 2000
-
-    def is_fresh(fo, _own, pm):
-        if fo is None:
-            return True  # no output events
-        if pm is not None:
-            return fo < 0.5 * pm
-        return fo < FRESH  # parentless: must start fresh
-
-    n_sub_checked = len(x["sub_all"])
-    bad = [(fo, own, pm) for (fo, own, pm) in x["sub_all"] if not is_fresh(fo, own, pm)]
-    add_ok = (n_sub_checked == x["n_sub"]) and (len(bad) == 0)
-    max_first = max((fo for fo, _, _ in x["sub_all"] if fo is not None), default=0)
+    boundary_ok = not (
+        x["replay_parent_mismatches"]
+        or x["unresolved_replay_parents"]
+        or x["post_task_nonmonotonic"]
+        or x["legacy_large_starts"]
+    )
     print("=" * 78)
     print("AUDIT VERIFY — headline numbers re-derived from the live logs")
     print(
@@ -447,7 +598,7 @@ def main():
         f"ids={c['distinct_ids']:,}  cross-partition={c['cross_partition']}"
     )
 
-    print("\nNODE 2 — Codex output tokens (per-file, subagents additive)")
+    print("\nNODE 2 — Codex output tokens (per-thread, replay-aware)")
     print(
         inv(
             "node2 no resumes (ids==files)",
@@ -457,18 +608,19 @@ def main():
     )
     print(
         inv(
-            "node2 subagents additive",
-            add_ok,
-            f"all {n_sub_checked}/{x['n_sub']} subs start fresh; "
-            f"{len(bad)} start large; max first_out={max_first}",
+            "node2 counter boundaries",
+            boundary_ok,
+            f"modes={x['counter_modes']}; "
+            f"unresolved replay parents={len(x['unresolved_replay_parents'])}; "
+            f"replay/parent mismatches={len(x['replay_parent_mismatches'])}; "
+            f"post-task nonmonotonic={len(x['post_task_nonmonotonic'])}; "
+            f"ambiguous legacy starts={len(x['legacy_large_starts'])}",
         )
     )
     print(base("subagent share %", round(x["share"], 1), BASELINE["node2_share_pct"]))
     print(base("main_tok", x["main_tok"], BASELINE["node2_main_tok"]))
     print(base("sub_tok", x["sub_tok"], BASELINE["node2_sub_tok"]))
     print(f"        threads {x['n_main']} root / {x['n_sub']} sub")
-    for fo, mxo, pm in x["sub_independence"][:4]:
-        print(f"          sub first={fo:<6} max={mxo:<8} parent_max={pm}")
 
     print("\nNODE 3 — Claude human words")
     print(base("human blocks", c["node3_blocks"], BASELINE["node3_human_blocks"]))

@@ -1,7 +1,7 @@
 ---
-description: Estimate AI token/word usage for a project (rolled up from its directory), optionally by month
+description: Estimate AI token/word usage for a project, optionally by month or exact time window
 allowed-tools: Bash
-argument-hint: "[--dir <path> | --person <name> | --all] [--month] [--csv <file>]"
+argument-hint: "[--dir <path> | --person <name> | --all] [--month | --start <ISO> --end <ISO>] [--csv <file>]"
 ---
 
 # /estimate — AI token / word usage
@@ -21,10 +21,12 @@ installed directory — the `scripts/estimate.py` under `denubis-token-estimator
 - `--person <name>` — every project under a person.
 - `--all` — every person/project.
 
-**Modifiers:** `--month` adds a per-month breakdown; `--csv <file>` also writes the
-tidy `(source, person, project, month)` leaf grain.
+**Modifiers:** `--month` adds a per-month breakdown. Paired timezone-aware `--start`
+and `--end` select one inclusive/exclusive interval `[start, end)` and cannot be used
+with `--month`. `--csv <file>` also writes the tidy
+`(source, person, project, month)` leaf grain.
 
-**What it reports** (corrected, reproducible methodology — see the
+**What it reports** (reproducible methodology — see the
 `using-token-estimator` skill):
 - **output tokens**, origin-deduplicated, split into **main** (human-steered main
   thread) and **sub** (autonomous subagent fan-out);

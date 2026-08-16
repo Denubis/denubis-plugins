@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-token-estimator] 0.2.0
+
+**Fixed:**
+- Codex subagents that replay and continue a parent cumulative counter now subtract
+  the exact pre-task replay baseline. Fresh, reset, and legacy counters remain
+  additive after classification; the live verifier reports each mode and checks the
+  replay against the parent value at fork.
+
+**Added:**
+- Paired timezone-aware `--start` and `--end` bounds produce an exact `[start, end)`
+  structural slice. Claude assigns each globally deduplicated message to its origin;
+  Codex differences replay-adjusted cumulative counters at the boundaries.
+- Independent audit instructions and evaluator conclusions are separated into
+  `AUDIT-BRIEF.md` and `AUDIT-ORACLE.md` so the actor does not receive the answers.
+
+**Changed:**
+- The public skill and design now describe the current counting procedure directly,
+  including time-boundary granularity and the requirement to audit topical exclusions
+  separately from structural counting.
+
 ## [denubis-plan-and-execute] 4.1.1
 
 **Changed:**

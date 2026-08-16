@@ -8,9 +8,9 @@ bugs this code ever had were *counting* bugs that prose review missed:
     parent's message.id. Counting by file location double-counts the main thread.
     Correct rule: dedup globally by id (MAX output), classify main if the id appears
     in any main-thread file.
-  * Codex: a subagent rollout has its OWN, independent output counter. Merging it
-    into the parent (as a resumed thread) ERASES the child's real work. Correct rule:
-    subagents are additive.
+  * Codex: modern subagent rollouts may replay the parent's counter before NEW_TASK,
+    then continue that cumulative counter. Correct rule: remove replay and subtract
+    the inherited baseline before adding the child's owned output.
 
 If either rule regresses, these fail.
 """
@@ -47,6 +47,33 @@ def _user(text, uuid, cwd="/r/Alice/ProjX", list_form=True, **extra):
     rec = {"type": "user", "uuid": uuid, "cwd": cwd, "message": {"content": content}}
     rec.update(extra)
     return rec
+
+
+def _codex_token(output, timestamp):
+    return {
+        "timestamp": timestamp,
+        "type": "event_msg",
+        "payload": {
+            "type": "token_count",
+            "info": {"total_token_usage": {"output_tokens": output}},
+        },
+    }
+
+
+def _new_task(timestamp):
+    return {
+        "timestamp": timestamp,
+        "type": "response_item",
+        "payload": {
+            "type": "agent_message",
+            "content": [
+                {
+                    "type": "input_text",
+                    "text": "Message Type: NEW_TASK\nImplement the bounded task.",
+                }
+            ],
+        },
+    }
 
 
 # ----------------------------------------------------------------- Claude
@@ -197,8 +224,6 @@ def test_codex_subagents_additive():
     assert x["sub_tok"] == 900  # ADDITIVE — the child's own counter, not merged away
     assert x["distinct_ids"] == 2  # node2 "no resumes": one id per file
     assert x["sub_all"] == [(400, 900, 1500)]  # (first_out, own_max, parent_max)
-    first_out, _own_max, parent_max = x["sub_all"][0]
-    assert first_out < 0.5 * parent_max  # the additive invariant verify.py checks
 
 
 @pytest.mark.usefixtures("codex_corpus")
@@ -207,3 +232,146 @@ def test_codex_node4_words():
     assert x["node4_turns"] == 2  # "do the thing" + "# Claude do X"
     assert x["node4_words"] == 7  # 3 + 4
     assert x["node4_excl"] == {"turn_aborted": 1}
+
+
+def test_codex_continued_child_subtracts_pre_task_replay(tmp_path, monkeypatch):
+    root = tmp_path / "sessions"
+    parent = root / "2026" / "08" / "rollout-parent.jsonl"
+    child = root / "2026" / "08" / "rollout-child.jsonl"
+    _write_jsonl(
+        parent,
+        [
+            {
+                "timestamp": "2026-08-16T00:00:00Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "M1",
+                    "source": "cli",
+                    "cwd": "/r/Alice/ProjX",
+                },
+            },
+            _codex_token(1_000, "2026-08-16T00:00:01Z"),
+            _codex_token(5_000, "2026-08-16T00:00:05Z"),
+        ],
+    )
+    _write_jsonl(
+        child,
+        [
+            {
+                "timestamp": "2026-08-16T00:00:05Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "S1",
+                    "forked_from_id": "M1",
+                    "source": {
+                        "subagent": {"thread_spawn": {"parent_thread_id": "M1"}}
+                    },
+                    "cwd": "/r/Alice/ProjX",
+                },
+            },
+            # Parent events replay before the child's task boundary.
+            _codex_token(1_000, "2026-08-16T00:00:05.100Z"),
+            _codex_token(5_000, "2026-08-16T00:00:05.200Z"),
+            _new_task("2026-08-16T00:00:06Z"),
+            # The child continues the inherited cumulative counter.
+            _codex_token(5_200, "2026-08-16T00:00:07Z"),
+            _codex_token(6_500, "2026-08-16T00:00:08Z"),
+        ],
+    )
+    monkeypatch.setattr(V, "CODEX_ROOT", root)
+
+    threads = {thread["id"]: thread for thread in V.codex_threads()}
+    assert threads["S1"]["counter_mode"] == "continued-parent-counter"
+    assert threads["S1"]["replay_baseline"] == 5_000
+    assert threads["S1"]["parent_at_fork"] == 5_000
+    assert threads["S1"]["output_tokens"] == 1_500
+    assert (
+        V.windowed_output(
+            threads["S1"],
+            V.parse_timestamp("2026-08-16T00:00:06Z"),
+            V.parse_timestamp("2026-08-16T00:00:08Z"),
+        )
+        == 200
+    )
+
+    result = V.codex_pass()
+    assert result["main_tok"] == 5_000
+    assert result["sub_tok"] == 1_500
+    assert result["unresolved_replay_parents"] == []
+    assert result["replay_parent_mismatches"] == []
+
+
+def test_codex_child_reset_after_replay_counts_fresh_counter(tmp_path, monkeypatch):
+    root = tmp_path / "sessions"
+    _write_jsonl(
+        root / "2026" / "08" / "rollout-parent.jsonl",
+        [
+            {
+                "timestamp": "2026-08-16T00:00:00Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "M1",
+                    "source": "cli",
+                    "cwd": "/r/Alice/ProjX",
+                },
+            },
+            _codex_token(5_000, "2026-08-16T00:00:05Z"),
+        ],
+    )
+    _write_jsonl(
+        root / "2026" / "08" / "rollout-child.jsonl",
+        [
+            {
+                "timestamp": "2026-08-16T00:00:05Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "S1",
+                    "forked_from_id": "M1",
+                    "source": {
+                        "subagent": {"thread_spawn": {"parent_thread_id": "M1"}}
+                    },
+                    "cwd": "/r/Alice/ProjX",
+                },
+            },
+            _codex_token(5_000, "2026-08-16T00:00:05.100Z"),
+            _new_task("2026-08-16T00:00:06Z"),
+            # A future runtime may reset rather than continue after replay.
+            _codex_token(400, "2026-08-16T00:00:07Z"),
+            _codex_token(2_000, "2026-08-16T00:00:08Z"),
+        ],
+    )
+    monkeypatch.setattr(V, "CODEX_ROOT", root)
+
+    threads = {thread["id"]: thread for thread in V.codex_threads()}
+    assert threads["S1"]["counter_mode"] == "fresh-after-replay"
+    assert threads["S1"]["output_tokens"] == 2_000
+    assert V.codex_pass()["sub_tok"] == 2_000
+
+
+def test_codex_replay_without_resolvable_parent_is_reported(tmp_path, monkeypatch):
+    root = tmp_path / "sessions"
+    _write_jsonl(
+        root / "2026" / "08" / "rollout-orphan-child.jsonl",
+        [
+            {
+                "timestamp": "2026-08-16T00:00:05Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "S1",
+                    "forked_from_id": "missing-parent",
+                    "source": {
+                        "subagent": {
+                            "thread_spawn": {"parent_thread_id": "missing-parent"}
+                        }
+                    },
+                    "cwd": "/r/Alice/ProjX",
+                },
+            },
+            _codex_token(5_000, "2026-08-16T00:00:05.100Z"),
+            _new_task("2026-08-16T00:00:06Z"),
+            _codex_token(5_500, "2026-08-16T00:00:07Z"),
+        ],
+    )
+    monkeypatch.setattr(V, "CODEX_ROOT", root)
+
+    assert V.codex_pass()["unresolved_replay_parents"] == ["S1"]

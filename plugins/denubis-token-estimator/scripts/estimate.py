@@ -3,13 +3,14 @@
 .token-estimator mapper), optionally broken down by month.
 
 Reuses the audited methodology in verify.py as the single source of truth
-(origin dedup, machine-tag allow-lists, additive Codex subagents) and the mapper in
+(origin dedup, machine-tag allow-lists, replay-aware Codex counters) and the mapper in
 mapper.py for directory rollup. People-roots come from ~/.token-estimator (else the
 target/local directory) — see verify.load_roots.
 
 Usage:
   python3 estimate.py --dir .                 # project of a directory (cwd)
   python3 estimate.py --dir <path> --month    # ... broken down by month
+  python3 estimate.py --dir <path> --start <ISO> --end <ISO>
   python3 estimate.py --person Jodie          # every project for a person
   python3 estimate.py --person Jodie --month  # ... with month rows
   python3 estimate.py --all                   # every person/project (rollup)
@@ -45,12 +46,57 @@ def _blank():
     return [0, 0, 0]
 
 
-def collect_claude(leaves, attr):
+def _remember_claude_user(human_by_uuid, record):
+    uid = record.get("uuid")
+    when = V.parse_timestamp(record.get("timestamp"))
+    content = (record.get("message") or {}).get("content")
+    if isinstance(content, str):
+        blocks = [content]
+    elif isinstance(content, list):
+        blocks = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+    else:
+        blocks = []
+    previous = human_by_uuid.get(uid)
+    if previous is None or (
+        when is not None and (previous[0] is None or when < previous[0])
+    ):
+        human_by_uuid[uid] = (
+            when,
+            record.get("cwd"),
+            record.get("timestamp"),
+            blocks,
+        )
+
+
+def _add_claude_human_words(leaves, attr, human_by_uuid, start, end):
+    for when, cwd, timestamp, blocks in human_by_uuid.values():
+        if start is not None and not (when is not None and start <= when < end):
+            continue
+        person, project, _ = attr(cwd)
+        month = (
+            "(window)" if start is not None else (timestamp or "")[:7] or "(no-date)"
+        )
+        words = sum(
+            len(text.split())
+            for text in blocks
+            if text and text.strip() and V.lead_tag(text) not in V.MACHINE_TAGS
+        )
+        if words:
+            leaves[("claude", person, project, month)][2] += words
+
+
+def collect_claude(leaves, attr, *, start=None, end=None):
     out_max = collections.defaultdict(int)
     in_main = collections.defaultdict(bool)
     cwd_atmax = {}
     month_atmax = {}
-    seen_uuid = set()
+    first_main = {}
+    first_sub = {}
+    human_by_uuid = {}
     for fp in V.claude_files():
         is_sub = "/subagents/" in str(fp)
         try:
@@ -71,10 +117,24 @@ def collect_claude(leaves, attr):
                     mid, model = m.get("id"), m.get("model")
                     if not mid or not model or "synthetic" in model:
                         continue
-                    if not (is_sub or r.get("isSidechain") is True):
+                    is_main = not (is_sub or r.get("isSidechain") is True)
+                    if is_main:
                         in_main[mid] = True
+                    when = V.parse_timestamp(r.get("timestamp"))
+                    origins = first_main if is_main else first_sub
+                    if when is not None and (mid not in origins or when < origins[mid]):
+                        origins[mid] = when
                     out = (m.get("usage") or {}).get("output_tokens") or 0
-                    if mid not in cwd_atmax or out > out_max[mid]:
+                    previous_cwd = cwd_atmax.get(mid)
+                    if (
+                        mid not in cwd_atmax
+                        or out > out_max[mid]
+                        or (
+                            out == out_max[mid]
+                            and previous_cwd is not None
+                            and str(r.get("cwd")) < str(previous_cwd)
+                        )
+                    ):
                         out_max[mid] = out
                         cwd_atmax[mid] = r.get("cwd")
                         month_atmax[mid] = (r.get("timestamp") or "")[:7] or "(no-date)"
@@ -85,92 +145,36 @@ def collect_claude(leaves, attr):
                         or r.get("isMeta") is True
                     ):
                         continue
-                    uid = r.get("uuid")
-                    if uid in seen_uuid:
-                        continue
-                    seen_uuid.add(uid)
-                    person, project, _ = attr(r.get("cwd"))
-                    month = (r.get("timestamp") or "")[:7] or "(no-date)"
-                    msg = r.get("message") or {}
-                    content = msg.get("content")
-                    blocks = (
-                        [content]
-                        if isinstance(content, str)
-                        else [
-                            b.get("text", "")
-                            for b in content
-                            if isinstance(b, dict) and b.get("type") == "text"
-                        ]
-                        if isinstance(content, list)
-                        else []
-                    )
-                    w = sum(
-                        len(tx.split())
-                        for tx in blocks
-                        if tx and tx.strip() and V.lead_tag(tx) not in V.MACHINE_TAGS
-                    )
-                    if w:
-                        leaves[("claude", person, project, month)][2] += w
+                    _remember_claude_user(human_by_uuid, r)
+    _add_claude_human_words(leaves, attr, human_by_uuid, start, end)
     for mid, out in out_max.items():
+        origin = first_main.get(mid) if in_main[mid] else first_sub.get(mid)
+        if start is not None and not (origin is not None and start <= origin < end):
+            continue
         person, project, _ = attr(cwd_atmax.get(mid))
-        leaves[("claude", person, project, month_atmax[mid])][
-            0 if in_main[mid] else 1
-        ] += out
+        month = "(window)" if start is not None else month_atmax[mid]
+        leaves[("claude", person, project, month)][0 if in_main[mid] else 1] += out
 
 
-def collect_codex(leaves, attr):
-    for fp in V.codex_files():
-        own = None
-        seen = False
-        kind = "main"
-        mx = 0
-        cwd = None
-        utext = []
+def collect_codex(leaves, attr, *, start=None, end=None):
+    for thread in V.codex_threads():
+        fp = Path(thread["file"])
         mm = _CODEX_MONTH.search(fp.name)
-        month = mm.group(1) if mm else "(no-date)"
-        try:
-            fh = fp.open(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        with fh:
-            for line in fh:
-                try:
-                    r = json.loads(line)
-                except ValueError:
-                    continue
-                t = r.get("type")
-                p = r.get("payload") or {}
-                if t == "session_meta" and not seen:
-                    own = p.get("id")
-                    cwd = p.get("cwd")
-                    kind = "sub" if isinstance(p.get("source"), dict) else "main"
-                    seen = True
-                elif t == "event_msg" and p.get("type") == "token_count":
-                    o = ((p.get("info") or {}).get("total_token_usage") or {}).get(
-                        "output_tokens"
-                    )
-                    if isinstance(o, (int, float)) and o > mx:
-                        mx = int(o)
-                elif (
-                    t == "response_item"
-                    and p.get("type") == "message"
-                    and p.get("role") == "user"
-                ):
-                    parts = [
-                        c.get("text", "")
-                        for c in (p.get("content") or [])
-                        if isinstance(c, dict) and c.get("text")
-                    ]
-                    if parts:
-                        utext.append("\n".join(parts))
-        if not own:
-            continue
-        person, project, _ = attr(cwd)
+        month = "(window)" if start is not None else mm.group(1) if mm else "(no-date)"
+        person, project, _ = attr(thread["cwd"])
         key = ("codex", person, project, month)
-        leaves[key][1 if kind == "sub" else 0] += mx
-        if kind == "main":
+        output = (
+            V.windowed_output(thread, start, end)
+            if start is not None
+            else thread["output_tokens"]
+        )
+        leaves[key][1 if thread["kind"] == "sub" else 0] += output
+        if thread["kind"] == "main":
             leaves[key][2] += sum(
-                len(tx.split()) for tx in utext if not V.codex_machine_marker(tx)
+                len(text.split())
+                for when, text in thread["user_texts"]
+                if not V.codex_machine_marker(text)
+                and (start is None or (when is not None and start <= when < end))
             )
 
 
@@ -273,7 +277,16 @@ def write_csv(leaves, path):
     print(f"[csv] wrote {path}", file=sys.stderr)
 
 
-def main():
+def _window_timestamp(value):
+    parsed = V.parse_timestamp(value)
+    if parsed is None:
+        raise argparse.ArgumentTypeError("must be an ISO 8601 timestamp")
+    if parsed.utcoffset() is None:
+        raise argparse.ArgumentTypeError("must include a UTC offset or Z")
+    return parsed
+
+
+def parse_args(argv=None):
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group()
     g.add_argument(
@@ -282,8 +295,29 @@ def main():
     g.add_argument("--person")
     g.add_argument("--all", action="store_true")
     ap.add_argument("--month", action="store_true", help="break down by month")
+    ap.add_argument(
+        "--start",
+        type=_window_timestamp,
+        help="inclusive ISO 8601 window start (requires --end)",
+    )
+    ap.add_argument(
+        "--end",
+        type=_window_timestamp,
+        help="exclusive ISO 8601 window end (requires --start)",
+    )
     ap.add_argument("--csv", dest="csv_out")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    if (args.start is None) != (args.end is None):
+        ap.error("--start and --end must be provided together")
+    if args.start is not None and args.start >= args.end:
+        ap.error("--start must be earlier than --end")
+    if args.start is not None and args.month:
+        ap.error("--month cannot be combined with an exact window")
+    return args
+
+
+def main(argv=None):
+    args = parse_args(argv)
 
     # Roots: ~/.token-estimator if present, else the target/local directory. In --dir
     # mode the directory itself seeds the fallback root, so a config-less run still
@@ -292,12 +326,16 @@ def main():
     roots = V.load_roots(target)
     attr = make_attr(roots)
     sys.stderr.write(f"roots: {roots}\n")
+    if args.start is not None:
+        sys.stderr.write(
+            f"window: [{args.start.isoformat()}, {args.end.isoformat()})\n"
+        )
 
     leaves = collections.defaultdict(_blank)
     sys.stderr.write("scanning Claude logs...\n")
-    collect_claude(leaves, attr)
+    collect_claude(leaves, attr, start=args.start, end=args.end)
     sys.stderr.write("scanning Codex logs...\n")
-    collect_codex(leaves, attr)
+    collect_codex(leaves, attr, start=args.start, end=args.end)
 
     if args.csv_out:
         write_csv(leaves, args.csv_out)

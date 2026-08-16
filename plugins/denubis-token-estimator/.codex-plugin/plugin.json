@@ -1,7 +1,7 @@
 {
   "name": "denubis-token-estimator",
-  "version": "0.1.0",
-  "description": "Measure model output tokens and human input words from Claude Code and Codex logs.",
+  "version": "0.2.0",
+  "description": "Measure replay-aware model output tokens and human input words by project and time window.",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "url": "https://github.com/denubis"
@@ -13,7 +13,7 @@
   "interface": {
     "displayName": "Token Estimator",
     "shortDescription": "Audit AI output tokens and human input words",
-    "longDescription": "Measure origin-deduplicated model output tokens and human-authored input words from Claude Code and Codex logs, then reproduce and audit the reported totals.",
+    "longDescription": "Measure origin-deduplicated and replay-adjusted model output tokens plus human-authored input words from Claude Code and Codex logs, by project, month, or exact time window.",
     "developerName": "Brian Ballsun-Stanton",
     "category": "Productivity",
     "capabilities": ["Interactive"],
