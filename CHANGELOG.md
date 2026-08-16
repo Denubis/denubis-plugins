@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.0
+
+**Added:**
+- The workflow statusline now persists a one-line quota snapshot
+  (`timestamp|used_pct|resets_at`) per rate-limit window to
+  `$XDG_CACHE_HOME/claude-statusline/quota-{five_hour,seven_day}` on every render.
+  The seven-day snapshot is an external contract read by the byobu status cell in
+  the tmux-codex-quota project (`claude_quota.py`, installed as
+  `~/.byobu/bin/30_claude_quota`).
+
 ## [denubis-plan-and-execute] 4.0.1
 
 **Changed:**
