@@ -33,7 +33,7 @@ flowchart LR
 | Agents | 10 | Implementation, bug fixing, review, coherence, database review, proleptic challenge, refactoring, smell assessment, and test analysis (`plugins/denubis-plan-and-execute/agents/`, `c6882d2`). |
 | Commands | 2 | `/flesh-it-out` and `/how-to-customize` are thin command entry points (`plugins/denubis-plan-and-execute/commands/`, `c6882d2`). |
 | Hook programs | 2 | Live-transcript marker update and pre-write quality guard (`plugins/denubis-plan-and-execute/hooks/hooks.json`). |
-| Statusline | 1 package | Renders branch, context, rate-limit, and active-workflow state for the Claude Code statusline (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/pyproject.toml`, `898504f`). |
+| Statusline | 1 package | Renders branch, context, rate-limit, and active-workflow state for the Claude Code statusline, and persists per-window quota snapshots (`timestamp\|used_pct\|resets_at`) to `$XDG_CACHE_HOME/claude-statusline/quota-*` as an external contract read by the tmux-codex-quota byobu cell (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/pyproject.toml`, `898504f`). |
 | Wrapper | 1 script | Starts Claude with the configured tool restrictions and team mode, and maintains liveness state consumed by crash recovery (`plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh`, `8cd6825`). |
 
 ## Skill groups
