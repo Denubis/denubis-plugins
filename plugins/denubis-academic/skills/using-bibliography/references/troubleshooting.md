@@ -3,14 +3,14 @@
 Anchor every helper to the installed plugin root:
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 uv run "$BIB/resolve.py" --help
 ```
 
-If `${CLAUDE_PLUGIN_ROOT}` is empty, the command is not running in an installed
-plugin context. Invoke `/denubis-academic:using-bibliography` first or use the
-absolute installed-cache path Claude reports. Do not fall back to a source-tree
-relative command.
+If neither provider root is set, the command is not running in an installed plugin
+context. Invoke the skill from the installed plugin and inspect the provider's plugin
+listing. Do not fall back to a source-tree-relative command.
 
 ## Plugin load errors
 
@@ -20,7 +20,7 @@ relative command.
 | `denubis-bibliography` still installed | Inspect installed IDs and marketplace revision | Follow the retired-name migration in `setup-and-migration.md` |
 | Marketplace says current but old code runs | Compare marketplace and installed versions; remember installs are cached copies | Run `claude plugin update denubis-academic@denubis-plugins --scope <discovered scope>`, restart, and compare again; if still stale, confirm the current-ID uninstall/reinstall branch |
 | Skill command not found | Verify manifest name `denubis-academic` and skill directory/frontmatter `using-bibliography` | Invoke `/denubis-academic:using-bibliography` |
-| Helper file not found | Print the resolved plugin root and test for the file | Use `${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography`, independent of cwd |
+| Helper file not found | Print the resolved plugin root and test for the file | Use `$BIB`, resolved from the provider plugin root and independent of cwd |
 
 Only use `~/.claude/bin/plugin-refresh denubis-plugins` for an intended full
 **user-scope** refresh after reviewing its destructive cache/marketplace effects

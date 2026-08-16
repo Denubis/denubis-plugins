@@ -4,7 +4,8 @@ Render once on the orchestrator side, then give each reader one paper's Markdown
 path. Do not make parallel readers each resolve or extract the same source.
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 uv run "$BIB/resolve.py" --citekey <exact-key>
 ```
 

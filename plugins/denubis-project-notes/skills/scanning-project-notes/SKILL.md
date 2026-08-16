@@ -1,13 +1,18 @@
 ---
 name: scanning-project-notes
-description: Use when a task's purpose is clear and before changing project files, to retrieve relevant project memory and prior chat work directly.
+description: Use when explicitly asked to recover project notes or prior work, or when a task depends on a named historical decision that current repository artifacts cannot resolve
 ---
 
 # Scanning Project Notes
 
-Retrieve project memory and feedback as main-agent task-entry work. Notes do not create
-authority or decisions: resolve any human instruction they rely on to the original human
-record. Do not dispatch an advisor and do not wait for a SessionStart reminder.
+Retrieve project memory and feedback as main-agent work when the task actually depends on
+them. Do not run this as an ambient pre-edit ritual. Ordinary repository instructions,
+current code, and a supplied plan remain the first owners of ordinary implementation
+facts.
+
+Notes do not create authority or decisions: resolve any human instruction they rely on to
+the original human record. Do not dispatch an advisor and do not wait for a SessionStart
+reminder.
 
 ## 1. Resolve the notes universe
 
@@ -16,23 +21,27 @@ absolute directory and use its parent as the main repository root; this makes ev
 worktree share the main checkout's `.notes/`. Outside Git, use the current project root.
 
 Use `<main-repository-root>/.notes/` as the notes directory. List its Markdown files by
-name with hidden and ignored paths included. Record the count before judging relevance.
-If the directory is absent, say only that it is absent at the resolved path.
+name with hidden and ignored paths included. If the directory is absent, say only that it
+is absent at the resolved path and stop unless prior-chat recovery is independently
+required.
 
 ## 2. Read before selecting
 
-Read every note's frontmatter yourself. Compare the number read with the inventory count.
-A partial read is not a completed scan. Open the full body of each note whose description,
-type, or evidence could change the task.
+Read enough frontmatter to identify the notes that could change this task, then open those
+notes completely. State the inventory and the selection boundary; do not bulk-load
+unrelated bodies merely to complete a count.
 
 Do not select notes with a keyword grep. Keywords are finding aids written for an earlier
 task, not the boundary of the current task's subject.
 
 ## 3. Search prior chats
 
-Run several differently framed `cc-search-chats search "<terms>" --json` searches for
-the task. Use `--all` when it spans projects and `--everything` when normal coverage is
-too narrow. Treat an empty result as bounded by the command's reported coverage.
+Search prior chats only when the user requested prior-work recovery or the current task
+depends on a historical decision that notes and repository artifacts do not resolve. Run
+one narrowly scoped search first. Reframe or widen it only when a concrete unresolved
+question remains; do not search the whole task in several ways by default. Use `--all` or
+`--everything` only when the required source is known to cross those boundaries. Treat an
+empty result as bounded by the command's reported coverage.
 
 Resolve a relevant message with `cc-search-chats context <full-message-id> --json` before
 using it. Prefer provider-qualified exact locators when the installed resolver supports
@@ -61,8 +70,8 @@ is written only after the user agrees to the durable wording.
 ## Completion check
 
 - The main-repository notes path is explicit.
-- Inventory count and frontmatter-read count agree.
+- The note inventory and selection boundary are explicit.
 - Relevant note bodies were opened.
-- Chat searches report their coverage.
+- Any necessary chat search reports its coverage.
 - Every relied-on pointer resolves exactly.
 - No advisor or SessionStart request stands between the task and retrieval.

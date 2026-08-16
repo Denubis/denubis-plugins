@@ -1,227 +1,75 @@
 ---
 name: commit
-description: Create git commits with proper analysis, message drafting, and project conventions. Use when asked to commit, or when /commit is invoked.
+description: Use when the human asks to commit, or an approved execution lifecycle authorises a private checkpoint - stages owned changes intentionally and records coherent outcomes without publishing
 user-invocable: true
 ---
 
-# Git Commit
+# Create Git Commits
 
-Create well-structured git commits by analysing changes, drafting messages, and following project conventions.
+## Authority
 
-**Announce at start:** "I'm using the commit skill to create a git commit."
+An explicit commit request authorises local commits for the named work. Executing an
+approved implementation plan authorises private checkpoint commits on its feature branch
+without routine prompts when that plan's lifecycle says so. Neither route authorises
+pushing, publishing, deploying, force-rewriting published history, or committing unrelated
+work.
 
-## Arguments
+Do not commit on a protected base branch unless the human explicitly named that branch and
+action. Preserve pre-existing changes.
 
-- No args: analyse all changes, draft message, confirm with user
-- `-m "message"`: use provided message directly (skip drafting)
+## Inspect the real scope
 
-## The Process
+Resolve repository root, branch, base, upstream, worktree, status, staged and unstaged
+diffs, untracked files, and recent message style. Determine which changes this task owns.
+Inspect likely secrets, generated binaries, caches, and editor files before staging.
 
-### Step 1: Gather State (parallel)
+Read project instructions and configured test or commit-hook guidance. Run the smallest
+fresh gates needed for the changed boundary. Do not invent a fallback language command:
+if no gate is configured, state the evidence available rather than running an unrelated
+suite. A failing required gate blocks the commit.
 
-Run all three in parallel via Bash:
+Update current architecture, directives, runbooks, or user documentation only when the
+implemented contract changed and those files own it. Historical plans do not need
+palimpsest edits.
 
-```bash
-# 1. Untracked and modified files (NEVER use -uall)
-git status
+## Choose coherent boundaries
 
-# 2. Staged and unstaged diffs
-git diff HEAD
+A durable commit is one independently understandable and reversible outcome. Keep its
+behavior, first consumer, tests, migration, and documentation together. Split unrelated
+outcomes even when they share a file; do not split design, setup, implementation, fixes,
+tests, and docs merely because they occurred at different times.
 
-# 3. Recent commit messages for style matching
-git log --oneline -15
-```
+There is no target count. Private checkpoints may be frequent. Fix rounds, review-response
+commits, and superseded checkpoints fold into the outcome they serve during the
+post-acceptance normalization lifecycle. Accepted design plans normally land with their
+implementation; an accepted ADR may stand alone because the decision is itself durable.
 
-### Step 2: Analyse Changes
+Ask one pointed question only when ownership or the intended split would materially change
+what is committed. A direct request with one coherent owned outcome needs no ceremonial
+confirmation.
 
-From the gathered state:
+## Stage and commit
 
-1. **Check for sensitive files** (.env, credentials, keys, tokens). If found, warn the user and exclude them.
-2. **Check for anything to commit.** If no untracked files and no modifications, say so and stop.
-3. **Identify the nature of changes:** new feature, enhancement, bug fix, refactor, test, docs, etc.
-4. **Group changes by concern** for potential multi-commit splitting.
+Stage exact owned paths or patch hunks. Never use broad staging when unowned, untracked, or
+sensitive files could be included. Inspect the staged diff and staged name/status list
+before committing.
 
-### Step 3: Check Context Documentation
+Match the repository's message convention. Name the outcome concisely; put design
+reasoning, alternatives, review findings, and verification narratives in project
+documentation rather than the subject line. Do not add a provider-specific co-author
+unless the project or human requires it.
 
-Use the diff already gathered in Step 1 to determine whether the changes alter
-contracts, APIs, domain structure, or agent instructions documented in a
-`CLAUDE.md` or `AGENTS.md` file.
+Pass varying commit text through a file created by the runtime's structured file-editing
+primitive, then use git commit -F with that exact file. Do not interpolate untrusted or
+model-generated text into a shell command. Remove only the temporary file this operation
+created after the commit succeeds.
 
-- If no context document is affected, continue.
-- If a context document is affected, invoke
-  `denubis-extending-claude:maintaining-project-context` and update the affected
-  current document. Do not proceed to commit while the implementation and its
-  context documentation disagree.
+Do not bypass hooks, disable signing, amend, or rewrite history unless the human named that
+action. A rejected commit never existed; fix the demonstrated cause, restage, and create
+the intended commit normally.
 
-This check belongs here because commit preparation has both the complete diff and a
-real transition to gate. Read-only `git status` and `git log` commands are not evidence
-that a commit is imminent.
+## Read back
 
-### Step 4: Run Fast Tests
-
-Before committing, run lightweight test gates to catch obvious breakage.
-
-**Discover fast test commands** using the same priority as make-pr/merge-to-main, but only `fast`-marked suites:
-
-**Priority 1:** Read `.ed3d/testing-guidance.md` if it exists. Run only suites marked `(fast)` — e.g. `### Unit Tests (required, fast)`.
-
-**Priority 2:** Read CLAUDE.md for test commands. If found, run only unit test commands (not e2e, not integration, not docs build).
-
-**Priority 3:** Read `.ed3d/implementation-plan-guidance.md` for fast/unit test commands.
-
-**Priority 4:** Fallback: `pytest tests/unit/` if a `tests/unit/` directory exists, otherwise `pytest` with a short timeout.
-
-```
-Running fast tests before commit...
-  [command]
-  → PASSED / FAILED
-```
-
-**If fast tests fail:**
-```
-Fast tests failed. Fix before committing:
-
-[failure output]
-```
-
-Stop. Do not proceed to commit.
-
-**If no fast test suites are discovered and no test directory exists:** Skip this step. Not every project has tests.
-
-**If fast tests pass:** Continue to Step 5.
-
-### Step 5: Plan Commits
-
-Split by **logical concern**, not by file count. One concern, one commit — even when the diff touches many files. A 30-file refactor that does one thing is one commit. Two unrelated fixes in the same file are two commits.
-
-**Splitting rules:**
-- Use concern boundaries, not file-count thresholds
-- Test files go with their implementation in the same commit
-- Never separate a test from the code it tests
-- For genuinely mixed changes (bug fix + unrelated feature in the same diff), split by concern
-- When in doubt, ask the user how to split
-
-### Step 6: Match Commit Style
-
-From `git log` output, detect the repository's convention:
-
-- Semantic prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`)
-- Plain descriptions
-- Other patterns
-
-Match whatever the repo uses.
-
-### Step 7: Draft and Confirm
-
-**If `-m` was provided:** Use that message. Skip to Step 8.
-
-**Otherwise:** Draft a concise commit message (1-2 sentences) focusing on the **why** not the **what**.
-
-Present the plan to the user:
-
-```
-Commit plan:
-
-1. [files] — "message"
-2. [files] — "message"
-
-Proceed?
-```
-
-Wait for confirmation. If the user adjusts, incorporate their feedback.
-
-### Step 8: Execute Commits
-
-For each commit:
-
-```bash
-# Stage specific files (never git add -A or git add .)
-git add file1.py file2.py
-```
-
-Then use the **Write tool** (not Bash) to write the commit message:
-
-```
-Write .commit-msg.tmp with content:
-
-Commit message here.
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
-Then commit with a **fixed** Bash command (allowable once, reusable forever):
-
-```bash
-git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp
-```
-
-**Why Write tool + fixed Bash:**
-- Write tool handles varying message content — no shell quoting, no injection, no `$()`.
-- The Bash command is identical every time regardless of message content. Users can add `Bash(git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp)` to their allow list once.
-- `.commit-msg.tmp` in the working directory is visible, auditable, and cleaned up after commit.
-- If `.commit-msg.tmp` already exists when Write is called, Write will show the user the overwrite — providing natural lockfile protection.
-
-**Never use Bash to write commit messages** — no `printf`, `echo`, `cat`, or heredoc. The Write tool is the only safe path.
-
-After all commits:
-
-```bash
-git status
-```
-
-Verify clean working tree (or expected remaining changes).
-
-### Step 9: Report
-
-State what was committed. If there are remaining uncommitted changes, mention them.
-
-## Safety Rules
-
-**NEVER:**
-- `git add -A` or `git add .` (can include secrets or binaries)
-- `git push` (unless user explicitly asks)
-- `--no-verify` or `--no-gpg-sign` (unless user explicitly asks)
-- `--amend` (unless user explicitly asks — amending after hook failure destroys the previous commit)
-- Force push to main/master
-- Commit files that look like secrets (.env, credentials.json, \*.key, \*.pem)
-- Use `-i` flag (interactive mode not supported)
-- Use `printf`, `echo`, or `$()` command substitution for commit messages — shell injection risk
-
-**ALWAYS:**
-- Use Write tool for `.commit-msg.tmp`, then `git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp` — no shell involvement in message content
-- Include `Co-Authored-By: Claude <noreply@anthropic.com>`
-- Stage files by name, not by wildcard
-- Run fast tests before committing
-- Run `git status` after committing to verify
-- Create NEW commits after hook failures (not amend)
-
-## Pre-commit Hook Failures
-
-If a commit is rejected by pre-commit hooks:
-
-1. Read the hook output
-2. Fix the issues
-3. Re-stage the fixed files
-4. Create a **NEW** commit (the failed commit never happened — amending would modify the previous commit)
-
-## Common Mistakes
-
-**Giant commits**
-- Problem: Dumping everything into one commit
-- Fix: Follow the splitting rules above
-
-**Amending after hook failure**
-- Problem: `--amend` modifies the PREVIOUS commit, not the failed one
-- Fix: Always create a new commit after fixing hook issues
-
-**Vague messages**
-- Problem: "update code", "fix stuff"
-- Fix: Focus on why the change was made
-
-**Pushing without asking**
-- Problem: User didn't want to push yet
-- Fix: Never push unless explicitly asked
-
-**Shell injection in commit messages**
-- Problem: `printf`, `echo`, `cat`, or heredoc in Bash with unescaped special characters
-- Fix: Always use the Write tool for `.commit-msg.tmp`, never Bash
+Inspect the new commit, its tree and diff, and current status. Confirm only intended files
+landed and report any remaining staged, unstaged, or untracked work. A commit proves a tree
+was recorded; it does not replace tests, UAT, or integration evidence.

@@ -1,114 +1,54 @@
-# Cited-source fidelity lane
+# Cited-source fidelity
 
-Use this reference for `SRC`. Its product is a project file named
-`source-claims.md`: a pinpointed audit of whether each cited paper supports each
-manuscript claim attributed to it. The pinpoints make the review auditable; they
-do not imply that ordinary paraphrases need page locators in the manuscript.
+Audit whether a cited work supports the proposition attributed to it. Internal physical
+page pinpoints make the review auditable; they do not imply that a manuscript paraphrase
+must print a page number.
 
-## Freeze the claim-source inventory
+## Resolve the claim-source relationship
 
-Run `SRC` only after the Stage 2 gate has incorporated `ARG` omissions into the
-canonical claim map. Include every source-dependent claim in scope and every
-cited work presented as supporting it.
+Establish the manuscript's exact attributed proposition and local context before reading
+the source. Split grouped citations and compound propositions where each source is
+presented as independent support. If placement leaves the relationship ambiguous, mark it
+unverified and raise placement separately.
 
-- Split a grouped citation into one claim-source pair per cited work.
-- Split a sentence when its cited source is asked to support more than one
-  independently assessable proposition.
-- Preserve enough immediate manuscript context to disambiguate the attributed
-  proposition.
-- Do not silently treat a citation as decorative or as support for the whole
-  surrounding paragraph. Mark an indeterminate claim-citation relationship
-  `UNVERIFIED` and raise a placement concern separately.
+Load using-bibliography and follow its current resolver and render procedure. Never invent
+a citekey, hand-extract an attachment, or fetch, re-render, OCR, annotate, or write to
+Zotero outside that procedure's authority. Positively verify the rendered source and read
+its metadata. OCR text is a locator until checked against the PDF for exact quotation.
 
-## Prepare rendered sources on the orchestrator side
+An absent source, uncertain identity, missing attachment, or unreliable render is
+UNVERIFIED. It has not failed to support the claim because it has not been checked.
 
-Load `using-bibliography` and follow its current workflow rather than copying
-commands from this reference.
+## Read enough to decide
 
-1. Resolve each work through its real citekey. Never construct or truncate a
-   citekey. When only author/title/DOI evidence is available, use the resolver
-   to discover the real key and then continue by that key.
-2. Let the bibliography workflow reuse a quality-checked render or render the
-   source once. Do not hand-extract a PDF or let lane readers re-render it.
-3. Check the reported state, then prove that
-   `papers/<citekey>/full.md` exists and is non-empty. Read `meta.json` and
-   record renderer/OCR caveats.
-4. Record the render path and provenance in `source-claims.md`. Lock or digest
-   the rendered file when the local review protocol supports it.
-5. If the source is absent, lacks a usable PDF, has an uncertain identity, or
-   needs confirmation-gated OCR/fetching, record `UNVERIFIED`. Fetching or a
-   gated OCR escalation requires the user's explicit confirmation. Do not
-   improvise an internet fetch.
+Search the full rendered work, then read the candidate passage in enough context to
+understand population or corpus, conditions, method, uncertainty, limitations, and the
+paper's own conclusion. The nearest page marker and corresponding per-page Markdown supply
+the physical page. Before NOT-FOUND, state the search scope and strongest nearby passage.
 
-An inaccessible source has not failed to support a claim; it has not been
-checked.
+Record for each relationship:
 
-## Fan out by paper
-
-Give one independent reader one rendered paper and all claim-source pairs
-assigned to it. The packet contains:
-
-- the exact real citekey;
-- the `full.md` path and OCR note;
-- each canonical claim ID, manuscript wording, normalised attributed
-  proposition, paragraph ID, and short local context;
-- the required result schema below.
-
-Readers inspect only the supplied `full.md` and its sibling `pages/NNN.md`.
-They do not query Zotero, fetch, convert, or re-render anything. Batch paper
-readers within the available agent limit; the orchestrator reserves its own
-slot and owns the canonical ledger.
-
-For each pair, the reader must read enough of the paper to interpret the
-pinpoint in context and search the full render before returning `NOT-FOUND`.
-The nearest `<!-- page:N -->` marker supplies the physical PDF page. Recheck
-the matching per-page markdown before finalising the evidence record.
-
-## Return one evidence record per pair
-
-Return:
-
-- evidence ID placeholder, claim ID, paragraph and exact manuscript anchor;
+- manuscript anchor and exact attributed proposition;
 - real citekey and resolved source identity;
-- the precise proposition the manuscript attributes to this source;
 - physical page or pages;
-- a short verbatim source passage, or a precise source paraphrase when quoting
-  would add noise;
-- verdict and material source scope/qualification;
+- short source passage or precise paraphrase;
+- material scope or qualification;
 - strongest competing interpretation;
-- confidence, search scope, and what would change the verdict;
-- render/OCR caveat.
+- render or OCR caveat; and
+- one verdict.
 
-Use these verdicts:
+Verdicts:
 
-- `SUPPORTED` — direct support at the manuscript's strength and scope;
-- `PARTIAL` — support for only part of a compound proposition;
-- `QUALIFIED` — broad support whose material conditions, limits, population,
-  uncertainty, or scope the manuscript omits;
-- `CONTRADICTED` — an incompatible source statement or result;
-- `NOT-FOUND` — no support after inspecting the resolved readable source in
-  full; include the strongest nearby passage and the search scope;
-- `UNVERIFIED` — inaccessible source, unreliable render, unresolved identity,
-  or ambiguous attribution.
+- SUPPORTED: direct support at the manuscript's strength and scope.
+- PARTIAL: support for only part of a compound proposition.
+- QUALIFIED: broad support, but a material condition, limit, population, uncertainty, or
+  scope is missing from the manuscript.
+- CONTRADICTED: the source establishes an incompatible claim or result.
+- NOT-FOUND: no support after the resolved readable source was searched with stated
+  coverage.
+- UNVERIFIED: identity, access, attribution, or render quality prevented a reliable
+  assessment.
 
-Do not aggregate verdicts into a score. One weak source in a citation group is
-not rescued by another source unless the manuscript clearly distributes the
-claim between them.
-
-## Synthesis boundary
-
-The orchestrator writes verified raw results into `source-claims.md`, assigns
-stable `SRC-E-nnn` IDs, and cross-links them to `ARG` and author-facing
-findings at Stage 4. It may reconcile duplicate evidence but must not turn a
-reader's `PARTIAL`, `QUALIFIED`, `CONTRADICTED`, `NOT-FOUND`, or `UNVERIFIED`
-result into `SUPPORTED` without recording the new evidence.
-
-Keep three questions separate:
-
-1. Does the cited paper support the attributed proposition?
-2. Is the citation placed clearly and attached to the right words?
-3. Does the venue require a particular citation style or page locator?
-
-`SRC` answers the first. `COH`/`REG` may answer the second and third. Internal
-physical-page pinpoints remain required even when the answer to question 3 is
-"no page locator for this paraphrase."
+Do not aggregate verdicts into a score or let one source silently rescue another. Keep
+three questions separate: source support, citation attachment to the intended words, and
+venue formatting or locator convention.

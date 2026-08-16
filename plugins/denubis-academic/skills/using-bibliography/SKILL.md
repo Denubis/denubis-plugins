@@ -10,9 +10,9 @@ Use Zotero as the bibliographic source of truth and
 paper through the bundled resolver; never invent a citekey, infer absence from
 one failed search, or reimplement the render pipeline.
 
-The installed plugin is `denubis-academic@denubis-plugins`. The callable skill
-is `/denubis-academic:using-bibliography`. `denubis-bibliography` is the retired
-plugin name; `denubis-bib` is not a valid marketplace or skill name.
+The canonical skill is `using-bibliography` in the `denubis-academic` plugin.
+Provider-specific invocation syntax is transport, not part of the bibliography method.
+`denubis-bibliography` is the retired plugin name.
 
 ## Read the relevant procedure
 
@@ -30,18 +30,19 @@ operation, then return here for the shared safety rules.
 
 ## Installed paths
 
-Claude Code copies installed plugins into its cache. Commands must therefore be
-anchored to the plugin root exposed by Claude, never to a source checkout or the
-caller's working directory:
+Plugin hosts may copy installations into a cache. Commands must therefore be anchored to
+the installed plugin root, never to a source checkout or caller working directory. Codex
+sets `PLUGIN_ROOT`; Claude Code sets `CLAUDE_PLUGIN_ROOT`; Codex also supplies the latter
+for compatibility.
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 uv run "$BIB/resolve.py" --help
 ```
 
-When a skill subprocess is the only context available, `${CLAUDE_SKILL_DIR}` is
-this skill directory and is also safe. Prefer `${CLAUDE_PLUGIN_ROOT}` in shared
-instructions because it makes the plugin boundary explicit.
+When the runtime exposes the current skill directory directly, resolving scripts relative
+to it is also safe.
 
 ## Preconditions
 
@@ -65,7 +66,8 @@ Before any bibliography operation:
 Start every paper lookup with `resolve.py`:
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 uv run "$BIB/resolve.py" <known-citekey>
 uv run "$BIB/resolve.py" --author Vehtari --year 2017
 uv run "$BIB/resolve.py" --title "scoping studies"
@@ -142,5 +144,5 @@ Report only evidence appropriate to the operation:
 - Zotero write: approved preview, endpoint result, and post-write read-back;
 - bib refresh: the registered auto-export ran and the exact citekey parsed from
   the resulting well-formed bibliography;
-- install/migration: current marketplace entry, installed plugin name/version,
-  and successful `/denubis-academic:using-bibliography` invocation after restart.
+- install/migration: current marketplace entry, installed plugin name/version, and
+  successful fresh-session discovery and invocation of this skill.

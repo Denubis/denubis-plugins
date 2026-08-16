@@ -19,7 +19,6 @@ REQUIRED_FILES = (
     "references/evidence-base.md",
     "references/promotion-triage.md",
     "references/review-lanes.md",
-    "references/review-records.md",
     "references/source-fidelity.md",
     "references/toulmin-analysis.md",
 )
@@ -27,17 +26,6 @@ REQUIRED_FILES = (
 
 def _markdown_files() -> list[Path]:
     return sorted(SKILL_ROOT.rglob("*.md"))
-
-
-def _schedule_rows(text: str) -> list[tuple[int, str, set[str]]]:
-    rows: list[tuple[int, str, set[str]]] = []
-    for line in text.splitlines():
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) != 3 or not cells[0].isdigit():
-            continue
-        lanes = set(re.findall(r"`([A-Z]+)`", cells[2]))
-        rows.append((int(cells[0]), cells[1], lanes))
-    return rows
 
 
 def test_paper_review_package_is_complete() -> None:
@@ -66,25 +54,12 @@ def test_relative_markdown_links_resolve() -> None:
     assert not missing, f"broken relative links: {missing}"
 
 
-def test_hybrid_schedule_preserves_independent_lanes_and_serial_gates() -> None:
+def test_reference_material_is_reachable_from_the_skill() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    rows = _schedule_rows(skill)
+    linked = set(re.findall(r"\[[^]]+\]\((references/[^)#]+)", skill))
+    expected = {name for name in REQUIRED_FILES if name.startswith("references/")}
 
-    assert [stage for stage, _mode, _lanes in rows] == list(range(7))
-    assert [mode for _stage, mode, _lanes in rows] == [
-        "Serial",
-        "Parallel wave",
-        "Serial",
-        "Parallel wave",
-        "Serial",
-        "Parallel wave",
-        "Serial",
-    ]
-    assert [lanes for _stage, _mode, lanes in rows if lanes] == [
-        {"ARG", "APP", "TRN"},
-        {"SRC", "COH", "SCAR"},
-        {"REG", "CUT"},
-    ]
+    assert expected <= linked, f"unreachable paper-review references: {expected - linked}"
 
 
 def test_evidence_base_retains_source_identifiers() -> None:

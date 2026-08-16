@@ -1,6 +1,6 @@
 ---
 name: using-token-estimator
-description: Use when measuring AI token/word usage from Claude Code or Codex logs for a disclosure, via /estimate, the origin-dedup methodology, the .token-estimator mapper, and re-auditing the numbers.
+description: Use when measuring AI token/word usage from Claude Code or Codex logs for a disclosure, using the origin-dedup methodology, the .token-estimator mapper, and an independent audit of the numbers.
 user-invocable: true
 ---
 
@@ -29,12 +29,16 @@ of sessions (this only counts).
 
 ## Running it
 
-```
-/estimate                     # the project of the current directory, one total
-/estimate --dir <path> --month   # one project, rolled up, per-month rows
-/estimate --person <name>     # every project under a person
-/estimate --all               # every person/project
-/estimate --dir <path> --csv out.csv   # also dump tidy leaf grain
+Resolve the installed plugin directory through the provider-supplied root, then invoke
+the script directly:
+
+```bash
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+python3 "$PLUGIN_DIR/scripts/estimate.py"                     # current project
+python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --month
+python3 "$PLUGIN_DIR/scripts/estimate.py" --person <name>
+python3 "$PLUGIN_DIR/scripts/estimate.py" --all
+python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --csv out.csv
 ```
 
 Scripts (read-only over `~/.claude/projects` and `~/.codex/sessions`):
@@ -94,7 +98,7 @@ The methodology was wrong twice before it was right (a Codex split inverted by m
 subagents; a word count whose method didn't reproduce). Both were caught by reproducibility,
 so treat no number as final until it re-derives.
 
-- `python3 scripts/verify.py` — recomputes every headline figure; PASS/FAIL on structural
+- `python3 "$PLUGIN_DIR/scripts/verify.py"` — recomputes every headline figure; PASS/FAIL on structural
   invariants (no resumes, subagents additive, person-grain reconciliation), `[base]` on
   point-in-time counts that drift as logs grow.
 - `docs/AUDIT-BRIEF.md` + `docs/findings.schema.json` — hand to a *different* engine

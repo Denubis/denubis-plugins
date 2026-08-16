@@ -4,7 +4,8 @@ Project rules own note locations and write permissions. Inspect `AGENTS.md`,
 `CLAUDE.md`, and named `.notes/` files before proposing a write.
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 ```
 
 ## Literature notes

@@ -5,7 +5,8 @@ preview first, state the exact item and destination/change, and obtain explicit
 confirmation before the write flag.
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 ```
 
 Probe the optional extension without exposing credentials:

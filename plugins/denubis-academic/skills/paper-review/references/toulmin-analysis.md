@@ -1,89 +1,24 @@
-# Toulmin argument analysis
+# Toulmin analysis for a complex argument
 
-Use this reference for the `ARG` lane. Map argumentation exhaustively, but do
-not let it monopolise the peer review.
+Use this optional structure when ordinary claim tracing cannot expose a load-bearing
+inference. Do not inventory every sentence merely to fill it.
 
-## Include claims broadly
+For the claim under review, record its exact expression and normalized proposition, then:
 
-Stage 0 creates the canonical claim inventory. `ARG` audits it and returns any
-omission with an exact anchor; only the orchestrator assigns the next unused
-stable ID. Include every proposition the manuscript asks the reader to accept:
+- grounds: evidence or reasons offered;
+- warrant: the rule connecting grounds to claim;
+- backing: support for that warrant;
+- qualifier or scope;
+- rebuttal or reservation;
+- upstream dependencies and downstream consequences; and
+- strongest competing reading.
 
-- empirical observations and numerical statements;
-- definitions and classifications;
-- descriptions of authorial action;
-- causal and comparative propositions;
-- interpretations and generalisations;
-- limitations and qualifications;
-- recommendations and normative propositions;
-- contribution and reach metaclaims;
-- propositions carried by contrast, presupposition, transition, heading,
-  caption, or example.
+Classify missing relations as explicit, implicit but recoverable, genuinely missing,
+disputed, or not applicable. Distinguish implications the manuscript states or entails
+from those it merely invites, leaves speculative, overextends, or contradicts.
 
-Do not assign a separate claim ID to purely grammatical support. When commitment
-is ambiguous, create an `UNCERTAIN` claim and state the competing readings.
-
-## Record each claim
-
-- Exact expression and normalised proposition.
-- Visibility: `EXPLICIT`, `IMPLICIT`, `PRESUPPOSED`, or `UNCERTAIN`.
-- Type and argumentative role.
-- Grounds: evidence or reasons offered.
-- Warrant: rule connecting grounds to claim.
-- Backing: support for that warrant.
-- Qualifier or scope condition.
-- Rebuttal or reservation.
-- Upstream dependencies and downstream dependants.
-- Competing reading and evidence that would change the assessment.
-
-For every Toulmin relation use:
-
-- `EXPLICIT`
-- `IMPLICIT-RECOVERABLE`
-- `MISSING`
-- `DISPUTED`
-- `N/A`
-
-Prefer linked claim IDs over repeated paraphrase when one claim supplies
-grounds, warrant, or backing for another.
-
-## Classify implications
-
-- `STATED` — the manuscript expressly draws it.
-- `ENTAILED` — it follows from the stated premises.
-- `INVITED` — wording pragmatically encourages the reading.
-- `SPECULATIVE` — plausible but not established.
-- `OVEREXTENDED` — stronger than the premises permit.
-- `CONTRADICTED` — conflicts with another mapped proposition.
-
-Do not attribute an invited or speculative implication to the authors as though
-they stated it.
-
-## Falsify the map
-
-For every `MISSING`, `OVEREXTENDED`, or `CONTRADICTED` diagnosis:
-
-1. Identify the exact textual evidence expected if the diagnosis were false.
-2. Search the whole canonical manuscript, including tables and supplements.
-3. State the strongest recoverable implicit warrant or competing reading.
-4. Distinguish absence in the manuscript from absence in the accessible source
-   set.
-5. Record the result as supported, weakened, falsified, or unresolved.
-
-## Cross-check other lanes during synthesis
-
-Lane readers do not perform these checks by reading other lane packets. The
-orchestrator adds cross-links without altering the raw verdicts:
-
-- Stage 2 — `ARG` ↔ `APP`: does the design and evidence warrant the central
-  claims?
-- Stage 2 — `ARG` ↔ `TRN`: can the evidential path be inspected or
-  reconstructed?
-- Stage 4 — `ARG` ↔ `SRC`: do the cited works supply the grounds, warrants, or
-  backing the manuscript attributes to them, at the claimed strength and scope?
-- Stage 4 — `ARG` ↔ `COH`: does paragraph order expose the real dependency
-  structure?
-- Stage 4 — `ARG` ↔ `SCAR`: is a rebuttal textually motivated or answering an
-  absent interlocutor?
-- Stage 6 — `ARG` ↔ `CUT`: would a deletion remove grounds, warrant,
-  qualification, or rebuttal?
+For a missing, overextended, or contradicted relation, name the text expected if the
+diagnosis were false, inspect the complete in-scope manuscript including tables and
+supplements, and record the strongest recovery. Cross-check the result against appraisal,
+transparency, source fidelity, coherence, and any proposed cut only where those facets
+actually bear on the same inference.

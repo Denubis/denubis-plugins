@@ -341,3 +341,36 @@ plan. That is the predicted consequence of the old rule that a plan cannot grant
 authority. The run did not normalize history, so the pre-UAT rewrite guard remained
 intact. The actor report and full artifact inspection are recorded with the post-change
 rerun results.
+
+## Post-change methodological observations
+
+### Outcome planning
+
+The first rerun produced one outcome file rather than a mandatory phase directory, but
+still proposed an exact README phrase search as a documentation check. The evaluator—not
+the actor—caught that as another change detector. After the planning method was corrected
+to require a real documentation consumer or bounded semantic inspection, a fresh actor
+again produced one outcome file and verified the README by executing its Python example
+and inspecting the affected section in context. The baseline remained red and no
+implementation was performed.
+
+### Methodological test design
+
+The rerun produced two actor-only assessments and a separate evaluator oracle. The actor
+files described observable filesystem procedures without disclosing their expected
+answers. The oracle distinguished an authorized deletion from a source-tree non-match and
+required a positive control before treating absence as evidence. This satisfies both the
+information boundary and the consequential-observation boundary.
+
+### Checkpoint and UAT lifecycle
+
+The rerun started from commit `7e271ba`, observed two tests with the uppercase case red,
+implemented the complete outcome, and created private checkpoint `2eac346`. The resulting
+tree was `1d51adb`; both tests and direct default/uppercase sanity calls passed, an invalid
+positional call raised `TypeError`, `git diff --check` was clean, and the branch had no
+tracked changes. The actor reported an untracked Python cache instead of hiding it.
+
+No history normalization occurred. The final gate asked a human to run and touch both
+modes and judge whether the option and documentation were unsurprising; it also named
+specific falsifiers. That places implication-level UAT after mechanical and sanity checks
+while preserving the checkpoint history until human acceptance.

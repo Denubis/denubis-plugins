@@ -84,11 +84,9 @@ modern manuscript workflow. Local `.notes` registers and current venue rules
 override its house-style examples. Its role here is to structure editorial
 checks, not to judge validity or evidence.
 
-## Workflow adaptation
+## Adaptation limit
 
-The paragraph/claim coverage, cold-reader test, lane independence, serial
-gates, and author-ruling records are workflow mechanisms synthesised by this
-skill. The sources above motivate particular review criteria; they do not
-empirically validate the schedule or prove that the lanes are independent.
-Treat project scratchpads as application records, not universal source
-material.
+The sources motivate review questions; they do not validate a fixed schedule, worker
+count, all-paragraph coverage matrix, or universal independence among facets. Choose
+methods proportionately to the manuscript and brief. Project scratchpads are application
+records, not normative workflow evidence.

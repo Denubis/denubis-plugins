@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -83,14 +85,45 @@ def test_bibliography_commands_are_independent_of_callers_working_directory() ->
         f"commands depend on a source checkout or caller cwd: {violations}"
     )
 
-    missing_root = [
-        str(path.relative_to(SKILL_ROOT))
+    assignment = re.compile(r"(?m)^PLUGIN_DIR=.*\nBIB=.*$")
+    missing_root = {
+        str(path.relative_to(SKILL_ROOT)): "no executable provider-root assignment"
         for path, text in command_docs.items()
-        if "${CLAUDE_PLUGIN_ROOT}" not in text
-    ]
-    assert not missing_root, (
-        f"command docs do not establish the installed plugin root: {missing_root}"
+        if assignment.search(text) is None
+    }
+    assert not missing_root, f"command docs lack installed-root setup: {missing_root}"
+
+    base_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"}
+    }
+    cases = (
+        ({"PLUGIN_ROOT": "/codex/plugin"}, "/codex/plugin/skills/using-bibliography"),
+        (
+            {"CLAUDE_PLUGIN_ROOT": "/claude/plugin"},
+            "/claude/plugin/skills/using-bibliography",
+        ),
+        (
+            {
+                "PLUGIN_ROOT": "/codex/plugin",
+                "CLAUDE_PLUGIN_ROOT": "/claude/plugin",
+            },
+            "/codex/plugin/skills/using-bibliography",
+        ),
     )
+    for path, text in command_docs.items():
+        block = assignment.search(text)
+        assert block is not None
+        for provider_env, expected in cases:
+            result = subprocess.run(
+                ["bash", "-c", f"set -u\n{block.group()}\nprintf '%s' \"$BIB\""],
+                check=True,
+                capture_output=True,
+                env=base_env | provider_env,
+                text=True,
+            )
+            assert result.stdout == expected, path
 
 
 def test_setup_names_are_derived_from_the_current_manifest() -> None:

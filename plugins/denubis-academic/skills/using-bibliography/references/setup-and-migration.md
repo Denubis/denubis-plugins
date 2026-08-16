@@ -185,7 +185,8 @@ After restart, first test skill discovery, then the installed helper path:
 ```
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 test -f "$BIB/resolve.py"
 uv run "$BIB/resolve.py" --help
 ```
@@ -193,7 +194,8 @@ uv run "$BIB/resolve.py" --help
 Then, with Zotero running and config present, resolve one citekey known to exist:
 
 ```bash
-BIB="${CLAUDE_PLUGIN_ROOT}/skills/using-bibliography"
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+BIB="${PLUGIN_DIR}/skills/using-bibliography"
 uv run "$BIB/resolve.py" --citekey <known-citekey> --no-render
 ```
 
