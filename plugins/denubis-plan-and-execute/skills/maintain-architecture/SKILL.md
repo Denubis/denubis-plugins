@@ -1,86 +1,81 @@
 ---
 name: maintain-architecture
-description: Use for standalone architecture maintenance - maps implemented state against living architecture, resolves factual drift, and updates current documentation with exact evidence
+description: Use when implemented state and living architecture may differ - maps current evidence, updates the existing semantic owner, and verifies every changed relationship
 user-invocable: true
 argument-hint: "[artifact, change range, or architecture scope]"
 ---
 
 # Maintain Architecture
 
-## Purpose
+## Boundary
 
-Bring living architecture into agreement with implemented state. This workflow discovers
-what exists, identifies factual drift and unresolved decisions, invokes the document
-updater, and verifies the result. It does not redesign the system or turn a future plan
-into current topology.
+Living architecture describes implemented state and continuing decisions. It does not
+predict an unimplemented design, preserve correction history, or certify work because a
+document was generated. This skill both maps and updates current architecture; do not
+invoke a second writer skill for the same responsibility.
 
-## Resolve scope and baseline
+Use the scope or change range supplied by the human. Otherwise derive the narrowest
+complete boundary from the merge base plus relevant staged, unstaged, and untracked work.
+For a current-state audit, compare named documents with implementation sources without
+requiring a diff. State what the baseline cannot see.
 
-Use the artifact, change range, or scope supplied by the human. If none is supplied and
-the working tree has relevant changes, use the repository merge base plus staged,
-unstaged, and relevant untracked files. If the request is an audit of current docs, compare
-the named architecture surface with its implementation sources rather than requiring a
-Git diff.
+## Build the implemented-state map first
 
-When called from plan execution, also require the plan's `flow-boundaries.md` and the
-caller's implementation change boundary, implemented-state map, and exact supporting
-sources. The prediction is comparison input, not evidence of implemented state. Invoke
-this workflow only when reconciliation identified an architecture-owned claim,
-relationship, source pointer, or decision record that needs creation, change, or removal.
+Read project instructions and inventory the relevant architecture universe. Inspect actual
+modules, schemas, manifests, hooks, commands, tests, generated artifacts, and runtime
+observations before a design prediction. An empty diff or search is not proof of currency;
+use another route or positive control to establish the inspected universe.
 
-If several scopes would lead to materially different work and evidence cannot identify
-the intended one, ask one pointed question. Otherwise proceed with the narrowest scope
-that fully contains the changed responsibilities and their consumers.
-
-Record what the chosen baseline cannot see. An empty diff or search result does not prove
-that architecture is current until the implementation and document universes have both
-been inspected.
-
-## Map current state
-
-Inspect the implementation and architecture directly. Read project instructions, list all
-files under `docs/architecture/`, and open the documents relevant to the scope. Inspect
-the actual modules, schemas, manifests, hooks, commands, tests, and runtime evidence on
-which those documents rely.
-
-For plan reconciliation, reconstruct the implemented boundary from the supplied change
-range before reading the predicted map: enumerate every changed code, schema,
-configuration, generated, and runtime surface and account for its boundary consequence.
-Then compare that implementation-first inventory with the caller's map and prediction.
-Treat an omitted changed surface as an incomplete input, not evidence that no flow changed.
-
-Map:
+Map only what the evidence supports:
 
 - system boundary, actors, external systems, and responsibilities;
-- components, data flows, state transitions, and public contracts;
-- implemented constraints and their observable checks;
+- components, public contracts, data or control flows, state transitions, and failure
+  routes;
+- durable constraints and how they are checked;
 - decisions with continuing consequences;
-- downstream consumers and failure behavior;
-- claims present only in docs or only in implementation; and
-- missing, stale, ambiguous, or wrong-role source references.
+- downstream consumers; and
+- claims present only in documents or only in implementation.
 
-When a predicted boundary map applies, compare it with the implemented map. Distinguish an
-internal change in how from a load-bearing change in what crosses the boundary. A changed
-participant, flow, meaning, consumer, observable effect, ordering, persistence, control
-signal, or failure route is a change in what. A non-applicable prediction contradicted by
-implemented flow is a plan defect, not a documentation shortcut.
+When plan execution supplies a predicted boundary, derive the implemented map independently
+from every changed code, schema, configuration, generated, and runtime surface, then
+compare them. A different internal mechanism is not a design change when participants,
+inputs, outputs, meaning, consumers, effects, ordering, persistence, control, and failure
+behavior remain fixed. A difference in one of those properties is load-bearing: restore
+the accepted design or obtain a real design decision before documenting it as accepted.
 
-Direct code and test evidence settles technical facts. A human question is appropriate
-only when current sources expose a genuine ownership, scope, or architecture decision that
-cannot be recovered. In that case ask one pointed question with the exact consequences and
-sources.
+## Update the semantic owner
 
-## Update and verify
+Follow the repository's existing architecture organization when it has a clear owner.
+Update rather than duplicate:
 
-Invoke `denubis-plan-and-execute:architecture-update` with the working root, mapped
-implemented state, relevant document paths, source pointers, confirmed defects, and any
-applicable predicted boundary map and reconciliation result.
+- context or component architecture for boundaries, components, flows, and consumers;
+- constraints for implemented invariants;
+- database architecture for current schema and transaction boundaries;
+- an ADR for an accepted decision with continuing consequences;
+- personae for actor goals and access patterns; and
+- glossary for project-specific terms.
 
-After it returns, inspect the edits directly. Verify links and source pointers, rerun any
-structural documentation checks, and compare each changed claim with its implementation
-evidence. Confirm that proposed but unimplemented design remains in its design plan and
-that living documents contain no correction narrative.
+Create only the sections and diagrams needed to make actual relationships inspectable.
+There is no mandatory template set. A repository may keep all relevant truth in one
+context document or split it by genuine semantic boundaries.
 
-Report changed documents, resolved defects, exact verification evidence, and any genuine
-unresolved decision. Do not commit, publish, or update remote systems without separate
-authority.
+Write current truth directly. Do not retain “previously,” correction dialogue, phase
+narration, historical commit identifiers, or comparison prose in living sections. Remove
+a retired entity from indexes and affected edges with its source. Proposed components stay
+in the accepted design until implementation evidence makes them current.
+
+Technical claims cite resolvable current sources at the precision needed to check them.
+Do not require an exact chat-message locator for facts established by code, tests, or
+runtime evidence. A human source locator is required only when an architecture decision
+depends on that human judgment and cannot be recovered from an accepted project artifact.
+
+## Verify
+
+Open every changed claim beside its source. Verify links and source pointers, run project
+documentation or reference-integrity checks, and inspect every relationship affected by a
+renamed, added, moved, or retired entity. A negative search for a stale name needs a known
+search universe and positive control.
+
+Report changed documents, exact evidence, removed stale claims, and any genuine unresolved
+decision. Do not commit, publish, deploy, or mutate remote systems unless separately
+authorised.

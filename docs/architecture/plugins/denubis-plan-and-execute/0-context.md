@@ -1,92 +1,80 @@
-# denubis-plan-and-execute — Context (Level 0)
+# denubis-plan-and-execute — Context
 
-> System boundary: the design, implementation, verification, and branch-lifecycle
-> procedures; the agents they delegate to; two Claude Code hook programs; the
-> workflow statusline; and the Claude wrapper.
+## Boundary
 
-## Context
+The plugin owns provider-neutral methods for design, outcome planning, implementation,
+verification, human acceptance, architecture maintenance, and Git lifecycle. Claude
+metadata, agent definitions, commands, a live-marker hook, wrapper, and statusline adapt
+those methods to Claude Code.
 
-```mermaid
-flowchart LR
-    H[Human]
-    C[Claude Code host]
-    P[Plan-and-execute plugin]
-    F[Project files and Git]
-    A[Bundled and sibling agents]
-    T[Terminal and tmux]
-    R[Crash-recovery plugin]
+    Human
+      └─ intent, decisions, UAT, integration authority → Plan-and-execute methods
+           ├─ designs, plans, code, tests, private history ↔ Project repository
+           ├─ bounded brief → Optional agent role → diff or evidence leads
+           └─ loaded by Claude Code host
+                └─ SessionStart transcript identity → Live-marker adapter
+                     └─ owned marker update → Crash-recovery contract
 
-    H -->|request or command| C
-    C -->|load skill, agent, or command| P
-    P -->|PreToolUse decision or warning| C
-    C <-->|plans, code, tests, branches| F
-    P <-->|delegated work and review| A
-    P -->|statusline| T
-    P -->|live marker| R
-```
+## Semantic components
 
-## What the plugin ships
+- Workflow entry routes consequential work to the procedure that owns its next decision.
+- Design resolves intent and material trade-offs into an accepted project artifact.
+- Implementation planning groups work by independently understandable, usable or
+  verifiable outcomes rather than chronological phases.
+- Execution uses project-native TDD or positive operational probes, creates recoverable
+  private checkpoints, and assembles the complete surface.
+- Verification completes mechanical gates, independent sanity checks, boundary
+  reconciliation, documentation, and diff/status inspection before human UAT.
+- UAT asks the human to interact with an irreducible implication of the finished surface.
+- Post-UAT normalization folds fixes and superseded checkpoints into coherent outcomes
+  while preserving the accepted tree.
+- Architecture maintenance maps current implementation and updates its existing semantic
+  owner directly; there is no second architecture-writer skill or compulsory template set.
 
-| Component | Current surface | Responsibility |
-|---|---:|---|
-| Skills | 34 | Design discovery, planning, implementation discipline, review, verification, Git lifecycle, and supporting procedures (`plugins/denubis-plan-and-execute/skills/`, `c6882d2`). |
-| Agents | 10 | Implementation, bug fixing, review, coherence, database review, proleptic challenge, refactoring, smell assessment, and test analysis (`plugins/denubis-plan-and-execute/agents/`, `c6882d2`). |
-| Commands | 2 | `/flesh-it-out` and `/how-to-customize` are thin command entry points (`plugins/denubis-plan-and-execute/commands/`, `c6882d2`). |
-| Hook programs | 2 | Live-transcript marker update and pre-write quality guard (`plugins/denubis-plan-and-execute/hooks/hooks.json`). |
-| Statusline | 1 package | Renders branch, context, rate-limit, and active-workflow state for the Claude Code statusline, and persists per-window quota snapshots (`timestamp\|used_pct\|resets_at`) to `$XDG_CACHE_HOME/claude-statusline/quota-*` as an external contract read by the tmux-codex-quota byobu cell (`plugins/denubis-plan-and-execute/scripts/workflow_statusline/pyproject.toml`, `898504f`). |
-| Wrapper | 1 script | Starts Claude with the configured tool restrictions and team mode, and maintains liveness state consumed by crash recovery (`plugins/denubis-plan-and-execute/scripts/claude-wrapper.sh`, `8cd6825`). |
+The coding skills select project-specific language, testing, and database decisions.
+Python versions and tools, PostgreSQL keys and transaction conventions, mocking strategy,
+and Hypothesis settings come from the project and current consumers rather than universal
+plugin defaults.
 
-## Skill groups
+## Runtime adapters
 
-| Group | Skills |
-|---|---|
-| Workflow entry and lifecycle | `using-plan-and-execute`, `starting-a-design-plan`, `starting-an-implementation-plan`, `executing-an-implementation-plan`, `finishing-a-development-branch` |
-| Design and architecture | `brainstorming`, `design-clarify`, `design-write`, `impl-plan-write`, `proleptic-challenge`, `maintain-architecture`, `architecture-update` |
-| Coding and debugging | `coding-tdd`, `coding-effectively`, `coding-fcis`, `coding-good-tests`, `coding-property-testing`, `coding-python-idioms`, `coding-verify`, `defense-in-depth`, `systematic-debugging`, `howto-develop-with-postgres` |
-| Review and acceptance | `requesting-code-review`, `critical-peer-review`, `exec-coherence-review`, `exec-uat-gate`, `exec-refactoring-rubric` |
-| Git lifecycle | `using-git-worktrees`, `make-pr`, `merge-to-main` |
-| Supporting procedures | `controlled-dependency-upgrade`, `exec-session-naming`, `restate-our-assumptions`, `using-code-search` |
+Claude Code discovers the plugin through
+plugins/denubis-plan-and-execute/.claude-plugin/plugin.json. Agent files define only their
+provider role, edit authority, and evidence return. Commands are thin entry points.
 
-The grouping is an index over the 34 source directories at `c6882d2`; the individual
-skill bodies own their entry and exit contracts.
+hooks/update-live-marker.py handles one Claude SessionStart boundary: when the wrapper
+supplies an owned CR_LIVE_FILE, it atomically updates the transcript identity consumed by
+crash recovery. It does not emit workflow guidance or establish skill compliance. Textual
+Write/Edit quality detectors were removed because matching chosen source phrases does not
+establish behavior and their tool payload was provider-specific.
 
-Implementation planning and execution inspect the repository directly by default.
-Delegated agents and review skills are optional bounded tools, not mandatory transition
-stages. Tests, operational commands, and irreducible human UAT own completion evidence.
-Design follows the same boundary: direct clarification and inspection are normal,
-proleptic challenge is targeted to a named uncertainty, and design writing causes no Git
-or GitHub side effect.
+The wrapper and statusline are observed runtime utilities, not execution gates. On each
+Claude statusline render, the statusline persists the per-window
+`timestamp|used_pct|resets_at` quota snapshot under
+`$XDG_CACHE_HOME/claude-statusline/quota-*`; that file is an external contract consumed by
+the tmux-codex-quota Byobu cell. Codex transport is documented by its own plugin manifest
+and discovery metadata; it must not duplicate provider-neutral skill prose.
 
-## Hook boundaries
+## Evidence and failure boundaries
 
-| Program | Event | Current effect |
-|---|---|---|
-| `update-live-marker.py` | `SessionStart`, matcher `startup|resume|clear|compact` | Updates the wrapper's live marker with the current transcript identity when the wrapper supplied `CR_LIVE_FILE` (`plugins/denubis-plan-and-execute/hooks/update-live-marker.py`, `5412160`). |
-| `code-quality-guard.py` | `PreToolUse:Write|Edit` | Returns deny or advisory output for selected banned write patterns (`plugins/denubis-plan-and-execute/hooks/code-quality-guard.py`, `2f8be5c`). |
+- Project files, Git state, tests, builds, and runtime observations establish technical
+  results; task labels, commits, and model verdicts do not.
+- An approved execution request permits private checkpoints only on its feature branch.
+  Push, publication, deployment, inherited-history rewriting, and destructive cleanup are
+  separate actions.
+- Human UAT happens after complete mechanical and sanity evidence. A failed observation
+  returns to implementation and invalidates affected evidence.
+- An optional agent receives an exact brief and returns a diff or cited leads. The main
+  session verifies them before continuing.
+- The live-marker adapter and crash-recovery consumer can drift independently; their
+  cross-plugin file contract requires direct runtime tests.
 
-The live-marker updater performs a side effect. The quality guard controls only patterns
-implemented in its checks and only at its registered write boundary. Workflow procedures
-and the two task-entry gates remain in skills and are not repeated at SessionStart.
+## Sources
 
-## External boundaries and failure modes
-
-- The human owns decisions, acceptance, and commits. Skills and agents propose or carry
-  out work within that authority.
-- Project files and Git hold plans, implementation, tests, and history. A skill's report
-  that work was completed is not a repository result.
-- Sibling agent plugins supply optional delegated workers. Their availability and model
-  tier are deployment concerns outside this plugin's source boundary and do not block
-  direct execution.
-- The wrapper writes liveness evidence; `denubis-crash-recovery` interprets it. Either
-  side can drift independently, so their file contract is cross-plugin.
-- The statusline displays observed state. It is not an execution gate.
-- SessionStart owns transcript-marker maintenance only; ordinary success supplies no
-  workflow prose to the model.
-
-## Cross-references
-
-- **Plugin manifest:** `plugins/denubis-plan-and-execute/.claude-plugin/plugin.json`,
-  version 4.0.0.
-- **Crash recovery:** [`../denubis-crash-recovery/0-context.md`](../denubis-crash-recovery/0-context.md).
-- **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).
-- **Shared constraints:** [`../../constraints.md`](../../constraints.md).
+- Provider-neutral skills: plugins/denubis-plan-and-execute/skills/
+- Claude roles and transport: plugins/denubis-plan-and-execute/agents/,
+  plugins/denubis-plan-and-execute/commands/,
+  plugins/denubis-plan-and-execute/hooks/hooks.json
+- Wrapper and statusline: plugins/denubis-plan-and-execute/scripts/
+- [Cross-cutting constraints](../../constraints.md)
+- [Crash recovery](../denubis-crash-recovery/0-context.md)

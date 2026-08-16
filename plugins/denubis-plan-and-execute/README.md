@@ -1,127 +1,87 @@
 # denubis-plan-and-execute
 
-Design, implementation, debugging, verification, architecture, and Git lifecycle
-procedures for Claude Code.
+Design, outcome planning, implementation, verification, architecture, and Git-lifecycle
+procedures.
 
-The plugin separates three kinds of work:
+    human intent
+        ↓
+    accepted design
+        ↓
+    coherent implementation outcomes
+        ↓
+    mechanically verified finished surface
+        ↓
+    human implication-level UAT
+        ↓
+    normalized private history and selected integration
 
-```text
-human request
-    ↓
-current design
-    ↓
-just-in-time implementation plan
-    ↓
-verified repository state
-```
-
-Each transition has one owner and one evidence boundary. The workflow does not create
-commits, worktrees, reviews, pull requests, merges, deployments, or human gates merely
-because the preceding stage finished.
+Stage boundaries exist only where authority, evidence, recoverability, or safe next actions
+change. They are not a required narration format.
 
 ## Main workflow
 
-### 1. Design
+### Design
 
-Invoke:
+    /denubis-plan-and-execute:starting-a-design-plan <request or topic>
 
-```text
-/denubis-plan-and-execute:starting-a-design-plan <request or topic>
-```
+The design workflow inspects project evidence, resolves one material decision at a time,
+and writes one current design under docs/design-plans/. Living architecture changes only
+when implementation changes the system.
 
-The design workflow inspects the project directly, asks only about intent or material
-tradeoffs that evidence cannot recover, compares genuine alternatives, and writes one
-current design under `docs/design-plans/`.
+### Outcome planning
 
-Human-derived decisions carry an exact source locator and resolver. Proposed components
-remain in the design plan; living architecture changes only when implementation changes
-the system.
+    /denubis-plan-and-execute:starting-an-implementation-plan <absolute-design-path>
 
-### 2. Implementation planning
+Planning defaults to one implementation-plan file. It splits files only when independently
+resumable outcomes make that useful. Outcomes keep an interface with its first consumer,
+tests, failure behavior, and documentation. Boundary-flow, verification, and UAT
+appendices exist only when they have a real cross-outcome consumer.
 
-Invoke the exact handoff returned by design:
+### Execution and acceptance
 
-```text
-/denubis-plan-and-execute:starting-an-implementation-plan <absolute-design-path>
-```
+    /denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-path> <absolute-working-directory>
 
-Planning uses the current workspace unless isolation is requested, required by project
-instructions, or needed to avoid overlapping edits. It produces:
+The main session executes directly by default. Behavior changes use the project-native
+red-green-refactor cycle; operational work uses a real consumer or positive probe.
+Mechanical gates, an independent sanity pass, documentation reconciliation, and complete
+diff/status inspection precede human UAT.
 
-- `phase_##.md` files containing coherent tasks and acceptance ownership;
-- `test-requirements.md` for automated and operational evidence; and
-- `uat-requirements.md` for irreducible human judgment, which may contain no entries.
-
-Planning inspects the repository directly. Delegated investigation and review are optional.
-No model-authored stamp or verdict certifies the plan.
-
-### 3. Execution
-
-Invoke the exact plan and working directory:
-
-```text
-/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-directory> <absolute-working-directory>
-```
-
-The main session executes one phase at a time by default. Behavior changes use the
-project-native red–green–refactor cycle. Tests, type checks, builds, and operational
-read-backs establish deterministic claims. Human UAT runs only for a planned item that
-automation cannot decide.
-
-Execution preserves pre-existing changes and does not commit, publish, deploy, or mutate
-another system without separate authority.
+Executing an approved plan authorises private checkpoint commits on its isolated feature
+branch without routine prompts. It does not authorise pushing or publication. Fix rounds
+and superseded checkpoints fold into coherent outcomes only after the human accepts UAT on
+the finished implication. Normalization must preserve the exact accepted tree and is
+reverified before integration.
 
 ## Explicit lifecycle skills
 
-These user-invocable skills perform only their named action:
+- using-git-worktrees: create and verify one isolated checkout.
+- systematic-debugging: establish a cause and fix only the demonstrated mechanism.
+- maintain-architecture: reconcile current implementation and living architecture.
+- controlled-dependency-upgrade: audit or upgrade one direct dependency at a time.
+- critical-peer-review: falsify a bounded artifact against current evidence.
+- restate-our-assumptions: test a scoped assumption.
+- make-pr: verify, push, create, and read back one pull request.
+- merge-to-main: perform and verify one local integration.
+- exec-session-naming: optional tmux-window naming.
 
-| Skill | Boundary |
-|---|---|
-| `using-git-worktrees` | Create and verify one isolated checkout |
-| `systematic-debugging` | Diagnose a failure; fix only when the request includes a fix |
-| `maintain-architecture` | Reconcile living docs with implemented state |
-| `controlled-dependency-upgrade` | Audit or upgrade one direct dependency at a time |
-| `critical-peer-review` | Read-only falsification review of a bounded artifact |
-| `restate-our-assumptions` | Test a scoped assumption against current evidence |
-| `make-pr` | Verify, push, create, and read back one pull request |
-| `merge-to-main` | Perform and verify one local integration |
-| `exec-session-naming` | Rename the tmux window containing the current pane |
+Worktree cleanup, history rewriting outside the private feature series, destructive
+discard, publication, and deployment retain separate authority.
 
-`make-pr` does not merge or edit issue labels. `merge-to-main` does not push or delete the
-feature branch. Worktree cleanup and destructive discard are separate actions.
+## Agents and project guidance
 
-## Optional agents
+Bundled agents are provider-specific role adapters for bounded implementation, review, and
+analysis. Their report is a lead; the main session inspects their diff or cited evidence
+and reruns relevant checks.
 
-Bundled agents are bounded tools, not workflow stages. Implementors and fixers may edit
-only their assigned scope and never commit. Reviewers are read-only and return exact-source
-leads without approval tokens or persistent findings files. The main session verifies any
-delegated result before acting on it.
+Optional project guidance lives at .ed3d/design-plan-guidance.md and
+.ed3d/implementation-plan-guidance.md. /how-to-customize describes these files.
+/flesh-it-out provides standalone clarification.
 
-The plugin does not require the research-agent or extending-Claude plugins to complete its
-main workflow. Their specialists may be used when a bounded task genuinely benefits from
-them.
+## Claude runtime surfaces
 
-## Project customization
+The Claude package includes a SessionStart adapter that keeps the crash-recovery plugin's
+live-transcript marker current, plus the claudew wrapper and workflow statusline. The
+live-marker contract is Claude-specific and is not part of provider-neutral planning
+semantics. Textual pre-write quality detectors are not shipped.
 
-Optional project guidance lives at:
-
-- `.ed3d/design-plan-guidance.md`
-- `.ed3d/implementation-plan-guidance.md`
-
-`/how-to-customize` describes their supported shape. `/flesh-it-out` provides standalone
-clarification without starting the full design workflow.
-
-## Runtime surfaces
-
-The plugin also ships:
-
-- a `SessionStart` hook that updates the wrapper's live-transcript marker and emits no
-  ordinary workflow prose;
-- a `PreToolUse:Write|Edit` quality guard for its explicitly implemented banned patterns;
-- the `claudew` wrapper and workflow statusline.
-
-The hook, wrapper, and statusline report or control only their actual runtime boundaries.
-They do not establish that a model followed a skill.
-
-See the [architecture context](../../docs/architecture/plugins/denubis-plan-and-execute/0-context.md)
-for the current system map and failure boundaries.
+See the [architecture context](../../docs/architecture/plugins/denubis-plan-and-execute/0-context.md).

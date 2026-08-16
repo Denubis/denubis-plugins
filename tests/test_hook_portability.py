@@ -1,7 +1,6 @@
 """Repo-wide hook-portability fitness function.
 
-Incident (2026-06-20): four hooks (`shortcut-detector.py`, `branch-bg.py`,
-`gh-fork-guard.py`, `code-quality-guard.py`) had acquired Python-3.14-only
+Incident (2026-06-20): several Python hooks had acquired Python-3.14-only
 syntax and died on a colleague's stock-3.9 Mac before any logic ran. Hooks are
 invoked `uv run python "$script"` from the user's working directory, so they
 inherit whatever interpreter that machine resolves, which may be far older than
