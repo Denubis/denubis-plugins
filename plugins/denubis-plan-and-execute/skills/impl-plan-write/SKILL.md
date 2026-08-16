@@ -1,6 +1,6 @@
 ---
 name: impl-plan-write
-description: Use when an accepted design needs executable implementation phases with exact files, dependencies, verification ownership, and only genuine open decisions raised to the human
+description: Use when an accepted design needs an executable plan organized around coherent completed outcomes, their consumers, and falsifiable evidence
 user-invocable: false
 ---
 
@@ -8,255 +8,158 @@ user-invocable: false
 
 ## Purpose
 
-Convert one accepted design plan into phase files that another session can execute without
-reconstructing the repository or inventing missing decisions. Planning does not implement,
-commit, publish, or certify the work.
+Turn an accepted design into work another session can execute without reconstructing the
+repository or inventing missing decisions. Plan around coherent completed outcomes, not
+the order in which files happen to be edited. Planning does not implement, publish, or
+certify the behavior.
 
-## Inputs and discovery
+## Ground the plan
 
-Start from the exact design-plan path. Read the current project instructions,
-implementation guidance, architecture, test configuration, and the code each phase will
-touch. List the relevant universe before asserting that a file, test, dependency, or
-pattern is absent.
+Read the exact design, project instructions, implementation guidance, architecture, test
+configuration, affected code, and two or three relevant consumers or local examples.
+List the relevant search universe before asserting that a file, test, dependency, or
+pattern is absent. A delegated report is a lead; open its cited source before relying on
+it.
 
-The main session may inspect the codebase directly. Delegation is optional and useful only
-when a bounded investigation benefits from independent context. A delegated report is a
-lead: open its file, symbol, test, log, or documentation pointer before using the finding.
+Use current official documentation for external public contracts and upstream source for
+undocumented internals. Record the version and source when they affect the implementation.
 
-For an external dependency, use current official documentation for the public contract and
-upstream source for undocumented internals. Record the version and source the task depends
-on. Do not turn model recollection into an API requirement.
+Compare design assumptions with current state. Correct implementation detail in the
+plan. If evidence invalidates the accepted direction or exposes materially different
+consequences, stop that branch and ask one pointed question. Do not manufacture options:
+discard restatements, invented alternatives, ordinary defaults selected by project
+evidence, and facts recoverable by inspection.
 
-Compare the design's assumptions with current state. Correct implementation detail in the
-plan. If current evidence invalidates the accepted direction or reveals a choice with
-materially different consequences, stop that branch of planning and use the decision
-filter below.
+## Choose outcome boundaries
 
-## Open decisions
+An outcome is a state that is independently understandable, usable or verifiable, and
+reversible without depending on an unfinished later edit. It normally includes a new
+interface with its first real consumer, behavioral tests, failure handling, and user or
+operator documentation. Separate outcomes when they protect different decisions, have
+different rollback or deployment boundaries, or can be accepted independently. Do not
+split setup, implementation, tests, fixes, review responses, and documentation merely
+because they occur at different times.
 
-There is one route: inspect, filter apparent choices, ask only about survivors, then write
-the settled phase. Do not offer review modes or make the human review routine defaults.
+There is no target count. A substantial design often yields two or three outcomes; a
+small design may yield one and a large design may yield more.
 
-Apply these filters in order:
+## Artifact shape
 
-1. **Restatement.** If it restates the design or an acceptance criterion, it is not a
-   decision.
-2. **Invented alternative.** If an alternative exists only so the plan has options to
-   present, discard it.
-3. **Obvious default.** If current project evidence and the accepted design select one
-   ordinary implementation, write it and cite that evidence.
-4. **Recoverable fact.** If inspection or current documentation can answer it, investigate
-   instead of asking.
+Default to one file:
 
-Most phases surface none. Zero is the normal outcome. For a genuine survivor, ask one
-pointed question at a time and include:
-
-- the decision and why it blocks this phase;
-- the viable alternatives supported by current evidence;
-- **What it implies:** the concrete downstream difference for each alternative; and
-- the exact sources a human can open.
-
-Record the resolved choice in the design's decision record when it changes design. Do not
-leave the conversation as its only durable owner.
-
-## Plan artifacts
-
-Write to `docs/implementation-plans/YYYY-MM-DD-<slug>/`:
-
-- one `phase_##.md` per design phase;
-- `flow-boundaries.md`, containing the predicted boundary flow or the bounded reason it
-  does not apply;
-- `test-requirements.md`, mapping automated and operational checks to acceptance criteria;
-  and
-- `uat-requirements.md`, containing only irreducible human-judgment checks. A zero-entry
-  file is valid.
-
-Do not create model-authored approval certificates, transition ledgers, or review receipts.
-A review file may record findings when an actual review occurs, but it does not prove the
-plan is correct.
-
-## Boundary-flow contract
-
-Decide applicability from the behavior being changed, not the file type or size. A
-predicted DFD is required when the implementation changes what crosses a boundary between
-an actor, external system, runtime component, process, or durable store. This includes
-adding, removing, or rerouting a flow; changing its meaning, owner, ordering, persistence,
-transformation, side effect, or failure route; or changing a control signal that permits,
-blocks, retries, or terminates downstream work. Plan phases are delivery boundaries, not
-DFD participants; a multi-phase plan does not become applicable for that reason alone.
-
-It is not required for an internal change in how one component performs its responsibility
-when the boundary participants, inputs, outputs, effects, ordering, and failure behavior
-remain unchanged. A refactor, dependency substitution, test repair, or prose edit is not
-automatically exempt: use its observable boundary effect.
-
-Always create `flow-boundaries.md`. Start it with an applicability result and the current
-design, architecture, or source evidence that supports that result. When it does not
-apply, give one specific sentence naming the preserved boundary; do not add an empty
-diagram or generic “no architecture change” claim.
-
-When it applies, map breadth-first before elaborating phases:
-
-- the system or feature boundary and external actors;
-- processes, components, and durable stores that own a transformation or decision;
-- each data or control flow's source, destination, payload or signal, contract or
-  transformation, ordering or persistence when material, and failure behavior;
-- separately, the delivery phase that creates each runtime producer and consumer, plus
-  every inter-phase construction seam; and
-- downstream consumers and exclusions needed to prevent an adjacent system from being
-  silently pulled into scope.
-
-Use stable flow identifiers that phase tasks can cite. Decompose only where another phase,
-consumer, or failure boundary needs the detail. The artifact predicts what should be made;
-it is not living architecture and must not describe planned state as implemented.
-
-## Phase contract
-
-Every phase starts with:
-
-```markdown
-# Phase N: [Outcome]
-
-**Goal:** [observable state this phase creates]
-**Architecture:** [how this phase fits the accepted design]
-**Tech Stack:** [current tools and dependency versions]
-**Depends on:** [prior phase or external prerequisite]
-
-## Acceptance Criteria Coverage
-
-- `<slug>.AC1.1` — [design text, copied exactly]
+```text
+docs/implementation-plans/YYYY-MM-DD-<slug>.md
 ```
 
-Use scoped acceptance-criterion identifiers from the design. A phase may cite an earlier
-criterion, but one phase owns its completion.
+Use a directory with an `index.md` and one file per outcome only when independent loading
+or interruption recovery materially helps. Create a boundary-flow appendix, verification
+appendix, or UAT appendix only when its content is shared by several outcomes or has a
+real consumer outside the outcome that owns it. Do not create empty or “not applicable”
+paperwork.
 
-Wrap each coherent task so the execution skill can extract it without loading every phase:
-
-```markdown
-<!-- START_TASK_1 -->
-### Task 1: [Outcome]
-
-**Files:**
-- Create: `/absolute/path/to/new_file.py`
-- Modify: `/absolute/path/to/existing_file.py`
-- Test: `/absolute/path/to/test_file.py`
-
-**Prerequisites:** [files, interfaces, or state already established]
-**Verifies:** `<slug>.AC1.1`, or `None` for a non-behavioural task
-
-1. [One coherent change, including the consumer of every new interface]
-2. [Relevant failing check before a feature or bug fix]
-3. [Minimal implementation and cleanup]
-
-**Run:** `[exact project-native command]`
-**Expected evidence:** [positive result and the condition that would fail]
-<!-- END_TASK_1 -->
-```
-
-Use subcomponent markers only when several tasks share one reviewable outcome:
+The plan begins with the design path, working root, current repository evidence, scope,
+and acceptance criteria. For each outcome include:
 
 ```markdown
-<!-- START_SUBCOMPONENT_A (tasks 2-4) -->
-<!-- START_TASK_2 -->
-...
-<!-- END_TASK_2 -->
-<!-- END_SUBCOMPONENT_A -->
+## Outcome: <completed state>
+
+**Goal:** <observable state>
+**Depends on:** <prior outcome or external prerequisite, if any>
+**Owns:** <acceptance criteria or design invariant>
+
+### Files and consumers
+- Modify/Create/Test: `<resolved path>` — <role>
+- First real consumer: `<resolved path or runtime surface>`
+
+### Work
+1. <failing behavioral check or other positive operational probe>
+2. <smallest implementation with its consumer and failure path>
+3. <documentation and bounded cleanup owned by this behavior>
+
+### Verification
+- Run: `<project-native command>`
+- Positive signal: <evidence that the intended boundary ran and worked>
+- Failure signal: <evidence that the behavior or probe is defective>
+
+### Finished-work implication
+<human UAT action, judgment, and falsifier, or “None: automated evidence settles it.”>
 ```
 
-Task boundaries follow coherent outcomes, not a two-minute timer. Keep tests with the
-behaviour they establish. Name a real consumer for every new function, class, field, file,
-or service. Do not write `if present`, unresolved TODOs, speculative paths, or code that
-only becomes valid in a later phase.
-
-Use the project's own test runner and conventions. Functionality and bug-fix tasks use
-red-green-refactor. Infrastructure tasks use a positive operational signal. A preparatory
-refactor changes structure while existing behavioural tests remain green; it does not add
-new behaviour to justify the refactor after the fact.
-
-Never put a commit step in a task unless the human authorised commits for this plan. A
-version bump is a release boundary, not a progress marker.
+Tasks may be nested where dependency detail helps execution, but do not add parser markers
+or phase types unless a real consumer requires them. Never leave `if present`, unresolved
+TODOs, speculative paths, or an interface that becomes valid only in a later outcome.
 
 ## Verification ownership
 
-Map every acceptance criterion to one primary verification owner:
+Assign every criterion one primary owner:
 
-| Claim | Owner | Plan destination |
-|---|---|---|
-| Deterministic behaviour or invariant | Automated test or static check | `test-requirements.md` |
-| Install, build, migration, or integration result | Operational command with positive signal | `test-requirements.md` |
-| Usability, domain fit, clarity, or another irreducible judgment | Human use of the built surface | `uat-requirements.md` |
-| Missing prerequisite or unavailable environment | Explicit blocker | Phase prerequisite; no success claim |
+- deterministic behavior or invariant: automated test or static check;
+- install, build, migration, or integration state: operational command with a positive
+  signal;
+- usability, domain fit, clarity, or another irreducible judgment: human interaction with
+  the complete built surface; or
+- unavailable prerequisite: explicit blocker, with no success claim.
 
-`test-requirements.md` names the criterion, test level, file or command, setup, positive
-signal, and failure signal. Tests verify observable behaviour rather than a particular
-internal call.
+Tests observe public behavior rather than a particular call or phrase. Features and bug
+fixes use red-green-refactor. A refactor first needs behavioral coverage and must keep it
+green. Infrastructure and generated metadata need a real consumer or operational probe.
+For documentation, execute examples or render through the real documentation consumer
+when that machinery exists; otherwise require a bounded agent inspection against the
+implemented interface. Do not invent an exact-phrase search as a documentation test. An
+empty search is not success until scope and a positive control establish what it could
+have found.
 
-UAT collation consumes two inputs:
+For methodological evaluations, keep the acting instructions and the evaluator's oracle
+in different artifacts. The actor receives its task, applicable skill, and realistic
+workspace, but not expected answers or scoring criteria. The evaluator inspects observable
+actions or consequences and includes a permitted or positive-control path so “nothing
+happened” cannot pass by default.
 
-- **Input 1, the accumulated entries.** Keep only decisions whose prediction cannot be
-  settled by an automated or operational check.
-- **Input 2, the acceptance criteria no decision covered.** Inspect every unmapped
-  criterion and add a human check only when judgment is irreducible.
+## Boundary changes
 
-Before retaining individual entries, map the human-visible boundaries of the built
-surface breadth-first. Include the intended workflow, relevant failure paths, and seams
-with existing systems. Design one or more actions that let the human encounter both the
-wanted result and plausible unwanted behavior. The agent supplies the actions; the human
-does not have to invent the experiment. Coverage is incomplete when it probes only literal
-acceptance-criterion success while leaving said-versus-wanted, said-versus-built, adjacent
-system, regression, or side-effect boundaries unexamined.
+Add a boundary-flow section only when the work changes what crosses a boundary between an
+actor, external system, runtime component, process, or durable store. Trace participants,
+payload or signal, transformation, ordering or persistence where material, side effects,
+failure routes, and downstream consumers. Name which outcome owns each changed producer
+and consumer. An internal change that preserves participants, inputs, outputs, effects,
+ordering, and failures needs no ceremonial diagram.
 
-Each UAT entry states what the human does with the built surface, what they judge, and the
-specific experience that would falsify the design. A phase that produced zero entries is normal,
-and an entirely empty UAT plan is valid. Do not pad deterministic assertions with words such
-as “feels” to make a manual gate.
+## UAT and Git lifecycle
 
-Before retaining an entry, apply three distinctions:
+Collate UAT over the finished design, after every implementation outcome. Retain a human
+probe only when automation and operational evidence cannot settle the judgment and
+informed observers could reasonably disagree. Give the human a concrete action on the
+built surface and a falsifying experience. Do not ask for per-outcome UAT when later work
+changes the surface, and do not disguise deterministic checks with words such as “feels.”
 
-- **Separation:** after every automated prerequisite passes, can the human judgment still
-  fail? If not, route the claim to automated verification.
-- **Reduction:** can the scenario be decomposed into checks whose outputs settle the
-  verdict? If so, automate those checks instead of asking the human to perform them.
-- **Disagreement:** could informed observers using the same built surface reasonably
-  disagree about the result? If not, the entry describes a deterministic check.
+When the human invokes execution of the approved plan, that instruction authorises local
+private checkpoint commits for the plan on an isolated feature branch unless project or
+human instructions explicitly prohibit them. Checkpoints may be frequent and require no
+routine prompt. They do not authorise pushing, publication, deployment, or rewriting
+inherited or published history.
 
-When an entry combines a deterministic boundary with an irreducible judgment, split it:
-route the boundary to `test-requirements.md` and keep only the independently falsifiable
-human judgment in `uat-requirements.md`.
+Fix rounds and superseded checkpoints fold into their owning outcome. Final history
+normalization waits until the human has accepted finished-work UAT. It must preserve the
+exact accepted tree, then rerun the relevant diff audit and verification. A plan should
+state these lifecycle boundaries, not prescribe a commit-count quota.
 
-No model-authored stamp binds either file. Execution evidence comes from the tests,
-operational results, and human interaction the entries name.
-
-## Plan integrity
+## Integrity and handoff
 
 Before handoff, verify directly that:
 
-- every phase, task, file, skill, agent, command, and external source pointer resolves;
-- every acceptance criterion has one primary owner and no criterion silently disappears;
-- every phase leaves the repository in a runnable, testable state;
-- dependencies and consumers precede the tasks that require them;
-- `flow-boundaries.md` has a supported applicability result; when applicable, every
-  inter-phase producer/consumer seam has one owner on each side and every changed flow is
-  covered by a task and either an existing acceptance criterion or an explicit design
-  invariant. Do not invent an acceptance criterion solely to satisfy flow bookkeeping;
-- each negative result states its search or check coverage and has a positive control;
-- open decisions are resolved or marked as blockers; and
-- the plan requests no commit, publication, deployment, credential, or human ceremony
-  beyond the authority already granted.
+- every file, consumer, skill, command, dependency, and external source resolves;
+- every criterion has one primary evidence owner and no outcome duplicates or drops it;
+- every outcome leaves a runnable, testable state;
+- dependencies precede their consumers without chronology-only splits;
+- open decisions are resolved or named as blockers;
+- UAT is complete-surface judgment after mechanical and sanity checks; and
+- no publication, deployment, credential use, or final history rewrite exceeds granted
+  authority.
 
-A review finding is a lead, not a completion certificate. If a review is used, open each
-cited artifact, repair confirmed defects, and leave unresolved findings visible. Do not
-manufacture a green verdict, loop reviews until one appears, or treat a findings-file
-header as external evidence.
-
-## Handoff
-
-Report the absolute plan directory and working directory. Name any blocker. When none
-remain, provide the exact invocation:
+Report the exact plan path and working root. When no blocker remains, provide:
 
 ```text
-/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-directory> <absolute-working-directory>
+/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-path> <absolute-working-directory>
 ```
 
-Do not claim that planned tests passed or that planned behaviour exists. Those are
-execution results.
+Do not claim that planned behavior or tests already exist.

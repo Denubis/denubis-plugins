@@ -15,8 +15,8 @@ self-criticism.
 Direct investigation is the default. Delegation and independent review are optional for a
 bounded question; the main session still verifies returned evidence.
 
-At the start, use `denubis-plan-and-execute:exec-session-naming` so concurrent terminal
-sessions expose this work's repository and purpose to the human.
+Session naming is an optional convenience when concurrent terminals would otherwise be
+ambiguous. It is not a debugging prerequisite.
 
 ## Establish the failure
 

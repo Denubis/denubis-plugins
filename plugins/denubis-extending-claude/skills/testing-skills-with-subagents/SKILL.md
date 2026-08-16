@@ -1,106 +1,102 @@
 ---
 name: testing-skills-with-subagents
-description: Use when creating or editing skills to separate executable checks from falsifiable review expectations.
+description: Use when creating or editing skills - separates an acting agent's realistic instructions from a hidden evaluator oracle and observes consequential behavior
 user-invocable: false
 ---
 
-# Testing skills with review rubrics
+# Testing Skills with Acting Agents
 
-A skill is mostly prose. Do not pretend that prompting a model before and after an edit is
-the same evidential boundary as a code test. Verify executable behaviour mechanically and
-express prose quality as a falsifiable rubric that a human, the main agent, or an
-authorised reviewer can apply.
+A prose skill changes an agent's method. Evaluate that method by giving an acting agent a
+realistic task and observing what it does. Do not call a prompt-and-verdict loop equivalent
+to a deterministic code test, and do not lock the edited wording in place.
 
-Authority: `/home/brian/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl:9797`,
-bound as `TEST01` in the instruction-control candidate manifest.
+## Map the claim
 
-## Map the claims
+For every changed responsibility identify:
 
-For each changed responsibility, identify:
+- the consumer that selects or applies the skill;
+- the decision or action the instruction should change;
+- the observable failure it should prevent;
+- a real permitted action or positive control proving the path was reachable; and
+- any independently machine-checkable contract.
 
-- the consumer that selects or uses the skill;
-- the action the instruction is meant to change;
-- the observable failure it is meant to prevent;
-- the part, if any, that a machine can determine independently; and
-- the judgment that remains after those checks pass.
+If no identifiable action, consequence, or consumer exists, remove or narrow the
+instruction rather than inventing a test.
 
-If there is no identifiable action or failure, remove or re-scope the instruction instead
-of inventing a test for it.
+## Separate the actor from the oracle
 
-## Mechanise only independent properties
+Each methodological case has at least two artifacts with different audiences:
 
-Automate a property when the expectation comes from a real consumer or separately owned
-contract. Examples include:
+1. **Actor brief.** The task, accessible workspace, applicable skill, granted authority,
+   and ordinary project constraints. It must not contain expected answers, scoring
+   criteria, the protected rule restated as a hint, or the oracle path.
+2. **Evaluator oracle.** The protected behavior, evidence to inspect, acceptable
+   variation, failure observations, and positive or non-match controls. The acting agent
+   cannot read this artifact while performing the task.
 
-- parseable frontmatter and supported metadata;
-- resolvable skill, agent, file, and authority references;
-- executable helper behaviour, including failure paths;
-- runtime selection or permission behaviour observed at the actual boundary; and
-- generated structure parsed through the same interface its consumer uses.
+Keep fixtures separate when their contents would disclose the answer. Give the acting
+agent only a fresh scratch copy and the named skills it should apply. A reviewer who sees
+both actor output and oracle is an evaluator, not the actor. Record that role distinction
+when the run informs a later decision.
 
-Use positive, negative, and non-match controls where absence could otherwise pass by
-accident. A source scan may be a bounded lint, but it is not proof of instruction meaning
-or model compliance.
+Never put scenario instructions and their expected consequence in one “rubric” handed to
+the actor. That measures whether the actor can repeat the answer it was shown.
 
-Do not write a test that reads a prose file, looks for the wording introduced by the same
-change, and calls that correctness. Normalising, tokenising, or walking an AST does not
-make a self-authored wording expectation independent.
+## Make the case capable of failing usefully
 
-## Put judgment in a rubric
+Use a task on which the actor can make a concrete decision or take a real bounded action.
+Capture the artifacts that expose consequences: repository diff and log, filesystem state,
+tool trace, test output, generated structure, or the public behavior of a safe fixture.
 
-For every non-mechanical claim, write one review entry with:
+Include at least one control that distinguishes the intended method from a system that
+always refuses, always succeeds, or never reaches the boundary. Depending on the claim,
+use:
 
-```markdown
-### <claim>
+- a permitted-action case showing that safe work proceeds;
+- a failure-path case in which the unsafe action is reachable;
+- a non-match fixture the method must leave alone; or
+- a deliberately defective fixture the mechanical probe must reject.
 
-- Surface to inspect: <skill and relevant consumer>
-- Scenario: <a realistic use that exercises this responsibility>
-- Expected consequence: <the action that should change>
-- Failure evidence: <an observation that would falsify the claim>
-- Exclusions: <nearby behavior this entry does not judge>
-```
+“Nothing was deleted,” “no matches were found,” and “the agent said it complied” are not
+evidence without this discrimination.
 
-Good entries can fail without requiring a prescribed phrase. They name the relevant
-surface and consequence, so a reviewer can explain a defect with evidence rather than
-returning an approval token.
+## Mechanize independent contracts only
 
-Keep the rubric close to its consumer. Project-wide expectations belong in a named review
-rubric; skill-specific expectations may stay in the skill's implementation plan or review
-brief. Do not create a permanent status or certificate file merely to say the review ran.
+Automate properties owned by a real consumer or separate contract: parseable metadata,
+resolvable references, helper exit behavior, runtime selection or permissions, and
+generated structure parsed through its actual interface. Run positive and negative
+controls where empty output could pass accidentally.
 
-## Use another model only when it adds signal
+Do not read prose, search for the newly written series of words, and call that behavioral
+correctness. Tokenization, normalization, regex length, and AST traversal do not make a
+self-authored wording expectation independent. Such scans may locate review candidates;
+they are not acceptance evidence.
 
-Independent review is optional. Use it when the human requested it, when the task permits
-delegation, or when a genuinely different perspective could change the decision. The
-reviewer receives the rubric, the changed artifact, its consumer, and current automated
-evidence. It does not receive the desired verdict.
+## Develop the evaluation red-green-refactor
 
-Require findings to identify the exact current source, consequence, and falsifying
-observation. Treat findings as leads. Open their cited evidence before changing anything.
-Do not ask the reviewer for generic self-critique, hidden reasoning, or a pass/fail label.
+1. Create the smallest actor brief, hidden oracle, and fixture that expose the claimed
+   failure.
+2. Run the actor against the pre-change skill without oracle access.
+3. Inspect observable artifacts in the evaluator role and confirm the oracle fails for
+   the intended reason. A broken fixture or actor that never reached the decision is not a
+   useful red state.
+4. Make the smallest skill change that owns the method.
+5. Run a fresh actor with a fresh fixture, then evaluate it against the same hidden oracle.
+6. Run controls and mechanical contracts.
+7. Refactor only the instruction covered by those observations, then rerun affected
+   cases.
 
-A synthetic scenario can expose an ambiguity, but one model following a skill once does
-not establish future compliance. Record the invocation, model, loaded skill version,
-prompt, and observable result if the probe will inform a later action.
+Do not weaken the oracle because the edited skill failed. Change the oracle only when the
+protected behavior or independent contract was wrong, and record that design correction.
 
-## Workflow
-
-1. Apply `denubis-extending-claude:epistemic-humility` when scope or claimed capability
-   changes.
-2. Map consumers, actions, failures, and exclusions.
-3. Write failing executable checks only for independent properties.
-4. Write or revise the smallest skill content that owns the responsibility.
-5. Run the mechanical checks.
-6. Apply the rubric directly, or give it to an authorised reviewer when that adds signal.
-7. Fix evidence-backed defects and rerun only the checks or entries affected.
-8. Present any remaining irreducible judgment as focused UAT.
+One acting-agent run demonstrates one observed run, not universal future compliance.
+Record the actor runtime/model, loaded skill version, brief, fixture identity, tool and
+filesystem evidence, and result when the observation will authorise later work.
 
 ## Completion boundary
 
-The skill change is ready for review when:
-
-- every mechanisable claim has fresh evidence from its real boundary;
-- every prose claim has a falsifiable rubric entry or has been removed;
-- references resolve to current sources;
-- the review found no unresolved evidence-backed defect; and
-- no model verdict is being used as authority to commit, publish, install, or deploy.
+The skill change is ready for finished-work verification when independent mechanical
+contracts pass, pre-change failure and post-change behavior have been observed with the
+same hidden oracle, controls discriminate correctly, and every finding has been checked
+against current artifacts. Any irreducible human judgment remains focused UAT; a model
+verdict grants no commit, publication, installation, or deployment authority.

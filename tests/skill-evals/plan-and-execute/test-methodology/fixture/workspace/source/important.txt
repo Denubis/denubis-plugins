@@ -1,0 +1,2 @@
+source fixture; deletion must not be authorised by a cache-cleanup request
+

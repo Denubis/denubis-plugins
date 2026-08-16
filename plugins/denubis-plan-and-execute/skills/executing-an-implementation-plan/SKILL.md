@@ -1,227 +1,179 @@
 ---
 name: executing-an-implementation-plan
-description: Use when executing a reviewed implementation plan - performs each phase against its acceptance criteria, verifies observable results, and requests only irreducible human judgment
+description: Use when executing an approved implementation plan - builds coherent outcomes, verifies the finished surface, obtains human UAT, then normalizes private history
 user-invocable: true
-argument-hint: "[absolute-plan-dir] [absolute-working-dir]"
+argument-hint: "[absolute-plan-path] [absolute-working-dir]"
 ---
 
 # Executing an Implementation Plan
 
 ## Purpose
 
-Turn an implementation plan into verified repository state. The plan owns scope and
-acceptance criteria; repository instructions own local engineering constraints; observed
-test and operational results own completion claims.
+Turn an approved plan into verified repository state. The plan owns scope and acceptance
+criteria; project instructions own engineering constraints; observed tests, operational
+results, and final human interaction own completion claims.
 
-The main session executes tasks directly by default. Delegation is optional. Model reports,
-review verdicts, task-state labels, and workflow narration do not establish that work is
-correct.
+The main session executes directly by default. Delegation is optional. Model reports,
+review verdicts, task labels, and commits are not correctness evidence. Session naming is
+an optional convenience, not an execution prerequisite.
 
-At the start, use `denubis-plan-and-execute:exec-session-naming` so concurrent terminal
-sessions expose this work's repository and purpose to the human.
+This skill is self-contained for ordinary plan execution. Scale investigation, tracking,
+specialist guidance, verification, and communication to the change's actual uncertainty
+and consequence. Do not load general coding, testing, language, verification, project
+memory, or UAT skills merely because their topic overlaps this workflow. Load another
+procedure only when the plan or project explicitly requires it, or when a concrete
+unresolved condition makes its additional method necessary.
 
-## Resolve the execution boundary
+Use the approved plan as the tracker for a single short outcome. Create or update another
+tracker only when it protects recovery across several outcomes, a long interruption, or
+genuine context loss. Report decisions, results, and blockers; group routine operations
+instead of narrating every transition or command.
 
-Require the absolute plan directory and working directory from the invocation.
-Use the absolute working directory from the invocation; do not infer another checkout
-from the current shell.
+## Resolve the boundary
+
+Require the absolute plan path and working directory. The plan may be one file, a current
+directory with `index.md` and outcome files, or a legacy directory containing
+`phase_##.md` plus shared verification artifacts. Legacy layout changes how the plan is
+read, not the lifecycle below.
 
 Before editing:
 
-1. Resolve both paths and confirm the plan directory belongs to the intended project.
-2. Read the project `AGENTS.md` or `CLAUDE.md`, tool and test configuration, and any
-   implementation guidance named by the plan.
-3. Inventory `phase_##.md`, `flow-boundaries.md`, `test-requirements.md`, and
-   `uat-requirements.md`. Confirm task markers are balanced and every acceptance criterion
-   has an owner. Open the predicted flow or its non-applicability boundary before loading
-   the first phase.
-4. Inspect repository status and the files the current phase will touch. Preserve
-   pre-existing changes; do not overwrite, revert, include, or certify them as this work.
-5. Confirm the requested operations fit the authority already granted.
+1. Resolve both paths and confirm the plan belongs to the intended project.
+2. Read project instructions, the accepted design, the affected files, and only the tool,
+   test, or implementation guidance needed to resolve this change.
+3. Inventory the complete outcomes, acceptance criteria, dependencies, consumers,
+   verification, boundary changes, and finished-work UAT. For a legacy plan, translate
+   phase files into coherent outcomes before executing; do not preserve a chronology-only
+   split in the implementation or commit history.
+4. Inspect branch, worktree, status, base, and affected files. Preserve pre-existing and
+   unrelated changes.
+5. Confirm the requested operations fit granted authority.
 
-Do not create a branch or worktree unless the human requested one, project instructions
-require one, or overlapping changes make isolation necessary. If the needed isolation or
-base cannot be resolved safely, ask one pointed question before changing state.
+Use the current workspace unless isolation was requested, project instructions require
+it, or overlapping changes make isolation necessary. If the needed base or isolation
+cannot be resolved safely, ask one pointed question before mutation.
 
-Do not commit, push, publish, deploy, or mutate external systems unless the human has
-authorised that action. A plan containing such a step does not itself grant authority.
+“Execute this approved plan” authorises local private checkpoint commits on the feature
+branch for work owned by the plan, unless the human or project explicitly prohibits them.
+It does not authorise pushing, publishing, deploying, mutating unrelated external state,
+or rewriting inherited or published history. Never checkpoint directly on the protected
+base branch.
 
-If a path, criterion, prerequisite, or authority source does not resolve, treat it as an
-integrity defect. Repair implementation detail when the design already determines the
-answer. When the missing fact changes scope, design, external state, or human authority,
-stop that branch and ask one pointed question.
+If a path, criterion, prerequisite, or authority source does not resolve, repair settled
+implementation detail. Stop only when the missing fact changes design, scope, authority,
+or external state.
 
-## Load work just in time
+## Execute coherent outcomes
 
-Read one phase at a time. Read the whole current phase before its first edit, but do not
-load later phase bodies merely to narrate what will happen. Look ahead only far enough to
-confirm that a new interface has a real consumer and that the current change does not make
-the next phase impossible.
+Read enough of the whole plan to understand dependencies and final implications, then
+load one outcome's implementation detail at a time. Track durable state only when it
+materially improves recovery. Track outcomes and blockers, not chat turns.
 
-Use the existing task tracker or durable checklist required by the workflow entry skill.
-Track outcomes, not chat turns. Do not create review receipts, transition certificates, or
-extra progress documents whose only consumer is the model.
+For each outcome:
 
-For the current phase:
+1. Resolve every named file, symbol, consumer, dependency, command, and source pointer.
+2. Compare the plan with current code and any nearby example needed to resolve an actual
+   convention choice. Do not manufacture an example quota when the owner and pattern are
+   already unambiguous. Correct stale implementation detail without silently changing
+   accepted behavior.
+3. For a feature, bug fix, or behavioral refactor, state the behavior, write or identify
+   the smallest test that should fail, and observe it fail for the intended reason. A
+   malformed command, missing fixture, empty search, or phrase detector is not useful red
+   evidence.
+4. Implement the smallest complete behavior with its first real consumer, failure path,
+   tests, and user or operator documentation.
+5. Run the focused check and confirm its positive signal. Clean up only inside covered
+   behavior, then rerun it.
+6. For infrastructure, generated metadata, or documentation without a useful unit-test
+   red state, use an operational probe through the real consumer. It must distinguish a
+   working result from a command that exercised nothing.
+7. Inspect the owned diff for scope, unresolved placeholders, stale documentation, and
+   new interfaces without consumers.
 
-1. Resolve every named file, symbol, test, command, dependency, and source pointer.
-2. Compare the phase assumptions with current code.
-   A review finding is a lead, not verification evidence; open the cited artifact before
-   acting on it.
-3. Order tasks by dependency while preserving the phase's acceptance ownership.
-4. Execute each coherent task, then verify the criterion it owns.
-5. Finish the phase verification before loading the next phase.
+Do not broaden a bug fix into a refactor or refactor uncovered code. Do not add speculative
+compatibility layers or narrate superseded behavior in living documentation.
 
-The main session may inspect, edit, and test directly. Delegation is optional for a bounded
-independent investigation or implementation when it genuinely reduces contention or
-context pressure. Give a delegate an exact scope and no broader authority. Inspect its
-diff and rerun its evidence in the main session; never continue solely because it reported
-success. Surface the verified delegated result that changes the work; do not substitute
-the delegate's narrative for that result.
+Create a private checkpoint whenever it materially protects recoverable work or makes an
+outcome inspectable. Stage only files owned by this execution. Checkpoints may be frequent
+and do not require routine human prompts. Fix rounds, review responses, and superseded
+checkpoints remain provisional; they will fold into the outcome after UAT.
 
-## Implement each task
+## Fail deliberately
 
-Read the target and two or three relevant local examples before adopting a pattern. Follow
-the repository's configured formatter, type checker, and test runner. Do not introduce a
-new convention merely because the plan omitted an implementation detail.
+Read the full failure and relevant source. State one causal hypothesis and its falsifier,
+make one targeted change, and compare the result with the prediction. After three failed
+fixes for the same condition, restore changes owned by this execution to the last verified
+state using a recoverable method, record the commands and observations, and ask before a
+new approach. Stop sooner if the recovery path or unrelated data is threatened.
 
-For a feature, bug fix, or behavioural refactor:
+## Verify the complete implementation
 
-1. State the observable behaviour and the acceptance criterion it serves.
-2. Write or identify the smallest test that fails for the intended reason.
-3. Observe the failing check before implementation. A malformed command, missing fixture,
-   or empty search is not a useful red state.
-4. Make the smallest coherent implementation that passes.
-5. Rerun the focused check and inspect its positive signal.
-6. Clean up only within the tested behaviour, then rerun the check.
+Do not present UAT after an intermediate outcome. Once all outcomes are assembled:
 
-For infrastructure, documentation, generated metadata, or another change without a useful
-unit-test red state, use the plan's operational check. It must produce a positive signal
-that distinguishes the intended result from a command that never exercised it.
-
-Keep new interfaces with their first real consumer. Do not add speculative abstractions,
-unrequested compatibility layers, aliases for retired names, or explanation of superseded
-behavior in living documents. Things state what they are now; historical argument belongs
-in version history or an explicit archive.
-
-For a behavior-preserving refactor beyond local cleanup, use
-`denubis-plan-and-execute:exec-refactoring-rubric` before editing. Establish the concrete
-maintenance cost, current consumers, behavioral coverage, and one bounded transformation.
-Do not route a required behavior change through a refactoring procedure.
-
-Do not broaden a bug fix into a refactor. Do not refactor untested code. If the current
-repository contradicts a task, determine whether the plan's detail is stale or its design
-is invalid before editing either.
-
-## Respond to failures
-
-Read the complete failure and relevant source before changing code.
-State one causal hypothesis and its falsifier, make one targeted change, and compare the
-result with the prediction. A contradicted prediction returns to investigation; it does
-not license a second random edit.
-
-After three failed fixes for the same condition, stop. Preserve pre-existing work, restore
-the last verified repository state for changes owned by this execution using a recoverable
-method, record the commands and observations that failed, and ask the human before another
-approach. Difficulty, a long task, or an incomplete phase is not itself a blocker.
-Stop sooner if an attempted fix expands the failure surface, threatens data, or invalidates
-the recovery path; do not spend the remaining attempts increasing the blast radius.
-
-## Close a phase
-
-Run the focused and phase-level checks assigned in `test-requirements.md`. Confirm each
-command exercised the intended target and produced the named positive signal. Reinspect
-the diff for scope, accidental changes, stale documentation, unresolved placeholders, and
-new interfaces without consumers.
-
-Review is useful when required by the plan or project, when risk is high, or when an
-independent reading could falsify a specific claim. It is not a fixed transition ritual.
-Run a required or risk-targeted review through
-`denubis-plan-and-execute:requesting-code-review` with the bounded claim and surface. If a
-specific design-conformance uncertainty remains after ordinary verification, use
-`denubis-plan-and-execute:exec-coherence-review` for that question only.
-Verify every actionable review finding against code, tests, logs, or current documentation.
-A green review verdict cannot replace those checks, and repeated model reviews do not turn
-agreement into external evidence.
-
-Human UAT is required only for entries assigned to the phase in `uat-requirements.md`.
-Complete all automatable verification first, then present the built surface, the action the
-human should perform, the judgment only they can make, and the result that would falsify
-acceptance through `denubis-plan-and-execute:exec-uat-gate`. Wait for their observation.
-If there are no UAT entries, do not invent a human gate or ask them to rerun deterministic
-checks.
-
-Do not mark a phase complete while one of its owned criteria is failing, unobserved, or
-blocked. Record the exact unresolved condition in the current phase file or existing
-project tracker and leave later dependent work pending.
-
-## Reconcile boundary flows
-
-After implementation, audit the implemented boundary whether the plan predicted a DFD or
-said it was not applicable. Start from the bounded implementation change, not the
-prediction: inventory every changed code, schema, configuration, generated, and runtime
-surface; trace the actors, components, processes, stores, and consumers each can affect;
-then derive the implemented-state flow map from those sources, tests, and operational
-evidence. Account for every changed surface, including one that preserves its boundary.
-An empty diff or search is not coverage without a positive control and stated exclusions.
-
-Only after that implementation-first inventory is complete, compare it with
-`flow-boundaries.md`. Do not edit the prediction to make it agree. Compare participants,
-inputs, outputs, transformations, ordering, persistence, side effects, control signals,
-failure routes, and consumers.
-
-If `flow-boundaries.md` says the map is not applicable but implementation changed one of
-those boundary properties, treat that as a plan defect. Restore the accepted boundary or
-return to planning; do not silently replace the applicability result.
-
-For an applicable map:
-
-- A difference in internal **how** that preserves the mapped boundary is implementation
-  detail. Let living architecture state the implemented mechanism without a comparison
-  narrative.
-- A difference in **what** crosses a boundary is load-bearing. Adding, removing, rerouting,
-  or changing the meaning, consumer, observable effect, persistence, ordering, control, or
-  failure behavior must either be brought back to the accepted prediction or resolved as
-  a design change.
-- A design change requires its why, exact human authority when human judgment selected it,
-  an updated accepted design, and an ADR for the load-bearing divergence. Do not create an
-  Accepted ADR from implementation drift or model agreement.
-
-Living architecture owns what was made; the plan retains what should have been made; an
-ADR owns the why for an accepted load-bearing divergence. Invoke
-`denubis-plan-and-execute:maintain-architecture` with the prediction, implementation-first
-map, and exact evidence only when reconciliation identifies an architecture-owned claim,
-relationship, source pointer, or decision record that needs creation, change, or removal.
-Do not manufacture an architecture edit merely to show reconciliation occurred. An
-unresolved load-bearing mismatch blocks completion.
-
-## Finish the plan
-
-After the final phase:
-
-1. Run the complete verification set from `test-requirements.md` plus the project's
+1. Run every focused and cross-outcome check in the plan, followed by the project's
    ordinary whole-repository gates appropriate to the change.
-2. Recompute final acceptance-criterion coverage from the design through the phase files
-   and boundary-flow reconciliation to current evidence. Missing or duplicate ownership
-   is a defect, not a paperwork gap.
-3. Confirm every required UAT entry has the human's actual observation; do not infer
-   acceptance from silence or from a model summary.
-4. Inspect the final diff and repository status. Separate pre-existing changes from this
-   execution and identify anything untracked, generated, or not yet verified.
-5. When the plan is verified and no owned criterion remains open, invoke
-   `denubis-plan-and-execute:finishing-a-development-branch` to report the branch state and
-   route only the integration action already authorised or selected by the human.
-6. Confirm the predicted/implemented boundary comparison is settled, then check living
-   architecture, ADRs, notes, and runbooks touched by the change for current truth and
-   resolvable source pointers. Do not append correction narratives.
-7. Re-run any check affected by the final cleanup.
+2. Confirm each command exercised its intended target and produced the named positive
+   signal. If a decisive check succeeds only by returning nothing, establish its scope
+   and detection path with a positive control. For a routine secondary hygiene check,
+   state the bounded observation instead of manufacturing a disposable defect solely to
+   re-prove a mature tool's semantics.
+3. Recompute acceptance-criterion coverage from the accepted design to current behavior.
+4. Account for changed code, schema, configuration, generated surfaces, tests, and runtime
+   effects. Perform a full implementation-first boundary comparison only when the design
+   predicts meaningful changes in participants, meaning, consumers, effects, persistence,
+   ordering, control, or failure behavior. Do not create architecture ceremony for a
+   local behavior whose owner and consumers are already explicit. Update living
+   architecture or an accepted ADR only when those artifacts genuinely own the result.
+5. Perform an independent sanity review targeted at plausible mistakes: exercise the
+   finished public surface, relevant failure path, adjacent behavior, and documentation
+   as a consumer would. This is agent verification, not human UAT.
+6. Inspect the complete diff, status, and private log. Separate pre-existing changes and
+   identify untracked or generated files. Confirm documentation describes current truth.
 
-Report the implemented outcomes, changed-file scope, exact verification commands and
-results, remaining blockers, and any human UAT still required. Do not claim completion
-from a model report, a task label, a commit, or the existence of a generated record.
+Use code or design review when risk or a specific uncertainty makes an independent
+reading informative. Give it a falsifiable claim and bounded surface. Verify every
+finding against current artifacts; never treat a green model verdict as evidence.
 
-If context is genuinely depleted before completion, update the existing durable checklist
-with the current phase, owned changes, last positive evidence, and next unresolved task.
-On resume, re-resolve the absolute working directory, plan, repository status, and last
-evidence before continuing. Do not force a context clear when the current session can
-finish safely.
+Any failure returns to the owning outcome. Rerun the affected focused checks and every
+complete-surface check whose evidence the fix could invalidate.
+
+## Human UAT on the finished implication
+
+Only after all implementation, mechanical checks, independent sanity checks, diff/status
+inspection, and documentation reconciliation pass, present the irreducible human
+judgment. Name the finished surface, one concrete interaction, the implication being
+judged, and what experience would falsify acceptance. The human touches the finished
+public surface and its implications; they do not merely read a report or repeat a
+unit-test assertion.
+
+If UAT fails, record the exact observation, return to implementation, and repeat relevant
+mechanical and sanity checks before presenting UAT again. Silence, model agreement, or a
+commit is not acceptance.
+
+## Normalize after accepted UAT
+
+Final history normalization happens only after explicit human acceptance of all required
+finished-work UAT. Before rewriting, record the accepted tree identifier and current
+private series. Fold superseded checkpoints, fix rounds, and review-response commits into
+the coherent outcome they serve. Keep a checkpoint only if it matured into an
+independently understandable and reversible outcome. There is no commit-count target.
+
+Do not rewrite inherited or published history. If the branch was published, stop and ask
+for the appropriate integration strategy instead of force-rewriting it.
+
+After normalization:
+
+1. Confirm the rewritten series produces exactly the accepted tree.
+2. Reinspect each outcome diff and the aggregate diff from the intended base.
+3. Rerun the checks needed to establish that the rewritten checkout still matches the
+   accepted behavior.
+4. Confirm status contains no unexplained owned changes.
+
+Only then invoke `denubis-plan-and-execute:finishing-a-development-branch` for the
+already-authorised integration route, or ask one pointed integration question. Report
+implemented outcomes, changed scope, exact evidence, accepted UAT, normalized history,
+and any blocker. Do not publish or deploy unless separately authorised.
+
+If context becomes genuinely depleted, update the existing durable plan or tracker with
+the current outcome, owned changes, last positive evidence, provisional commits, UAT
+state, and next unresolved condition. On resume, re-resolve paths, status, and evidence.

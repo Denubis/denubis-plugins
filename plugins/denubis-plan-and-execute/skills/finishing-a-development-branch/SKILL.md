@@ -1,44 +1,40 @@
 ---
 name: finishing-a-development-branch
-description: Use when verified branch work is ready for a human-selected integration route - reports current state and delegates only the requested PR or local-merge action
+description: Use when accepted and normalized branch work is ready for a human-selected integration route
 user-invocable: false
 ---
 
 # Finish a Development Branch
 
-## Purpose
-
-Route verified branch work to the integration action the human actually wants. This skill
-does not add another review gate, discard work, or treat cleanup as part of integration.
-
 ## Establish readiness
 
-Inspect branch status and verification evidence:
+Inspect rather than infer:
 
-- current branch, upstream, remote, base, and worktree path;
-- staged, unstaged, and untracked files;
-- commits and diff relative to the intended base. Treat an upstream `ahead` count only as
-  divergence from that configured ref; before calling commits unpushed or at risk, check
-  whether the intended base or any remote ref already contains them;
-- fresh required test and operational results; and
-- unresolved human UAT or documented blockers.
+- current branch, upstream, remote, intended base, and worktree path;
+- staged, unstaged, and untracked files, separated from pre-existing work;
+- commits and aggregate diff relative to the intended base;
+- fresh required test, build, lint, type, and operational evidence;
+- explicit human observations for every required finished-work UAT entry;
+- the accepted tree identifier before normalization and proof that the normalized private
+  series produces that exact tree; and
+- any blocker or unresolved design, architecture, or documentation inconsistency.
 
-Do not call the branch complete because a task label, reviewer, or implementation report
-says so. If required evidence is missing, return to verification. Preserve unrelated and
-pre-existing changes.
+If UAT, normalization, exact-tree comparison, or affected verification is missing, return
+to execution. Do not call a branch complete because a task label, reviewer, commit, or
+implementation report says so. If the branch was published, do not rewrite it to satisfy
+the private-history lifecycle.
 
-## Route
+## Route only the selected integration
 
-If the human already requested a pull request or local merge, do not ask again. Invoke the
-corresponding owner with the exact repository, branch, base, and verification evidence:
+If the human already requested a pull request or local merge, invoke the owner with the
+exact repository, branch, base, accepted tree, and verification evidence:
 
 - `denubis-plan-and-execute:make-pr` for a pushed branch and one pull request;
 - `denubis-plan-and-execute:merge-to-main` for one verified local integration.
 
-If no integration action was specified, ask one pointed question whether they want a pull
-request, a local merge, or the branch left as-is. State any concrete consequence such as
-an unpushed branch or pending UAT. Leaving the branch and worktree unchanged is the safe
-default when no answer is available.
+If no integration action was specified, ask one pointed question whether to open a pull
+request, merge locally, or leave the branch as-is. State a concrete consequence such as
+an unpushed branch. Leaving the branch unchanged is the safe default without an answer.
 
-Do not delete a branch or worktree, discard commits, force-push, or clean untracked files.
-Those are separate destructive actions and require exact targets plus explicit authority.
+Do not delete a branch or worktree, discard commits, force-push, clean untracked files,
+publish, or deploy. Those are separate actions with their own exact targets and authority.

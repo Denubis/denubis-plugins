@@ -15,8 +15,8 @@ document owns the resulting boundaries and acceptance criteria.
 
 This workflow does not implement the design or certify that it is correct.
 
-At the start, use `denubis-plan-and-execute:exec-session-naming` so concurrent terminal
-sessions expose this work's repository and purpose to the human.
+Session naming is an optional convenience when concurrent terminals would otherwise be
+ambiguous. It is not a design prerequisite.
 
 ## Resolve the boundary
 
