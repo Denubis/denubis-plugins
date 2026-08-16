@@ -186,6 +186,12 @@ def main() -> None:
                 max_age_seconds=_SAMPLE_MAX_AGE,
                 session_id=session_id,
             )
+            cache.write_quota_snapshot(
+                cache.quota_snapshot_path("five_hour"),
+                timestamp=now,
+                used_pct=used,
+                resets_at=resets,
+            )
             rate_parts.append(_window_cell("5h", used, resets, now, _FIVE_HOUR_WINDOW))
 
         if seven_day:
@@ -198,6 +204,12 @@ def main() -> None:
                 used,
                 max_age_seconds=_SAMPLE_MAX_AGE,
                 session_id=session_id,
+            )
+            cache.write_quota_snapshot(
+                cache.quota_snapshot_path("seven_day"),
+                timestamp=now,
+                used_pct=used,
+                resets_at=resets,
             )
             rate_parts.append(_window_cell("7d", used, resets, now, _SEVEN_DAY_WINDOW))
             seven_day_samples = cache.read_rate_samples(cache_file)

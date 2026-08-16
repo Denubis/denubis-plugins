@@ -20,6 +20,32 @@ def rate_cache_path(window_key: str) -> str:
     return str(Path(base) / "claude-statusline" / f"rate-{window_key}")
 
 
+def quota_snapshot_path(window_key: str) -> str:
+    """Return the per-user snapshot file path for a rate-limit window.
+
+    Sits beside the rate-sample buffers. The file is an external contract:
+    tmux-codex-quota's claude_quota.py reads it to render the byobu cell.
+    """
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    base = xdg or str(Path(os.environ.get("HOME", "/tmp")) / ".cache")
+    return str(Path(base) / "claude-statusline" / f"quota-{window_key}")
+
+
+def write_quota_snapshot(
+    snapshot_file: str, *, timestamp: float, used_pct: float, resets_at: float
+) -> None:
+    """Atomically overwrite the one-line snapshot ``timestamp|used_pct|resets_at``.
+
+    The pid-suffixed temp name keeps concurrent statusline renders from
+    clobbering each other's partial writes; last completed rename wins.
+    """
+    Path(snapshot_file).parent.mkdir(parents=True, exist_ok=True)
+    tmp = f"{snapshot_file}.{os.getpid()}.tmp"
+    with Path(tmp).open("w") as f:
+        f.write(f"{timestamp}|{used_pct}|{resets_at}\n")
+    Path(tmp).replace(snapshot_file)
+
+
 def read_if_fresh(cache_file: str, max_age: float) -> str | None:
     """Return file contents if the file exists and is younger than max_age seconds.
 

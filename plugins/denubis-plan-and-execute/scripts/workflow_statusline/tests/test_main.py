@@ -466,3 +466,36 @@ class TestTmuxIntegration:
             capture_output=True,
         )
         mock_tmux_cache.write.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Quota snapshot side-effect — external contract for the byobu quota cell
+# ---------------------------------------------------------------------------
+class TestQuotaSnapshotSideEffect:
+    def test_writes_quota_snapshots_for_both_windows(self, tmp_path, monkeypatch):
+        """main() persists timestamp|used_pct|resets_at per window, read by
+        tmux-codex-quota/claude_quota.py."""
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        payload = _base_payload(
+            rate_limits={
+                "five_hour": {"used_percentage": 12, "resets_at": 1003600.0},
+                "seven_day": {"used_percentage": 34, "resets_at": 1086400.0},
+            }
+        )
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch("workflow_statusline.__main__.git_location", return_value=loc),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
+            mock.patch("workflow_statusline.__main__.time") as mock_time,
+            mock.patch("workflow_statusline.__main__.maybe_rename"),
+        ):
+            mock_time.time.return_value = 1000000.0
+            main()
+
+        base = tmp_path / "claude-statusline"
+        assert (base / "quota-five_hour").read_text() == "1000000.0|12|1003600.0\n"
+        assert (base / "quota-seven_day").read_text() == "1000000.0|34|1086400.0\n"

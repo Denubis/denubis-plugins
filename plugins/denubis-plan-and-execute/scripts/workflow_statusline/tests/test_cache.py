@@ -309,3 +309,44 @@ class TestDefaultCachePath:
         path = cache.rate_cache_path("seven_day")
         assert str(xdg) in path
         assert "rate-seven_day" in path
+
+
+class TestQuotaSnapshot:
+    """The quota snapshot is the external contract read by the byobu cell
+    (tmux-codex-quota/claude_quota.py): one line, ``timestamp|used_pct|resets_at``.
+    """
+
+    def test_path_lives_beside_rate_cache(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        path = cache.quota_snapshot_path("seven_day")
+        assert str(tmp_path) in path
+        assert "claude-statusline" in path
+        assert path.endswith("quota-seven_day")
+
+    def test_write_produces_single_parseable_line(self, tmp_path: Path) -> None:
+        snapshot_file = str(tmp_path / "quota-seven_day")
+        cache.write_quota_snapshot(
+            snapshot_file, timestamp=1000.5, used_pct=34.0, resets_at=90000.0
+        )
+        content = Path(snapshot_file).read_text()
+        assert content == "1000.5|34.0|90000.0\n"
+
+    def test_write_overwrites_previous_snapshot(self, tmp_path: Path) -> None:
+        snapshot_file = str(tmp_path / "quota-five_hour")
+        cache.write_quota_snapshot(
+            snapshot_file, timestamp=1000.0, used_pct=10.0, resets_at=5000.0
+        )
+        cache.write_quota_snapshot(
+            snapshot_file, timestamp=2000.0, used_pct=12.0, resets_at=5000.0
+        )
+        content = Path(snapshot_file).read_text()
+        assert content == "2000.0|12.0|5000.0\n"
+
+    def test_write_creates_parent_directories(self, tmp_path: Path) -> None:
+        snapshot_file = str(tmp_path / "deep" / "nested" / "quota-seven_day")
+        cache.write_quota_snapshot(
+            snapshot_file, timestamp=1.0, used_pct=2.0, resets_at=3.0
+        )
+        assert Path(snapshot_file).exists()
