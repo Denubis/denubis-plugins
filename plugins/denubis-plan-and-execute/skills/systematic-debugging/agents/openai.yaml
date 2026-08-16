@@ -1,0 +1,7 @@
+interface:
+  display_name: "Systematic Debugging"
+  short_description: "Find and fix the demonstrated causal mechanism"
+  default_prompt: "Use $systematic-debugging to establish the cause of this unexpected behavior."
+
+policy:
+  allow_implicit_invocation: true

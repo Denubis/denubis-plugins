@@ -1,0 +1,7 @@
+interface:
+  display_name: "Coherence Review"
+  short_description: "Audit implementation against an accepted design"
+  default_prompt: "Use $exec-coherence-review to test this implementation against the accepted design."
+
+policy:
+  allow_implicit_invocation: true

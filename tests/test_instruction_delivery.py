@@ -12,8 +12,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 PROJECT_NOTES_ROOT = REPO_ROOT / "plugins" / "denubis-project-notes"
 PLAN_HOOKS = (
-    REPO_ROOT / "plugins" / "denubis-plan-and-execute" / "hooks" / "hooks.json"
+    REPO_ROOT
+    / "plugins"
+    / "denubis-plan-and-execute"
+    / "hooks"
+    / "claude-hooks.json"
 )
+
+
+def _claude_hooks_path(plugin_root: Path) -> Path:
+    manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    return plugin_root / manifest.get("hooks", "hooks/hooks.json")
 
 
 def _marketplace_hook_events() -> set[tuple[str, str]]:
@@ -23,7 +33,7 @@ def _marketplace_hook_events() -> set[tuple[str, str]]:
     for plugin in marketplace["plugins"]:
         source = plugin["source"]
         plugin_root = REPO_ROOT / source.removeprefix("./")
-        hooks_path = plugin_root / "hooks" / "hooks.json"
+        hooks_path = _claude_hooks_path(plugin_root)
         if not hooks_path.is_file():
             continue
         hooks = json.loads(hooks_path.read_text(encoding="utf-8"))["hooks"]

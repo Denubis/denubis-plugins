@@ -1,59 +1,41 @@
 # denubis-git-commit — Context (Level 0)
 
-> System boundary: a single-skill plugin implementing `/commit` as a user-invocable skill that drafts and creates git commits with project-specific message conventions.
+> System boundary: one explicit-only shared skill that records an authorized coherent
+> outcome as a local Git commit without publishing it.
 
-## Diagram
+## Context
 
 ```mermaid
 flowchart LR
-    User[Human user]
-    CC[Claude Code host]
-    Git[git CLI]
+    H[Human or approved execution lifecycle]
+    A[Claude Code or Codex session]
+    S[Shared commit skill]
+    G[Git repository]
 
-    Plugin((0.0\ndenubis-git-commit))
-
-    User -->|"/commit\n(or 'commit this')"| CC
-    CC -->|"loads SKILL.md\ninto model context"| Plugin
-    Plugin -.->|"behavioural prompt\ndrives staging,\ndiff inspection,\nmessage drafting,\ncommit creation"| CC
-    CC <-->|"git status / diff / log\ngit add / commit"| Git
+    H -->|bounded commit authority| A
+    A -->|loads provider-neutral procedure| S
+    S -->|inspect, stage owned paths, commit| G
+    G -->|status, diff, log, new commit id| A
 ```
 
-## External Entities
+## Current contracts
 
-| Entity | Description | Inputs to System | Outputs from System |
-|--------|-------------|------------------|---------------------|
-| Human user | Invokes the skill via `/commit` or by asking Claude to commit. | `/commit` invocation; staged or unstaged changes in the working tree | A git commit (created by Claude via the Bash tool, per the skill's instructions) |
-| Claude Code host | Loads `SKILL.md` into context on invocation; runs `git` commands via the `Bash` tool. | Skill invocation | Skill body as a behavioural prompt for the model |
-| git CLI | Source of working-tree state and target of the eventual commit. | `git status`, `git diff`, `git log` (read); `git add`, `git commit` (write) — invoked by the model following the skill | A new commit on the current branch |
+| Boundary | Contract |
+|---|---|
+| Authority | A direct commit request or an approved plan's private-checkpoint lifecycle authorizes the owned local commit. Push, publication, deployment, destructive cleanup, and inherited-history rewriting remain separate. |
+| Outcome | Stage one coherent completed outcome rather than files grouped by authoring chronology. If the changes cannot be explained as one outcome, separate them by behavior and dependency. |
+| Preflight | Inspect repository root, branch, worktree status, staged and unstaged diffs, untracked files, recent message convention, and applicable project instructions before mutation. |
+| Documentation | Update living documentation when the changed behavior makes it false. Do not turn commit messages into the only durable design or operating documentation. |
+| Verification | Run the checks that own the staged behavior, inspect the exact staged diff, commit through a message file, then verify the resulting commit and remaining status. |
+| Lifecycle | Private checkpoints may be frequent. Fix rounds and superseded checkpoints fold into their coherent outcome only after accepted finished-work human UAT. |
 
-## System Boundary
+The skill is explicit-only in Codex metadata. Claude's `/commit` entry remains a direct
+human invocation. Neither provider may infer permission to push from permission to commit.
 
-**In scope:**
-- Drive Claude to run `git status`, `git diff`, and `git log` to inspect changes;
-  check whether changed contracts, APIs, domain structure, or agent instructions require
-  corresponding `CLAUDE.md` or `AGENTS.md` updates; draft a commit message that matches
-  the repo's existing style; stage relevant files; and create the commit
-  (`plugins/denubis-git-commit/skills/commit/SKILL.md`). The skill is
-  `user-invocable: true` so the user can type `/commit` directly.
+## Packaging
 
-**Out of scope:**
-- Pushing — no `git push` unless the user separately asks.
-- Pre-commit hook bypass — the skill respects `--no-verify` only on explicit user request.
-- Authoring `.gitignore`, branch management, or rebase operations.
-- Multi-repo or cross-worktree commits.
-- Generic reminders after read-only git inspection; documentation freshness is checked
-  at the commit-preparation boundary.
-
-## What This Plugin Ships
-
-### Skills (`plugins/denubis-git-commit/skills/`)
-
-| Skill | User-invocable? | Description (frontmatter) |
-|-------|-----------------|---------------------------|
-| `commit` | yes | Create git commits with proper analysis, message drafting, and project conventions. Use when asked to commit, or when `/commit` is invoked. (`commit/SKILL.md`, `1ef36f5`) |
-
-## Cross-References
-
-- **Plugin manifest:** `plugins/denubis-git-commit/.claude-plugin/plugin.json`, version 1.2.2. Manifest description: *"Git commit skill for Claude Code. Handles /commit as a proper skill instead of failing as a non-existent built-in."*
-- **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
-- **Shared docs:** `../../README.md`, `../../glossary.md`, `../../constraints.md`.
+- Shared procedure: `plugins/denubis-git-commit/skills/commit/SKILL.md`.
+- Claude manifest: `plugins/denubis-git-commit/.claude-plugin/plugin.json`.
+- Codex manifest: `plugins/denubis-git-commit/.codex-plugin/plugin.json`.
+- Codex invocation policy:
+  `plugins/denubis-git-commit/skills/commit/agents/openai.yaml`.

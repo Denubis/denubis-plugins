@@ -1,0 +1,7 @@
+interface:
+  display_name: "Python Project Idioms"
+  short_description: "Follow the project's Python versions and tools"
+  default_prompt: "Use $coding-python-idioms to implement this Python change within project constraints."
+
+policy:
+  allow_implicit_invocation: true

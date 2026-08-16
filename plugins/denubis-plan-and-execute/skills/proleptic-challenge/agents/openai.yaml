@@ -1,0 +1,7 @@
+interface:
+  display_name: "Proleptic Challenge"
+  short_description: "Challenge a consequential decision before it binds work"
+  default_prompt: "Use $proleptic-challenge to test this decision's named uncertainty before proceeding."
+
+policy:
+  allow_implicit_invocation: true

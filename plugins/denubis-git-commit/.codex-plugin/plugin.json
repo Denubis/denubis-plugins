@@ -1,0 +1,22 @@
+{
+  "name": "denubis-git-commit",
+  "version": "1.2.2",
+  "description": "Create intentional Git commits at authorized workflow boundaries.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["git", "commit", "workflow"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Git Commit",
+    "shortDescription": "Record coherent outcomes without publishing them",
+    "longDescription": "Inspect owned changes, stage one coherent outcome, and create an authorized local Git commit without pushing or rewriting shared history.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Commit the coherent outcome I have authorized, without publishing it."]
+  }
+}

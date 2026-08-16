@@ -1,0 +1,22 @@
+{
+  "name": "denubis-academic",
+  "version": "0.15.0",
+  "description": "Academic writing, manuscript review, and Zotero-backed source workflows.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["academic", "writing", "peer-review", "zotero", "bibliography"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Academic Research",
+    "shortDescription": "Write, review, and verify scholarly work",
+    "longDescription": "Evidence-bounded academic revision and manuscript review, with Zotero resolution, rendered-paper reading, quotation verification, and controlled bibliography writes.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Review this manuscript against its evidence and project register."]
+  }
+}

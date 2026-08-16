@@ -1,0 +1,7 @@
+interface:
+  display_name: "Defense in Depth"
+  short_description: "Assign distinct invariants to reliable boundaries"
+  default_prompt: "Use $defense-in-depth to place validation at the boundaries that own it."
+
+policy:
+  allow_implicit_invocation: true

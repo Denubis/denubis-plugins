@@ -1,12 +1,13 @@
 {
   "name": "denubis-plan-and-execute",
   "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "github": "denubis"
   },
   "license": "CC-BY-SA-4.0",
+  "hooks": "./hooks/claude-hooks.json",
   "keywords": [
     "skills",
     "tdd",

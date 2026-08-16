@@ -4,23 +4,27 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 
 ## Marketplace and Plugin Structure
 
-- **Marketplace**: the deployment catalogue in `.claude-plugin/marketplace.json` at the
-  repo root. Plugins are installed individually as `<name>@denubis-plugins`. The
-  marketplace is packaging, not the architectural decomposition axis.
+- **Marketplace**: a provider deployment catalogue. Claude Code reads
+  `.claude-plugin/marketplace.json`; Codex reads `.agents/plugins/marketplace.json`.
+  Plugins are installed individually as `<name>@denubis-plugins`. A catalogue is
+  packaging, not the architectural decomposition axis.
 - **Plugin**: a directory under `plugins/<name>/` shipping any combination of skills,
-  agents, commands, hooks, and scripts. Every plugin manifest is at
-  `plugins/<name>/.claude-plugin/plugin.json`; hook registration remains under
-  `plugins/<name>/hooks/hooks.json`.
+  agents, commands, hooks, and scripts. Claude manifests live at
+  `plugins/<name>/.claude-plugin/plugin.json`; Codex-compatible plugins also have
+  `plugins/<name>/.codex-plugin/plugin.json` and per-skill `agents/openai.yaml` metadata.
+  Provider hook registrations are named explicitly when their commands or events differ.
 - **Skill**: a `SKILL.md` file under `plugins/<name>/skills/<skill-name>/` providing
-  structured instructions to Claude for a specific task. A model-invocable skill's
-  description is available to Claude and its full body loads when invoked.
+  the canonical procedure for a specific task. A model-invocable skill's description is
+  available to the provider and its full body loads when invoked.
   `user-invocable: false` prevents user invocation but still permits Claude to invoke the
   skill; `disable-model-invocation: true` prevents Claude from doing so. See the current
   [Claude Code skill invocation controls](https://code.claude.com/docs/en/slash-commands#control-who-invokes-a-skill)
   (verified 2026-08-12).
 - **Agent**: a markdown file under `plugins/<name>/agents/<agent-name>.md` with frontmatter declaring `name`, `model`, and `description`. Dispatched via the `Task` tool with `subagent_type: <plugin>:<agent-name>`.
 - **Command**: a slash-command markdown file under `plugins/<name>/commands/<name>.md`. The user types `/<name>` to invoke; the command body is loaded directly into the model's context.
-- **Hook**: a Python or shell script under `plugins/<name>/hooks/` declared in a `hooks.json` config. Triggered by Claude Code on lifecycle events. Returns a JSON decision on stdout.
+- **Hook**: a Python or shell script under `plugins/<name>/hooks/`, declared by a
+  provider manifest through a provider-specific hook JSON file. The script may be shared
+  even when event matchers, root variables, trust, or launch commands differ.
 - **Hook events** in the current source marketplace: `SessionStart` and `PreToolUse`.
   The remaining SessionStart hooks perform terminal recolouring or live-marker
   maintenance; they do not inject generic workflow prose.

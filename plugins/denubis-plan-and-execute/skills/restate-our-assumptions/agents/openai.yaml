@@ -1,0 +1,7 @@
+interface:
+  display_name: "Restate Our Assumptions"
+  short_description: "Test current architecture and dependency assumptions"
+  default_prompt: "Use $restate-our-assumptions to audit the assumptions behind this system."
+
+policy:
+  allow_implicit_invocation: true

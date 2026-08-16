@@ -1,0 +1,7 @@
+interface:
+  display_name: "Request Code Review"
+  short_description: "Target review at a concrete implementation claim"
+  default_prompt: "Use $requesting-code-review to seek evidence against this implementation claim."
+
+policy:
+  allow_implicit_invocation: true

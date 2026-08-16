@@ -1,0 +1,7 @@
+interface:
+  display_name: "Create a Pull Request"
+  short_description: "Verify and publish a requested branch as a PR"
+  default_prompt: "Use $make-pr to verify this branch and create the requested pull request."
+
+policy:
+  allow_implicit_invocation: false

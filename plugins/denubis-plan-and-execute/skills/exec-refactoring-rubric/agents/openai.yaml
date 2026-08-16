@@ -1,0 +1,7 @@
+interface:
+  display_name: "Refactoring Rubric"
+  short_description: "Bound a behavior-preserving refactor by evidence"
+  default_prompt: "Use $exec-refactoring-rubric to decide whether and how this refactor is justified."
+
+policy:
+  allow_implicit_invocation: true

@@ -374,3 +374,32 @@ No history normalization occurred. The final gate asked a human to run and touch
 modes and judge whether the option and documentation were unsurprising; it also named
 specific falsifiers. That places implication-level UAT after mechanical and sanity checks
 while preserving the checkpoint history until human acceptance.
+
+### Installed-runtime proportionality failure
+
+The original checkpoint/UAT actor brief named four overlapping skills, and its evaluator
+oracle judged lifecycle correctness without asking whether each additional procedure,
+search, tracker, or progress report had a consumer. It therefore established the commit
+and UAT order but could not detect orchestration overhead.
+
+A fresh Codex CLI run from the installed `4.0.1` cache exposed that missing boundary on a
+three-file greeting fixture. The actor correctly implemented one outcome, created one
+private checkpoint, ran mechanical and consumer checks, and stopped before normalization.
+It also invoked project-memory retrieval solely because a file edit was about to happen,
+performed broad and then scoped prior-chat searches with no task-local dependency, loaded
+six overlapping workflow skills, restated the supplied plan in another tracker, narrated
+routine transitions, and created a disposable whitespace defect to validate a secondary
+`git diff --check` observation. Brian rejected the workflow even though the greeting
+behavior itself passed.
+
+The actor brief now supplies only the top-level execution skill. Its separate evaluator
+oracle inspects loaded skill files, searches, trackers, temporary controls, and progress
+reports, and asks whether each resolved a concrete uncertainty or protected recoverable
+state. It deliberately does not use command, token, elapsed-time, or wording quotas. A
+fresh actor run against the source correction produced one private outcome checkpoint,
+used the supplied plan as its only tracker, and reported no project-memory or prior-chat
+search, additional workflow skill, or disposable hygiene control. The independent
+evaluator found no oracle failure in the Git tree, reflog, implementation, tests, or
+documentation. It also bounded the result correctly: ephemeral skill loads, searches,
+trackers, and narration are not recoverable from repository state. The installed Codex
+transcript therefore remains the decisive evidence for those proportionality boundaries.

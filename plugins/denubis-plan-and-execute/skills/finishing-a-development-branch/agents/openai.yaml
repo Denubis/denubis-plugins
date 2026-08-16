@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finish a Development Branch"
+  short_description: "Offer integration routes after accepted branch work"
+  default_prompt: "Use $finishing-a-development-branch to prepare this accepted branch for integration."
+
+policy:
+  allow_implicit_invocation: true

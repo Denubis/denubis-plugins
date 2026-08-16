@@ -1,0 +1,7 @@
+interface:
+  display_name: "Coding Effectively"
+  short_description: "Guide direct code work without duplicate workflow layers"
+  default_prompt: "Use $coding-effectively for this direct code change when no other workflow owns implementation."
+
+policy:
+  allow_implicit_invocation: true

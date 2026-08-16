@@ -8,7 +8,7 @@
 ```mermaid
 flowchart LR
     H[Human author or reviewer]
-    C[Claude Code host]
+    C[Claude Code or Codex host]
     P[Academic plugin]
     N[Project writing and register notes]
     M[Manuscript]
@@ -30,7 +30,7 @@ flowchart LR
 | Component | Responsibility |
 |---|---|
 | `academic-writing` skill | Loads project register notes before drafting or revising, then applies the portable prose and revision discipline (`plugins/denubis-academic/skills/academic-writing/SKILL.md`, `8dae417`). |
-| `paper-review` skill | Runs a diagnostic manuscript review across independent lanes while keeping defects, concerns, competing readings, and uncertainty distinct (`plugins/denubis-academic/skills/paper-review/SKILL.md`, `ba8acdb`). |
+| `paper-review` skill | Selects relevant review facets, orders them by evidence dependency, and keeps defects, concerns, competing readings, and uncertainty distinct (`plugins/denubis-academic/skills/paper-review/SKILL.md`). |
 | `using-bibliography` skill | Routes Zotero resolution, rendering, source-fidelity checks, confirmed writes, bibliography refresh, notes, and installation recovery (`plugins/denubis-academic/skills/using-bibliography/SKILL.md`). |
 | `Academic Writing` output style | Holds the portable prose register continuously while retaining coding instructions (`plugins/denubis-academic/output-styles/academic-writing.md`, `8dae417`). |
 | Bibliography helpers | `resolve.py` is the front door; `ingest.py` handles DOI batches; `render.py` owns the render cascade; the remaining helpers preview and perform bounded Zotero or quotation operations (`plugins/denubis-academic/skills/using-bibliography/`). |
@@ -54,10 +54,10 @@ flowchart LR
 - Rendered Markdown supports source inspection. Clean text-layer page Markdown
   can ground an exact quote; OCR Markdown is only a locator until the wording is
   visually checked against the source PDF.
-- Installed helpers resolve from Claude's plugin root and do not depend on a
-  developer checkout or caller working directory. `${CLAUDE_PLUGIN_ROOT}`
-  resolves anywhere it appears in skill and agent content
-  (code.claude.com/docs/en/plugins-reference, verified 2026-08-14).
+- Installed helpers resolve Codex's `PLUGIN_ROOT` or Claude Code's
+  `CLAUDE_PLUGIN_ROOT` and do not depend on a developer checkout or caller working
+  directory. Executable portability tests exercise both provider environments and their
+  precedence.
 - Missing Zotero, configuration, attachment, renderer, or zettelkasten preconditions
   block only the literature operation that depends on them.
 - A project register can override the portable writing floor. The session must read it;
@@ -65,7 +65,7 @@ flowchart LR
 
 ## Cross-references
 
-- **Plugin manifest:** `plugins/denubis-academic/.claude-plugin/plugin.json`, version
-  0.15.0.
+- **Plugin manifests:** `plugins/denubis-academic/.claude-plugin/plugin.json` and
+  `plugins/denubis-academic/.codex-plugin/plugin.json`, version 0.15.0.
 - **Bundled bibliography:** `plugins/denubis-academic/references.bib` (`42a3287`).
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

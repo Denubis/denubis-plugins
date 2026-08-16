@@ -1,0 +1,7 @@
+interface:
+  display_name: "Merge to Main"
+  short_description: "Verify and perform a requested local main merge"
+  default_prompt: "Use $merge-to-main to verify and merge this accepted branch into main."
+
+policy:
+  allow_implicit_invocation: false

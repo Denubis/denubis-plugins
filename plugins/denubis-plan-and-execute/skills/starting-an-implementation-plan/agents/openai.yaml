@@ -1,0 +1,7 @@
+interface:
+  display_name: "Start an Implementation Plan"
+  short_description: "Turn an accepted design into outcome-owned work"
+  default_prompt: "Use $starting-an-implementation-plan to plan implementation of this accepted design."
+
+policy:
+  allow_implicit_invocation: true

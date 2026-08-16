@@ -1,9 +1,9 @@
 # Instruction control — Context (Level 0)
 
-> System boundary: the cross-cutting system that supplies instructions to a Claude Code
-> session, constrains selected actions, recalls project knowledge, and records evidence
-> about what happened. Plugins and marketplaces are deployment packaging within this
-> system, not its architectural boundary.
+> System boundary: the cross-cutting system that supplies instructions to Claude Code and
+> Codex sessions, constrains selected actions, recalls project knowledge, and records
+> evidence about what happened. Plugins and marketplaces are deployment packaging within
+> this system, not its architectural boundary.
 
 This document separates the source candidate in this worktree from the live state observed
 on host `foa4008439` on 2026-08-11. The project-note inventory was rechecked on
@@ -15,7 +15,7 @@ on host `foa4008439` on 2026-08-11. The project-note inventory was rechecked on
 ```mermaid
 flowchart LR
     H[Human]
-    C[Claude Code session]
+    C[Claude Code or Codex session]
     G[Global CLAUDE.md and rules]
     P[Project CLAUDE.md]
     S[Global settings]
@@ -63,10 +63,10 @@ it.
 | Global rules | Human-maintained, machine-local configuration | Matching Claude sessions | Loaded by Claude Code | Live `~/.claude/rules/context7.md`, observed digest below | Machine-local drift; no repository review or deployment receipt. |
 | Output style | Plugin source, selected by global settings | Every response in the configured session | Claude Code loads the selected Markdown style | Live settings and installed file digests below | The settings identifier names `denubis-plan-and-execute` while the observed installed source is under `denubis-academic`; this document does not infer how Claude resolves that mismatch. |
 | Direct hooks | Human-maintained global settings and scripts | Claude Code event dispatcher | Commands registered directly in `settings.json` | Live settings digest below | Machine-local and outside this repository. A zero exit or context message is not proof that the intended policy held. |
-| Plugin hooks | Plugin source, enabled by global settings | Claude Code event dispatcher | Event registrations in each plugin's `hooks.json` | Source files cited in the event table | Source, marketplace metadata, cache, and enablement can drift independently. |
-| Skills and commands | Plugin source | Main session when invoked or injected | Markdown procedures loaded on demand; some are injected by hooks | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
+| Plugin hooks | Plugin source, enabled by provider configuration and trust | Provider event dispatcher | Provider manifest points to its hook registration; scripts may be shared | Source files cited in the event table | Source, marketplace metadata, installed cache, trust, and enablement can drift independently. |
+| Skills and commands | Plugin source | Main session when invoked or selected | Shared Markdown procedures load on demand; provider metadata controls discovery and invocation | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
 | Agents and external advisors | Plugin source plus model/runtime | Main session and human | Delegated work returned as model output | Source-tagged result; some paths verify source access | A fluent report is not proof. The proposer and verifier can share blind spots. |
-| Project `.notes/` | Human-approved, gitignored project memory | Main session | The core candidate performs direct task-entry inventory and raw-source resolution. No top-level Markdown notes remain; `.notes/local-mail/` is operational coordination state, not project memory. `denubis-project-notes` remains source-only until cross-vendor exact resolution is ready. | Main-repository `.notes/`, exhaustively listed with hidden and ignored scope on 2026-08-12 | Hidden and ignored scope makes incomplete search look empty. Frontmatter and referenced evidence can drift. |
+| Project `.notes/` | Human-approved, gitignored project memory | Main session when recovery is explicitly invoked or a named dependency requires it | `denubis-project-notes` inventories the main repository and resolves relied-on raw sources; Codex implicit invocation is disabled | Project `.notes/`, including hidden and ignored scope | Hidden and ignored scope makes incomplete search look empty. Selection can omit a relevant note; frontmatter and referenced evidence can drift. Operational coordination databases are not durable project memory. |
 | Human transcripts | Claude and Codex runtimes | Human, search tools, authority-bearing documents | Vendor JSONL and transcript archives; installed `cc-search-chats` 2.0.0a5 currently describes itself as Claude-only | Raw record and exact message locator | Provider schemas and paths differ. Cross-vendor search is prospective. A summary or model quotation is not the human invocation. |
 | Plans, ADRs, notes, constraints, and architecture | Repository or project authors | Humans and future sessions | Markdown memorials and living maps | Resolvable source pointer or repository evidence | A broken pointer is an integrity defect. Correction layers create palimpsests rather than current documents. The deployment manifest now verifies the raw human records used by this candidate. |
 | Tests and hook logs | Executed mechanism | Human or a downstream gate | External result bound to an artifact or event | Test output or structured log | Self-report is not evidence. A result without subject identity or invalidation rules cannot bind later action. A test that only matches source wording observes the edit rather than correctness. |
@@ -79,9 +79,8 @@ fires successfully on every machine.
 | Event | Registration | Effect class | Observable behaviour |
 |---|---|---|---|
 | `SessionStart` | global settings | Context | Emits the current date. |
-| `SessionStart` | `denubis-plan-and-execute` | Side effect | Updates the crash-recovery live marker; it emits no generic workflow context (`plugins/denubis-plan-and-execute/hooks/hooks.json`). |
-| `SessionStart` | `denubis-hook-branch-bg` | User-interface side effect | Recolours the terminal from repository and branch identity; ordinary success is silent (`plugins/denubis-hook-branch-bg/hooks/branch-bg.py::main`). |
-| `PreToolUse:Write\|Edit` | `denubis-plan-and-execute` | Permission decision or context | Denies selected writes and warns on others (`plugins/denubis-plan-and-execute/hooks/hooks.json`, `215efb9`). |
+| `SessionStart` | `denubis-plan-and-execute` on Claude Code only | Side effect | Updates the crash-recovery live marker; Codex's explicit empty registration excludes this Claude-only protocol (`plugins/denubis-plan-and-execute/hooks/claude-hooks.json`). |
+| `SessionStart` | `denubis-hook-branch-bg` on Claude Code and Codex | User-interface side effect | Recolours the terminal from repository and branch identity through provider-specific registrations and one shared script; ordinary success is silent (`plugins/denubis-hook-branch-bg/hooks/branch-bg.py::main`). |
 | `PreToolUse:Bash` | global approver | Permission decision or context | Runs the machine-local approver before Bash. This repository does not own or test it. |
 | `PreToolUse:Bash` | dispatcher plus sibling guards | Permission decision or context | Discovers sibling `pretooluse-bash.sh` programs; the fork guard can deny a `gh` target (`plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json`, `215efb9`; `plugins/denubis-hook-gh-fork-guard/hooks/pretooluse-bash.sh`, `566f230`). |
 | `PostToolUse:Bash` | global approver | Context | Runs the same machine-local approver after Bash. |
@@ -102,10 +101,10 @@ fires successfully on every machine.
 
 ## Source and deployment boundary
 
-The repository contains plugin source and catalogue metadata. A live session consumes
-machine-local configuration and installed cache content. Therefore a source edit is not
-evidence of deployment, and an enabled-plugin entry is not evidence that the cache holds
-the same bytes.
+The repository contains plugin source plus Claude Code and Codex catalogue metadata. A
+live session consumes machine-local configuration, trust decisions, and installed cache
+content. Therefore a source edit is not evidence of deployment, and an enabled-plugin
+entry is not evidence that the cache holds the same bytes.
 
 Observed machine-local artifacts on 2026-08-11:
 
@@ -122,8 +121,8 @@ These are observation stamps, not synchronization policy. Recompute them before 
 on the snapshot. Each machine's live `~/.claude` is authoritative for that machine;
 remote shell access does not imply replicated state.
 
-The 2026-08-12 exhaustive inventory found zero top-level Markdown files in the
-main-repository `.notes/`; only `.notes/local-mail/index.sqlite3` remained.
+The 2026-08-12 inventory is a historical observation, not a current memory contract.
+The discarded local-mail SQLite prototype is not a project-note mechanism.
 
 ## Exclusions
 

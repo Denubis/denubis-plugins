@@ -22,7 +22,7 @@ This test lifts that remedy from reviewer-eye to an automated guard (Ford et
 al., Building Evolutionary Architectures), as the sibling `test_hook_portability`
 does for the 3.14-syntax class. Two teeth:
 
-  * a static check that every `uv run` launcher in `plugins/*/hooks/hooks.json`
+  * a static check that every `uv run` launcher declared by a Claude plugin manifest
     carries both flags (runs without uv, so it guards even where uv is absent);
   * a behavioural check that each launcher, invoked from a conflict-marked cwd,
     does not die in settings discovery — paired with a teeth test proving a bare
@@ -100,18 +100,23 @@ def _iter_commands(node: object) -> list[str]:
 
 
 def _uv_run_launchers() -> list[tuple[str, Path]]:
-    """(command, plugin_root) for every ``uv run`` launcher in main-tree hooks.
+    """(command, plugin_root) for every Claude ``uv run`` launcher.
 
-    plugin_root is the hooks.json's plugin directory, i.e. the value the hook
+    plugin_root is the manifest's plugin directory, i.e. the value the hook
     receives as CLAUDE_PLUGIN_ROOT at runtime.
     """
     launchers: list[tuple[str, Path]] = []
-    for hooks_json in sorted(_PLUGINS_DIR.glob("*/hooks/hooks.json")):
+    for plugin_root in sorted(path for path in _PLUGINS_DIR.iterdir() if path.is_dir()):
+        manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        hooks_json = plugin_root / manifest.get("hooks", "hooks/hooks.json")
         try:
             data = json.loads(hooks_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        plugin_root = hooks_json.parent.parent
         for command in _iter_commands(data):
             if "uv run" in command:
                 launchers.append((command, plugin_root))
@@ -166,8 +171,8 @@ def _os_path() -> str:
 
 
 def test_at_least_one_uv_launcher_discovered() -> None:
-    """Sanity: the glob finds uv launchers. Catches a silent layout regression."""
-    assert _LAUNCHERS, f"no `uv run` launchers found under {_PLUGINS_DIR}/*/hooks/hooks.json"
+    """Sanity: manifest discovery finds uv launchers."""
+    assert _LAUNCHERS, f"no Claude `uv run` hook launchers found under {_PLUGINS_DIR}"
 
 
 @pytest.mark.parametrize("entry", _LAUNCHERS, ids=_launcher_id)

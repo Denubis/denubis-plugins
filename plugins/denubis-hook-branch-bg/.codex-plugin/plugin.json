@@ -1,0 +1,22 @@
+{
+  "name": "denubis-hook-branch-bg",
+  "version": "0.2.6",
+  "description": "Set a terminal background color from the current Git repository and branch.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["hooks", "terminal", "git", "worktrees"],
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Branch Background",
+    "shortDescription": "Color terminal backgrounds by repository and branch",
+    "longDescription": "Set a stable terminal background color family from the Git common directory and vary it by branch so related worktrees remain recognizable.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Hooks"],
+    "defaultPrompt": ["Enable repository and branch background colors for this Codex session."]
+  }
+}

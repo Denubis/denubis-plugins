@@ -8,8 +8,8 @@
 ```mermaid
 flowchart LR
     H[Human]
-    C[Claude session or shell]
-    P[estimate command and scripts]
+    C[Claude Code, Codex, or shell]
+    P[shared skill and scripts]
     CL[Claude Code logs]
     CX[Codex rollout logs]
     M[.token-estimator mapping]
@@ -17,7 +17,7 @@ flowchart LR
     V[Verification report]
 
     H -->|scope and options| C
-    C -->|/estimate or script call| P
+    C -->|provider entry or installed script call| P
     CL -->|read-only records| P
     CX -->|read-only records| P
     M -->|canonical project mapping| P
@@ -38,8 +38,8 @@ flowchart LR
 
 ## What the plugin ships
 
-- `/estimate`, a Bash-enabled command that selects project, person, all-project, monthly,
-  and CSV scopes (`plugins/denubis-token-estimator/commands/estimate.md`, `fb92d59`).
+- Claude Code's `/estimate` command selects project, person, all-project, monthly, and CSV
+  scopes. Codex invokes the same installed scripts through the shared skill.
 - `using-token-estimator`, the methodology and operating procedure
   (`plugins/denubis-token-estimator/skills/using-token-estimator/SKILL.md`, `fb92d59`).
 - `estimate.py`, the report engine; `mapper.py`, project identity resolution; and
@@ -58,8 +58,8 @@ flowchart LR
 
 ## Cross-references
 
-- **Plugin manifest:** `plugins/denubis-token-estimator/.claude-plugin/plugin.json`,
-  version 0.1.0 (`fb92d59`).
+- **Plugin manifests:** `plugins/denubis-token-estimator/.claude-plugin/plugin.json` and
+  `plugins/denubis-token-estimator/.codex-plugin/plugin.json`, version 0.1.0.
 - **Design and audit brief:** `plugins/denubis-token-estimator/docs/DESIGN.md` and
   `plugins/denubis-token-estimator/docs/AUDIT-BRIEF.md` (`7b1b4a4`).
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

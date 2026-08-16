@@ -1,0 +1,7 @@
+interface:
+  display_name: "Maintain Architecture"
+  short_description: "Reconcile living architecture with implemented state"
+  default_prompt: "Use $maintain-architecture to reconcile the architecture docs with current code."
+
+policy:
+  allow_implicit_invocation: true

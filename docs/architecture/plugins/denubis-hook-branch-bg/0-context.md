@@ -1,12 +1,13 @@
 # denubis-hook-branch-bg — Context (Level 0)
 
-> System boundary: a single Python script invoked by Claude Code on session start that recolours the terminal background based on the current git repo and branch.
+> System boundary: a single Python script invoked by Claude Code or Codex on session start
+> that recolours the terminal background based on the current Git repo and branch.
 
 ## Diagram
 
 ```mermaid
 flowchart LR
-    CC[Claude Code host]
+    CC[Claude Code or Codex host]
     Git[git CLI]
     Proc@{ shape: das, label: "/proc filesystem" }
     TTY[Terminal device\n/dev/pts/* or /dev/tty*]
@@ -25,7 +26,7 @@ flowchart LR
 
 | Entity | Description | Inputs to System | Outputs from System |
 |--------|-------------|------------------|---------------------|
-| Claude Code host | Emits the `SessionStart` event that triggers the hook. | `SessionStart` event payload (event name and session metadata) | No stdout on ordinary success; the hook's useful output goes directly to the terminal device (`plugins/denubis-hook-branch-bg/hooks/branch-bg.py::main`) |
+| Agent host | Claude Code or Codex emits the `SessionStart` event that triggers the hook. | `SessionStart` event payload; the script itself does not consume provider-specific fields | No stdout on ordinary success; the hook's useful output goes directly to the terminal device (`plugins/denubis-hook-branch-bg/hooks/branch-bg.py::main`) |
 | git CLI | Invoked twice as a subprocess to learn the repo identity and current branch. | `git rev-parse --git-common-dir`; `git rev-parse --abbrev-ref HEAD` (`branch-bg.py::get_git_info`, `f0d1846`) | Common-dir path; branch name |
 | `/proc` filesystem | Read to walk the process tree from the hook's PID up to the controlling terminal. | `readlink /proc/<pid>/fd/0`; `cat /proc/<pid>/stat` (`branch-bg.py::find_terminal`, `f0d1846`) | File-descriptor target; parent PID |
 | Terminal device | The `/dev/pts/*` or `/dev/tty*` device file the OSC 11 escape sequence is written to. | OSC 11 string `\033]11;#RRGGBB\007` (`branch-bg.py::set_terminal_bg`, `f0d1846`) | (none) |
@@ -39,14 +40,14 @@ flowchart LR
 
 **Out of scope:**
 - Persisting or restoring the prior terminal colour (the hook does not save what it overwrites).
-- Non-`SessionStart` events — `hooks.json` registers only on `SessionStart` (`plugins/denubis-hook-branch-bg/hooks/hooks.json`, `22d2148`).
+- Non-`SessionStart` events — both provider registrations contain only `SessionStart`.
 - Non-git directories — `get_git_info` returns `(None, None)` and `main` skips the colour step (`branch-bg.py`, `f0d1846`).
 - Platforms without `/proc` — `find_terminal` returns `None` and `set_terminal_bg` returns without writing (`branch-bg.py::find_terminal`, `f0d1846`).
 - Failure reporting — `subprocess` errors, `OSError`, and `PermissionError` are caught silently (`branch-bg.py::get_git_info`, `set_terminal_bg`, `f0d1846`).
 
 ## Hook Registration
 
-Registered in `plugins/denubis-hook-branch-bg/hooks/hooks.json` (`22d2148`):
+Claude Code registers `plugins/denubis-hook-branch-bg/hooks/claude-hooks.json`:
 
 - **Event:** `SessionStart`
 - **Matcher:** `startup|resume|clear|compact`
@@ -55,9 +56,15 @@ Registered in `plugins/denubis-hook-branch-bg/hooks/hooks.json` (`22d2148`):
 - **suppressOutput:** `true`
 - **Why `--no-project --no-config`:** the launcher must ignore the caller's cwd. A malformed `pyproject.toml` there (e.g. git conflict markers mid-merge) otherwise wedges `uv` in settings discovery before the hook runs. Guarded by `tests/test_hook_launcher_cwd_independence.py`.
 
+Codex registers `plugins/denubis-hook-branch-bg/hooks/codex-hooks.json`. It invokes the
+same standard-library script with `python3 "${PLUGIN_ROOT}/hooks/branch-bg.py"`, has no
+Claude lifecycle matcher, and remains subject to Codex's native hook-trust boundary.
+
 ## Cross-References
 
-- **Plugin manifest:** `plugins/denubis-hook-branch-bg/.claude-plugin/plugin.json`, version 0.2.6.
-- **Marketplace entry:** `.claude-plugin/marketplace.json` (`18f3b80`).
+- **Plugin manifests:** `plugins/denubis-hook-branch-bg/.claude-plugin/plugin.json` and
+  `plugins/denubis-hook-branch-bg/.codex-plugin/plugin.json`, version 0.2.6.
+- **Marketplace entries:** `.claude-plugin/marketplace.json` and
+  `.agents/plugins/marketplace.json`.
 - **Related architecture docs:** `../../README.md` (index), `../../glossary.md`, `../../constraints.md`.
 - **Sibling hook plugins** (peer entities under Claude Code's hook system, not consumers of this plugin's output): `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`.

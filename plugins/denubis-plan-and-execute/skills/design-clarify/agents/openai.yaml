@@ -1,0 +1,7 @@
+interface:
+  display_name: "Clarify a Design"
+  short_description: "Resolve design intent that evidence cannot settle"
+  default_prompt: "Use $design-clarify to resolve the remaining intent in this design request."
+
+policy:
+  allow_implicit_invocation: true

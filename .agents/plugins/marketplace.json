@@ -1,0 +1,44 @@
+{
+  "name": "denubis-plugins",
+  "interface": {
+    "displayName": "Denubis Plugins"
+  },
+  "plugins": [
+    {
+      "name": "denubis-plan-and-execute",
+      "source": {"source": "local", "path": "./plugins/denubis-plan-and-execute"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-academic",
+      "source": {"source": "local", "path": "./plugins/denubis-academic"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    },
+    {
+      "name": "denubis-git-commit",
+      "source": {"source": "local", "path": "./plugins/denubis-git-commit"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-project-notes",
+      "source": {"source": "local", "path": "./plugins/denubis-project-notes"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    },
+    {
+      "name": "denubis-token-estimator",
+      "source": {"source": "local", "path": "./plugins/denubis-token-estimator"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    },
+    {
+      "name": "denubis-hook-branch-bg",
+      "source": {"source": "local", "path": "./plugins/denubis-hook-branch-bg"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    }
+  ]
+}

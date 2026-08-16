@@ -1,0 +1,7 @@
+interface:
+  display_name: "Git Commit"
+  short_description: "Stage owned changes and record one coherent outcome"
+  default_prompt: "Use $commit to inspect and commit the coherent outcome I have authorized."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Property Testing"
+  short_description: "Find generative invariants stronger than examples"
+  default_prompt: "Use $coding-property-testing to identify and test this function's invariants."
+
+policy:
+  allow_implicit_invocation: true

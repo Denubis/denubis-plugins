@@ -1,254 +1,139 @@
 # denubis-plugins
 
-A Claude Code plugin marketplace for design, implementation, Python, SQL, LaTeX, and
-academic-research work. It is forked from
-[ed3d-plugins](https://github.com/ed3dai/ed3d-plugins).
+A shared source repository for customized Claude Code and Codex plugins. Provider-neutral
+skills live once under `plugins/<name>/skills/`; Claude and Codex manifests, hook
+registrations, invocation metadata, commands, and agent adapters express only the
+provider-specific transport.
 
-`denubis-plan-and-execute` supplies the main design → implementation-plan → execution
-workflow through the user-invocable `starting-a-design-plan`,
-`starting-an-implementation-plan`, and `executing-an-implementation-plan` skills. It
-does not commit or publish work without an explicit request.
+The repository is forked from [ed3d-plugins](https://github.com/ed3dai/ed3d-plugins).
 
-Project-specific design and implementation guidance lives in
-`.ed3d/design-plan-guidance.md` and `.ed3d/implementation-plan-guidance.md`. Run
-`/how-to-customize` for the supported shape.
+## Core workflow
 
-The catalogue below is an installation view. The
-[architecture index](docs/architecture/README.md) describes behaviour by system boundary
-before showing subsidiary plugin packaging views.
+`denubis-plan-and-execute` routes non-trivial design, implementation, debugging, review,
+verification, human acceptance, and Git integration work to the procedure that owns the
+next consequential decision.
 
-## Installation catalogue
+An approved implementation plan authorizes private feature-branch checkpoints. Those may
+be frequent. Fix rounds and superseded checkpoints remain provisional. After all outcomes
+are assembled, the agent completes mechanical checks, independent sanity checks,
+documentation reconciliation, and diff/status inspection. Human UAT then touches an
+irreducible implication of the finished behavior. Only explicit UAT acceptance authorizes
+folding provisional history into coherent outcome commits. Push, publication, deployment,
+and inherited-history rewriting remain separate authorities.
 
-### Main workflow
+There is no phase or commit-count quota. A coherent outcome is an independently
+understandable, usable or verifiable change with its consumer, failure path, tests, and
+operator or user documentation where those are real parts of the behavior.
 
-| Plugin | What it does |
-|--------|-------------|
-| **`denubis-plan-and-execute`** | Three-phase workflow: design → plan → execute. The main event. |
+## Provider support
 
-### Optional agent libraries
+The initial Codex marketplace exposes only plugins whose current behavior Codex can run
+honestly:
 
-The main workflow works without these. Install them when their specialist roles are useful.
+| Plugin | Shared behavior |
+|---|---|
+| `denubis-plan-and-execute` | Design through implementation, verification, UAT, and Git lifecycle |
+| `denubis-academic` | Academic revision, manuscript review, and Zotero-backed source work |
+| `denubis-git-commit` | Intentional local commits at authorized boundaries |
+| `denubis-project-notes` | Project-owned notes and relevant prior-chat retrieval |
+| `denubis-token-estimator` | Reproducible Claude Code and Codex usage measures |
+| `denubis-hook-branch-bg` | Terminal background color by Git repository and branch |
 
-| Plugin | What it does |
-|--------|-------------|
-| **`denubis-basic-agents`** | Generic agents (haiku/sonnet/opus) plus `python-developer` and `academic-researcher`. |
-| **`denubis-research-agents`** | Optional codebase investigation and internet research agents. |
+Claude Code additionally packages its agent libraries, onboarding, crash recovery,
+extension guidance, external-agent adapters, and Bash hook infrastructure. Those are not
+listed in Codex merely because a manifest could be generated. The reasons and redesign
+boundaries are recorded in the
+[Codex compatibility matrix](docs/audits/2026-08-16-codex-plugin-compatibility-matrix.md).
 
-### Recommended — quality of life
+## Install for Codex CLI
 
-These make Claude Code noticeably better to work with.
+Codex reads the repository marketplace at `.agents/plugins/marketplace.json`. From a local
+checkout:
 
-| Plugin | What it does |
-|--------|-------------|
-| **`denubis-extending-claude`** | Meta-skills for writing plugins, agents, skills, CLAUDE.md maintenance, and syncing with upstream. |
-| **`denubis-git-commit`** | `/commit` as a proper skill with multi-commit support. |
-| **`denubis-project-notes`** | Reads project-owned notes and relevant chat history directly when a task begins. |
-
-### Infrastructure hooks — Linux/macOS only
-
-These bash-heavy hooks do not work on Windows (even with Git Bash). Skip them on Windows.
-
-| Plugin | What it does | Requires |
-|--------|-------------|----------|
-| **`denubis-hook-pretooluse-dispatcher`** | Dispatcher that auto-discovers and runs PreToolUse:Bash hooks from plugins. | bash, Unix paths |
-| **`denubis-hook-gh-fork-guard`** | Blocks `gh` CLI commands targeting repos you don't own. | dispatcher, `gh` |
-
-### Terminal-specific
-
-| Plugin | What it does | Requires |
-|--------|-------------|----------|
-| **`denubis-hook-branch-bg`** | Colours your terminal background by repo+branch. | OSC 11 terminal (Ghostty, iTerm2) |
-
-### Onboarding
-
-| Plugin | What it does |
-|--------|-------------|
-| **`denubis-00-getting-started`** | This guide. Run `/getting-started` or `/setup`. Can disable after setup. |
-
-### Domain Agents
-
-**`python-developer`** (Sonnet) - Python 3.14+ with:
-- T-strings for SQL/HTML/shell (security-sensitive strings)
-- Deferred annotations (no quotes for forward references)
-- Bracketless exception handling
-- `concurrent.interpreters` for CPU-bound parallelism
-
-**`academic-researcher`** (Opus) - Academic rigor with:
-- Proper citations and source attribution
-- LaTeX conventions (environments, BibTeX)
-- Scholarly argument structure
-
-### Optional specialist plugins
-
-| Plugin | What it does |
-|--------|-------------|
-| **`denubis-academic`** | Academic writing, manuscript review, and Zotero-backed bibliography workflows. |
-| **`denubis-crash-recovery`** | Deterministic classification and triage of interrupted Claude sessions. |
-| **`denubis-external-agents`** | Procedures for Codex review/supervision and Fable consultation. |
-| **`denubis-token-estimator`** | Read-only token and context estimates over Claude and Codex logs. |
-
-### Transcript Archiving
-
-Transcript archiving is provided by the separate [`transcript-archive`](https://github.com/Denubis/claude-code-research-transcript-hook) plugin. Install it as a marketplace plugin for the `/transcript` command, bulk archival, status reporting, and more.
-
-## Prerequisites
-
-| Tool | Required for | Install |
-|------|-------------|---------|
-| **Node.js 18+** | Claude Code itself | [nodejs.org](https://nodejs.org/) |
-| **Git** | Everything | [git-scm.com](https://git-scm.com/) |
-| **Python 3.11+** | Hook scripts | [python.org](https://www.python.org/) |
-| **Python 3.14+** | `denubis-academic` bibliography resolver | [python.org](https://www.python.org/) |
-| **uv** | Running Python hooks | [docs.astral.sh/uv](https://docs.astral.sh/uv/) |
-
-**Linux/macOS only:**
-
-| Tool | Required for | Install |
-|------|-------------|---------|
-| **jq** | Dispatcher / gh-fork-guard hooks | Package manager (`apt`, `brew`) |
-
-## Installation
-
-### Add the marketplace
-
-Inside Claude Code:
+```bash
+codex plugin marketplace add /absolute/path/to/denubis-plugins
+codex plugin add denubis-plan-and-execute@denubis-plugins
+codex plugin add denubis-academic@denubis-plugins
+codex plugin add denubis-git-commit@denubis-plugins
+codex plugin add denubis-project-notes@denubis-plugins
+codex plugin add denubis-token-estimator@denubis-plugins
+codex plugin add denubis-hook-branch-bg@denubis-plugins
+codex plugin list --marketplace denubis-plugins --available --json
 ```
+
+`denubis-hook-branch-bg` is useful only in a terminal that supports OSC 11 and on a system
+with `/proc`. Codex applies its normal hook-trust boundary. Start the CLI with `codex`,
+inspect `/hooks`, and trust the installed hook only after its source and command are the
+ones you intend.
+
+Per-skill `agents/openai.yaml` files provide human-readable discovery metadata. Commit,
+pull-request creation, local main merges, and tmux naming are explicit-only; ordinary
+planning, coding, review, and research procedures may be selected when the task matches.
+
+## Install for Claude Code
+
+Inside Claude Code, add the marketplace:
+
+```text
 /plugin marketplace add https://github.com/Denubis/denubis-plugins.git
 ```
 
-### Choose your plugins
+Install only the components you need. A provider-neutral working set is:
 
-**Recommended set** (works on all platforms including Windows/Git Bash):
-```
-/plugin install denubis-00-getting-started@denubis-plugins
+```text
 /plugin install denubis-plan-and-execute@denubis-plugins
-/plugin install denubis-basic-agents@denubis-plugins
-/plugin install denubis-research-agents@denubis-plugins
-/plugin install denubis-extending-claude@denubis-plugins
+/plugin install denubis-academic@denubis-plugins
 /plugin install denubis-git-commit@denubis-plugins
 /plugin install denubis-project-notes@denubis-plugins
+/plugin install denubis-token-estimator@denubis-plugins
 ```
 
-**Add infrastructure hooks** (Linux/macOS only):
-```
-/plugin install denubis-hook-pretooluse-dispatcher@denubis-plugins
-/plugin install denubis-hook-gh-fork-guard@denubis-plugins
-```
+Claude-specific optional components remain in `.claude-plugin/marketplace.json`. The
+PreToolUse dispatcher and its fork guard require Bash, `jq`, Unix paths, and a separate
+safety review of the guard's actual coverage. The branch-background hook additionally
+requires an OSC 11 terminal and `/proc`.
 
-**Add terminal colouring** (Ghostty/iTerm2 only):
-```
-/plugin install denubis-hook-branch-bg@denubis-plugins
-```
-
-**Add academic writing, review, and Zotero bibliography workflows:**
-```
-/plugin install denubis-academic@denubis-plugins
-```
-
-If an older machine reports `denubis-bib` or still has
+If an older installation reports `denubis-bib` or still has
 `denubis-bibliography`, follow the
 [academic setup and migration runbook](plugins/denubis-academic/skills/using-bibliography/references/setup-and-migration.md).
 
-Then run `/setup` to verify everything is configured correctly.
+## Requirements
 
-## Windows Setup (Git Bash)
+- Git for repository and worktree operations.
+- Python 3.11+ for current standalone hook scripts.
+- Python 3.14+ and `uv` for the academic bibliography helpers and token-estimator scripts.
+- Zotero with Better BibTeX for bibliography resolution and rendering.
+- `gh` only for requested pull-request operations.
 
-If you're on Windows using Git Bash (the default from [git-scm.com](https://git-scm.com/)), follow these extra steps.
+Project-local configuration, supported language versions, test runners, cache locations,
+database conventions, and architecture ownership come from the project being changed.
+The plugins do not replace those decisions with universal defaults.
 
-### 1. Configure line endings
+## Repository layout
 
-Git on Windows defaults to converting LF → CRLF on checkout. This breaks bash shebangs in hook scripts. Fix it **before** adding the marketplace:
-
-```bash
-git config --global core.autocrlf input
-```
-
-If you've already cloned or installed plugins, re-checkout to fix existing files:
-```bash
-# In the marketplace directory (~/.claude/plugins/marketplaces/denubis-plugins/)
-git checkout -- .
-```
-
-### 2. Install uv
-
-Most hook scripts run via `uv run python3`. Install uv for Windows:
-
-```powershell
-# In PowerShell (not Git Bash)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Verify it's on your Git Bash PATH:
-```bash
-uv --version
-```
-
-If not found, add uv's install directory to your Windows PATH (typically `%USERPROFILE%\.local\bin`).
-
-### 3. Install the recommended plugin set
-
-Install the **recommended set** listed above. **Do not install** the infrastructure hooks (`pretooluse-dispatcher`, `gh-fork-guard`) or `branch-bg` — they require Unix-only tooling.
-
-### 4. Run setup
-
-```
-/setup
-```
-
-The setup skill detects Windows and adjusts its checks accordingly.
-
-### Known limitations on Windows
-
-- **No fork guard** — The `gh` CLI guard depends on the dispatcher. Be careful with `gh` commands on repos you don't own.
-- **No terminal background colouring** — OSC 11 support varies across Windows terminals.
-- **Hook performance** — Some users report [hook-related hangs on Windows](https://github.com/anthropics/claude-code/issues/34457). If Claude Code becomes sluggish, disable hooks one at a time to isolate the problem.
-
-## Forking
-
-To create your own variant:
-
-1. Fork this repo on GitHub
-2. Edit plugins to suit your workflow (change agent models, add skills, remove what you don't need)
-3. Update `.claude-plugin/marketplace.json` with your name and repo URL
-4. Install your fork: `/plugin marketplace add https://github.com/YOUR-USER/YOUR-FORK.git`
-
-## Repository Structure
-
-```
+```text
 denubis-plugins/
-├── .claude-plugin/
-│   └── marketplace.json
+├── .agents/plugins/marketplace.json       # Codex catalogue
+├── .claude-plugin/marketplace.json        # Claude Code catalogue
 ├── plugins/
-│   ├── denubis-00-getting-started/
-│   ├── denubis-plan-and-execute/
-│   ├── denubis-basic-agents/
-│   ├── denubis-research-agents/
-│   ├── denubis-extending-claude/
-│   ├── denubis-git-commit/
-│   ├── denubis-project-notes/
-│   ├── denubis-academic/
-│   ├── denubis-crash-recovery/
-│   ├── denubis-external-agents/
-│   ├── denubis-token-estimator/
-│   ├── denubis-hook-pretooluse-dispatcher/
-│   ├── denubis-hook-gh-fork-guard/
-│   └── denubis-hook-branch-bg/
-├── CHANGELOG.md
-└── README.md
+│   └── <plugin>/
+│       ├── .codex-plugin/plugin.json      # when Codex-compatible
+│       ├── .claude-plugin/plugin.json     # Claude Code package
+│       ├── skills/<skill>/SKILL.md        # shared semantic procedure
+│       ├── skills/<skill>/agents/openai.yaml
+│       └── hooks/                         # provider registrations + shared scripts
+├── docs/architecture/
+├── docs/design-plans/
+└── tests/
 ```
 
-## Removed from Upstream
+The [architecture index](docs/architecture/README.md) describes behavior by system
+boundary before subsidiary plugin packaging views. Current design and compatibility
+audits explain decisions; living skills and architecture describe current behavior.
 
-These plugins were removed as not relevant to Python/SQL/LaTeX workflow:
-- `ed3d-house-style` - TypeScript/React focused
-- `ed3d-playwright` - JavaScript E2E testing
+## Attribution and license
 
-## Attribution
-
-Derived from [`ed3dai/ed3d-plugins`](https://github.com/ed3dai/ed3d-plugins) by Ed Ropple, which itself derives from [`obra/superpowers`](https://github.com/obra/superpowers) by Jesse Vincent.
-
-## License
-
-Original [obra/superpowers](https://github.com/obra/superpowers) code is MIT License, copyright Jesse Vincent.
-
-All other content is [CC-BY-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/).
+Derived from [`ed3dai/ed3d-plugins`](https://github.com/ed3dai/ed3d-plugins) by Ed Ropple,
+which derives from [`obra/superpowers`](https://github.com/obra/superpowers) by Jesse
+Vincent. Original Superpowers material is MIT-licensed. Other content is
+[CC-BY-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/).

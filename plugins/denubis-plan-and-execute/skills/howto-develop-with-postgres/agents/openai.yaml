@@ -1,0 +1,7 @@
+interface:
+  display_name: "Develop with PostgreSQL"
+  short_description: "Derive database guarantees from domain and workload"
+  default_prompt: "Use $howto-develop-with-postgres to design this PostgreSQL change safely."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Critical Peer Review"
+  short_description: "Falsify technical claims against their evidence"
+  default_prompt: "Use $critical-peer-review to audit this reasoning against its exact evidence."
+
+policy:
+  allow_implicit_invocation: true

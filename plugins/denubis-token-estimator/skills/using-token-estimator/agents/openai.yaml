@@ -1,0 +1,7 @@
+interface:
+  display_name: "Token Estimator"
+  short_description: "Audit AI output tokens and human input words"
+  default_prompt: "Use $using-token-estimator to measure and audit this project's AI usage."
+
+policy:
+  allow_implicit_invocation: true

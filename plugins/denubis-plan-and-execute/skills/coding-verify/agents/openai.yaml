@@ -1,0 +1,7 @@
+interface:
+  display_name: "Verify Completion"
+  short_description: "Verify each completion claim with fresh evidence"
+  default_prompt: "Use $coding-verify to verify every claim before reporting this work complete."
+
+policy:
+  allow_implicit_invocation: true

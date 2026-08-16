@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-      "version": "4.1.0",
+      "version": "4.1.1",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -204,8 +204,8 @@
     },
     {
       "name": "denubis-project-notes",
-      "description": "Direct task-entry retrieval of project-owned .notes memory and relevant chat history, with complete note coverage and resolvable source pointers.",
-      "version": "0.1.0",
+      "description": "Explicit recovery of project-owned .notes memory and relevant chat history with resolvable source pointers.",
+      "version": "0.1.1",
       "source": "./plugins/denubis-project-notes",
       "author": {
         "name": "Brian Ballsun-Stanton",

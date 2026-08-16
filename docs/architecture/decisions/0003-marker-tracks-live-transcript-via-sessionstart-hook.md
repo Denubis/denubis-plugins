@@ -43,7 +43,7 @@ match before weaker recovery paths.
 ## Verification
 
 - Hook: `plugins/denubis-plan-and-execute/hooks/update-live-marker.py`.
-- Registration: `plugins/denubis-plan-and-execute/hooks/hooks.json`.
+- Claude registration: `plugins/denubis-plan-and-execute/hooks/claude-hooks.json`.
 - Boundary tests: `tests/test_update_live_marker.bats` and
   `tests/test_claude_wrapper_liveness.bats`.
 - Paired current constraint: `../constraints.md`, “Live-transcript marker maintenance”.

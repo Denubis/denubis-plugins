@@ -1,0 +1,7 @@
+interface:
+  display_name: "Git Worktrees"
+  short_description: "Create and verify an isolated project worktree"
+  default_prompt: "Use $using-git-worktrees to create an isolated worktree for this change."
+
+policy:
+  allow_implicit_invocation: true

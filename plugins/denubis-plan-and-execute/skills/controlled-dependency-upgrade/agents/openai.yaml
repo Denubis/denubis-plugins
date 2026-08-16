@@ -1,0 +1,7 @@
+interface:
+  display_name: "Controlled Dependency Upgrade"
+  short_description: "Upgrade one Python dependency with current evidence"
+  default_prompt: "Use $controlled-dependency-upgrade to assess and upgrade this Python dependency."
+
+policy:
+  allow_implicit_invocation: true

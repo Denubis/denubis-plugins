@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan and Execute Router"
+  short_description: "Route consequential work to the procedure that owns it"
+  default_prompt: "Use $using-plan-and-execute to select the next procedure for this work."
+
+policy:
+  allow_implicit_invocation: true

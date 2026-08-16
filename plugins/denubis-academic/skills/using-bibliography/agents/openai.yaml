@@ -1,0 +1,7 @@
+interface:
+  display_name: "Using Bibliography"
+  short_description: "Resolve and verify sources through the Zotero corpus"
+  default_prompt: "Use $using-bibliography to resolve this source and verify its evidence."
+
+policy:
+  allow_implicit_invocation: true

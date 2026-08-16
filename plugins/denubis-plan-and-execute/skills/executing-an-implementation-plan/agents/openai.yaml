@@ -1,0 +1,7 @@
+interface:
+  display_name: "Execute an Implementation Plan"
+  short_description: "Execute an approved plan with proportional verification"
+  default_prompt: "Use $executing-an-implementation-plan to execute this approved plan proportionally through UAT."
+
+policy:
+  allow_implicit_invocation: true

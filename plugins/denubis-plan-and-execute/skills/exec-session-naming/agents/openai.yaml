@@ -1,0 +1,7 @@
+interface:
+  display_name: "Name the Session"
+  short_description: "Name the current tmux window for substantial work"
+  default_prompt: "Use $exec-session-naming to give this tmux session a concise task name."
+
+policy:
+  allow_implicit_invocation: false

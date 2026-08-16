@@ -1,0 +1,22 @@
+{
+  "name": "denubis-project-notes",
+  "version": "0.1.1",
+  "description": "Recover named project notes and prior chat context when a task depends on them.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["notes", "retrieval", "memory", "chat-search"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Project Notes",
+    "shortDescription": "Recover named project memory and prior work on demand",
+    "longDescription": "Recover task-relevant project notes or prior Claude Code and Codex chats when explicitly requested or required by a named historical dependency.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Productivity",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": ["Recover the named project memory or prior work needed for this task."]
+  }
+}

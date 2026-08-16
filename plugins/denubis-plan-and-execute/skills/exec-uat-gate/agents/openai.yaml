@@ -1,0 +1,7 @@
+interface:
+  display_name: "Human UAT Gate"
+  short_description: "Present finished behavior for implication-level UAT"
+  default_prompt: "Use $exec-uat-gate to prepare the mechanically verified behavior for human UAT."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.1
+
+**Changed:**
+- Plan execution now scales investigation, tracking, specialist guidance, evidence, and
+  narration to a concrete uncertainty or consequence. Its ordinary TDD, verification,
+  checkpoint, and UAT lifecycle is self-contained instead of loading a stack of
+  overlapping skills.
+- The checkpoint/UAT methodological evaluation now also judges observable
+  proportionality through a hidden evaluator oracle.
+
+## [denubis-project-notes] 0.1.1
+
+**Changed:**
+- Project-memory recovery is explicit in Codex rather than an ambient pre-edit action.
+  Notes and prior chats are retrieved only when requested or required by a named
+  historical dependency; chat search begins with one bounded query.
+
 ## [denubis-plan-and-execute] 4.1.0
 
 **Added:**

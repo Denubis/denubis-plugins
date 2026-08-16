@@ -1,6 +1,6 @@
 # Codex Marketplace Semantic Mirror
 
-**Status:** Current design; canonical skill correction is ready to implement.
+**Status:** Current design; installed-runtime UAT correction is in progress.
 
 ## Objective
 
@@ -194,8 +194,8 @@ plugins/<plugin>/.claude-plugin/plugin.json
 plugins/<plugin>/.codex-plugin/plugin.json
 plugins/<plugin>/skills/<skill>/SKILL.md
 plugins/<plugin>/skills/<skill>/agents/openai.yaml
-plugins/<plugin>/hooks/hooks.json
-plugins/<plugin>/hooks/codex-hooks.json       # only when transport differs
+plugins/<plugin>/hooks/claude-hooks.json      # when Claude transport is explicit
+plugins/<plugin>/hooks/codex-hooks.json       # when Codex transport differs
 ```
 
 `SKILL.md` and its provider-neutral references own behaviour. Codex metadata and
@@ -235,10 +235,38 @@ behavioural contract and hidden oracle.
 - Branch: `codex-marketplace-semantic-mirror`
 - Worktree:
   `/home/brian/people/Brian/brian-ed3d-plugins/.worktrees/codex-marketplace-semantic-mirror`
-- Base: `main` at `293036ccab3e2b0c5939b1248856718c92c17c05`
-- The plan-and-execute normative cross-check is complete; no migration implementation or
-  commit has occurred.
+- Original base: `main` at `293036ccab3e2b0c5939b1248856718c92c17c05`; updated
+  `main` through `16582b3` is merged into the private candidate without rewriting its
+  pre-UAT history.
+- The normative cross-check and initial canonical skill corrections are implemented as
+  private checkpoints. The old Codex repository cleanup is isolated on its own branch;
+  its unrelated adapter work remains untouched.
 - Baseline verification: `uv run pytest -q` — `1579 passed in 6.41s`.
-- Next action: create separate actor tasks and hidden evaluation oracles for the lifecycle
-  and testing-method changes, observe the current failure modes, then implement the first
-  lifecycle-and-methodology outcome.
+- Post-cross-check verification: `uv run pytest -q` — `1525 passed in 4.83s`; removed
+  tests were phrase, fixed-schedule, or orphan-artifact detectors rather than behavior.
+- The six-plugin Codex marketplace was temporarily registered and installed from this
+  worktree. That registration was removed because a stable marketplace must not point at a
+  disposable worktree. A fresh ephemeral Codex process had independently selected
+  `executing-an-implementation-plan` from the installed cache and reported the corrected
+  checkpoint → complete mechanical/sanity verification → human UAT → normalization order.
+- The first human CLI run was invalidated after inspection showed that Codex had loaded a
+  stale pre-rewrite plugin cache. The corrected run loaded
+  `denubis-plan-and-execute/4.0.1`, demonstrated the intended checkpoint and final-UAT
+  lifecycle, and preserved the feature branch without normalization.
+- Brian rejected that corrected run on proportionality. A three-file greeting change
+  automatically invoked project-memory retrieval, performed irrelevant prior-chat
+  searches, loaded six overlapping workflow skills, copied the supplied plan into another
+  tracker, narrated routine transitions, and manufactured a disposable defect to re-prove
+  a secondary Git hygiene check. Functional output passed; workflow UAT did not.
+- The correction makes ordinary plan execution self-contained and proportional, and makes
+  Codex project-memory retrieval explicit. A fresh actor-only source evaluation produced
+  one private checkpoint without another tracker or reported workflow fan-out; repository
+  inspection found no oracle failure. A fresh installed-runtime UAT is still required for
+  transient skill-load, search, and narration behavior.
+- The duplicated old skill tree and its 37 global Codex symlinks were retired after the
+  invalid first acceptance. That cleanup is isolated on its own branch and remains
+  reversible; Ponytail, Gemini adapter files, and all pre-existing uncommitted
+  old-repository work remain.
+- The existing canonical commits remain independently coherent. The failed-UAT correction
+  and updated-main merge remain visible as private checkpoints; no normalization or main
+  integration is authorised before corrected installed-runtime UAT acceptance.

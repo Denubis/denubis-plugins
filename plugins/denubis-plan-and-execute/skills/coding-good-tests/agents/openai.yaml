@@ -1,0 +1,7 @@
+interface:
+  display_name: "Good Tests"
+  short_description: "Test observable behavior at the smallest useful boundary"
+  default_prompt: "Use $coding-good-tests to design tests that fail for the intended reason."
+
+policy:
+  allow_implicit_invocation: true

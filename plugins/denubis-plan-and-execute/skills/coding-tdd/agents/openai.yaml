@@ -1,0 +1,7 @@
+interface:
+  display_name: "Test-Driven Development"
+  short_description: "Drive behavioral changes through red, green, and refactor"
+  default_prompt: "Use $coding-tdd to implement this behavioral change from a failing test."
+
+policy:
+  allow_implicit_invocation: true

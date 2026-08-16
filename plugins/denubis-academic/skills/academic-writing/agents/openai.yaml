@@ -1,0 +1,7 @@
+interface:
+  display_name: "Academic Writing"
+  short_description: "Revise prose without changing evidential strength"
+  default_prompt: "Use $academic-writing to revise this passage in the project's attested register."
+
+policy:
+  allow_implicit_invocation: true

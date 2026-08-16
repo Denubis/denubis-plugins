@@ -8,7 +8,8 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 
 - [`instruction-control/0-context.md`](instruction-control/0-context.md) — how global and
   project instructions, output style, hooks, skills, project memory, transcripts,
-  documentary authority, and external evidence combine in a live Claude Code session.
+  documentary authority, and external evidence combine in live Claude Code and Codex
+  sessions.
 
 ## Plugin packaging views (14)
 
@@ -23,8 +24,8 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 ### Workflow and delegated work
 
 - [`denubis-plan-and-execute/0-context.md`](plugins/denubis-plan-and-execute/0-context.md)
-  — 34 skills, 10 agents, 2 commands, two hook programs, the workflow statusline,
-  and the Claude wrapper.
+  — 33 shared skills, thin Claude role and command adapters, Codex discovery metadata,
+  one Claude-only live-marker hook, the workflow statusline, and the Claude wrapper.
 - [`denubis-basic-agents/0-context.md`](plugins/denubis-basic-agents/0-context.md) — five
   general-purpose or domain agents and one situational selection skill.
 - [`denubis-research-agents/0-context.md`](plugins/denubis-research-agents/0-context.md) —
@@ -39,11 +40,12 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 ### Knowledge, research, and measurement
 
 - [`denubis-project-notes/0-context.md`](plugins/denubis-project-notes/0-context.md) —
-  direct main-agent retrieval of project memory and relevant chat history at task entry.
+  explicit main-agent recovery of named project memory and relevant prior chats.
 - [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — three
   academic skills, one output style, and bibliography helper scripts.
 - [`denubis-token-estimator/0-context.md`](plugins/denubis-token-estimator/0-context.md)
-  — one command, one methodology skill, and read-only Claude/Codex log analysis.
+  — one shared methodology skill, provider entry points, and read-only Claude/Codex log
+  analysis.
 - [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) —
   deterministic session classification, rendering, and triage over its SQLite state.
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write an Implementation Plan"
+  short_description: "Plan coherent outcomes with falsifiable evidence"
+  default_prompt: "Use $impl-plan-write to turn this accepted design into executable outcomes."
+
+policy:
+  allow_implicit_invocation: true

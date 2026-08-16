@@ -1,0 +1,7 @@
+interface:
+  display_name: "Functional Core, Imperative Shell"
+  short_description: "Separate pure decisions from side-effect boundaries"
+  default_prompt: "Use $coding-fcis to separate this business logic from its side effects."
+
+policy:
+  allow_implicit_invocation: true

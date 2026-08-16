@@ -1,0 +1,7 @@
+interface:
+  display_name: "Design Brainstorming"
+  short_description: "Compare viable designs after intent is settled"
+  default_prompt: "Use $brainstorming to compare viable designs for this accepted problem."
+
+policy:
+  allow_implicit_invocation: true

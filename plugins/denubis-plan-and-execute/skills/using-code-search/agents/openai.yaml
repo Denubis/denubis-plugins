@@ -1,0 +1,7 @@
+interface:
+  display_name: "Code Search"
+  short_description: "Choose reliable text or structural repository search"
+  default_prompt: "Use $using-code-search to design and interpret this repository search."
+
+policy:
+  allow_implicit_invocation: true

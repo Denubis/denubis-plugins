@@ -1,0 +1,7 @@
+interface:
+  display_name: "Paper Review"
+  short_description: "Review manuscripts against one evidence boundary"
+  default_prompt: "Use $paper-review to conduct a critical, evidence-bounded manuscript review."
+
+policy:
+  allow_implicit_invocation: true

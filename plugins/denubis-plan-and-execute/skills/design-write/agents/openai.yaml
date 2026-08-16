@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write a Design"
+  short_description: "Record an accepted design with falsifiable boundaries"
+  default_prompt: "Use $design-write to record this accepted design and its acceptance boundary."
+
+policy:
+  allow_implicit_invocation: true

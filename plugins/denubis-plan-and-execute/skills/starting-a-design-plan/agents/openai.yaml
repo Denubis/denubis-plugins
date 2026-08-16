@@ -1,0 +1,7 @@
+interface:
+  display_name: "Start a Design Plan"
+  short_description: "Resolve intent and produce an accepted design"
+  default_prompt: "Use $starting-a-design-plan to develop this non-trivial change from intent to design."
+
+policy:
+  allow_implicit_invocation: true
