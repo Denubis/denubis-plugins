@@ -5,32 +5,40 @@ Codex supervision monitor.
 
 | Script | What it does |
 |---|---|
-| `scripts/claude-ponytail` | Creates or reuses a worktree and launches Claude with Ponytail loaded for that session |
-| `scripts/codex-ponytail` | Creates or reuses a worktree and launches **isolated** Codex with upstream Ponytail installed |
+| `scripts/claude-ponytail` | Reuses the caller checkout or selects a worktree and launches Claude with audited Ponytail loaded for that session |
+| `scripts/codex-ponytail` | Reuses the caller checkout or selects a worktree and launches **isolated** Codex with audited Ponytail installed |
 | `scripts/codex_supervisor.py` | Watches a joined Codex pane and drives it; see the `supervising-codex` skill |
 
 Both launchers run the selected CLI in the current terminal. Their first argument selects
-the worktree branch; every later argument is passed to Claude or Codex unchanged.
+the branch. If that is the branch checked out where the command was invoked, the launcher
+uses that checkout directly. Otherwise it reuses or creates a worktree. Every later
+argument is passed to Claude or Codex unchanged.
 
 ## Isolated Codex Ponytail sessions
 
-`codex-ponytail` creates or reuses a named git worktree and launches Codex with state
-isolated beneath `~/.codex-ponytail`. These sessions carry the pinned upstream
-Ponytail plugin and disable every user-installed skill discovered beneath
-`~/.agents/skills`.
+`codex-ponytail` launches Codex with state isolated beneath `~/.codex-ponytail`. These
+sessions carry an exact checkout of the audited upstream Ponytail commit and disable every
+user-installed skill discovered beneath `~/.agents/skills`.
+
+The launcher installs that checkout through a stable local Codex marketplace. When the
+audited SHA in the launcher changes, the next invocation fetches, installs, and verifies
+the new checkout automatically. No separate marketplace-upgrade command is required. The
+first invocation after this change installs the local plugin before retiring the previous
+remote marketplace, so a failed migration leaves the previous installation intact.
 
 ### One-time setup
 
-1. Run `codex-ponytail <name>` from a repository whose `.worktrees/` directory is
-   gitignored.
+1. Run `codex-ponytail <branch>`. If selecting a different branch may create a worktree,
+   the repository's `.worktrees/` directory must be gitignored.
 2. Complete the isolated Codex login if prompted.
 3. Open `/hooks`, review the Ponytail hooks, and trust only those you accept.
 4. Close Codex and run `codex-ponytail <name>` again, so the trusted `SessionStart` hook runs
    in a new thread.
 
-Login persists in `~/.codex-ponytail/auth.json`. Hook trust persists until a hook's
-content hash changes; the audited Ponytail revision is pinned, so that normally happens
-only when the pin is deliberately moved.
+Login persists in `~/.codex-ponytail/auth.json`. The one-time migration changes the Codex
+plugin identity from `ponytail@ponytail` to `ponytail@ponytail-pinned`, so review `/hooks`
+again after it. Thereafter hook trust persists until a hook's content hash changes; that
+normally happens only when the audited pin deliberately moves.
 
 ### Normal use
 
@@ -39,29 +47,34 @@ codex-ponytail <name> [<codex-args>...]
 claude-ponytail <name> [<claude-args>...]
 ```
 
-Each invocation verifies the Ponytail installation and refreshes the global-skill
-deny-list before launching the CLI. It needs no new login or hook review.
+Each invocation verifies both the audited checkout and Codex's installed copy, then
+refreshes the global-skill deny-list before launching the CLI. It needs no new login or
+hook review unless the hook content changed.
 
-Fish completion offers the branches of registered worktrees beneath `.worktrees/` as the
-worktree selector, including after `--dry-run`. Install the completion files into Fish's
-autoload directory with:
+Fish completion offers every local branch, including the caller checkout and branches not
+yet attached to a worktree, including after `--dry-run`. Install the completion files into
+Fish's autoload directory with:
 
 ```fish
 plugins/denubis-external-agents/scripts/install-ponytail-fish-completions
 ```
 
 The installer writes regular files rather than checkout-dependent symlinks; rerun it after
-updating these completion sources. An existing managed worktree is resolved by branch even
-when its directory spelling differs, such as branch `research/proposer/verifier` at
-`.worktrees/research-proposer-verifier`. A path at `.worktrees/<name>` is still refused when
-it contains another branch.
+updating these completion sources. The checkout where the launcher was invoked wins when
+it already has the selected branch. Otherwise an existing managed worktree is resolved by
+branch even when its directory spelling differs, such as branch
+`research/proposer/verifier` at `.worktrees/research-proposer-verifier`. A path at
+`.worktrees/<name>` is still refused when it contains another branch.
+An unqualified name that uniquely matches an existing qualified branch is refused with
+the full-name suggestion rather than silently creating a second branch.
 
 New worktrees branch from the `HEAD` of the checkout where the launcher was invoked. This
 means invoking it from a linked worktree creates the new branch from that worktree's current
 commit. `--dry-run` is a launcher option only when it precedes the worktree name; all
 arguments after the worktree name belong to the underlying CLI.
 
-Ponytail's persistent configuration lives under `~/.codex-ponytail/xdg-config`. Normal
+Ponytail's persistent configuration lives under `~/.codex-ponytail/xdg-config`; its
+audited checkout and local marketplace live under `~/.codex-ponytail/marketplace`. Normal
 Codex, Claude Ponytail, `~/.codex`, and normal XDG configuration are untouched.
 
 ### What the launcher writes into the isolated config

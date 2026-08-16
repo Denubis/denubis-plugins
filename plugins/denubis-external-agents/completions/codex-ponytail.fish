@@ -18,4 +18,4 @@ complete -c codex-ponytail \
     -n __fish_codex_ponytail_needs_worktree \
     -f \
     -a '(codex-ponytail --complete-worktrees)' \
-    -d 'Existing worktree'
+    -d 'Local branch'

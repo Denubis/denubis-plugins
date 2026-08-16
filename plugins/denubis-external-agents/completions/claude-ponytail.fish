@@ -18,4 +18,4 @@ complete -c claude-ponytail \
     -n __fish_claude_ponytail_needs_worktree \
     -f \
     -a '(claude-ponytail --complete-worktrees)' \
-    -d 'Existing worktree'
+    -d 'Local branch'

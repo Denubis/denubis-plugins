@@ -10,6 +10,16 @@
   the tmux-codex-quota project (`claude_quota.py`, installed as
   `~/.byobu/bin/30_claude_quota`).
 
+## [denubis-external-agents] 0.16.2
+
+**Fixed:**
+- Codex Ponytail upgrades now install and verify the exact audited checkout through a
+  stable local marketplace, then retire the legacy remote plugin. Updating the audited SHA
+  takes effect on the next invocation without a separate marketplace migration.
+- Both Ponytail launchers reuse the invoking checkout when it already carries the selected
+  branch, Fish completion now offers every local branch, and an accidentally unqualified
+  branch name is refused with its unique full-name suggestion.
+
 ## [denubis-plan-and-execute] 4.0.1
 
 **Changed:**

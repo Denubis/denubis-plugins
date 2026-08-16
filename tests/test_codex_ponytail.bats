@@ -6,9 +6,11 @@
 
 REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 SCRIPT="$REPO_ROOT/plugins/denubis-external-agents/scripts/codex-ponytail"
+PROFILE_EDITOR="$REPO_ROOT/plugins/denubis-external-agents/scripts/update_codex_profile.py"
 COMPLETION="$REPO_ROOT/plugins/denubis-external-agents/completions/codex-ponytail.fish"
 COMPLETION_INSTALLER="$REPO_ROOT/plugins/denubis-external-agents/scripts/install-ponytail-fish-completions"
 FAKE_CODEX_FIXTURE="$REPO_ROOT/tests/fixtures/fake_codex"
+CONFIGURED_UV_CACHE_DIR="$(uv cache dir)"
 
 make_repo() {
     local repo="$1"
@@ -32,8 +34,19 @@ setup() {
     chmod +x "$FAKE_CODEX"
     export FAKE_CODEX
     export CODEX_PONYTAIL_BINARY="$FAKE_CODEX"
-    export CODEX_PONYTAIL_MARKETPLACE="$TEST_DIR/upstream-ponytail"
-    export CODEX_PONYTAIL_SHA="0123456789abcdef0123456789abcdef01234567"
+    FAKE_PONYTAIL="$TEST_DIR/upstream-ponytail"
+    git init -q -b main "$FAKE_PONYTAIL"
+    git -C "$FAKE_PONYTAIL" config user.email t@e.st
+    git -C "$FAKE_PONYTAIL" config user.name test
+    mkdir -p "$FAKE_PONYTAIL/.claude-plugin" "$FAKE_PONYTAIL/skills/ponytail"
+    printf '{"name":"ponytail","version":"4.9.0"}\n' \
+        > "$FAKE_PONYTAIL/.claude-plugin/plugin.json"
+    printf 'stub\n' > "$FAKE_PONYTAIL/skills/ponytail/SKILL.md"
+    git -C "$FAKE_PONYTAIL" add -A
+    git -C "$FAKE_PONYTAIL" commit -qm initial
+    export CODEX_PONYTAIL_URL="$FAKE_PONYTAIL"
+    CODEX_PONYTAIL_SHA="$(git -C "$FAKE_PONYTAIL" rev-parse HEAD)"
+    export CODEX_PONYTAIL_SHA
     export FAKE_CODEX_CALLS="$TEST_DIR/codex-calls"
     export FAKE_CODEX_SESSION_ARGS="$TEST_DIR/session-args"
     export FAKE_CODEX_SESSION_HOME="$TEST_DIR/session-home"
@@ -43,11 +56,11 @@ setup() {
     export GIT_CONFIG_GLOBAL=/dev/null
     export GIT_CONFIG_SYSTEM=/dev/null
 
-    # The sandbox-cache-root resolution reads these from the environment, so an
-    # operator shell that happens to export any of them (as this one does, for
-    # UV_CACHE_DIR and PIP_CACHE_DIR) would otherwise leak real host paths into
-    # what is meant to be a hermetic test.
-    unset UV_CACHE_DIR PIP_CACHE_DIR HF_HOME TORCH_HOME CARGO_HOME \
+    # The profile editor is a PEP 723 script, so retain uv's configured cache
+    # rather than inventing a package cache beneath each disposable HOME. Tests
+    # for uv's no-override behaviour explicitly unset this value.
+    export UV_CACHE_DIR="$CONFIGURED_UV_CACHE_DIR"
+    unset PIP_CACHE_DIR HF_HOME TORCH_HOME CARGO_HOME \
         XDG_CACHE_HOME NPM_CONFIG_CACHE npm_config_cache
 
     mkdir -p "$HOME/.agents/skills"
@@ -71,7 +84,7 @@ teardown() {
     [[ "$output" == *"One-time setup"* ]]
 }
 
-@test "Fish completes registered worktree branches after launcher options" {
+@test "Fish completes every local branch, including the caller checkout" {
     mkdir -p "$TEST_DIR/bin" "$WORK/.worktrees/ordinary"
     ln -s "$SCRIPT" "$TEST_DIR/bin/codex-ponytail"
     git -C "$WORK" branch parked
@@ -81,7 +94,7 @@ teardown() {
         "source '$COMPLETION'; complete -C 'codex-ponytail --dry-run '"
 
     [ "$status" -eq 0 ]
-    [ "$output" = $'research/topic\tExisting worktree' ]
+    [ "$output" = $'main\tLocal branch\nparked\tLocal branch\nresearch/topic\tLocal branch' ]
 }
 
 @test "Fish completion installer writes relocatable regular files" {
@@ -105,6 +118,21 @@ teardown() {
         "$config_home/fish/completions/claude-ponytail.fish"
 }
 
+@test "packaged launcher resolves its self-contained profile editor" {
+    local packaged_scripts="$TEST_DIR/packaged-plugin/scripts"
+    mkdir -p "$packaged_scripts"
+    cp "$SCRIPT" "$packaged_scripts/codex-ponytail"
+    cp "$PROFILE_EDITOR" "$packaged_scripts/update_codex_profile.py"
+    chmod +x "$packaged_scripts/codex-ponytail" \
+        "$packaged_scripts/update_codex_profile.py"
+
+    run bash "$packaged_scripts/codex-ponytail" feature
+
+    [ "$status" -eq 0 ]
+    [ -f "$CODEX_PONYTAIL_HOME/ponytail.config.toml" ]
+    [ -f "$FAKE_CODEX_SESSION_ARGS" ]
+}
+
 @test "literal branch validation rejects revision syntax and HEAD" {
     run bash "$SCRIPT" '@{-1}'
     [ "$status" -ne 0 ]
@@ -117,6 +145,17 @@ teardown() {
     [ ! -e "$CODEX_PONYTAIL_HOME" ]
 }
 
+@test "an unqualified branch suffix refuses with the unique full-name suggestion" {
+    git -C "$WORK" branch hotfix/deploy-local-vitest
+
+    run bash "$SCRIPT" deploy-local-vitest
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"did you mean 'hotfix/deploy-local-vitest'"* ]]
+    [ ! -e "$CODEX_PONYTAIL_HOME" ]
+    [ ! -e "$WORK/.worktrees/deploy-local-vitest" ]
+}
+
 @test "production mode ignores test-only source and home overrides" {
     unset CODEX_PONYTAIL_TESTING
 
@@ -127,7 +166,7 @@ teardown() {
     [[ "$output" == *"DietrichGebert/ponytail"* ]]
     [[ "$output" == *"0a4dd63ad4541f4f655c4108a295916f3c1d8fda"* ]]
     [[ "$output" != *"$CODEX_PONYTAIL_HOME"* ]]
-    [[ "$output" != *"$CODEX_PONYTAIL_MARKETPLACE"* ]]
+    [[ "$output" != *"$CODEX_PONYTAIL_URL"* ]]
     [[ "$output" != *"$CODEX_PONYTAIL_SHA"* ]]
 }
 
@@ -144,12 +183,23 @@ teardown() {
     [ ! -e "$WORK/.worktrees/feature" ]
 }
 
-@test "branch already checked out elsewhere is rejected before home mutation" {
-    run bash "$SCRIPT" main
+@test "a branch checked out in another unmanaged worktree is rejected before home mutation" {
+    git -C "$WORK" worktree add -q -b elsewhere "$TEST_DIR/elsewhere"
+    run bash "$SCRIPT" elsewhere
 
     [ "$status" -ne 0 ]
     [[ "$output" == *"already checked out"* ]]
     [ ! -e "$CODEX_PONYTAIL_HOME" ]
+}
+
+@test "requesting the caller branch launches the caller checkout" {
+    run bash "$SCRIPT" main
+
+    [ "$status" -eq 0 ]
+    mapfile -d '' args < "$FAKE_CODEX_SESSION_ARGS"
+    [ "${args[0]}" = "-C" ]
+    [ "${args[1]}" = "$WORK" ]
+    [ ! -e "$WORK/.worktrees/main" ]
 }
 
 # A main checkout can be bare while all work happens in linked worktrees.
@@ -265,33 +315,95 @@ make_bare_main() {
     [ -d "$WORK/.worktrees/feature" ]
     [ -f "$CODEX_PONYTAIL_HOME/config.toml" ]
     [ -f "$CODEX_PONYTAIL_HOME/ponytail.config.toml" ]
-    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/plugin" ]
+    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/plugins/ponytail@ponytail-pinned" ]
     [ "$(stat -c %a "$CODEX_PONYTAIL_HOME")" = "700" ]
     [ "$(stat -c %a "$CODEX_PONYTAIL_HOME/xdg-config")" = "700" ]
     [ "$(stat -c %a "$CODEX_PONYTAIL_HOME/.codex-ponytail.lock")" = "600" ]
-    grep -F -- "plugin marketplace add" "$FAKE_CODEX_CALLS"
-    grep -F -- "$CODEX_PONYTAIL_MARKETPLACE --ref $CODEX_PONYTAIL_SHA" \
+    grep -F -- "plugin marketplace add $CODEX_PONYTAIL_HOME/marketplace --json" \
         "$FAKE_CODEX_CALLS"
-    grep -F -- "plugin add ponytail@ponytail --json" \
+    grep -F -- "plugin add ponytail@ponytail-pinned --json" \
         "$FAKE_CODEX_CALLS"
+    [ "$(git -C "$CODEX_PONYTAIL_HOME/marketplace/plugin" rev-parse HEAD)" \
+        = "$CODEX_PONYTAIL_SHA" ]
+    diff -qr "$CODEX_PONYTAIL_HOME/marketplace/plugin" \
+        "$CODEX_PONYTAIL_HOME/plugins/cache/ponytail-pinned/ponytail/4.9.0"
     [ -f "$FAKE_CODEX_SESSION_ARGS" ]
 }
 
-@test "rerun preserves base config state while replacing only the profile" {
+@test "invalid hand-written profile is rejected without overwriting state" {
     run bash "$SCRIPT" feature
     [ "$status" -eq 0 ]
     printf '\n[hooks.state.test]\ntrusted = true\n' >> "$CODEX_PONYTAIL_HOME/config.toml"
     printf 'session\n' > "$CODEX_PONYTAIL_HOME/session-sentinel"
     printf 'stale profile\n' > "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    rm -f "$FAKE_CODEX_SESSION_ARGS"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    grep -F -- "[plugins.\"ponytail@ponytail-pinned\"]" "$CODEX_PONYTAIL_HOME/config.toml"
+    grep -F -- "[hooks.state.test]" "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(cat "$CODEX_PONYTAIL_HOME/session-sentinel")" = "session" ]
+    [ "$(cat "$CODEX_PONYTAIL_HOME/ponytail.config.toml")" = "stale profile" ]
+    [ ! -e "$FAKE_CODEX_SESSION_ARGS" ]
+}
+
+@test "rerun refreshes managed skills while preserving Codex-owned profile tables" {
+    local profile="$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    local hook_table='[hooks.state."ponytail@ponytail-pinned:hooks/claude-codex-hooks.json:session_start:0:0"]'
+    local project_table='[projects."/tmp/reviewed-project"]'
+    local obsolete_skill="$HOME/.agents/skills/obsolete/SKILL.md"
+    mkdir -p "$(dirname "$obsolete_skill")"
+    printf 'obsolete\n' > "$obsolete_skill"
+
+    run bash "$SCRIPT" feature
+    [ "$status" -eq 0 ]
+    grep -F -- "$obsolete_skill" "$profile"
+
+    mv "$HOME/.agents/skills/obsolete" "$TEST_DIR/obsolete-skill"
+    mkdir -p "$HOME/.agents/skills/current"
+    printf 'current\n' > "$HOME/.agents/skills/current/SKILL.md"
+    local managed_profile
+    managed_profile=$(<"$profile")
+    printf '%s\n' \
+        'hand_written = "preserve me" # user comment' \
+        'literal = """' \
+        '[[skills.config]]' \
+        'this is string data, not a table' \
+        '"""' \
+        '' \
+        "$managed_profile" \
+        '' \
+        "$project_table" \
+        'trust_level = "trusted"' \
+        '' \
+        '[hooks.state]' \
+        '' \
+        "$hook_table" \
+        'trusted_hash = "sha256:test-hook-trust"' \
+        > "$profile"
 
     run bash "$SCRIPT" feature
 
     [ "$status" -eq 0 ]
-    grep -F -- "[plugins.\"ponytail@ponytail\"]" "$CODEX_PONYTAIL_HOME/config.toml"
-    grep -F -- "[hooks.state.test]" "$CODEX_PONYTAIL_HOME/config.toml"
-    [ "$(cat "$CODEX_PONYTAIL_HOME/session-sentinel")" = "session" ]
-    run grep -F -- "stale profile" "$CODEX_PONYTAIL_HOME/ponytail.config.toml"
+    grep -F -- 'hand_written = "preserve me" # user comment' "$profile"
+    grep -F -- 'this is string data, not a table' "$profile"
+    grep -F -- "$HOME/.agents/skills/current/SKILL.md" "$profile"
+    run grep -F -- "$obsolete_skill" "$profile"
     [ "$status" -eq 1 ]
+    [ "$(grep -cF -- '[[skills.config]]' "$profile")" -eq 2 ]
+    awk -v table="$project_table" '
+        $0 == table { inside = 1; tables++; next }
+        /^[[:space:]]*\[/ { inside = 0 }
+        inside && $0 == "trust_level = \"trusted\"" { values++ }
+        END { exit !(tables == 1 && values == 1) }
+    ' "$profile"
+    awk -v table="$hook_table" '
+        $0 == table { inside = 1; tables++; next }
+        /^[[:space:]]*\[/ { inside = 0 }
+        inside && $0 == "trusted_hash = \"sha256:test-hook-trust\"" { values++ }
+        END { exit !(tables == 1 && values == 1) }
+    ' "$profile"
 }
 
 # A supervising process reads Codex's status out of the terminal title, so an
@@ -473,6 +585,7 @@ make_bare_main() {
 # override-variable passthrough. Neither default directory is pre-created
 # here, for the same unconditional-grant reason as above.
 @test "uv and npm caches are granted at their documented defaults with no override set" {
+    unset UV_CACHE_DIR
     run bash "$SCRIPT" feature
 
     [ "$status" -eq 0 ]
@@ -490,6 +603,7 @@ make_bare_main() {
     mkdir -p "$pip_cache" "$hf_cache" "$torch_cache" "$cargo_home" "$xdg_cache"
     export PIP_CACHE_DIR="$pip_cache" HF_HOME="$hf_cache" TORCH_HOME="$torch_cache"
     export CARGO_HOME="$cargo_home" XDG_CACHE_HOME="$xdg_cache"
+    unset UV_CACHE_DIR
 
     run bash "$SCRIPT" feature
 
@@ -564,15 +678,117 @@ make_bare_main() {
     [ ! -e "$FAKE_CODEX_SESSION_ARGS" ]
 }
 
-@test "existing marketplace at another revision fails instead of repinning" {
-    mkdir -p "$CODEX_PONYTAIL_HOME/fake-codex-state"
-    printf '%s\n%s\n' "$CODEX_PONYTAIL_MARKETPLACE" "another-revision" \
-        > "$CODEX_PONYTAIL_HOME/fake-codex-state/marketplace"
+@test "a changed audited sha refreshes the pinned plugin automatically" {
+    run bash "$SCRIPT" one
+    [ "$status" -eq 0 ]
+    printf 'updated\n' > "$FAKE_PONYTAIL/updated.txt"
+    git -C "$FAKE_PONYTAIL" add updated.txt
+    git -C "$FAKE_PONYTAIL" commit -qm updated
+    CODEX_PONYTAIL_SHA="$(git -C "$FAKE_PONYTAIL" rev-parse HEAD)"
+    export CODEX_PONYTAIL_SHA
+
+    run bash "$SCRIPT" two
+
+    [ "$status" -eq 0 ]
+    [ "$(git -C "$CODEX_PONYTAIL_HOME/marketplace/plugin" rev-parse HEAD)" \
+        = "$CODEX_PONYTAIL_SHA" ]
+    [ "$(cat "$CODEX_PONYTAIL_HOME/plugins/cache/ponytail-pinned/ponytail/4.9.0/updated.txt")" \
+        = updated ]
+}
+
+@test "a failed pin refresh leaves the previous checkout and installed plugin intact" {
+    run bash "$SCRIPT" one
+    [ "$status" -eq 0 ]
+    local old_sha
+    old_sha="$(git -C "$CODEX_PONYTAIL_HOME/marketplace/plugin" rev-parse HEAD)"
+
+    export CODEX_PONYTAIL_SHA="0000000000000000000000000000000000000000"
+    export CODEX_PONYTAIL_URL="$TEST_DIR/definitely-not-a-repo"
+    run bash "$SCRIPT" two
+
+    [ "$status" -ne 0 ]
+    [ "$(git -C "$CODEX_PONYTAIL_HOME/marketplace/plugin" rev-parse HEAD)" = "$old_sha" ]
+    [ "$(cat "$CODEX_PONYTAIL_HOME/plugins/cache/ponytail-pinned/ponytail/4.9.0/skills/ponytail/SKILL.md")" \
+        = stub ]
+    [ ! -e "$WORK/.worktrees/two" ]
+}
+
+@test "a modified audited checkout is replaced before Codex loads it" {
+    run bash "$SCRIPT" one
+    [ "$status" -eq 0 ]
+    printf 'tampered\n' > "$CODEX_PONYTAIL_HOME/marketplace/plugin/skills/ponytail/SKILL.md"
+
+    run bash "$SCRIPT" two
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$CODEX_PONYTAIL_HOME/marketplace/plugin/skills/ponytail/SKILL.md")" = stub ]
+    [ -z "$(git -C "$CODEX_PONYTAIL_HOME/marketplace/plugin" status --porcelain --untracked-files=all)" ]
+}
+
+@test "a symlinked managed marketplace cannot redirect writes" {
+    local redirected="$TEST_DIR/redirected-marketplace"
+    mkdir -p "$CODEX_PONYTAIL_HOME" "$redirected"
+    ln -s "$redirected" "$CODEX_PONYTAIL_HOME/marketplace"
 
     run bash "$SCRIPT" feature
 
     [ "$status" -ne 0 ]
-    [[ "$output" == *"marketplace source or revision mismatch"* ]]
+    [[ "$output" == *"managed marketplace path must not be a symlink"* ]]
+    [ -z "$(find "$redirected" -mindepth 1 -print -quit)" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+seed_legacy_ponytail() {
+    local state="$CODEX_PONYTAIL_HOME/fake-codex-state"
+    mkdir -p "$state/marketplaces" "$state/plugins" "$CODEX_PONYTAIL_HOME/legacy"
+    printf '%s\n%s\n' 'DietrichGebert/ponytail' 'old-revision' \
+        > "$state/marketplaces/ponytail"
+    printf '%s\n%s\n%s\n' '4.8.4' "$CODEX_PONYTAIL_HOME/legacy" \
+        'https://github.com/DietrichGebert/ponytail.git' \
+        > "$state/plugins/ponytail@ponytail"
+}
+
+@test "legacy Ponytail is retired only after the pinned local plugin installs" {
+    seed_legacy_ponytail
+    printf '%s\n' \
+        'cli_auth_credentials_store = "file"' \
+        '[hooks.state.test]' \
+        'trusted = true' > "$CODEX_PONYTAIL_HOME/config.toml"
+    printf 'session\n' > "$CODEX_PONYTAIL_HOME/session-sentinel"
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -eq 0 ]
+    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/plugins/ponytail@ponytail-pinned" ]
+    [ ! -e "$CODEX_PONYTAIL_HOME/fake-codex-state/plugins/ponytail@ponytail" ]
+    [ ! -e "$CODEX_PONYTAIL_HOME/fake-codex-state/marketplaces/ponytail" ]
+    local add_line remove_line
+    add_line=$(grep -n -F 'plugin add ponytail@ponytail-pinned --json' "$FAKE_CODEX_CALLS" | cut -d: -f1)
+    remove_line=$(grep -n -F 'plugin remove ponytail@ponytail --json' "$FAKE_CODEX_CALLS" | cut -d: -f1)
+    [ "$add_line" -lt "$remove_line" ]
+    grep -F -- '[hooks.state.test]' "$CODEX_PONYTAIL_HOME/config.toml"
+    [ "$(cat "$CODEX_PONYTAIL_HOME/session-sentinel")" = session ]
+}
+
+@test "failed pinned installation leaves the legacy plugin and marketplace intact" {
+    seed_legacy_ponytail
+    export FAKE_CODEX_FAIL_PLUGIN=1
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/plugins/ponytail@ponytail" ]
+    [ -f "$CODEX_PONYTAIL_HOME/fake-codex-state/marketplaces/ponytail" ]
+    [ ! -e "$WORK/.worktrees/feature" ]
+}
+
+@test "installed plugin content must match the audited checkout exactly" {
+    export FAKE_CODEX_CORRUPT_INSTALL=1
+
+    run bash "$SCRIPT" feature
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"installed Ponytail does not match"* ]]
     [ ! -e "$WORK/.worktrees/feature" ]
 }
 

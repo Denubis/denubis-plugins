@@ -18,7 +18,7 @@ set -euo pipefail
 if [[ "${CODEX_PONYTAIL_TESTING:-}" == "1" ]]; then
     PONYTAIL_HOME="${CODEX_PONYTAIL_HOME:-$HOME/.codex-ponytail}"
     CODEX="${CODEX_PONYTAIL_BINARY:-$(command -v codex || true)}"
-    PONYTAIL_MARKETPLACE="${CODEX_PONYTAIL_MARKETPLACE:-DietrichGebert/ponytail}"
+    PONYTAIL_URL="${CODEX_PONYTAIL_URL:-https://github.com/DietrichGebert/ponytail.git}"
     PONYTAIL_SHA="${CODEX_PONYTAIL_SHA:-0a4dd63ad4541f4f655c4108a295916f3c1d8fda}"
 else
     # Production values are not environment-overridable. Pinned to v4.9.0 after
@@ -26,16 +26,22 @@ else
     # Codex manifest, skills, and hooks.
     PONYTAIL_HOME="$HOME/.codex-ponytail"
     CODEX="$(command -v codex || true)"
-    PONYTAIL_MARKETPLACE="DietrichGebert/ponytail"
+    PONYTAIL_URL="https://github.com/DietrichGebert/ponytail.git"
     PONYTAIL_SHA="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 fi
 PONYTAIL_XDG_CONFIG_HOME="$PONYTAIL_HOME/xdg-config"
+PONYTAIL_MARKETPLACE_ROOT="$PONYTAIL_HOME/marketplace"
+PONYTAIL_VENDOR="$PONYTAIL_MARKETPLACE_ROOT/plugin"
+PONYTAIL_PLUGIN_ID="ponytail@ponytail-pinned"
 
 DRY_RUN=false
 WORKTREE_ACTION=""
 ROOT=""
 WORKTREE=""
 LOCK_FD=""
+PONYTAIL_STAGING=""
+PONYTAIL_OLD_MOVED=false
+PROFILE_EDITOR=""
 
 die() {
     printf 'codex-ponytail: %s\n' "$1" >&2
@@ -75,6 +81,16 @@ toml_quote() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || die "$1 is required"
+}
+
+resolve_profile_editor() {
+    local launcher_path script_directory
+    launcher_path=$(readlink -f -- "${BASH_SOURCE[0]}") \
+        || die "could not resolve the codex-ponytail launcher path"
+    script_directory=${launcher_path%/*}
+    PROFILE_EDITOR="$script_directory/update_codex_profile.py"
+    [[ -f "$PROFILE_EDITOR" ]] \
+        || die "Codex profile editor not found: $PROFILE_EDITOR"
 }
 
 validate_environment_paths() {
@@ -143,30 +159,27 @@ is_worktree_root() {
 }
 
 completion_worktree_names() {
-    local root field wt branch prefix
+    local root
     root=$(main_checkout 2>/dev/null) || return 0
-    prefix="$root/.worktrees/"
-    wt=""
-    branch=""
+    git -C "$root" for-each-ref --sort=refname \
+        --format='%(refname:short)' refs/heads 2>/dev/null
+}
 
-    while IFS= read -r -d '' field; do
-        case "$field" in
-            worktree\ *) wt="${field#worktree }" ;;
-            branch\ refs/heads/*) branch="${field#branch refs/heads/}" ;;
-            "")
-                if [[ "$wt" == "$prefix"?* \
-                      && -d "$wt" \
-                      && ! -L "$wt" ]] \
-                   && is_worktree_root "$wt" "$root"; then
-                    printf '%s\n' "$branch"
-                fi
-                wt=""
-                branch=""
+qualified_branch_suggestion() {
+    local root="$1" name="$2" branch match="" count=0
+    while IFS= read -r branch; do
+        case "$branch" in
+            */"$name")
+                match="$branch"
+                count=$((count + 1))
                 ;;
         esac
     done < <(
-        git -C "$root" worktree list --porcelain -z 2>/dev/null
+        git -C "$root" for-each-ref --sort=refname \
+            --format='%(refname:short)' refs/heads 2>/dev/null
     )
+    [[ "$count" -eq 1 ]] || return 1
+    printf '%s\n' "$match"
 }
 
 registered_worktree_for_branch() {
@@ -236,7 +249,7 @@ require_worktrees_ignored() {
 }
 
 preflight_worktree() {
-    local name="$1" base="$2" actual_branch linked_worktree
+    local name="$1" base="$2" actual_branch linked_worktree caller_checkout caller_branch suggestion
 
     if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
        || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
@@ -244,6 +257,21 @@ preflight_worktree() {
     fi
 
     ROOT=$(main_checkout)
+    if ! git -C "$ROOT" show-ref --verify --quiet "refs/heads/$name" \
+       && suggestion=$(qualified_branch_suggestion "$ROOT" "$name"); then
+        die "branch '$name' does not exist; did you mean '$suggestion'? Use the full branch name"
+    fi
+    if caller_checkout=$(git rev-parse --show-toplevel 2>/dev/null); then
+        caller_checkout=$(cd "$caller_checkout" 2>/dev/null && pwd -P) \
+            || die "could not resolve the caller checkout"
+        caller_branch=$(git -C "$caller_checkout" branch --show-current)
+        if [[ -n "$caller_branch" && "$caller_branch" == "$name" ]] \
+           && is_worktree_root "$caller_checkout" "$ROOT"; then
+            WORKTREE="$caller_checkout"
+            WORKTREE_ACTION="reuse-current"
+            return 0
+        fi
+    fi
     require_worktrees_ignored "$ROOT"
     WORKTREE="$ROOT/.worktrees/$name"
 
@@ -487,7 +515,7 @@ initialize_base_config() {
 
 write_profile() {
     local profile="$PONYTAIL_HOME/ponytail.config.toml"
-    local temporary list skill_file
+    local temporary list
     if [[ -e "$profile" || -L "$profile" ]]; then
         [[ ! -L "$profile" ]] \
             || die "managed profile must not be a symlink: $profile"
@@ -497,10 +525,6 @@ write_profile() {
     temporary=$(mktemp "$PONYTAIL_HOME/.ponytail.config.toml.XXXXXX")
     list=$(mktemp "$PONYTAIL_HOME/.global-skills.XXXXXX")
 
-    printf '%s\n' \
-        '# Managed by codex-ponytail; changes are replaced on the next invocation.' \
-        > "$temporary"
-
     if [[ -d "$HOME/.agents/skills" ]]; then
         if ! find -L "$HOME/.agents/skills" \
             -mindepth 2 -maxdepth 2 -type f -name SKILL.md -print0 \
@@ -508,10 +532,14 @@ write_profile() {
             rm -f -- "$temporary" "$list"
             die "could not discover global skills beneath $HOME/.agents/skills"
         fi
-        while IFS= read -r -d '' skill_file; do
-            printf '\n[[skills.config]]\npath = %s\nenabled = false\n' \
-                "$(toml_quote "$skill_file")" >> "$temporary"
-        done < "$list"
+    fi
+
+    # Parse and round-trip the complete TOML document. Only skills.config is
+    # launcher-owned; hand-written settings and Codex state remain untouched.
+    if ! uv run --no-project --script "$PROFILE_EDITOR" \
+        "$profile" "$temporary" "$list"; then
+        rm -f -- "$temporary" "$list"
+        die "could not refresh managed skills in $profile"
     fi
 
     chmod 600 "$temporary"
@@ -524,6 +552,173 @@ isolated_codex() {
         CODEX_HOME="$PONYTAIL_HOME" \
         XDG_CONFIG_HOME="$PONYTAIL_XDG_CONFIG_HOME" \
         "$CODEX" "$@"
+}
+
+# Every recursive delete stays strictly inside the dedicated Ponytail home.
+safe_rm() {
+    local target="${1:-}"
+    case "$target" in
+        "$PONYTAIL_HOME"/?*) ;;
+        *) die "refusing to remove '$target': not inside $PONYTAIL_HOME" ;;
+    esac
+    rm -rf -- "$target"
+}
+
+ponytail_checkout_valid() {
+    local head state
+    [[ -d "$PONYTAIL_VENDOR/.git" && ! -L "$PONYTAIL_VENDOR" ]] || return 1
+    head=$(git -C "$PONYTAIL_VENDOR" rev-parse HEAD 2>/dev/null) || return 1
+    [[ "$head" == "$PONYTAIL_SHA" ]] || return 1
+    state=$(git -C "$PONYTAIL_VENDOR" status --porcelain=v1 \
+        --untracked-files=all --ignored=matching 2>/dev/null) || return 1
+    [[ -z "$state" ]]
+}
+
+cleanup_ponytail_swap() {
+    local status=$?
+    trap - EXIT HUP INT TERM
+
+    if [[ -n "$PONYTAIL_STAGING" && -d "$PONYTAIL_STAGING" ]]; then
+        if $PONYTAIL_OLD_MOVED \
+           && [[ ! -e "$PONYTAIL_VENDOR" && ! -L "$PONYTAIL_VENDOR" ]] \
+           && [[ -e "$PONYTAIL_STAGING/old" ]]; then
+            if ! mv -- "$PONYTAIL_STAGING/old" "$PONYTAIL_VENDOR"; then
+                printf 'codex-ponytail: could not restore the previous audited checkout; recover it from %s\n' \
+                    "$PONYTAIL_STAGING/old" >&2
+                exit "$status"
+            fi
+        fi
+        safe_rm "$PONYTAIL_STAGING"
+    fi
+    exit "$status"
+}
+
+ensure_marketplace_layout() {
+    local directory manifest temporary
+    for directory in \
+        "$PONYTAIL_MARKETPLACE_ROOT" \
+        "$PONYTAIL_MARKETPLACE_ROOT/.agents" \
+        "$PONYTAIL_MARKETPLACE_ROOT/.agents/plugins"; do
+        [[ ! -L "$directory" ]] \
+            || die "managed marketplace path must not be a symlink: $directory"
+        if [[ -e "$directory" ]]; then
+            [[ -d "$directory" ]] \
+                || die "managed marketplace path is not a directory: $directory"
+        else
+            mkdir "$directory"
+        fi
+    done
+
+    manifest="$PONYTAIL_MARKETPLACE_ROOT/.agents/plugins/marketplace.json"
+    [[ ! -L "$manifest" ]] \
+        || die "managed marketplace manifest must not be a symlink: $manifest"
+    if [[ -e "$manifest" ]]; then
+        [[ -f "$manifest" ]] \
+            || die "managed marketplace manifest is not a regular file: $manifest"
+    fi
+    temporary=$(mktemp "$PONYTAIL_MARKETPLACE_ROOT/.marketplace.json.XXXXXX")
+    printf '%s\n' \
+        '{' \
+        '  "name": "ponytail-pinned",' \
+        '  "interface": {"displayName": "Ponytail (audited)"},' \
+        '  "plugins": [' \
+        '    {' \
+        '      "name": "ponytail",' \
+        '      "source": {"source": "local", "path": "./plugin"},' \
+        '      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},' \
+        '      "category": "Productivity"' \
+        '    }' \
+        '  ]' \
+        '}' > "$temporary"
+    chmod 600 "$temporary"
+    mv -T -- "$temporary" "$manifest"
+}
+
+ensure_ponytail_checkout() {
+    ponytail_checkout_valid && return 0
+    printf 'fetching audited Ponytail at %s\n' "${PONYTAIL_SHA:0:12}" >&2
+
+    PONYTAIL_STAGING=$(mktemp -d "$PONYTAIL_HOME/.ponytail-staging.XXXXXX")
+    PONYTAIL_OLD_MOVED=false
+    trap cleanup_ponytail_swap EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    if ! git clone --quiet "$PONYTAIL_URL" "$PONYTAIL_STAGING/new" \
+       || ! git -C "$PONYTAIL_STAGING/new" checkout --quiet --detach "$PONYTAIL_SHA"; then
+        die "could not fetch Ponytail ${PONYTAIL_SHA:0:12} from $PONYTAIL_URL (existing audited checkout left intact)"
+    fi
+
+    if [[ -e "$PONYTAIL_VENDOR" || -L "$PONYTAIL_VENDOR" ]]; then
+        PONYTAIL_OLD_MOVED=true
+        mv -- "$PONYTAIL_VENDOR" "$PONYTAIL_STAGING/old"
+    fi
+    mv -- "$PONYTAIL_STAGING/new" "$PONYTAIL_VENDOR"
+    safe_rm "$PONYTAIL_STAGING"
+    PONYTAIL_STAGING=""
+    PONYTAIL_OLD_MOVED=false
+    trap - EXIT HUP INT TERM
+}
+
+json_has_plugin() {
+    local json="$1" plugin_id="$2"
+    node -e '
+        const fs = require("fs");
+        const value = JSON.parse(fs.readFileSync(0, "utf8"));
+        process.exit(value.installed?.some(item => item.pluginId === process.argv[1]) ? 0 : 1);
+    ' "$plugin_id" <<< "$json"
+}
+
+json_has_marketplace() {
+    local json="$1" marketplace="$2"
+    node -e '
+        const fs = require("fs");
+        const value = JSON.parse(fs.readFileSync(0, "utf8"));
+        process.exit(value.marketplaces?.some(item => item.name === process.argv[1]) ? 0 : 1);
+    ' "$marketplace" <<< "$json"
+}
+
+installed_path_from_add() {
+    node -e '
+        const fs = require("fs");
+        const value = JSON.parse(fs.readFileSync(0, "utf8"));
+        if (typeof value.installedPath !== "string" || value.installedPath.length === 0) process.exit(2);
+        process.stdout.write(value.installedPath);
+    '
+}
+
+ensure_native_ponytail() {
+    local add_result installed_path plugin_list marketplace_list
+
+    ensure_marketplace_layout
+    ensure_ponytail_checkout
+    isolated_codex plugin marketplace add "$PONYTAIL_MARKETPLACE_ROOT" \
+        --json >/dev/null
+    add_result=$(isolated_codex plugin add "$PONYTAIL_PLUGIN_ID" --json)
+    installed_path=$(installed_path_from_add <<< "$add_result") \
+        || die "Codex did not report where it installed audited Ponytail"
+    case "$installed_path" in
+        "$PONYTAIL_HOME"/plugins/cache/?*) ;;
+        *) die "Codex reported an unsafe Ponytail install path: $installed_path" ;;
+    esac
+    [[ -d "$installed_path" && ! -L "$installed_path" ]] \
+        || die "Codex did not create a regular Ponytail install directory: $installed_path"
+    diff -qr "$PONYTAIL_VENDOR" "$installed_path" >/dev/null \
+        || die "installed Ponytail does not match audited commit ${PONYTAIL_SHA:0:12}"
+
+    # The old marketplace followed upstream main even when added with --ref.
+    # Retire it only after the exact audited local plugin is installed and
+    # verified, so a failed migration leaves the old working installation.
+    plugin_list=$(isolated_codex plugin list --json)
+    if json_has_plugin "$plugin_list" "ponytail@ponytail"; then
+        printf 'retiring legacy unpinned Ponytail plugin\n' >&2
+        isolated_codex plugin remove ponytail@ponytail --json >/dev/null
+    fi
+    marketplace_list=$(isolated_codex plugin marketplace list --json)
+    if json_has_marketplace "$marketplace_list" "ponytail"; then
+        isolated_codex plugin marketplace remove ponytail --json >/dev/null
+    fi
 }
 
 bootstrap_ponytail() {
@@ -547,9 +742,7 @@ bootstrap_ponytail() {
     write_profile
 
     printf 'ensuring native Ponytail at %s\n' "${PONYTAIL_SHA:0:12}" >&2
-    isolated_codex plugin marketplace add "$PONYTAIL_MARKETPLACE" \
-        --ref "$PONYTAIL_SHA" --json >/dev/null
-    isolated_codex plugin add ponytail@ponytail --json >/dev/null
+    ensure_native_ponytail
     umask "$old_umask"
 }
 
@@ -560,7 +753,7 @@ create_or_reuse_worktree() {
     # the launcher lock so concurrent invocations see the latest worktree state.
     preflight_worktree "$name" "$base"
     case "$WORKTREE_ACTION" in
-        reuse)
+        reuse|reuse-current)
             printf 'reusing existing worktree %s\n' "$WORKTREE" >&2
             ;;
         existing-branch)
@@ -592,8 +785,10 @@ print_result() {
     if $DRY_RUN; then
         printf 'dry run  : no Codex state, branch, or worktree was created\n'
     fi
-    printf 'remove   : git -C %s worktree remove %s\n' \
-        "$(shell_quote "$ROOT")" "$(shell_quote "$WORKTREE")"
+    if [[ "$WORKTREE_ACTION" != "reuse-current" ]]; then
+        printf 'remove   : git -C %s worktree remove %s\n' \
+            "$(shell_quote "$ROOT")" "$(shell_quote "$WORKTREE")"
+    fi
     printf 'one-time : log in if prompted, review /hooks, then restart Codex\n'
     printf 'later use: login and hook trust persist while credentials and hook hashes remain valid\n'
     printf '\nrun this in the window you want it in:\n\n  %s\n\n' "$command"
@@ -618,6 +813,10 @@ main() {
     require_command git
     require_command node
     require_command flock
+    require_command diff
+    require_command readlink
+    require_command uv
+    resolve_profile_editor
 
     base=$(git rev-parse --verify 'HEAD^{commit}') \
         || die "could not resolve the caller checkout's HEAD"
@@ -625,11 +824,13 @@ main() {
 
     if $DRY_RUN; then
         printf '+ initialize isolated Codex home %s\n' "$PONYTAIL_HOME" >&2
-        printf '+ codex plugin marketplace add %s --ref %s\n' \
-            "$PONYTAIL_MARKETPLACE" "$PONYTAIL_SHA" >&2
-        printf '+ codex plugin add ponytail@ponytail\n' >&2
+        printf '+ ensure audited Ponytail checkout %s at %s\n' \
+            "$PONYTAIL_URL" "$PONYTAIL_SHA" >&2
+        printf '+ codex plugin marketplace add %s\n' \
+            "$PONYTAIL_MARKETPLACE_ROOT" >&2
+        printf '+ codex plugin add %s\n' "$PONYTAIL_PLUGIN_ID" >&2
         case "$WORKTREE_ACTION" in
-            reuse) printf '+ reuse %s\n' "$WORKTREE" >&2 ;;
+            reuse|reuse-current) printf '+ reuse %s\n' "$WORKTREE" >&2 ;;
             existing-branch)
                 printf '+ git -C %s worktree add %s %s\n' \
                     "$ROOT" "$WORKTREE" "$name" >&2

@@ -9,14 +9,52 @@ if [[ "${1:-}" == "--profile" ]]; then
     shift 2
 fi
 
+state_dir="$CODEX_HOME/fake-codex-state"
+marketplaces_dir="$state_dir/marketplaces"
+plugins_dir="$state_dir/plugins"
+
+json_string() {
+    node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$1"
+}
+
+marketplace_name() {
+    node -e '
+        const fs = require("fs");
+        const path = require("path");
+        const manifest = path.join(process.argv[1], ".agents/plugins/marketplace.json");
+        process.stdout.write(JSON.parse(fs.readFileSync(manifest, "utf8")).name);
+    ' "$1"
+}
+
+plugin_source() {
+    node -e '
+        const fs = require("fs");
+        const path = require("path");
+        const root = process.argv[1];
+        const plugin = process.argv[2];
+        const manifest = JSON.parse(fs.readFileSync(
+            path.join(root, ".agents/plugins/marketplace.json"), "utf8"));
+        const entry = manifest.plugins.find(candidate => candidate.name === plugin);
+        if (!entry || entry.source?.source !== "local") process.exit(2);
+        process.stdout.write(path.resolve(root, entry.source.path));
+    ' "$1" "$2"
+}
+
 if [[ "${1:-}" == "plugin" && "${2:-}" == "marketplace" && "${3:-}" == "add" ]]; then
     [[ -z "${FAKE_CODEX_FAIL_MARKETPLACE:-}" ]] || exit 41
     source="${4:-}"
-    [[ "${5:-}" == "--ref" && -n "${6:-}" && "${7:-}" == "--json" ]] || exit 92
-    revision="$6"
-    state_dir="$CODEX_HOME/fake-codex-state"
-    state_file="$state_dir/marketplace"
-    mkdir -p "$state_dir"
+    revision=""
+    if [[ "${5:-}" == "--ref" ]]; then
+        revision="${6:-}"
+        [[ -n "$revision" && "${7:-}" == "--json" ]] || exit 92
+        name="ponytail"
+    else
+        [[ "${5:-}" == "--json" ]] || exit 92
+        name=$(marketplace_name "$source")
+    fi
+
+    mkdir -p "$marketplaces_dir"
+    state_file="$marketplaces_dir/$name"
     if [[ -f "$state_file" ]]; then
         IFS= read -r recorded_source < "$state_file"
         IFS= read -r recorded_revision < <(sed -n '2p' "$state_file")
@@ -24,21 +62,110 @@ if [[ "${1:-}" == "plugin" && "${2:-}" == "marketplace" && "${3:-}" == "add" ]];
             printf 'marketplace source or revision mismatch\n' >&2
             exit 42
         fi
-        printf '{"marketplaceName":"ponytail","alreadyAdded":true}\n'
+        printf '{"marketplaceName":%s,"alreadyAdded":true}\n' "$(json_string "$name")"
         exit 0
     fi
+
     printf '%s\n%s\n' "$source" "$revision" > "$state_file"
-    printf '\n[plugins."ponytail@ponytail"]\nenabled = true\n' >> "$CODEX_HOME/config.toml"
-    printf '{"marketplaceName":"ponytail","alreadyAdded":false}\n'
+    printf '{"marketplaceName":%s,"alreadyAdded":false}\n' "$(json_string "$name")"
+    exit 0
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "marketplace" && "${3:-}" == "list" ]]; then
+    [[ "${4:-}" == "--json" ]] || exit 94
+    node - "$marketplaces_dir" <<'NODE'
+const fs = require("fs");
+const dir = process.argv[2];
+const marketplaces = fs.existsSync(dir)
+    ? fs.readdirSync(dir).sort().map(name => {
+        const [source] = fs.readFileSync(`${dir}/${name}`, "utf8").split("\n");
+        return {name, root: source, marketplaceSource: {sourceType: "local", source}};
+    })
+    : [];
+process.stdout.write(JSON.stringify({marketplaces}));
+NODE
+    exit 0
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "marketplace" && "${3:-}" == "remove" ]]; then
+    [[ "${5:-}" == "--json" ]] || exit 95
+    name="${4:-}"
+    [[ -f "$marketplaces_dir/$name" ]] || exit 44
+    rm -f -- "$marketplaces_dir/$name"
+    printf '{"marketplaceName":%s,"installedRoot":null}\n' "$(json_string "$name")"
     exit 0
 fi
 
 if [[ "${1:-}" == "plugin" && "${2:-}" == "add" ]]; then
     [[ -z "${FAKE_CODEX_FAIL_PLUGIN:-}" ]] || exit 43
-    [[ "${3:-}" == "ponytail@ponytail" && "${4:-}" == "--json" ]] || exit 93
-    mkdir -p "$CODEX_HOME/fake-codex-state"
-    printf 'installed\n' > "$CODEX_HOME/fake-codex-state/plugin"
-    printf '{"pluginId":"ponytail@ponytail","installed":true}\n'
+    plugin_id="${3:-}"
+    [[ -n "$plugin_id" && "${4:-}" == "--json" ]] || exit 93
+    plugin="${plugin_id%@*}"
+    marketplace="${plugin_id#*@}"
+    marketplace_state="$marketplaces_dir/$marketplace"
+    [[ -f "$marketplace_state" ]] || exit 96
+    IFS= read -r marketplace_root < "$marketplace_state"
+    source_path=$(plugin_source "$marketplace_root" "$plugin")
+    version=$(node -e '
+        const fs = require("fs");
+        const path = require("path");
+        const manifest = path.join(process.argv[1], ".claude-plugin/plugin.json");
+        process.stdout.write(JSON.parse(fs.readFileSync(manifest, "utf8")).version);
+    ' "$source_path")
+    installed_path="$CODEX_HOME/plugins/cache/$marketplace/$plugin/$version"
+    case "$installed_path" in "$CODEX_HOME"/*) ;; *) exit 97 ;; esac
+    rm -rf -- "$installed_path"
+    mkdir -p "$(dirname "$installed_path")" "$plugins_dir"
+    cp -a -- "$source_path" "$installed_path"
+    if [[ -n "${FAKE_CODEX_CORRUPT_INSTALL:-}" ]]; then
+        printf 'corrupt\n' >> "$installed_path/skills/ponytail/SKILL.md"
+    fi
+    printf '%s\n%s\n%s\n' "$version" "$installed_path" "$source_path" \
+        > "$plugins_dir/$plugin_id"
+    printf '\n[plugins.%s]\nenabled = true\n' "$(json_string "$plugin_id")" \
+        >> "$CODEX_HOME/config.toml"
+    printf '{"pluginId":%s,"version":%s,"installedPath":%s}\n' \
+        "$(json_string "$plugin_id")" \
+        "$(json_string "$version")" \
+        "$(json_string "$installed_path")"
+    exit 0
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "remove" ]]; then
+    [[ "${4:-}" == "--json" ]] || exit 98
+    plugin_id="${3:-}"
+    state_file="$plugins_dir/$plugin_id"
+    [[ -f "$state_file" ]] || exit 45
+    IFS= read -r installed_path < <(sed -n '2p' "$state_file")
+    case "$installed_path" in "$CODEX_HOME"/*) rm -rf -- "$installed_path" ;; esac
+    rm -f -- "$state_file"
+    printf '{"pluginId":%s}\n' "$(json_string "$plugin_id")"
+    exit 0
+fi
+
+if [[ "${1:-}" == "plugin" && "${2:-}" == "list" ]]; then
+    [[ "${3:-}" == "--json" ]] || exit 99
+    node - "$plugins_dir" <<'NODE'
+const fs = require("fs");
+const dir = process.argv[2];
+const installed = fs.existsSync(dir)
+    ? fs.readdirSync(dir).sort().map(pluginId => {
+        const [version, installedPath, sourcePath] = fs.readFileSync(
+            `${dir}/${pluginId}`, "utf8").split("\n");
+        const separator = pluginId.lastIndexOf("@");
+        return {
+            pluginId,
+            name: pluginId.slice(0, separator),
+            marketplaceName: pluginId.slice(separator + 1),
+            version,
+            installed: true,
+            enabled: true,
+            source: {source: "local", path: sourcePath},
+        };
+    })
+    : [];
+process.stdout.write(JSON.stringify({installed, available: []}));
+NODE
     exit 0
 fi
 

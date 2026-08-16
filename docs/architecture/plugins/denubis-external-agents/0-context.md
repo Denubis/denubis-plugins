@@ -44,7 +44,7 @@ flowchart LR
 | `consulting-a-fable-advisor` | Handles a human-triggered Fable consultation and distinguishes the unrestricted Agent path from the explicitly checked pane path (`plugins/denubis-external-agents/skills/consulting-a-fable-advisor/SKILL.md`, working-tree source candidate). |
 | `supervising-codex` | Defines the prompt-file, monitoring, verification, and handover loop for a joined Codex pane (`plugins/denubis-external-agents/skills/supervising-codex/SKILL.md`, `2f11745`). |
 | `codex_supervisor.py` | Reads pane state, submits prompt files, monitors events, and writes supervised outputs (`plugins/denubis-external-agents/scripts/codex_supervisor.py`, `c6882d2`). |
-| `claude-ponytail`, `codex-ponytail` | Complete managed worktree branches after launcher options, create new branches from the caller checkout, reuse isolated worktrees, and launch the selected CLI with remaining arguments passed through (`plugins/denubis-external-agents/README.md`, source candidate). |
+| `claude-ponytail`, `codex-ponytail` | Complete all local branches after launcher options, reuse the caller checkout when it already carries the selected branch, otherwise create or reuse an isolated worktree, and launch the selected CLI with remaining arguments passed through. The Codex launcher installs and verifies an audited checkout through a stable local marketplace before retiring its legacy remote plugin (`plugins/denubis-external-agents/README.md`, source candidate). |
 | `tmux-send-guard` | Guards pane-targeted sends used by external-session control (`plugins/denubis-external-agents/scripts/tmux-send-guard`, `e98528a`). |
 
 ## Boundary and failure modes
@@ -67,6 +67,6 @@ flowchart LR
 ## Cross-references
 
 - **Plugin manifest:** `plugins/denubis-external-agents/.claude-plugin/plugin.json`,
-  source-candidate version 0.16.1.
+  source-candidate version 0.16.2.
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).
 - **Shared constraints:** [`../../constraints.md`](../../constraints.md).

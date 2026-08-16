@@ -89,7 +89,7 @@ teardown() {
     [[ "$output" == *"claude-ponytail <name> [<claude-args>...]"* ]]
 }
 
-@test "Fish completes registered worktree branches after launcher options" {
+@test "Fish completes every local branch, including the caller checkout" {
     mkdir -p "$TEST_DIR/bin" "$WORK/.worktrees/ordinary"
     ln -s "$SCRIPT" "$TEST_DIR/bin/claude-ponytail"
     git -C "$WORK" branch parked
@@ -99,7 +99,22 @@ teardown() {
         "source '$COMPLETION'; complete -C 'claude-ponytail --dry-run '"
 
     [ "$status" -eq 0 ]
-    [ "$output" = $'research/topic\tExisting worktree' ]
+    [ "$output" = $'main\tLocal branch\nparked\tLocal branch\nresearch/topic\tLocal branch' ]
+}
+
+@test "requesting the caller branch launches the caller checkout" {
+    local cwd_file="$TEST_DIR/claude-cwd"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'pwd -P > "$CLAUDE_CWD_FILE"' > "$CLAUDE_PONYTAIL_WRAPPER"
+    chmod +x "$CLAUDE_PONYTAIL_WRAPPER"
+    export CLAUDE_CWD_FILE="$cwd_file"
+
+    run "$SCRIPT" main
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$cwd_file")" = "$WORK" ]
+    [ ! -e "$WORK/.worktrees/main" ]
 }
 
 @test "no arguments refuses" {
@@ -112,6 +127,16 @@ teardown() {
     run "$SCRIPT" --bogus
     [ "$status" -ne 0 ]
     [[ "$output" == *"--bogus"* ]]
+}
+
+@test "an unqualified branch suffix refuses with the unique full-name suggestion" {
+    git -C "$WORK" branch hotfix/deploy-local-vitest
+
+    run "$SCRIPT" deploy-local-vitest
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"did you mean 'hotfix/deploy-local-vitest'"* ]]
+    [ ! -e "$WORK/.worktrees/deploy-local-vitest" ]
 }
 
 @test "positional arguments after the worktree pass through to Claude" {

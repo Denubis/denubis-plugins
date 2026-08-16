@@ -195,30 +195,27 @@ is_worktree_root() {
 }
 
 completion_worktree_names() {
-    local root field wt branch prefix
+    local root
     root=$(main_checkout 2>/dev/null) || return 0
-    prefix="$root/.worktrees/"
-    wt=""
-    branch=""
+    git -C "$root" for-each-ref --sort=refname \
+        --format='%(refname:short)' refs/heads 2>/dev/null
+}
 
-    while IFS= read -r -d '' field; do
-        case "$field" in
-            worktree\ *) wt="${field#worktree }" ;;
-            branch\ refs/heads/*) branch="${field#branch refs/heads/}" ;;
-            "")
-                if [[ "$wt" == "$prefix"?* \
-                      && -d "$wt" \
-                      && ! -L "$wt" ]] \
-                   && is_worktree_root "$wt" "$root"; then
-                    printf '%s\n' "$branch"
-                fi
-                wt=""
-                branch=""
+qualified_branch_suggestion() {
+    local root="$1" name="$2" branch match="" count=0
+    while IFS= read -r branch; do
+        case "$branch" in
+            */"$name")
+                match="$branch"
+                count=$((count + 1))
                 ;;
         esac
     done < <(
-        git -C "$root" worktree list --porcelain -z 2>/dev/null
+        git -C "$root" for-each-ref --sort=refname \
+            --format='%(refname:short)' refs/heads 2>/dev/null
     )
+    [ "$count" -eq 1 ] || return 1
+    printf '%s\n' "$match"
 }
 
 registered_worktree_for_branch() {
@@ -262,7 +259,8 @@ require_worktrees_ignored() {
 main() {
     local name="$1"
     shift
-    local root wt cmd argument actual_branch linked_worktree base
+    local root wt cmd argument actual_branch linked_worktree base caller_checkout caller_branch suggestion
+    local current_checkout=false
 
     if ! git check-ref-format --branch "$name" >/dev/null 2>&1 \
        || ! git check-ref-format "refs/heads/$name" >/dev/null 2>&1; then
@@ -270,37 +268,58 @@ main() {
     fi
 
     root=$(main_checkout)
+    if ! git -C "$root" show-ref --verify --quiet "refs/heads/$name" \
+       && suggestion=$(qualified_branch_suggestion "$root" "$name"); then
+        die "branch '$name' does not exist; did you mean '$suggestion'? Use the full branch name"
+    fi
     base=$(git rev-parse --verify 'HEAD^{commit}') \
         || die "could not resolve the caller checkout's HEAD"
-    require_worktrees_ignored "$root"
 
     [ -x "$WRAPPER" ] || die "claude wrapper not executable at $WRAPPER"
     ensure_ponytail
 
-    wt="$root/.worktrees/$name"
-    if [ -d "$wt" ]; then
-        is_worktree_root "$wt" "$root" \
-            || die "existing path is not a registered git worktree: $wt"
-        actual_branch=$(git -C "$wt" branch --show-current)
-        [ "$actual_branch" = "$name" ] \
-            || die "existing worktree uses branch '${actual_branch:-detached HEAD}', expected '$name': $wt"
-        printf 'reusing existing worktree %s\n' "$wt" >&2
-    elif git -C "$root" show-ref --verify --quiet "refs/heads/$name"; then
-        if linked_worktree=$(registered_worktree_for_branch "$root" "$name"); then
-            if [ ! -d "$linked_worktree" ] || [ -L "$linked_worktree" ]; then
-                die "registered worktree is unavailable: $linked_worktree"
-            fi
-            is_worktree_root "$linked_worktree" "$root" \
-                || die "registered worktree is invalid: $linked_worktree"
-            wt="$linked_worktree"
-            printf 'reusing existing worktree %s\n' "$wt" >&2
-        else
-            run git -C "$root" worktree add --quiet "$wt" "$name"
+    if caller_checkout=$(git rev-parse --show-toplevel 2>/dev/null); then
+        caller_checkout=$(cd "$caller_checkout" 2>/dev/null && pwd -P) \
+            || die "could not resolve the caller checkout"
+        caller_branch=$(git -C "$caller_checkout" branch --show-current)
+        if [ -n "$caller_branch" ] && [ "$caller_branch" = "$name" ] \
+           && is_worktree_root "$caller_checkout" "$root"; then
+            wt="$caller_checkout"
+            current_checkout=true
         fi
-    else
-        run git -C "$root" worktree add --quiet "$wt" -b "$name" "$base"
     fi
-    $DRY_RUN || lfs_guard "$wt"
+
+    if $current_checkout; then
+        printf 'reusing caller checkout %s\n' "$wt" >&2
+    else
+        require_worktrees_ignored "$root"
+        wt="$root/.worktrees/$name"
+        if [ -d "$wt" ]; then
+            is_worktree_root "$wt" "$root" \
+                || die "existing path is not a registered git worktree: $wt"
+            actual_branch=$(git -C "$wt" branch --show-current)
+            [ "$actual_branch" = "$name" ] \
+                || die "existing worktree uses branch '${actual_branch:-detached HEAD}', expected '$name': $wt"
+            printf 'reusing existing worktree %s\n' "$wt" >&2
+        elif git -C "$root" show-ref --verify --quiet "refs/heads/$name"; then
+            if linked_worktree=$(registered_worktree_for_branch "$root" "$name"); then
+                if [ ! -d "$linked_worktree" ] || [ -L "$linked_worktree" ]; then
+                    die "registered worktree is unavailable: $linked_worktree"
+                fi
+                is_worktree_root "$linked_worktree" "$root" \
+                    || die "registered worktree is invalid: $linked_worktree"
+                wt="$linked_worktree"
+                printf 'reusing existing worktree %s\n' "$wt" >&2
+            else
+                run git -C "$root" worktree add --quiet "$wt" "$name"
+            fi
+        else
+            run git -C "$root" worktree add --quiet "$wt" -b "$name" "$base"
+        fi
+    fi
+    if ! $DRY_RUN && ! $current_checkout; then
+        lfs_guard "$wt"
+    fi
 
     if $DRY_RUN; then
         if [ -n "$CONFIG_DIR" ]; then
@@ -319,8 +338,10 @@ main() {
         printf '\nworktree : %s\n' "$wt"
         printf 'ponytail : %s (pinned, audited)\n' "${PONYTAIL_SHA:0:12}"
         printf 'dry run  : no cache, branch, or worktree was created; the command below is illustrative\n'
-        printf 'remove   : git -C %s worktree remove %s\n' \
-            "$(shell_quote "$root")" "$(shell_quote "$wt")"
+        if ! $current_checkout; then
+            printf 'remove   : git -C %s worktree remove %s\n' \
+                "$(shell_quote "$root")" "$(shell_quote "$wt")"
+        fi
         printf '\nrun this in the window you want it in:\n\n  cd %s && %s\n\n' \
             "$(shell_quote "$wt")" "$cmd"
         return 0
