@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/instruction-budget.py\" --provider codex",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

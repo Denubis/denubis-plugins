@@ -26,8 +26,9 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
   provider manifest through a provider-specific hook JSON file. The script may be shared
   even when event matchers, root variables, trust, or launch commands differ.
 - **Hook events** in the current source marketplace: `SessionStart` and `PreToolUse`.
-  The remaining SessionStart hooks perform terminal recolouring or live-marker
-  maintenance; they do not inject generic workflow prose.
+  SessionStart hooks perform terminal recolouring, live-marker maintenance, or a
+  bounded user-facing instruction-budget alarm. They do not inject generic workflow
+  prose into model context.
 - **Auto-discovery dispatcher**: the `denubis-hook-pretooluse-dispatcher` plugin scans enabled marketplace plugins for `hooks/pretooluse-bash.sh` and a `~/.claude/hooks/pretooluse-bash.d/` drop directory, sorts by priority comment, and runs each with the original stdin. Used by `denubis-hook-gh-fork-guard` (which has an empty `hooks.json` of its own).
 
 ## Runtime Tools
@@ -66,6 +67,11 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 
 ## Behaviour Surfaces
 
+- **Instruction budget**: the repository's provider-independent startup policy for the
+  combined always-on global and local instruction chain: at most 200 lines **and** at
+  most 32,768 bytes. `denubis-hook-instruction-budget` reports excess through
+  `systemMessage`; it does not block startup or add model context. Codex's actual
+  project-chain loader limit remains a separate measurement.
 - **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Remaining uses are boundary-specific guard advice, not generic SessionStart workflow prose.
 - **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Denials from `denubis-hook-gh-fork-guard` and `denubis-hook-code-quality-guard` also carry a model-facing `permissionDecisionReason` and a transcript-facing `systemMessage`.
 - **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. No shipped plugin currently emits it.

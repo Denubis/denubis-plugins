@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/instruction-budget.py\" --provider claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

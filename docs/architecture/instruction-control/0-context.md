@@ -38,7 +38,7 @@ flowchart LR
     I -->|loads on demand or at events| K
     O -->|continuous prose| C
     K -->|procedure or delegated judgement| C
-    X -->|deny, side effect, or additionalContext| C
+    X -->|deny, side effect, warning, or additionalContext| C
     C -->|reads when prompted| N
     C -->|actions and model claims| E
     C -->|writes session record| T
@@ -64,6 +64,7 @@ it.
 | Output style | Plugin source, selected by global settings | Every response in the configured session | Claude Code loads the selected Markdown style | Live settings and installed file digests below | The settings identifier names `denubis-plan-and-execute` while the observed installed source is under `denubis-academic`; this document does not infer how Claude resolves that mismatch. |
 | Direct hooks | Human-maintained global settings and scripts | Claude Code event dispatcher | Commands registered directly in `settings.json` | Live settings digest below | Machine-local and outside this repository. A zero exit or context message is not proof that the intended policy held. |
 | Plugin hooks | Plugin source, enabled by provider configuration and trust | Provider event dispatcher | Provider manifest points to its hook registration; scripts may be shared | Source files cited in the event table | Source, marketplace metadata, installed cache, trust, and enablement can drift independently. |
+| Instruction-budget alarm | `denubis-hook-instruction-budget` source | Human at Claude Code or Codex startup | Measures the effective global-plus-local instruction chain and emits `systemMessage` when it exceeds 200 lines or 32,768 bytes | Shared checker, provider registrations, and behavioral tests | Advisory only: it neither blocks startup nor adds model context. Codex's separate project-chain loader limit is reported independently. |
 | Skills and commands | Plugin source | Main session when invoked or selected | Shared Markdown procedures load on demand; provider metadata controls discovery and invocation | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
 | Agents and external advisors | Plugin source plus model/runtime | Main session and human | Delegated work returned as model output | Source-tagged result; some paths verify source access | A fluent report is not proof. The proposer and verifier can share blind spots. |
 | Project `.notes/` | Human-approved, gitignored project memory | Main session when recovery is explicitly invoked or a named dependency requires it | `denubis-project-notes` inventories the main repository and resolves relied-on raw sources; Codex implicit invocation is disabled | Project `.notes/`, including hidden and ignored scope | Hidden and ignored scope makes incomplete search look empty. Selection can omit a relevant note; frontmatter and referenced evidence can drift. Operational coordination databases are not durable project memory. |
@@ -81,6 +82,7 @@ fires successfully on every machine.
 | `SessionStart` | global settings | Context | Emits the current date. |
 | `SessionStart` | `denubis-plan-and-execute` on Claude Code only | Side effect | Updates the crash-recovery live marker; Codex's explicit empty registration excludes this Claude-only protocol (`plugins/denubis-plan-and-execute/hooks/claude-hooks.json`). |
 | `SessionStart` | `denubis-hook-branch-bg` on Claude Code and Codex | User-interface side effect | Recolours the terminal from repository and branch identity through provider-specific registrations and one shared script; ordinary success is silent (`plugins/denubis-hook-branch-bg/hooks/branch-bg.py::main`). |
+| `SessionStart:startup` | `denubis-hook-instruction-budget` on Claude Code and Codex | User-interface warning | Measures the combined always-on global and local instruction chain against the intersection policy of at most 200 lines and 32,768 bytes. It emits only `systemMessage` on excess and stays silent within budget (`plugins/denubis-hook-instruction-budget/hooks/instruction-budget.py::main`). |
 | `PreToolUse:Bash` | global approver | Permission decision or context | Runs the machine-local approver before Bash. This repository does not own or test it. |
 | `PreToolUse:Bash` | dispatcher plus sibling guards | Permission decision or context | Discovers sibling `pretooluse-bash.sh` programs; the fork guard can deny a `gh` target (`plugins/denubis-hook-pretooluse-dispatcher/hooks/hooks.json`, `215efb9`; `plugins/denubis-hook-gh-fork-guard/hooks/pretooluse-bash.sh`, `566f230`). |
 | `PostToolUse:Bash` | global approver | Context | Runs the same machine-local approver after Bash. |

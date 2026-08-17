@@ -237,6 +237,24 @@
         "memory",
         "chat-search"
       ]
+    },
+    {
+      "name": "denubis-hook-instruction-budget",
+      "description": "SessionStart alarm for oversized global and project instruction chains in Claude Code and Codex.",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-hook-instruction-budget",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "hooks",
+        "instructions",
+        "context",
+        "claude-code",
+        "codex"
+      ]
     }
   ]
 }

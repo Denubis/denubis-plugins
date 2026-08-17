@@ -56,6 +56,7 @@ _IMPORT_SHIM = (
     "import importlib.util, sys\n"
     "spec = importlib.util.spec_from_file_location('hook_under_test', sys.argv[1])\n"
     "mod = importlib.util.module_from_spec(spec)\n"
+    "sys.modules[spec.name] = mod\n"
     "spec.loader.exec_module(mod)\n"
 )
 

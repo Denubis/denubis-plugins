@@ -87,6 +87,12 @@
       "source": {"source": "local", "path": "./plugins/denubis-hook-branch-bg"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
       "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-hook-instruction-budget",
+      "source": {"source": "local", "path": "./plugins/denubis-hook-instruction-budget"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
     }
   ]
 }

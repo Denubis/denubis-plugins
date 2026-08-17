@@ -1,0 +1,20 @@
+{
+  "name": "denubis-hook-instruction-budget",
+  "description": "SessionStart alarm for oversized global and project instruction chains.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "hooks": "./hooks/claude-hooks.json",
+  "keywords": [
+    "hooks",
+    "instructions",
+    "context",
+    "claude-code",
+    "codex"
+  ]
+}

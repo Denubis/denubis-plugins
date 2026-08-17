@@ -1,0 +1,22 @@
+{
+  "name": "denubis-hook-instruction-budget",
+  "version": "0.1.0",
+  "description": "Warn when always-on agent instructions exceed their agreed budget.",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["hooks", "instructions", "context", "claude-code", "codex"],
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Instruction Budget",
+    "shortDescription": "Warn when startup instructions are oversized",
+    "longDescription": "Measure global and project instruction files as one startup budget and show a warning when the chain exceeds 200 lines or 32,768 bytes.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Hooks"],
+    "defaultPrompt": ["Check the startup instruction budget for this repository."]
+  }
+}

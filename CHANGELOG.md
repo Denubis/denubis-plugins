@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-hook-instruction-budget] 0.1.0
+
+**Added:**
+- A shared Claude/Codex `SessionStart` alarm measures the applicable global and
+  local instruction chain against both agreed limits: 200 lines and 32,768
+  bytes. It reports each contributing source without injecting more model
+  context.
+- Claude measurement includes recursive imports and unconditional rules; Codex
+  measurement honors configured fallback filenames and separately identifies
+  actual project-chain truncation.
+
 ## [denubis-plan-and-execute] 4.1.2
 
 **Fixed:**
