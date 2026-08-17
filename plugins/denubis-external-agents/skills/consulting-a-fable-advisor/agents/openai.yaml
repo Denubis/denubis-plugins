@@ -1,0 +1,7 @@
+interface:
+  display_name: "Consult a Fable Advisor"
+  short_description: "Consult Fable for human-authorized judgment"
+  default_prompt: "Use $consulting-a-fable-advisor only for this human-authorized consultation."
+
+policy:
+  allow_implicit_invocation: false

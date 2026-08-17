@@ -1,0 +1,19 @@
+{
+  "name": "denubis-crash-recovery",
+  "version": "1.2.1",
+  "description": "Inspect and recover interrupted Claude Code sessions with deterministic classification.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["claude-code", "session-recovery", "triage", "resume"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Crash Recovery",
+    "shortDescription": "Triage interrupted Claude Code sessions",
+    "longDescription": "Inspect Claude Code liveness and transcript state, classify interrupted sessions, and regenerate the durable resume report.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Triage interrupted Claude Code sessions and stop before any destructive prune."]
+  }
+}

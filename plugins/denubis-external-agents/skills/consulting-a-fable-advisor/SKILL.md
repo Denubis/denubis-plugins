@@ -9,8 +9,9 @@ disable-model-invocation: true
 
 ## Boundary
 
-Fable work is human-triggered only. This skill is visible to the human and unavailable to
-Claude's model invocation. The authority record is
+Fable work is human-triggered only. Claude's skill frontmatter and Codex's skill metadata
+both disable implicit model invocation; on any other provider the agent must enforce the
+same boundary. The authority record is
 `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/e4421bb3-2615-4b37-944c-86e5dd65eccc.jsonl:12`;
 resolve it with
 `cc-search-chats context 0a1beea2-2d45-455f-9ced-9ec278afb8e8 --json`.
@@ -20,16 +21,19 @@ its own claims. The main session checks the cited source before acting.
 
 ## Choose the execution surface
 
-Use a background Agent when completion notification and easy follow-up matter more than
-tool isolation. The Agent surface has no per-dispatch tool restriction, so describe it
+Use a provider-native background agent when completion notification and easy follow-up
+matter more than tool isolation. That surface may have no per-dispatch tool restriction,
+so describe it
 honestly: the advisor is instructed not to implement, but the harness does not make that
 impossible.
 
-Use the pane variant when a restricted tool surface matters:
+Use the pane variant when a restricted tool surface matters. Resolve `plugin_root` from
+this loaded SKILL.md path by ascending two directories, rather than assuming the caller is
+at the repository root:
 
 ```fish
-bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh [cwd] [model]
-bash plugins/denubis-external-agents/skills/consulting-a-fable-advisor/advisor-send.sh <pane-id> -
+bash "$plugin_root/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh" [cwd] [model]
+bash "$plugin_root/skills/consulting-a-fable-advisor/advisor-send.sh" <pane-id> -
 ```
 
 The pane launcher denies the known mutation, orchestration, network, and MCP tools. The

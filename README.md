@@ -1,9 +1,9 @@
 # denubis-plugins
 
-A shared source repository for customized Claude Code and Codex plugins. Provider-neutral
-skills live once under `plugins/<name>/skills/`; Claude and Codex manifests, hook
-registrations, invocation metadata, commands, and agent adapters express only the
-provider-specific transport.
+A shared source repository for customized Claude Code, Codex, and Antigravity CLI
+plugins. Provider-neutral skills live once under `plugins/<name>/skills/`; provider
+manifests, hook registrations, invocation metadata, commands, and agent adapters express
+only the provider-specific transport.
 
 The repository is forked from [ed3d-plugins](https://github.com/ed3dai/ed3d-plugins).
 
@@ -27,22 +27,33 @@ operator or user documentation where those are real parts of the behavior.
 
 ## Provider support
 
-The initial Codex marketplace exposes only plugins whose current behavior Codex can run
-honestly:
+All 58 skills in the 11 active skill-bearing Claude plugins are exposed from the same
+`SKILL.md` trees to Claude Code, Codex, and Antigravity. Provider manifests and invocation
+metadata are adapters; they do not copy the procedures.
 
 | Plugin | Shared behavior |
 |---|---|
 | `denubis-plan-and-execute` | Design through implementation, verification, UAT, and Git lifecycle |
+| `denubis-00-getting-started` | Package-install safety policy and onboarding |
+| `denubis-basic-agents` | Provider-native delegation by functional role |
+| `denubis-research-agents` | Codebase, internet, combined, remote-code, and academic research routing |
+| `denubis-extending-claude` | Claude plugin, agent, skill, directive, and project-context maintenance from any host |
 | `denubis-academic` | Academic revision, manuscript review, and Zotero-backed source work |
 | `denubis-git-commit` | Intentional local commits at authorized boundaries |
+| `denubis-crash-recovery` | Claude session-state triage callable from any host |
+| `denubis-external-agents` | Provenance-bounded Codex and Fable consultation and supervision |
 | `denubis-project-notes` | Project-owned notes and relevant prior-chat retrieval |
 | `denubis-token-estimator` | Reproducible Claude Code and Codex usage measures |
-| `denubis-hook-branch-bg` | Terminal background color by Git repository and branch |
 
-Claude Code additionally packages its agent libraries, onboarding, crash recovery,
-extension guidance, external-agent adapters, and Bash hook infrastructure. Those are not
-listed in Codex merely because a manifest could be generated. The reasons and redesign
-boundaries are recorded in the
+Claude and Codex additionally share native transports for the branch-background hook,
+the concrete code-quality guard, and the GitHub fork guard. Claude alone installs the
+PreToolUse dispatcher because it compensates for Claude's hook aggregation; Codex
+aggregates those hooks natively. Antigravity validates and installs all 11 skill-bearing
+plugins and converts its supported command and agent surfaces. Hook-only plugins are not
+claimed for Antigravity: its current documented hook interface does not expose an
+equivalent blocking pre-tool contract for the two guards.
+
+The provider boundaries and runtime evidence are recorded in the
 [Codex compatibility matrix](docs/audits/2026-08-16-codex-plugin-compatibility-matrix.md).
 
 ## Install for Codex CLI
@@ -52,11 +63,19 @@ checkout:
 
 ```bash
 codex plugin marketplace add /absolute/path/to/denubis-plugins
+codex plugin add denubis-00-getting-started@denubis-plugins
 codex plugin add denubis-plan-and-execute@denubis-plugins
+codex plugin add denubis-basic-agents@denubis-plugins
+codex plugin add denubis-research-agents@denubis-plugins
+codex plugin add denubis-extending-claude@denubis-plugins
 codex plugin add denubis-academic@denubis-plugins
 codex plugin add denubis-git-commit@denubis-plugins
+codex plugin add denubis-crash-recovery@denubis-plugins
+codex plugin add denubis-external-agents@denubis-plugins
 codex plugin add denubis-project-notes@denubis-plugins
 codex plugin add denubis-token-estimator@denubis-plugins
+codex plugin add denubis-hook-code-quality-guard@denubis-plugins
+codex plugin add denubis-hook-gh-fork-guard@denubis-plugins
 codex plugin add denubis-hook-branch-bg@denubis-plugins
 codex plugin list --marketplace denubis-plugins --available --json
 ```
@@ -67,8 +86,9 @@ inspect `/hooks`, and trust the installed hook only after its source and command
 ones you intend.
 
 Per-skill `agents/openai.yaml` files provide human-readable discovery metadata. Commit,
-pull-request creation, local main merges, and tmux naming are explicit-only; ordinary
-planning, coding, review, and research procedures may be selected when the task matches.
+pull-request creation, local main merges, upstream synchronization, crash triage, and
+external-agent operations are explicit-only; ordinary planning, coding, review, and
+research procedures may be selected when the task matches.
 
 ## Install for Claude Code
 
@@ -97,10 +117,25 @@ If an older installation reports `denubis-bib` or still has
 `denubis-bibliography`, follow the
 [academic setup and migration runbook](plugins/denubis-academic/skills/using-bibliography/references/setup-and-migration.md).
 
+## Install for Antigravity CLI
+
+All 11 skill-bearing bundles carry native `plugin.json` manifests beside their existing
+shared skill trees. Validate and install them with:
+
+```bash
+scripts/install_antigravity_plugins.sh
+```
+
+The installer validates every bundle before installing any of them. Start a new `agy`
+session after installation, then use `agy plugin list` to inspect the imported set.
+Supported agents and commands are converted by Antigravity's validator. Codex metadata,
+Claude hook registrations, and unsupported hook bundles are skipped rather than copied
+into a parallel repository.
+
 ## Requirements
 
 - Git for repository and worktree operations.
-- Python 3.11+ for current standalone hook scripts.
+- Python 3.9+ for Claude hook scripts.
 - Python 3.14+ and `uv` for the academic bibliography helpers and token-estimator scripts.
 - Zotero with Better BibTeX for bibliography resolution and rendering.
 - `gh` only for requested pull-request operations.
@@ -117,6 +152,7 @@ denubis-plugins/
 ├── .claude-plugin/marketplace.json        # Claude Code catalogue
 ├── plugins/
 │   └── <plugin>/
+│       ├── plugin.json                    # when Antigravity-compatible
 │       ├── .codex-plugin/plugin.json      # when Codex-compatible
 │       ├── .claude-plugin/plugin.json     # Claude Code package
 │       ├── skills/<skill>/SKILL.md        # shared semantic procedure

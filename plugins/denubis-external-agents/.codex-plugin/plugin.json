@@ -1,0 +1,19 @@
+{
+  "name": "denubis-external-agents",
+  "version": "0.16.3",
+  "description": "Consult and supervise external model sessions without merging their authority.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["codex", "fable", "peer-review", "supervision"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "External Agents",
+    "shortDescription": "Consult external agents with provenance boundaries",
+    "longDescription": "Run provenance-checked Codex peer review, human-authorized Fable consultation, and supervised Codex sessions.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Use the requested external agent while preserving its separate authority and provenance."]
+  }
+}

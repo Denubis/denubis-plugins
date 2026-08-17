@@ -14,7 +14,7 @@ Measurable limits on the behaviour of `brian-ed3d-plugins` and the disciplines i
 | Constraint | Requirement | Verification |
 |------------|-------------|-------------|
 | Fork isolation | `gh` CLI commands targeting any repo other than the user's fork are denied. The allowed repo is set via `ALLOWED_GH_REPO` or inferred from `git remote get-url origin`. | `denubis-hook-gh-fork-guard`'s `gh-fork-guard.py` (`f62e8a6`) running under the `pretooluse-bash` dispatcher at priority 10. |
-| Banned-pattern writes | File writes/edits that match patterns the user has banned (e2e JS injection, `create_all`, migration edits, debug statements, easy-mode shortcuts, spec weakening) are denied or warned at `PreToolUse:Write|Edit`. | `denubis-plan-and-execute/hooks/code-quality-guard.py` (`9bac7ed`) with 5s timeout. |
+| Concrete code-write violations | JavaScript injection in E2E, Playwright, or integration tests and `metadata.create_all()` outside Alembic version files are denied at `PreToolUse:Write|Edit`. Context-dependent word patterns are not treated as violations. | `denubis-hook-code-quality-guard/hooks/code-quality-guard.py` with behavioral coverage in `tests/test_code_quality_guard.py`. |
 
 ## Process discipline (stated by skills)
 

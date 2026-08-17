@@ -43,8 +43,9 @@ Hooks are run in priority order. Each receives the **original** stdin (not modif
 
 | Output field | Merge behaviour |
 |-------------|----------------|
-| `permissionDecision: "deny"` | Wins immediately — stops processing, returns deny |
+| `permissionDecision: "deny"` | Wins immediately; missing model-facing reasons are repaired before return |
 | `permissionDecision: "allow"` | Preserved if any hook sets it |
+| `permissionDecisionReason` | Preserved; on deny, falls back to `systemMessage` or an explicit generic reason |
 | `updatedInput` | Last hook's value wins |
 | `additionalContext` | Concatenated from all hooks |
 | `systemMessage` | Concatenated from all hooks |

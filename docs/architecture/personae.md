@@ -41,8 +41,9 @@ User types, their goals, access patterns, and constraints.
 3. **About to commit something risky.** The commit procedure checks whether changed
    contracts, APIs, domain structure, or agent instructions require corresponding
    `CLAUDE.md` or `AGENTS.md` updates. `gh-fork-guard` denies `gh pr create` against
-   upstream. `code-quality-guard` denies file edits that match banned patterns (for
-   example `create_all`, migration edits, or debug statements).
+   upstream. The standalone `code-quality-guard` denies JavaScript injection in
+   user-surface tests and direct schema creation outside Alembic migrations; contextual
+   issues remain the responsibility of tests, project tools, and review.
 4. **Reading academic literature.** Adds a paper to Zotero. Invokes `denubis-academic:using-bibliography` to render the PDF into per-page markdown and emit page-keyed blockquotes.
 5. **Generic agent dispatch.** Uses `denubis-basic-agents` (haiku/sonnet/opus general-purpose, python-developer, academic-researcher) when a fresh subagent without specific tooling is the right move; `using-generic-agents` is the selection guide.
 

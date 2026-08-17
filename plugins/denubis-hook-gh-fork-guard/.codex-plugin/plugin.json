@@ -1,0 +1,19 @@
+{
+  "name": "denubis-hook-gh-fork-guard",
+  "version": "1.2.4",
+  "description": "Guard direct gh CLI commands from targeting repositories other than the configured fork.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["hooks", "github", "fork", "safety"],
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "GitHub Fork Guard",
+    "shortDescription": "Guard direct gh commands against upstream targets",
+    "longDescription": "Inspect direct gh CLI commands and block explicit repository targets that do not match the configured fork.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Hooks"],
+    "defaultPrompt": ["Guard direct gh CLI commands against unintended upstream repository targets."]
+  }
+}

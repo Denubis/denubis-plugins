@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write Claude Context Files"
+  short_description: "Structure durable CLAUDE.md and AGENTS.md context"
+  default_prompt: "Use $writing-claude-md-files to create or revise this project context file."
+
+policy:
+  allow_implicit_invocation: true

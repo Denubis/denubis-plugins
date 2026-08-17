@@ -52,8 +52,9 @@ discovers the same skill tree through `.codex-plugin/plugin.json`; each skill's
 hooks/update-live-marker.py handles one Claude SessionStart boundary: when the wrapper
 supplies an owned CR_LIVE_FILE, it atomically updates the transcript identity consumed by
 crash recovery. It does not emit workflow guidance or establish skill compliance. Textual
-Write/Edit quality detectors were removed because matching chosen source phrases does not
-establish behavior and their tool payload was provider-specific.
+Write/Edit warnings were removed from this workflow bundle because matching contextual
+source phrases does not establish behavior. Two concrete Claude-only refusals now belong
+to the standalone `denubis-hook-code-quality-guard` plugin.
 
 The Claude registration is `hooks/claude-hooks.json`. The Codex registration is an
 explicit empty `hooks/codex-hooks.json`, so Codex cannot load the Claude crash-live marker

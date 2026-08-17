@@ -19,10 +19,14 @@ Say: "I'm using the denubis-crash-recovery:triage skill to inspect session state
 
 ## Step 1: Run triage
 
+Resolve `plugin_root` from the loaded `skills/triage/SKILL.md` path by ascending two
+directories. This works from a source checkout and from each provider's installed cache;
+do not substitute a hard-coded Claude marketplace path.
+
 Invoke the CLI and surface its output to the user verbatim. Do not summarise or reformat:
 
 ```bash
-uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery triage
+uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery triage
 ```
 
 **The terminal view is lean by default.** It answers "what crashed / needs attention" at a glance: crash victims, currently-unfinished, ambiguous, and the genuine investigation rows (dangling tails, concluded-then-killed) render in full, plus any uncorrelated crash markers. The non-actionable bulk — concluded, irrecoverable, and unrecognised-ending sessions — collapses to a `## Collapsed` count summary. Pass `--all` for the complete all-means-all roster; `~/llm-resume.md` (written by `regenerate`) is always the full roster and stays searchable.
@@ -37,7 +41,7 @@ Annotations are user-supplied context that survives prune. They are the only sig
 
 Walk the report's actionable sections in this order:
 
-1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use AskUserQuestion with a `[manual review]` prefix in the prompt. (As of classifier v2 `unmatched` is a defensive-only fallback reached by no realistic input — the former sole case, a dead-marker concluded tail, now classifies as `liveness_dead_pid_concluded_tail` in **Needs investigation** with a calm "concluded, then killed — likely nothing to resume" note, and usually needs no annotation.)
+1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use the provider's user-input tool with a `[manual review]` prefix in the prompt, or ask inline when that tool is unavailable. (As of classifier v2 `unmatched` is a defensive-only fallback reached by no realistic input — the former sole case, a dead-marker concluded tail, now classifies as `liveness_dead_pid_concluded_tail` in **Needs investigation** with a calm "concluded, then killed — likely nothing to resume" note, and usually needs no annotation.)
 2. **Ambiguous correlation**, then **Needs investigation**, then **Probable system-crash victims** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
 
 For each row, ask:
@@ -47,7 +51,7 @@ For each row, ask:
 On `yes`, prompt for the note text. Then invoke:
 
 ```bash
-uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery note <uuid> "<text>"
+uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery note <uuid> "<text>"
 ```
 
 On `skip all`, stop the annotation loop and continue to Step 3.
@@ -61,17 +65,17 @@ Prune permanently deletes concluded rows whose JSONLs have vanished from disk. T
 1. Run the dry-run and show output:
 
    ```bash
-   uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery prune --dry-run
+   uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery prune --dry-run
    ```
 
-2. If candidates exist, AskUserQuestion:
+2. If candidates exist, use the provider's user-input tool, or ask inline if unavailable:
 
    > Delete N concluded sessions whose JSONLs are gone? This permanently removes their DB rows. Options: `yes` / `no` / `show me again`.
 
 3. On `yes`, run the destructive call and surface the deletion count:
 
    ```bash
-   uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery prune --confirm
+   uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery prune --confirm
    ```
 
 4. On `no`, print: "Prune skipped. You can re-run later with `crash-recovery prune --confirm`."
@@ -84,7 +88,7 @@ Prune permanently deletes concluded rows whose JSONLs have vanished from disk. T
 After annotations or prune, regenerate `~/llm-resume.md` so the on-disk artefact reflects the new DB state:
 
 ```bash
-uv run --project ~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-crash-recovery/scripts/crash_recovery crash-recovery regenerate
+uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery regenerate
 ```
 
 Report the resulting path to the user.

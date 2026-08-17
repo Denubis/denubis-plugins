@@ -5,8 +5,32 @@
   },
   "plugins": [
     {
+      "name": "denubis-00-getting-started",
+      "source": {"source": "local", "path": "./plugins/denubis-00-getting-started"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
       "name": "denubis-plan-and-execute",
       "source": {"source": "local", "path": "./plugins/denubis-plan-and-execute"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-basic-agents",
+      "source": {"source": "local", "path": "./plugins/denubis-basic-agents"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-research-agents",
+      "source": {"source": "local", "path": "./plugins/denubis-research-agents"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    },
+    {
+      "name": "denubis-extending-claude",
+      "source": {"source": "local", "path": "./plugins/denubis-extending-claude"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
       "category": "Developer Tools"
     },
@@ -17,8 +41,26 @@
       "category": "Productivity"
     },
     {
+      "name": "denubis-crash-recovery",
+      "source": {"source": "local", "path": "./plugins/denubis-crash-recovery"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Productivity"
+    },
+    {
       "name": "denubis-git-commit",
       "source": {"source": "local", "path": "./plugins/denubis-git-commit"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-hook-code-quality-guard",
+      "source": {"source": "local", "path": "./plugins/denubis-hook-code-quality-guard"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
+      "name": "denubis-hook-gh-fork-guard",
+      "source": {"source": "local", "path": "./plugins/denubis-hook-gh-fork-guard"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
       "category": "Developer Tools"
     },
@@ -33,6 +75,12 @@
       "source": {"source": "local", "path": "./plugins/denubis-token-estimator"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
       "category": "Productivity"
+    },
+    {
+      "name": "denubis-external-agents",
+      "source": {"source": "local", "path": "./plugins/denubis-external-agents"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
     },
     {
       "name": "denubis-hook-branch-bg",

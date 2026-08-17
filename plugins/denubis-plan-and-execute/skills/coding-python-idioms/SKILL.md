@@ -18,6 +18,14 @@ and `X | None` only when that floor permits them. Preserve a deliberate compatib
 style in mixed-version libraries. Run tools through the project's documented invocation;
 do not bypass its environment or invent a cache location.
 
+Preserve a committed dependency graph during verification. When a uv project has a
+lockfile and dependency resolution is not part of the task, run tests, formatters,
+linters, type checkers, and builds with `uv run --frozen ...`; plain `uv run` may
+re-resolve and rewrite `uv.lock` from user-level resolver settings. Use `--locked` when
+the check must instead prove that project metadata and the lockfile agree. Use unfrozen
+`uv lock`, `uv sync`, or `uv run` only when dependency metadata or resolution is an
+intentional part of the change, then inspect and verify the resulting lockfile.
+
 ## Types describe the real boundary
 
 - Type public interfaces and non-obvious internal values; let ordinary local inference

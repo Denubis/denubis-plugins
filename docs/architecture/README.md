@@ -11,12 +11,15 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
   documentary authority, and external evidence combine in live Claude Code and Codex
   sessions.
 
-## Plugin packaging views (14)
+## Plugin packaging views (15)
 
 ### Event hooks
 
 - [`denubis-hook-branch-bg/0-context.md`](plugins/denubis-hook-branch-bg/0-context.md) —
   `SessionStart`: recolours the terminal from repository and branch identity.
+- [`denubis-hook-code-quality-guard/0-context.md`](plugins/denubis-hook-code-quality-guard/0-context.md)
+  — `PreToolUse:Write|Edit`: blocks JavaScript injection in user-surface tests and direct
+  schema creation outside migrations.
 - [`denubis-hook-gh-fork-guard/0-context.md`](plugins/denubis-hook-gh-fork-guard/0-context.md)
   — `PreToolUse:Bash`, through the dispatcher: blocks `gh` against a non-fork target.
 - [`denubis-hook-pretooluse-dispatcher/0-context.md`](plugins/denubis-hook-pretooluse-dispatcher/0-context.md)
@@ -65,8 +68,9 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 
 ## Conventions
 
-- **Citation format:** factual repository claims cite a real file at a real commit in the
-  form `(path/to/file::SymbolName, abc1234)` or `(path/to/file.json, abc1234)`.
+- **Citation format:** current technical claims cite a resolvable file and symbol or
+  structural location. Historical claims also cite the relevant commit. This avoids
+  making a document's own commit hash a prerequisite for committing it.
 - **External observations:** machine-local or external facts name the artifact, the
   observation date, and an identity such as a digest. They are snapshots, not source
   truth.

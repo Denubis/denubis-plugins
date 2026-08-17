@@ -1,0 +1,7 @@
+interface:
+  display_name: "Test Skills with Subagents"
+  short_description: "Test skill behavior with separate actor and oracle"
+  default_prompt: "Use $testing-skills-with-subagents to test this skill through observable behavior."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Investigate a Codebase"
+  short_description: "Ground codebase claims in repository evidence"
+  default_prompt: "Use $investigating-a-codebase to verify these assumptions against the repository."
+
+policy:
+  allow_implicit_invocation: true

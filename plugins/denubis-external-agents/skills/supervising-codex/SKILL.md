@@ -8,10 +8,12 @@ user-invocable: true
 
 ## Overview
 
-Three roles, never merged. **Codex drafts** (OpenAI GPT-5.6 Sol, `gpt-5.6-sol`, via the
-codex CLI, as of 2026-07-17). **Claude supervises**: stages the context, writes the
-prompt, verifies the output against the repo. **The human rules**: adjudicates decisions
-and owns every commit.
+Three roles, never merged. **External Codex drafts** via the codex CLI. **The host agent
+supervises**: stages the context, writes the prompt, and verifies the output against the
+repo. **The human rules**: adjudicates decisions and owns every commit. Claude Code,
+Codex, or Antigravity may host the skill, but the external Codex process remains a
+separate voice. If host and doer use the same model, describe the result as process
+separation, not an independent-model check.
 
 The split exists because a model cannot reliably verify its own work and favours its own
 output. The supervisor must be a different model from the doer, and the doer's self-report
@@ -65,35 +67,18 @@ turns every ruling into oral tradition.
 
 ## Invoking the supervisor
 
-Every command below is this script:
+Resolve `plugin_root` from this loaded `skills/supervising-codex/SKILL.md` path by
+ascending two directories. Every command below is this script:
 
 ```sh
-uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/scripts/codex_supervisor.py"
+uv run --no-project --no-config python "$plugin_root/scripts/codex_supervisor.py"
 ```
 
 Written as `codex_supervisor.py …` from here on, for readability.
 
-`${CLAUDE_PLUGIN_ROOT}` is set when Claude Code invokes a plugin component, and unset in a
-plain shell. When it is unset, resolve the path rather than guessing at one:
-
-```sh
-# In a checkout of this repo, from any subdirectory:
-"$(git rev-parse --show-toplevel)/plugins/denubis-external-agents/scripts/codex_supervisor.py"
-
-# From the marketplace install (stable path, no version component):
-~/.claude/plugins/marketplaces/denubis-plugins/plugins/denubis-external-agents/scripts/codex_supervisor.py
-```
-
-The repo form goes through `git rev-parse` because a bare relative path resolves only at the
-repository root and fails one directory below it.
-
-If neither path is present, list every match rather than taking the first. `~/.claude/plugins/cache/`
-holds one copy per installed version, and `find … | head -1` was observed returning a
-different file on two consecutive runs, so it can hand you a stale version silently:
-
-```sh
-find ~/.claude/plugins -name codex_supervisor.py -path '*denubis-external-agents*'
-```
+The loaded skill path is the authority for which installed version is active. Do not scan
+provider caches and take the first match: caches can hold several versions, and filesystem
+order is not an activation decision.
 
 There is no shell wrapper for this tool: the Python file is the whole interface. **This plugin
 ships no `codex-watch.sh` and none is planned.** That filename comes from the google-live repo,
@@ -144,7 +129,7 @@ left as a documented licence to improvise.
 
 ## The loop
 
-1. **Claude writes a numbered prompt** to `codex-prompts/NN-<task>.md`, staging everything
+1. **The supervisor writes a numbered prompt** to `codex-prompts/NN-<task>.md`, staging everything
    codex needs:
    - paths to context files, with copies of anything outside the repo staged under
      `codex-prompts/context/`;
@@ -158,7 +143,7 @@ left as a documented licence to improvise.
      critical, pointed question at a time, never bundled and never resolved by silent
      assumption, until the uncertainty resolves; and anything ruled along the way probably
      belongs in the project's decision records, indexed in its ADR register*. The
-     one-question rule binds the supervisor too: when Claude is unsure, it asks the human
+     one-question rule binds the supervisor too: when it is unsure, it asks the human
      the same way;
    - **the write scope, stated by the prompt itself.** A drafting stage writes one
      document under `codex-prompts/out/`; a code phase writes source, tests, and generated
@@ -182,10 +167,10 @@ left as a documented licence to improvise.
    silently, so the supervisor documents it.
    ```
 
-   Claude does not drive codex unless the human has explicitly said this session may. When
+   The host agent does not drive Codex unless the human has explicitly said this session may. When
    it may, `codex_supervisor.py --send` delivers that same ping; the prompt's own output
    contract governs, and the sending mechanics below are not optional.
-3. **Claude verifies the output against the repo** before any of it lands in tracked
+3. **The supervisor verifies the output against the repo** before any of it lands in tracked
    documentation (see *Verification pass*).
 4. **The human validates.** Rulings from that discussion go into the next prompt, numbered.
 
@@ -268,8 +253,8 @@ The rule above is about sending blind. Answering a dialog you have read is a dif
 act, and it belongs to whoever is driving codex.
 
 **The human answers supervisor approvals**, meaning the rulings, scope calls and design
-decisions that surface in Claude's own pane. **Codex's per-command sandbox dialogs belong
-to the driver.** When the human has said this session may drive codex, Claude answers
+decisions that surface in the supervisor's own pane. **Codex's per-command sandbox dialogs belong
+to the driver.** When the human has said this session may drive Codex, the host agent answers
 those with `codex_supervisor.py --approve` rather than handing back each keypress. A pass
 made of probes and pytest runs generates one dialog per command, so routing every one to
 the human is the approval loop that *Codex does not commit* was ruled to prevent.
@@ -442,8 +427,10 @@ allowlist and ask far more often. The sandbox is the containment either way, and
 allowlist buys its extra caution in dialogs. Pass `-a untrusted` by hand for a pane whose
 work you have reason to distrust.
 
-When Claude and Codex are joined as panes in one tmux window, start the monitor from
-Claude's pane under the background Monitor tool.
+When the supervisor and Codex are joined as panes in one tmux window, start the monitor
+from the supervisor's pane under the provider's persistent background-monitor surface. If
+that surface is unavailable, run the shipped monitor in a durable watched terminal rather
+than claiming background supervision exists.
 
 **This plugin ships the monitor. Do not hand-craft one.** Arm it with exactly this and
 nothing else:
@@ -474,7 +461,7 @@ pane. If the plugin's monitor will not do what a Codex supervision task needs, t
 bug report for the human, not a licence to assemble a replacement — the same rule, and the
 same reasoning, as *The supervisor is the only way in*.
 
-Do not pass a pane ID. The monitor resolves Claude's `$TMUX_PANE`, searches only that exact
+Do not pass a pane ID. The monitor resolves the supervisor's `$TMUX_PANE`, searches only that exact
 tmux window, and requires exactly one foreground `codex` process. No match or multiple
 matches is an error; it never searches other windows or guesses from a worktree name.
 
@@ -519,7 +506,7 @@ Lifecycle hooks wake the monitor immediately for activity, permission requests, 
 stops. They are installed **globally**, once per machine, rather than per project:
 
 ```sh
-uv run "${CLAUDE_PLUGIN_ROOT}/skills/supervising-codex/hooks/install-codex-hooks.py"
+uv run "$plugin_root/skills/supervising-codex/hooks/install-codex-hooks.py"
 ```
 
 A project-local `.codex/hooks.json` only wakes the monitor in directories somebody set up

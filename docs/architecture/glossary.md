@@ -67,7 +67,7 @@ Ubiquitous language for `brian-ed3d-plugins`. Each term means the same thing in 
 ## Behaviour Surfaces
 
 - **`additionalContext`**: a string a hook can return inside `hookSpecificOutput`. Claude Code prepends it to the model's context for the current turn. Remaining uses are boundary-specific guard advice, not generic SessionStart workflow prose.
-- **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Used by `denubis-hook-gh-fork-guard` and the `code-quality-guard` hook in `denubis-plan-and-execute`.
+- **`permissionDecision`**: `"allow"` or `"deny"`, returned by a `PreToolUse` hook to permit or block a tool call. Denials from `denubis-hook-gh-fork-guard` and `denubis-hook-code-quality-guard` also carry a model-facing `permissionDecisionReason` and a transcript-facing `systemMessage`.
 - **`decision: "block"`**: a `Stop` hook output that prevents the turn from closing, surfacing a `reason` to the user. No shipped plugin currently emits it.
 - **MCP server**: an external tool provider connected to Claude Code via the Model Context Protocol. The marketplace consumes MCP (Gmail/Calendar/Drive, `context7`, `ast-grep`) but does not host servers.
 

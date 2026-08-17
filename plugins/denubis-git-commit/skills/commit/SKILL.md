@@ -59,10 +59,21 @@ reasoning, alternatives, review findings, and verification narratives in project
 documentation rather than the subject line. Do not add a provider-specific co-author
 unless the project or human requires it.
 
-Pass varying commit text through a file created by the runtime's structured file-editing
-primitive, then use git commit -F with that exact file. Do not interpolate untrusted or
-model-generated text into a shell command. Remove only the temporary file this operation
-created after the commit succeeds.
+Create `.commit-msg.tmp` in the repository root with the runtime's structured Write/Edit
+primitive. If that path already exists and this operation did not create it, stop and
+inspect it instead of overwriting it. Put the complete commit message in that file; never
+use Bash, `printf`, `echo`, `cat`, command substitution, or a heredoc to construct commit
+text.
+
+Commit and clean up with this fixed command:
+
+```bash
+git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp
+```
+
+The fixed shell text contains no varying message content. If the commit fails, `&&` leaves
+`.commit-msg.tmp` available for inspection. Remove only the file created by this operation,
+and only after the commit succeeds.
 
 Do not bypass hooks, disable signing, amend, or rewrite history unless the human named that
 action. A rejected commit never existed; fix the demonstrated cause, restage, and create

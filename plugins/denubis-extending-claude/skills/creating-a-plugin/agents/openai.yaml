@@ -1,0 +1,7 @@
+interface:
+  display_name: "Create a Claude Plugin"
+  short_description: "Create and validate Claude Code plugin packages"
+  default_prompt: "Use $creating-a-plugin to create this Claude Code plugin."
+
+policy:
+  allow_implicit_invocation: true

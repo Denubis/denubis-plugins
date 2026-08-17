@@ -1,0 +1,20 @@
+{
+  "name": "denubis-hook-code-quality-guard",
+  "description": "PreToolUse guard for concrete browser-test, schema-migration, and shell-authorship violations.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "hooks",
+    "testing",
+    "playwright",
+    "alembic",
+    "shell",
+    "safety"
+  ]
+}

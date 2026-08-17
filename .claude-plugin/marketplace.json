@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-      "version": "4.1.1",
+      "version": "4.1.2",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -33,7 +33,7 @@
     {
       "name": "denubis-basic-agents",
       "description": "Core agents for general-purpose tasks with Python/academic domain variants. Other plugins expect this to exist.",
-      "version": "2.2.1",
+      "version": "2.2.2",
       "source": "./plugins/denubis-basic-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.3.2",
+      "version": "1.3.3",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -66,7 +66,7 @@
     {
       "name": "denubis-git-commit",
       "description": "Git commit skill for Claude Code. Handles /commit as a proper skill.",
-      "version": "1.2.2",
+      "version": "1.3.0",
       "source": "./plugins/denubis-git-commit",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -79,9 +79,28 @@
       ]
     },
     {
+      "name": "denubis-hook-code-quality-guard",
+      "description": "PreToolUse guard for concrete browser-test, schema-migration, and shell-authorship violations.",
+      "version": "0.2.0",
+      "source": "./plugins/denubis-hook-code-quality-guard",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "hooks",
+        "testing",
+        "playwright",
+        "alembic",
+        "shell",
+        "safety"
+      ]
+    },
+    {
       "name": "denubis-hook-gh-fork-guard",
       "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork. Auto-discovered by the pretooluse-bash dispatcher.",
-      "version": "1.2.2",
+      "version": "1.2.4",
       "source": "./plugins/denubis-hook-gh-fork-guard",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -97,7 +116,7 @@
     {
       "name": "denubis-hook-pretooluse-dispatcher",
       "description": "PreToolUse:Bash dispatcher with auto-discovery from marketplace plugins and drop directory. Runs hooks sequentially and merges outputs.",
-      "version": "1.1.3",
+      "version": "1.1.4",
       "source": "./plugins/denubis-hook-pretooluse-dispatcher",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -150,7 +169,7 @@
     {
       "name": "denubis-crash-recovery",
       "description": "Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders ~/llm-resume.md.",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "source": "./plugins/denubis-crash-recovery",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -187,7 +206,7 @@
     {
       "name": "denubis-external-agents",
       "description": "Consult other agent sessions without merging their authority into the caller. Run Codex peer reviews, launch a human-triggered Fable consultation with an explicit tool-surface check, or supervise a Codex pane. Review findings require resolvable provenance. WIP.",
-      "version": "0.16.2",
+      "version": "0.16.3",
       "source": "./plugins/denubis-external-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",

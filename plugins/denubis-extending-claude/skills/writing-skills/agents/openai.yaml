@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write Agent Skills"
+  short_description: "Scope, write, and verify reusable agent skills"
+  default_prompt: "Use $writing-skills to scope and write this reusable skill."
+
+policy:
+  allow_implicit_invocation: true

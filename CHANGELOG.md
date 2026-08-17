@@ -1,5 +1,90 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.2
+
+**Fixed:**
+- Python verification against an existing uv lock now uses `uv run --frozen`,
+  preventing user-level resolver settings from silently rewriting `uv.lock`.
+  Dependency work remains explicitly unfrozen, while `--locked` is reserved for
+  proving that project metadata and the lock agree.
+
+## [denubis-hook-code-quality-guard] 0.2.0
+
+**Added:**
+- Claude Bash heredocs that route model-authored content through `cat` or `tee`
+  into a real file are denied with the same model-facing and transcript-facing
+  explanation as the existing Write/Edit checks.
+- An executable dispatcher adapter routes Claude Bash payloads into the shared
+  guard. Bare `tee`, `tee /dev/null`, reads, non-writing heredocs, and genuine
+  command output capture remain allowed.
+
+## [denubis-git-commit] 1.3.0
+
+**Changed:**
+- Commit messages again use the exact `.commit-msg.tmp` structured-write
+  protocol. Variable message content never enters Bash; failed commits retain the
+  file for inspection and successful commits remove only their owned temporary
+  file.
+
+## [denubis-hook-code-quality-guard] 0.1.0
+
+**Added:**
+- Restored the concrete write guards removed from the workflow bundle as a standalone
+  Claude Code plugin: user-surface tests cannot inject JavaScript around the browser
+  event pipeline, and application code cannot create schema outside Alembic migrations.
+- Claude and Codex share one guard implementation through native provider hook manifests.
+  Codex `apply_patch` input is parsed as file additions and uses Codex's supported
+  model-facing denial shape; Claude retains the transcript warning and exit-code backstop.
+  The former TODO, debug, skip, and other word-pattern warnings remain retired.
+
+## [denubis-hook-gh-fork-guard] 1.2.4
+
+**Added:**
+- Codex now invokes the existing fork guard directly through a native `PreToolUse:Bash`
+  hook; Claude continues to invoke the same implementation through its dispatcher.
+
+## [denubis-external-agents] 0.16.3
+
+**Changed:**
+- External-agent skills resolve their implementations from the loaded skill path, so the
+  same source works from Claude, Codex, and Antigravity caches without checkout-relative
+  or Claude-marketplace paths.
+- Codex supervision names provider-neutral host and external-process roles and distinguishes
+  process separation from a genuinely independent-model review.
+
+## [denubis-crash-recovery] 1.2.1
+
+**Changed:**
+- Claude-session triage remains Claude-specific in what it inspects, but its shared skill
+  now runs from the active provider's installed plugin root and uses the host's available
+  user-input boundary.
+
+## [denubis-research-agents] 1.3.3
+
+**Changed:**
+- Research routing selects evidence responsibilities before mapping them to a provider's
+  native subagent surface. Claude agent names remain implementations, not portable IDs.
+
+## [denubis-basic-agents] 2.2.2
+
+**Changed:**
+- Generic-agent routing now selects functional roles and maps them to Claude, Codex, or
+  Antigravity delegation without inventing unavailable provider-specific agent names.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.4
+
+**Fixed:**
+- Every denied tool call now carries a model-facing `permissionDecisionReason`.
+  Legacy hooks that supplied only `systemMessage` are promoted, and a reasonless
+  third-party denial receives an explicit fallback instead of reaching the model as
+  a bare refusal.
+
+## [denubis-hook-gh-fork-guard] 1.2.3
+
+**Fixed:**
+- Fork-policy denials now put the same explanation in Claude Code's model-facing
+  `permissionDecisionReason` and transcript-facing `systemMessage` channels.
+
 ## [denubis-token-estimator] 0.2.0
 
 **Fixed:**

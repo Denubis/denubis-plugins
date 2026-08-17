@@ -6,10 +6,16 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
+echo "Validating Claude plugin and marketplace manifests..."
+if ! claude plugin validate "$REPO_ROOT" --strict; then
+    echo "Claude plugin validation failed. Commit aborted."
+    exit 1
+fi
+
 echo "Running repository tests..."
-if ! uv run pytest "$REPO_ROOT/tests/" -q; then
+if ! uv run --frozen pytest "$REPO_ROOT/tests/" -q; then
     echo "Python tests failed. Commit aborted."
     exit 1
 fi
 
-echo "All tests passed."
+echo "Claude validation and repository tests passed."

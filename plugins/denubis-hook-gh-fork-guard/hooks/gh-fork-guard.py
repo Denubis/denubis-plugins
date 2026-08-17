@@ -144,13 +144,16 @@ def repo_is_allowed(repo: str) -> bool:
 
 def deny(reason: str) -> dict:
     """Build a deny response."""
-    return {
+    output = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "systemMessage": reason,
-        }
+            "permissionDecisionReason": reason,
+        },
     }
+    if os.environ.get("DENUBIS_HOOK_PROVIDER") != "codex":
+        output["systemMessage"] = reason
+    return output
 
 
 def main():

@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,10 @@ _HOOK_PATH = (
     / "hooks"
     / "gh-fork-guard.py"
 )
+_PLUGIN_ROOT = _HOOK_PATH.parents[1]
+_CODEX_MANIFEST_PATH = _PLUGIN_ROOT / ".codex-plugin" / "plugin.json"
+_CODEX_HOOKS_PATH = _PLUGIN_ROOT / "hooks" / "codex-hooks.json"
+_CODEX_MARKETPLACE_PATH = _PLUGIN_ROOT.parents[1] / ".agents/plugins/marketplace.json"
 _spec = importlib.util.spec_from_file_location("gh_fork_guard", _HOOK_PATH)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
@@ -176,16 +181,26 @@ class TestCheckExplicitRepoArg:
 # Integration: main() via subprocess
 # ---------------------------------------------------------------------------
 class TestMainIntegration:
-    def _run(self, input_data: dict) -> tuple[int, dict | None]:
+    def _run(
+        self,
+        input_data: dict,
+        *,
+        provider: str = "claude",
+    ) -> tuple[int, dict | None]:
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": "/usr/bin:/bin",
+                "ALLOWED_GH_REPO": "denubis/denubis-plugins",
+                "DENUBIS_HOOK_PROVIDER": provider,
+            }
+        )
         result = subprocess.run(
             [sys.executable, str(_HOOK_PATH)],
             input=json.dumps(input_data).encode(),
             capture_output=True,
             timeout=10,
-            env={
-                "PATH": "/usr/bin:/bin",
-                "ALLOWED_GH_REPO": "denubis/denubis-plugins",
-            },
+            env=environment,
         )
         stdout = result.stdout.decode().strip()
         parsed = json.loads(stdout) if stdout else None
@@ -228,7 +243,11 @@ class TestMainIntegration:
         )
         assert rc == 0
         assert output is not None
-        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        hook_output = output["hookSpecificOutput"]
+        assert hook_output["permissionDecision"] == "deny"
+        reason = hook_output["permissionDecisionReason"]
+        assert isinstance(reason, str) and "upstream/other" in reason
+        assert output["systemMessage"] == reason
 
     def test_api_path_denied(self):
         rc, output = self._run(
@@ -239,7 +258,25 @@ class TestMainIntegration:
         )
         assert rc == 0
         assert output is not None
+        hook_output = output["hookSpecificOutput"]
+        assert hook_output["permissionDecision"] == "deny"
+        reason = hook_output["permissionDecisionReason"]
+        assert isinstance(reason, str) and "upstream/other" in reason
+        assert output["systemMessage"] == reason
+
+    def test_codex_deny_omits_unsupported_system_message(self):
+        rc, output = self._run(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr create --repo upstream/other"},
+            },
+            provider="codex",
+        )
+
+        assert rc == 0
+        assert output is not None
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "systemMessage" not in output
 
     def test_repo_subcommand_advisory(self):
         """gh pr list without --repo gets advisory context."""
@@ -292,3 +329,26 @@ class TestOutputContract:
         assert result.returncode == 0
         out = json.loads(result.stdout.decode())
         assert out["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+
+
+def test_codex_plugin_routes_bash_to_shared_guard() -> None:
+    manifest = json.loads(_CODEX_MANIFEST_PATH.read_text(encoding="utf-8"))
+    hooks = json.loads(_CODEX_HOOKS_PATH.read_text(encoding="utf-8"))
+
+    assert manifest["name"] == "denubis-hook-gh-fork-guard"
+    assert _PLUGIN_ROOT / manifest["hooks"] == _CODEX_HOOKS_PATH
+    command = hooks["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    assert hooks["hooks"]["PreToolUse"][0]["matcher"] == "Bash"
+    assert command == (
+        'DENUBIS_HOOK_PROVIDER=codex python3 "${PLUGIN_ROOT}/hooks/gh-fork-guard.py"'
+    )
+
+
+def test_codex_marketplace_exposes_gh_fork_guard() -> None:
+    marketplace = json.loads(_CODEX_MARKETPLACE_PATH.read_text(encoding="utf-8"))
+    entries = {entry["name"]: entry for entry in marketplace["plugins"]}
+
+    assert entries["denubis-hook-gh-fork-guard"]["source"] == {
+        "source": "local",
+        "path": "./plugins/denubis-hook-gh-fork-guard",
+    }

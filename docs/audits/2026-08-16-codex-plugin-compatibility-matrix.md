@@ -4,39 +4,40 @@ Date: 2026-08-16
 
 ## Decision rule
 
-This repository is the semantic source of truth for both Claude Code and Codex. Shared
-procedures stay in one skill tree. Provider manifests, hook transports, invocation policy,
-and genuinely provider-specific procedures may differ. A plugin is listed in the Codex
+This repository is the semantic source of truth for Claude Code, Codex, and Antigravity.
+Shared procedures stay in one skill tree. Provider manifests, hook transports, invocation
+policy, and genuinely provider-specific procedures may differ. A plugin is listed in the Codex
 marketplace only when Codex can execute its current behavior without pretending that a
 Claude-only command, agent definition, hook event, session store, or dispatcher exists.
 
 `available` therefore means “installable and behaviorally supportable now,” not merely
-“a manifest can be generated.” `withheld` is an explicit compatibility result, not an
-unfinished bulk conversion.
+“a manifest can be generated.” Where a provider lacks a transport, the gap is named at
+that transport boundary rather than hiding or copying a shared skill.
 
-## Initial marketplace
+## Complete shared skill surface
 
-| plugin | status | semantic owner | Codex adaptation |
+The marketplace exposes all 58 skills from all 11 active skill-bearing Claude plugins.
+No skill is withheld or copied. Claude agent names are treated as implementations of
+functional roles; Codex and Antigravity use their native delegation surfaces. Skills that
+operate on Claude-specific state remain available from other hosts because the subject of
+the operation is Claude, not because the host is being misidentified.
+
+| plugin group | status | provider adaptation |
+|---|---|---|
+| Plan, academic, Git, notes, and estimator | available | Existing shared procedures plus Codex invocation metadata and Antigravity root manifests |
+| Getting started and extending Claude | available | Claude-specific subject matter remains callable from any host; provider metadata is transport only |
+| Basic and research agents | available | One functional-role procedure maps to each provider's native subagent surface; unavailable delegation falls back honestly to the host session |
+| Crash recovery | available | The shared skill resolves the active installed plugin root, while the implementation intentionally inspects Claude session state |
+| External agents | available, explicit-only where consequential | Helper paths resolve from the loaded skill; same-model Codex supervision is labelled process separation rather than independent-model review |
+
+## Hook transports
+
+| plugin | Claude | Codex | Antigravity |
 |---|---|---|---|
-| `denubis-plan-and-execute` | available | existing shared skills | Codex manifest and per-skill invocation metadata; an explicit empty Codex hook file prevents the Claude live-session marker from being loaded |
-| `denubis-academic` | available | existing shared skills | Codex manifest and per-skill invocation metadata; bibliography scripts resolve `PLUGIN_ROOT` or the Claude compatibility root |
-| `denubis-git-commit` | available | existing shared skill | Codex manifest; implicit invocation disabled because committing is a consequential boundary |
-| `denubis-project-notes` | available | existing shared skill | Codex manifest and invocation metadata; its external chat-search dependency remains explicit |
-| `denubis-token-estimator` | available | existing shared skill and scripts | Codex manifest and invocation metadata; direct installed-script commands replace the Claude slash-command assumption |
-| `denubis-hook-branch-bg` | available | existing provider-neutral Python hook | Codex manifest plus a native `SessionStart` hook using `PLUGIN_ROOT`; installation still requires normal Codex hook trust |
-
-## Withheld from the initial marketplace
-
-| plugin | status | reason | next honest boundary |
-|---|---|---|---|
-| `denubis-00-getting-started` | withheld | onboarding is composed around Claude commands, settings, and plugin setup | replace it with repository-level provider-specific installation documentation if users need a common entry point |
-| `denubis-basic-agents` | withheld | its primary payload is Claude agent definitions and Claude tool syntax; a Codex plugin manifest does not translate those agents | decide whether any role is absent from Codex's built-in subagents, then write only that provider adapter |
-| `denubis-crash-recovery` | withheld | it classifies Claude JSONL sessions and depends on the Claude wrapper/live-marker protocol | design Codex recovery against Codex's actual session and resume semantics rather than relabeling the Claude classifier |
-| `denubis-extending-claude` | withheld | its procedures and examples create Claude plugins, agents, commands, and marketplace metadata | keep Claude-specific extension guidance here; use Codex's maintained plugin/skill creators for Codex until a small shared conceptual core is demonstrated |
-| `denubis-external-agents` | withheld | the Codex paths drive or supervise another Codex process and include Ponytail-specific transport; installing them inside Codex creates recursive authority and provenance problems | keep those provider-specific capabilities outside the normal Codex marketplace and review each external-engine adapter separately |
-| `denubis-hook-gh-fork-guard` | withheld | the current guard parses raw shell text, only recognizes commands beginning exactly with `gh`, and relies on the Claude dispatcher convention; it can imply safety while missing equivalent invocations | redesign around native executable/policy boundaries with bypass tests before advertising protection |
-| `denubis-hook-pretooluse-dispatcher` | withheld | it compensates for Claude hook aggregation; Codex already aggregates native hooks | no Codex port; retain only while Claude needs the transport workaround |
-| `denubis-research-agents` | withheld | its payload is Claude agent definitions and provider tool syntax, while Codex already supplies research and codebase workers | add a Codex adapter only if a measured missing role remains |
+| `denubis-hook-branch-bg` | native `SessionStart` | native `SessionStart` | not claimed |
+| `denubis-hook-code-quality-guard` | `PreToolUse` Write/Edit | native `PreToolUse` `apply_patch`, normalized by the shared script | not claimed: no documented equivalent blocking pre-tool contract |
+| `denubis-hook-gh-fork-guard` | Claude Bash dispatcher | native `PreToolUse:Bash`, same implementation | not claimed: no documented equivalent blocking pre-tool contract |
+| `denubis-hook-pretooluse-dispatcher` | required transport workaround | absent by design; Codex aggregates hooks natively | absent by design |
 
 ## Codex mechanisms retained
 
@@ -48,8 +49,8 @@ unfinished bulk conversion.
 
 The mirror deliberately does not retain generated duplicate skills, filler descriptions,
 forced phase trackers, review-worker quotas, textual change detectors, the Claude hook
-dispatcher, or a second semantic repository. Historical `brian-ed3d-plugins-codex`
-content remains untouched until the initial marketplace passes human UAT.
+dispatcher, or a second semantic repository. The old Codex repository's retirement state
+is retained below as historical evidence rather than used as a second source.
 
 ## Acceptance boundary
 
@@ -60,7 +61,10 @@ CLI behavior and judges whether discovery, invocation, and consequences are unsu
 Only accepted UAT authorizes final history normalization and retirement of duplicated
 shared skills from the old Codex repository.
 
-## Mechanical evidence
+## Historical mechanical evidence for the six-plugin candidate
+
+The following evidence describes the superseded initial candidate. It does not validate
+the complete 58-skill candidate documented above; fresh runtime UAT remains required.
 
 The installation candidate was exercised with `codex-cli 0.145.0`:
 
@@ -117,7 +121,7 @@ hygiene observation.
 
 The integrated correction is versioned as `denubis-plan-and-execute` 4.1.1 and
 `denubis-project-notes` 0.1.1. Fresh installed-runtime UAT remains open. No current human
-acceptance authorises final normalization or main integration.
+acceptance authorises final normalization, installation, or publication.
 
 The 37 global `~/.agents/skills` links into `brian-ed3d-plugins-codex` and its 21,538-line
 copied skill tree were removed after the invalid first acceptance. Cleanup commit

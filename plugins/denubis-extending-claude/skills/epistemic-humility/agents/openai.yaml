@@ -1,0 +1,7 @@
+interface:
+  display_name: "Epistemic Humility"
+  short_description: "Bound claims and automation to observable evidence"
+  default_prompt: "Use $epistemic-humility to test whether this claim or automation earns its scope."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Generic Agent Roles"
+  short_description: "Choose a functional role for delegated work"
+  default_prompt: "Use $using-generic-agents to choose the provider-native role for this delegated task."
+
+policy:
+  allow_implicit_invocation: true

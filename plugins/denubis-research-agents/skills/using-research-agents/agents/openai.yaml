@@ -1,0 +1,7 @@
+interface:
+  display_name: "Research Agent Roles"
+  short_description: "Choose and direct the right research workflow"
+  default_prompt: "Use $using-research-agents to select the provider-native research role for this task."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Research the Internet"
+  short_description: "Research current claims with authoritative sources"
+  default_prompt: "Use $researching-on-the-internet to verify this current external claim."
+
+policy:
+  allow_implicit_invocation: true

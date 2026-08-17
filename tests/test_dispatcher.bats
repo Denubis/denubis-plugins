@@ -85,6 +85,39 @@ HOOK
     [ "$status" -eq 0 ]
     result=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision')
     [ "$result" = "deny" ]
+    reason=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecisionReason')
+    [ "$reason" = "blocked by test" ]
+}
+
+@test "drop dir: reasonless deny gains a model-facing fallback" {
+    cat > "$DISPATCHER_DROP_DIR/10-deny" <<'HOOK'
+#!/usr/bin/env bash
+cat > /dev/null
+echo '{"hookSpecificOutput":{"permissionDecision":"deny"}}'
+HOOK
+    chmod +x "$DISPATCHER_DROP_DIR/10-deny"
+
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    [ "$status" -eq 0 ]
+    reason=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecisionReason')
+    [ -n "$reason" ]
+    [ "$reason" != "null" ]
+}
+
+@test "drop dir: legacy nested system message becomes the model-facing reason" {
+    cat > "$DISPATCHER_DROP_DIR/10-deny" <<'HOOK'
+#!/usr/bin/env bash
+cat > /dev/null
+echo '{"hookSpecificOutput":{"permissionDecision":"deny","systemMessage":"legacy reason"}}'
+HOOK
+    chmod +x "$DISPATCHER_DROP_DIR/10-deny"
+
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    [ "$status" -eq 0 ]
+    reason=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecisionReason')
+    [ "$reason" = "legacy reason" ]
+    transcript=$(echo "$output" | jq -r '.systemMessage')
+    [ "$transcript" = "legacy reason" ]
 }
 
 @test "drop dir: allow hook with updatedInput passes through" {
@@ -185,6 +218,19 @@ HOOK
     create_plugin_hook "test-mp" "test-plugin" 10 \
         'cat > /dev/null; echo "{\"hookSpecificOutput\":{\"additionalContext\":\"should not appear\"}}"'
     # Plugin NOT enabled in settings
+
+    run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "drop dir: non-object JSON output is skipped" {
+    cat > "$DISPATCHER_DROP_DIR/10-bad" <<'HOOK'
+#!/usr/bin/env bash
+cat > /dev/null
+echo '[]'
+HOOK
+    chmod +x "$DISPATCHER_DROP_DIR/10-bad"
 
     run uv run python "$DISPATCHER" <<< "$SAMPLE_INPUT"
     [ "$status" -eq 0 ]

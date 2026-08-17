@@ -29,6 +29,9 @@ testpaths = [
 target-version = "py314"
 line-length = 88
 
+[tool.ruff.per-file-target-version]
+"plugins/*/hooks/*.py" = "py39"
+
 [tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors

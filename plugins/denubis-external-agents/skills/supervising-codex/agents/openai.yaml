@@ -1,0 +1,7 @@
+interface:
+  display_name: "Supervise External Codex"
+  short_description: "Supervise an external Codex session with evidence"
+  default_prompt: "Use $supervising-codex to supervise the requested external Codex session."
+
+policy:
+  allow_implicit_invocation: false

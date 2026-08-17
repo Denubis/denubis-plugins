@@ -9,6 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETPLACE_PATH = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+CLAUDE_MARKETPLACE_PATH = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 
 
 def _json(path: Path) -> dict[str, object]:
@@ -33,6 +34,24 @@ def _marketplace_plugins() -> list[tuple[dict[str, object], Path, dict[str, obje
         manifest = _json(plugin_root / ".codex-plugin" / "plugin.json")
         resolved.append((entry, plugin_root, manifest))
     return resolved
+
+
+def _claude_skill_plugins() -> dict[str, Path]:
+    marketplace = _json(CLAUDE_MARKETPLACE_PATH)
+    entries = marketplace.get("plugins")
+    assert isinstance(entries, list) and entries
+
+    plugins: dict[str, Path] = {}
+    for entry in entries:
+        assert isinstance(entry, dict)
+        name = entry.get("name")
+        source = entry.get("source")
+        assert isinstance(name, str)
+        assert isinstance(source, str)
+        plugin_root = (REPO_ROOT / source).resolve()
+        if list((plugin_root / "skills").glob("*/SKILL.md")):
+            plugins[name] = plugin_root
+    return plugins
 
 
 def _frontmatter(path: Path) -> dict[str, object]:
@@ -63,6 +82,41 @@ def test_marketplace_entries_resolve_to_matching_manifests() -> None:
         assert interface.get("shortDescription")
 
 
+def test_codex_and_claude_manifests_share_plugin_versions() -> None:
+    for _entry, plugin_root, codex_manifest in _marketplace_plugins():
+        claude_manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
+        if not claude_manifest_path.is_file():
+            continue
+        claude_manifest = _json(claude_manifest_path)
+
+        assert codex_manifest["version"] == claude_manifest["version"]
+
+
+def test_every_claude_skill_plugin_is_available_from_codex_marketplace() -> None:
+    codex_plugins = {
+        str(entry["name"]): plugin_root
+        for entry, plugin_root, _manifest in _marketplace_plugins()
+    }
+
+    assert _claude_skill_plugins().keys() <= codex_plugins.keys()
+
+
+def test_codex_discovers_every_claude_marketplace_skill() -> None:
+    expected = {
+        (plugin_name, skill_file.parent.name)
+        for plugin_name, plugin_root in _claude_skill_plugins().items()
+        for skill_file in (plugin_root / "skills").glob("*/SKILL.md")
+    }
+    discovered = {
+        (str(entry["name"]), skill_file.parent.name)
+        for entry, plugin_root, manifest in _marketplace_plugins()
+        if isinstance(manifest.get("skills"), str)
+        for skill_file in (plugin_root / str(manifest["skills"])).glob("*/SKILL.md")
+    }
+
+    assert expected <= discovered
+
+
 def test_every_exposed_skill_has_valid_codex_metadata() -> None:
     discovered = 0
     for _entry, plugin_root, manifest in _marketplace_plugins():
@@ -89,7 +143,9 @@ def test_every_exposed_skill_has_valid_codex_metadata() -> None:
             assert isinstance(display_name, str) and display_name.strip()
             assert isinstance(short_description, str)
             assert 25 <= len(short_description) <= 64
-            assert isinstance(default_prompt, str) and f"${skill_name}" in default_prompt
+            assert (
+                isinstance(default_prompt, str) and f"${skill_name}" in default_prompt
+            )
             assert isinstance(policy.get("allow_implicit_invocation"), bool)
 
     assert discovered > 0
@@ -107,7 +163,9 @@ def test_consequential_side_effect_skills_require_explicit_invocation() -> None:
         for relative in explicit_only
     }
 
-    assert all(policy == {"allow_implicit_invocation": False} for policy in observed.values())
+    assert all(
+        policy == {"allow_implicit_invocation": False} for policy in observed.values()
+    )
 
 
 def test_expensive_project_memory_retrieval_requires_explicit_invocation() -> None:

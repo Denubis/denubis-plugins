@@ -1,0 +1,7 @@
+interface:
+  display_name: "Maintain Project Context"
+  short_description: "Keep CLAUDE.md and AGENTS.md aligned with code"
+  default_prompt: "Use $maintaining-project-context to update the project context affected by these changes."
+
+policy:
+  allow_implicit_invocation: true

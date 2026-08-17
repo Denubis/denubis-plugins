@@ -1,0 +1,19 @@
+{
+  "name": "denubis-00-getting-started",
+  "version": "1.5.0",
+  "description": "Getting-started policy and onboarding for the Denubis plugin suite.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["getting-started", "npm", "supply-chain"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Getting Started",
+    "shortDescription": "Safe package-install policy and plugin onboarding",
+    "longDescription": "Apply the repository's npm install-script safety policy and maintain its provider-installed copies.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Apply the npm install-script policy to this blocked installation."]
+  }
+}

@@ -6,14 +6,19 @@ user-invocable: false
 
 # Using Research Agents
 
-## Agent Selection
+## Research-role selection
 
-| Agent | Model | Use When |
-|-------|-------|----------|
-| `internet-researcher` | Sonnet | Need current API docs, library comparisons, community consensus. External info only |
-| `codebase-investigator` | Sonnet | Need to understand existing code, verify assumptions, find patterns. Local info only |
-| `combined-researcher` | Sonnet | Need both external and local info together (e.g. "do we use Stripe? what's the current API?") |
-| `remote-code-researcher` | Sonnet | Need to read actual source code of external libraries. Clones repos to temp dir |
+Choose the research responsibility first. On Claude Code, the names below resolve to
+packaged agents. On Codex and Antigravity, dispatch a native subagent with the matching
+responsibility and give it the corresponding skill; the Claude name is provenance, not a
+provider-independent identifier.
+
+| Responsibility | Claude Code implementation | Use when |
+|---|---|---|
+| Internet research | `internet-researcher` | Current API docs, comparisons, or external consensus; no local-code claims |
+| Codebase investigation | `codebase-investigator` | Existing code, patterns, or local assumptions; no external claims |
+| Combined research | `combined-researcher` | One question genuinely requires both local and external evidence |
+| Remote-code research | `remote-code-researcher` | The answer requires reading an external library's actual source |
 
 Research requires source evaluation, so every research agent uses Sonnet or above.
 
@@ -29,30 +34,30 @@ Dispatch authority:
 **Decision flow:**
 
 ```
-Need external info? ----No----> codebase-investigator
+Need external info? ----No----> codebase investigation
        |
       Yes
        |
-Need local info too? ---No----> internet-researcher
+Need local info too? ---No----> internet research
        |
       Yes
        |
 Need to read library
-source code? -----------Yes---> remote-code-researcher
+source code? -----------Yes---> remote-code research
        |
       No
        |
        v
-combined-researcher
+combined research
 ```
 
 **Common mistakes:**
 
 | Mistake | Fix |
 |---------|-----|
-| Using combined-researcher for pure web search | Use internet-researcher (simpler, faster) |
-| Using internet-researcher when answer is in codebase | Use codebase-investigator |
-| Guessing library internals | Use remote-code-researcher to read the actual code |
+| Using combined research for pure web search | Use internet research (simpler, faster) |
+| Using internet research when answer is in codebase | Use codebase investigation |
+| Guessing library internals | Use remote-code research to read the actual code |
 | Running multiple agents sequentially when combined would do | Use combined-researcher |
 
 ## Academic Research Protocol
@@ -66,7 +71,7 @@ them from the web. The flow has three stages: identify, load, read.
 
 ### Stage 1: Identify (the research agent's job)
 
-A research agent (usually `internet-researcher`) searches for relevant work and
+A research agent using the internet-research responsibility searches for relevant work and
 returns, for each candidate, a locator the loader can act on:
 
 - a DOI as a URL (`https://doi.org/10.xxxx/xxxxx`), preferred
@@ -125,4 +130,8 @@ the markers in the rendered text and are verified with `blockquote.py`.
 
 ### When it does NOT apply
 
-- API documentation, blog posts, tutorials, Stack Overflow, or GitHub issues. Those are not scholarly sources, so use `internet-researcher` directly without this protocol.
+- API documentation, blog posts, tutorials, Stack Overflow, or GitHub issues. Those are not scholarly sources, so use the internet-research responsibility directly without this protocol.
+
+If the current provider has no subagent surface, perform the selected workflow in the
+current session and say that it was not isolated. Never claim that a named research agent
+ran when the provider could not dispatch one.

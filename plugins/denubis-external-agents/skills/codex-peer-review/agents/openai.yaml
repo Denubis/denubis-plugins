@@ -1,0 +1,7 @@
+interface:
+  display_name: "External Codex Peer Review"
+  short_description: "Run a provenance-checked external Codex review"
+  default_prompt: "Use $codex-peer-review to obtain the requested external Codex review."
+
+policy:
+  allow_implicit_invocation: false

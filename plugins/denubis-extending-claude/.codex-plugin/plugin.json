@@ -1,0 +1,19 @@
+{
+  "name": "denubis-extending-claude",
+  "version": "1.10.1",
+  "description": "Create and maintain Claude Code plugins, agents, skills, directives, and project context.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["claude-code", "plugins", "skills", "agents", "directives"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Extending Claude",
+    "shortDescription": "Build and maintain Claude Code extensions",
+    "longDescription": "Use any supported host agent to create, test, release, and maintain Claude Code plugins and project instructions.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": ["Create or maintain this Claude Code extension from its current source of truth."]
+  }
+}

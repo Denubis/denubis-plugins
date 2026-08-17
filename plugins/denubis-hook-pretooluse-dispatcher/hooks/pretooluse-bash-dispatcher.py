@@ -225,7 +225,11 @@ def _merge_hook_output(out: str, final: dict) -> bool:
         data = json.loads(out)
     except json.JSONDecodeError:
         return False
+    if not isinstance(data, dict):
+        return False
     hook_output = data.get("hookSpecificOutput") or {}
+    if not isinstance(hook_output, dict):
+        return False
     decision = hook_output.get("permissionDecision")
     if decision == "deny":
         final["deny_output"] = out
@@ -289,6 +293,40 @@ def build_output(final: dict) -> dict:
     return output
 
 
+def normalize_deny_output(out: str) -> str:
+    """Give every deny both model-facing and transcript-facing reasons."""
+    try:
+        data = json.loads(out)
+    except (json.JSONDecodeError, TypeError):
+        return out
+    if not isinstance(data, dict):
+        return out
+
+    hook_output = data.get("hookSpecificOutput")
+    if not isinstance(hook_output, dict):
+        return out
+
+    hook_output["hookEventName"] = "PreToolUse"
+    reason = hook_output.get("permissionDecisionReason")
+    if not isinstance(reason, str) or not reason:
+        candidates = (
+            data.get("systemMessage"),
+            hook_output.pop("systemMessage", None),
+        )
+        reason = next(
+            (
+                candidate
+                for candidate in candidates
+                if isinstance(candidate, str) and candidate
+            ),
+            "A PreToolUse hook denied this tool call without providing a reason.",
+        )
+        hook_output["permissionDecisionReason"] = reason
+    if not isinstance(data.get("systemMessage"), str) or not data["systemMessage"]:
+        data["systemMessage"] = reason
+    return json.dumps(data)
+
+
 # ── Diagnostics ────────────────────────────────────────────────────────────
 
 
@@ -337,16 +375,7 @@ def main(argv: list[str]) -> int:
 
     final = run_hooks(hook_list, sys.stdin.buffer.read())
     if final["deny_output"] is not None:
-        # Sub-hook deny output passes through verbatim; stamp the required
-        # hookEventName in case the sub-hook omitted it.
-        try:
-            deny_data = json.loads(final["deny_output"])
-            deny_hook_output = deny_data.get("hookSpecificOutput")
-            if isinstance(deny_hook_output, dict):
-                deny_hook_output["hookEventName"] = "PreToolUse"
-            print(json.dumps(deny_data))
-        except (json.JSONDecodeError, TypeError):
-            print(final["deny_output"])
+        print(normalize_deny_output(final["deny_output"]))
         return 0
     if not (
         final["decision"]

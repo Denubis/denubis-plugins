@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write Claude Directives"
+  short_description: "Write concise, enforceable Claude instructions"
+  default_prompt: "Use $writing-claude-directives to write or revise these Claude instructions."
+
+policy:
+  allow_implicit_invocation: true

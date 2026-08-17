@@ -1,0 +1,7 @@
+interface:
+  display_name: "Maintain a Claude Marketplace"
+  short_description: "Maintain Claude plugin releases without version drift"
+  default_prompt: "Use $maintaining-a-marketplace to release or repair this Claude plugin marketplace."
+
+policy:
+  allow_implicit_invocation: true

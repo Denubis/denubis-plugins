@@ -1,0 +1,7 @@
+interface:
+  display_name: "Create a Claude Agent"
+  short_description: "Design and test specialized Claude Code agents"
+  default_prompt: "Use $creating-an-agent to design this Claude Code agent."
+
+policy:
+  allow_implicit_invocation: true

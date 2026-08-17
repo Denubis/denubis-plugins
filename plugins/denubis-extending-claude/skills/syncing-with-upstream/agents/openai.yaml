@@ -1,0 +1,7 @@
+interface:
+  display_name: "Sync with Upstream"
+  short_description: "Integrate upstream changes without losing local work"
+  default_prompt: "Use $syncing-with-upstream to inspect and integrate the requested upstream changes."
+
+policy:
+  allow_implicit_invocation: false

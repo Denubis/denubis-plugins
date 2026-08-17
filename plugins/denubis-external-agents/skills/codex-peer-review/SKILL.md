@@ -14,11 +14,11 @@ Run OpenAI's `codex` as a single external critic over a target file, shaped by t
 
 ## When to use
 
-- You want an outside, non-Claude critique of a draft, design doc, analysis, or postmortem.
+- You want a critique from a separate Codex process, kept distinct from the host agent's voice.
 - You want a falsification-first review (overclaiming, evidence-grade violations, internal inconsistency) from a different model.
 
 **When NOT to use:**
-- For Claude's own review, dispatch `denubis-plan-and-execute:critical-peer-review` directly — this skill is specifically the *external* voice.
+- For the host agent's own review, use `denubis-plan-and-execute:critical-peer-review` directly — this skill is specifically the *external Codex process*.
 - On anything you cannot disclose to OpenAI. The disclosure surface is the target's repo **minus gitignored files** — whatever codex reads from that staging goes to OpenAI. `.gitignore` is the boundary, and it only holds if sensitive data is gitignored: if raw/participant data is *committed* (tracked), it gets staged and sent — glance at what's tracked first. Separately, `-s read-only` does not confine reads, so codex can still read its own well-known paths (`~/.codex`, `~/.ssh`); only an external sandbox (bwrap) closes that. Run on your own machine, on disclosable work, watched.
 
 ## How to run
@@ -29,9 +29,16 @@ Run OpenAI's `codex` as a single external critic over a target file, shaped by t
 
    **Do not hand-build context for codex.** The script stages the surrounding repo itself (next step). Do not assemble a `context/` directory of hand-picked files, and do not write the reviewer an orientation README — that is wasted effort the staging already covers. The focus note carries everything an orientation file would, in one line.
 
-3. **Run the script**, passing the target and the focus note. It stages the target's git repo (minus gitignored files and binaries) plus the rubric into a throwaway `/tmp` dir, runs codex with that as its only root, and writes the review to `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a self-ignoring `.gitignore` so output never leaks into the repo under review). If the target is not in a git repo, it reviews the file alone with no context.
+3. **Resolve the plugin root from this loaded SKILL.md path**, ascending two directories,
+   then run the script with the target and focus note. This is stable in the source tree and
+   every provider cache; do not assume the caller is at this repository root. The script
+   stages the target's git repo (minus gitignored files and binaries) plus the rubric into
+   a throwaway `/tmp` dir, runs codex with that as its only root, and writes the review to
+   `./.review/<target>.<timestamp>.REVIEW.md` (gitignored and persistent; it auto-drops a
+   self-ignoring `.gitignore` so output never leaks into the repo under review). If the
+   target is not in a git repo, it reviews the file alone with no context.
    ```bash
-   bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target> "<one-line focus note>"
+   bash "$plugin_root/skills/codex-peer-review/codex-peer-review.sh" <target> "<one-line focus note>"
    ```
    The focus note is optional and is injected as a priority hint, subordinate to the anti-fabrication grounding rules — it sharpens the review without narrowing the target's scope or relaxing the verbatim-quote requirement. The script prints the package dir, the staged target path, the focus note, the resolved model, the review path, and a ready-made smoke-check command.
 
@@ -74,7 +81,7 @@ A codex review enters the conversation only after its quotes are confirmed to ex
 
 | Step | Command / action |
 |------|------------------|
-| Run | `bash plugins/denubis-external-agents/skills/codex-peer-review/codex-peer-review.sh <target> "<one-line focus note>"` |
+| Run | `bash "$plugin_root/skills/codex-peer-review/codex-peer-review.sh" <target> "<one-line focus note>"` |
 | Find review | `./.review/<target>.<ts>.REVIEW.md` (path printed as `review: …`) |
 | Verify (mandatory) | `grep -nF '<quote>' '<cited file>'` (target or context) for several findings |
 | On quote mismatch | discard the review, report confabulation |

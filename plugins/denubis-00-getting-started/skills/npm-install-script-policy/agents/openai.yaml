@@ -1,0 +1,7 @@
+interface:
+  display_name: "Npm Install-Script Policy"
+  short_description: "Apply safe npm install-script policy"
+  default_prompt: "Use $npm-install-script-policy to resolve this blocked npm installation safely."
+
+policy:
+  allow_implicit_invocation: true

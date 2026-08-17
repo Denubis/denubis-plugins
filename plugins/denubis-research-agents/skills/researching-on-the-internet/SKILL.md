@@ -21,8 +21,8 @@ Gather accurate, current, well-sourced information from the internet to inform p
 
 **Don't use for:**
 - Information already in codebase (use codebase search)
-- General knowledge within Claude's training (just answer directly)
-- Project-specific conventions (check CLAUDE.md)
+- Stable general knowledge already available to the current model (answer directly)
+- Project-specific conventions (check the applicable AGENTS.md and CLAUDE.md files)
 
 ## Core Research Workflow
 
