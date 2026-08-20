@@ -223,8 +223,8 @@
     },
     {
       "name": "denubis-project-notes",
-      "description": "Explicit recovery of project-owned .notes memory and relevant chat history with resolvable source pointers.",
-      "version": "0.1.1",
+      "description": "Task-entry inspection and human-approved, evidence-linked maintenance of project notes and ADRs, with conditional prior-chat recovery.",
+      "version": "0.1.2",
       "source": "./plugins/denubis-project-notes",
       "author": {
         "name": "Brian Ballsun-Stanton",

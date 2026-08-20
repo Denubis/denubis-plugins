@@ -1,7 +1,7 @@
 interface:
-  display_name: "Scan Project Notes"
-  short_description: "Recover relevant project memory and prior work"
-  default_prompt: "Use $scanning-project-notes to recover the named project memory or prior work."
+  display_name: "Use Project Notes"
+  short_description: "Use project memory before and after work"
+  default_prompt: "Use $scanning-project-notes to inspect relevant project memory before work and propose evidence-linked maintenance afterward."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

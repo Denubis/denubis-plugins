@@ -1,7 +1,7 @@
 {
   "name": "denubis-project-notes",
-  "version": "0.1.1",
-  "description": "Recover named project notes and prior chat context when a task depends on them.",
+  "version": "0.1.2",
+  "description": "Use project notes before work and propose evidence-linked note or ADR maintenance afterward.",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "url": "https://github.com/denubis"
@@ -12,11 +12,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Project Notes",
-    "shortDescription": "Recover named project memory and prior work on demand",
-    "longDescription": "Recover task-relevant project notes or prior Claude Code and Codex chats when explicitly requested or required by a named historical dependency.",
+    "shortDescription": "Use project notes before and after work",
+    "longDescription": "Inspect task-relevant project-owned notes at task entry, then propose human-approved, evidence-linked note or ADR maintenance after durable findings. Recover prior chats only when explicitly requested or required by an unresolved historical dependency.",
     "developerName": "Brian Ballsun-Stanton",
     "category": "Productivity",
     "capabilities": ["Interactive"],
-    "defaultPrompt": ["Recover the named project memory or prior work needed for this task."]
+    "defaultPrompt": ["Inspect relevant project notes before work and propose evidence-linked maintenance afterward when durable knowledge changes."]
   }
 }

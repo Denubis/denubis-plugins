@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-project-notes] 0.1.2
+
+**Changed:**
+- Project work now begins with a bounded inventory of project-owned `.notes/` and
+  task-relevant note bodies in both Claude and Codex. Prior-chat recovery remains
+  conditional on an explicit request or an unresolved historical dependency.
+- Durable note or ADR changes require a proposal naming the exact owner, change,
+  consequence, and linked evidence before user approval; routine failures do not create
+  performative memory records.
+
 ## [denubis-hook-instruction-budget] 0.1.0
 
 **Added:**

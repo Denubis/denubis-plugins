@@ -1,14 +1,19 @@
 ---
 name: scanning-project-notes
-description: Use when explicitly asked to recover project notes or prior work, or when a task depends on a named historical decision that current repository artifacts cannot resolve
+description: Use before consequential project work to inspect relevant project-owned .notes, and after durable findings to propose evidence-linked note or ADR changes; prior-chat recovery stays conditional
 ---
 
 # Scanning Project Notes
 
-Retrieve project memory and feedback as main-agent work when the task actually depends on
-them. Do not run this as an ambient pre-edit ritual. Ordinary repository instructions,
-current code, and a supplied plan remain the first owners of ordinary implementation
-facts.
+Use project memory as a task loop: inspect it before the first consequential project
+action, apply relevant records during the work, and maintain a durable owner only when
+the work changes what future work should know. Keep local retrieval bounded: inventory
+every note, read enough frontmatter to select by the current task, and open only relevant
+bodies. Prior-chat recovery is a separate, conditional action.
+
+Ordinary repository instructions, current code, and an accepted plan remain the first
+owners of implementation facts. Notes carry durable project facts, preferences,
+references, and feedback.
 
 Notes do not create authority or decisions: resolve any human instruction they rely on to
 the original human record. Do not dispatch an advisor and do not wait for a SessionStart
@@ -21,15 +26,15 @@ absolute directory and use its parent as the main repository root; this makes ev
 worktree share the main checkout's `.notes/`. Outside Git, use the current project root.
 
 Use `<main-repository-root>/.notes/` as the notes directory. List its Markdown files by
-name with hidden and ignored paths included. If the directory is absent, say only that it
-is absent at the resolved path and stop unless prior-chat recovery is independently
+name with hidden and ignored paths included. If the directory is absent, record that
+bounded result and continue the ordinary task unless prior-chat recovery is independently
 required.
 
 ## 2. Read before selecting
 
 Read enough frontmatter to identify the notes that could change this task, then open those
-notes completely. State the inventory and the selection boundary; do not bulk-load
-unrelated bodies merely to complete a count.
+notes completely. Keep the inventory and selection boundary available as working
+evidence; do not bulk-load unrelated bodies or turn the scan into a ceremonial report.
 
 Do not select notes with a keyword grep. Keywords are finding aids written for an earlier
 task, not the boundary of the current task's subject.
@@ -64,14 +69,41 @@ Carry relevant findings into the work itself. Do not produce a ceremonial adviso
 unless the user asked for one. If sources disagree or a note is stale, raise the one
 decision that changes the next action.
 
-Do not create or update `.notes/` merely because the scan found something. Project memory
-is written only after the user agrees to the durable wording.
+## 6. Close the memory loop
+
+After a failure, correction, or newly verified constraint, decide whether the evidence
+changes durable project knowledge. Routine debugging, transient state, and facts already
+owned by code or tests do not earn a memory record.
+
+Choose the current semantic owner:
+
+- revise an existing `.notes/` record for a durable project fact, preference, reference,
+  or feedback;
+- revise an existing ADR for a current architectural decision and its rationale; or
+- use code, tests, or ordinary documentation when they already reveal the fact.
+
+Prefer revising the existing owner over appending a new lesson. Before changing a note or
+ADR, present one maintenance proposal containing:
+
+1. the exact owner path and whether it exists;
+2. the exact semantic change or proposed wording;
+3. why the change would alter future work; and
+4. the resolvable evidence to link, such as a focused test result, log, diff, current
+   source, or original human instruction.
+
+Wait for the user to approve that proposal before editing the note or ADR. After approval,
+apply only the agreed change and verify every evidence pointer. If no durable change clears
+this gate, finish without proposing or writing project memory.
 
 ## Completion check
 
 - The main-repository notes path is explicit.
 - The note inventory and selection boundary are explicit.
 - Relevant note bodies were opened.
-- Any necessary chat search reports its coverage.
+- Prior chats were searched only when independently required, with reported coverage.
 - Every relied-on pointer resolves exactly.
+- An absent or irrelevant notes set did not stop the ordinary task.
+- Any note or ADR maintenance proposal names its owner, change, consequence, and evidence.
+- The user approved the maintenance proposal before its owner was edited.
+- Routine failures did not produce performative memory records.
 - No advisor or SessionStart request stands between the task and retrieval.

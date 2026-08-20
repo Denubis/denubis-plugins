@@ -168,7 +168,7 @@ def test_consequential_side_effect_skills_require_explicit_invocation() -> None:
     )
 
 
-def test_expensive_project_memory_retrieval_requires_explicit_invocation() -> None:
+def test_project_note_inventory_allows_implicit_invocation() -> None:
     metadata = _metadata(
         REPO_ROOT
         / "plugins"
@@ -179,7 +179,7 @@ def test_expensive_project_memory_retrieval_requires_explicit_invocation() -> No
         / "openai.yaml"
     )
 
-    assert metadata["policy"] == {"allow_implicit_invocation": False}
+    assert metadata["policy"] == {"allow_implicit_invocation": True}
 
 
 def test_dual_provider_hooks_resolve_without_ambiguous_default_discovery() -> None:
