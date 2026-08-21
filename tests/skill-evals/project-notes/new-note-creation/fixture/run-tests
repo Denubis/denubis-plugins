@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+printf 'verification fixture\n'
+exit 3

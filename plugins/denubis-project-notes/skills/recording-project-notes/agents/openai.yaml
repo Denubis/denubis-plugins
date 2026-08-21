@@ -1,0 +1,7 @@
+interface:
+  display_name: "Record Project Note"
+  short_description: "Create one approved durable project note"
+  default_prompt: "Use $recording-project-notes to create the exact project note already approved by the user."
+
+policy:
+  allow_implicit_invocation: true

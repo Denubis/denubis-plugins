@@ -80,6 +80,8 @@ Choose the current semantic owner:
 - revise an existing `.notes/` record for a durable project fact, preference, reference,
   or feedback;
 - revise an existing ADR for a current architectural decision and its rationale; or
+- when no existing owner fits, propose one new `.notes/` path and use
+  `denubis-project-notes:recording-project-notes` only after the user approves it; or
 - use code, tests, or ordinary documentation when they already reveal the fact.
 
 Prefer revising the existing owner over appending a new lesson. Before changing a note or

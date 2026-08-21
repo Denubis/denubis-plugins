@@ -9,6 +9,10 @@ user-invocable: false
 Two tools, one decision. `rg` matches text. `ast-grep` matches syntax. Most mistakes in
 both come from typing a flag or a name that means something else than you expect.
 
+Before emitting an `rg` command, translate its options against ripgrep rather than grep.
+Ripgrep recurses by default: omit grep's `-r`; in `rg`, `-r` means `--replace` and
+consumes the next token as replacement text.
+
 **Versions measured 2026-08-07: ripgrep 14.1.0, GNU grep 3.11, ast-grep 0.44.1.** Flag
 meanings move between releases; re-run `rg --help` before trusting a row elsewhere.
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.5
+
+**Changed:**
+- `using-code-search` now places ripgrep's native-recursion rule before tool selection:
+  omit grep-style `-r`, which means `--replace` in ripgrep.
+- Added a separated actor/oracle regression case requiring a positive match from a nested
+  fixture without relying on the command approver to reject `rg -r`.
+
+## [denubis-project-notes] 0.1.3
+
+**Added:**
+- `recording-project-notes` creates one project-owned note only after the user approves
+  its exact path, semantic content, future consequence, and resolvable evidence.
+- The recorder preserves the established filename and flat-frontmatter format, rechecks
+  for an existing semantic owner, and verifies evidence pointers without treating the
+  new note as proof of its own claim.
+
 ## [denubis-plan-and-execute] 4.1.4
 
 **Fixed:**
