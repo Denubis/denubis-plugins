@@ -1,5 +1,19 @@
 # Changelog
 
+## [denubis-project-notes] 0.1.4
+
+**Added:**
+- `scanning-project-notes` now runs a bundled, stdlib-only inventory helper that emits
+  every project-memory Markdown entry's frontmatter as one complete JSON document before
+  body selection.
+
+**Changed:**
+- Inventory resolves the shared main checkout from linked worktrees, exposes malformed
+  and unsafe filesystem boundaries, never follows note symlinks, and excludes reported
+  `.notes/local-mail/` operational state without reading message bodies.
+- The friendly task-entry evaluation now requires both notes' frontmatter to appear
+  before the relevant note body is selected.
+
 ## [denubis-plan-and-execute] 4.1.5
 
 **Changed:**

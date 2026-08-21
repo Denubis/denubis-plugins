@@ -19,22 +19,40 @@ Notes do not create authority or decisions: resolve any human instruction they r
 the original human record. Do not dispatch an advisor and do not wait for a SessionStart
 reminder.
 
-## 1. Resolve the notes universe
+## 1. Inventory frontmatter
 
-Run `git rev-parse --git-common-dir`. In a Git repository, resolve that path to an
-absolute directory and use its parent as the main repository root; this makes every
-worktree share the main checkout's `.notes/`. Outside Git, use the current project root.
+Run the bundled inventory helper before selecting any note body. Do not substitute a
+filename listing, keyword search, or remembered inventory.
 
-Use `<main-repository-root>/.notes/` as the notes directory. List its Markdown files by
-name with hidden and ignored paths included. If the directory is absent, record that
-bounded result and continue the ordinary task unless prior-chat recovery is independently
-required.
+```bash
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+python3 "$PLUGIN_DIR/skills/scanning-project-notes/scripts/inventory.py" --cwd "$PWD"
+```
+
+The helper resolves the main repository root through Git's common directory so linked
+worktrees share the main checkout's `.notes/`. It reads each project-memory Markdown
+entry only through the closing frontmatter delimiter even when `.notes/` is hidden or
+ignored. It reports missing, malformed, unreadable, and symlink entries without emitting
+note bodies or following links outside the project. The reserved `.notes/local-mail/`
+subtree is reported as excluded operational state, not treated as project memory.
+
+Require one complete JSON document and confirm `markdown_count` equals the number of
+returned note entries before selection; a truncated prefix is not an inventory. A
+`symlink` or `not-directory` notes-root status is an unresolved boundary, not an absent
+notes set. Outside Git the helper treats the requested working directory as the project
+root. If `.notes/` is absent, record that bounded result and continue unless prior-chat
+recovery is independently required.
 
 ## 2. Read before selecting
 
-Read enough frontmatter to identify the notes that could change this task, then open those
-notes completely. Keep the inventory and selection boundary available as working
-evidence; do not bulk-load unrelated bodies or turn the scan into a ceremonial report.
+Consider every returned frontmatter block before choosing which bodies could change the
+task, then open those bodies completely. Select from the metadata's meaning, not the
+filename. For a missing, malformed, or unreadable entry, inspect enough of that file to
+determine whether it is a project note and whether it could change the task; do not
+silently exclude it. Do not follow a symlink entry. Ignore reported local-mail state
+unless the task independently concerns that mailbox. Keep the inventory and selection
+boundary available as working evidence without turning the scan into a ceremonial
+report.
 
 Do not select notes with a keyword grep. Keywords are finding aids written for an earlier
 task, not the boundary of the current task's subject.
@@ -99,8 +117,9 @@ this gate, finish without proposing or writing project memory.
 
 ## Completion check
 
-- The main-repository notes path is explicit.
-- The note inventory and selection boundary are explicit.
+- The helper reported the main-repository notes path, every project-memory Markdown
+  entry, and any excluded operational Markdown count.
+- Every returned frontmatter block was considered before body selection.
 - Relevant note bodies were opened.
 - Prior chats were searched only when independently required, with reported coverage.
 - Every relied-on pointer resolves exactly.

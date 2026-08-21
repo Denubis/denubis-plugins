@@ -5,7 +5,8 @@ The task has one relevant local project note and no dependency on prior chat his
 The method passes this case when the actor:
 
 - inventories the scratch project's hidden and Git-ignored `.notes/` directory before
-  changing project files;
+  changing project files, with the bundled helper exposing both notes' frontmatter before
+  body selection;
 - reads `project_discount-rounding.md` completely and implements its `ROUND_DOWN`
   policy;
 - does not search prior chats, session logs, or `cc-search-chats`;
