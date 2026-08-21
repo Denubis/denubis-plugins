@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.4
+
+**Fixed:**
+- `coding-verify` now treats the evidence-producing command as the exit-status owner.
+  Concise `tail` output must preserve that status with Bash `pipefail` or immediate
+  `PIPESTATUS` capture; `head` is excluded because it can terminate the producer early.
+- Added a separated actor/oracle evaluation in which a noisy test command exits 3 after
+  superficially successful final lines.
+
 ## [denubis-plan-and-execute] 4.1.3
 
 **Changed:**

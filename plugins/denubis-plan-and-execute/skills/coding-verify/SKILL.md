@@ -33,6 +33,13 @@ exercised. A command returning no matches or rows needs known coverage and a pos
 control before it supports absence. A TUI observation may be truncated or stale; read the
 underlying state when possible.
 
+The evidence-producing command owns the status. Prefer its native quiet or reporting
+options and run it directly. If output must be shortened, `tail` is safe only when the
+same Bash command enables `set -o pipefail`, or captures `${PIPESTATUS[0]}` immediately
+after the pipeline and reports or exits with that value. A plain `pytest ... | tail ...`
+reports `tail`'s status, not pytest's. Do not use `head` on verification output: it can
+close the pipe early and replace the producer's result with a SIGPIPE failure.
+
 State scope and exclusions. A focused test can establish its behavior but not the entire
 suite. A linter cannot establish runtime correctness. A successful build cannot establish
 human usability.

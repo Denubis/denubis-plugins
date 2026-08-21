@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+for number in {1..60}; do
+    printf 'test_%02d PASSED\n' "$number"
+done
+printf 'session cleanup complete\n'
+exit 3
