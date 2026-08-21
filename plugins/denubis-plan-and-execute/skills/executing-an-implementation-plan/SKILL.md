@@ -24,10 +24,12 @@ memory, or UAT skills merely because their topic overlaps this workflow. Load an
 procedure only when the plan or project explicitly requires it, or when a concrete
 unresolved condition makes its additional method necessary.
 
-Use the approved plan as the tracker for a single short outcome. Create or update another
-tracker only when it protects recovery across several outcomes, a long interruption, or
-genuine context loss. Report decisions, results, and blockers; group routine operations
-instead of narrating every transition or command.
+Use the plan directory's owners directly. `plan.md` or `index.md` holds stable outcomes;
+`todo.md` holds only pending, in-progress, or blocked work; `worklog.md` holds completed
+work, changed surfaces, and exact evidence. When a task completes, remove it from
+`todo.md` and append its result to `worklog.md`. Never retain a checked-off duplicate or
+copy the plan narrative into either file. Report decisions, results, and blockers; group
+routine operations instead of narrating every transition or command.
 
 ## Resolve the boundary
 
@@ -45,16 +47,27 @@ Before editing:
    verification, boundary changes, and finished-work UAT. For a legacy plan, translate
    phase files into coherent outcomes before executing; do not preserve a chronology-only
    split in the implementation or commit history.
-4. Inspect branch, worktree, status, base, and affected files. Preserve pre-existing and
-   unrelated changes.
+4. Inspect branch, worktrees, status, intended integration branch, concurrent task
+   ownership, and affected files. Preserve pre-existing and unrelated changes.
 5. Confirm the requested operations fit granted authority.
 
-Use the current workspace unless isolation was requested, project instructions require
-it, or overlapping changes make isolation necessary. If the needed base or isolation
-cannot be resolved safely, ask one pointed question before mutation.
+Choose the workspace before mutation:
 
-“Execute this approved plan” authorises local private checkpoint commits on the feature
-branch for work owned by the plan, unless the human or project explicitly prohibits them.
+- concurrent agents, overlapping files, or unrelated dirty state require a task-owned
+  worktree;
+- a clean existing branch or worktree already owned by this task is suitable;
+- if the only suitable checkout is the default branch, warn the human and wait for
+  explicit assent before the first edit there; and
+- after that assent, stay on the default branch rather than creating a ceremonial branch.
+
+Use `denubis-plan-and-execute:using-git-worktrees` only when the rubric selects isolation
+and no suitable task-owned worktree exists. Record the intended integration branch before
+checkpointing. If the base, ownership, or isolation cannot be resolved safely, ask one
+pointed question before mutation.
+
+“Execute this approved plan” authorises local private checkpoint commits on the isolated
+task branch for work owned by the plan, unless the human or project explicitly prohibits
+them.
 It does not authorise pushing, publishing, deploying, mutating unrelated external state,
 or rewriting inherited or published history. Never checkpoint directly on the protected
 base branch.
@@ -96,7 +109,12 @@ compatibility layers or narrate superseded behavior in living documentation.
 Create a private checkpoint whenever it materially protects recoverable work or makes an
 outcome inspectable. Stage only files owned by this execution. Checkpoints may be frequent
 and do not require routine human prompts. Fix rounds, review responses, and superseded
-checkpoints remain provisional; they will fold into the outcome after UAT.
+checkpoints remain provisional; they will fold into the outcome after UAT. Do not publish
+an internal checkpoint ref or present its commit list as the delivered result.
+
+After each completed task or outcome, update the durable owners: remove completed work
+from `todo.md`, append the completed state and fresh evidence to `worklog.md`, and leave
+only unresolved work and blockers in the todo.
 
 ## Fail deliberately
 
@@ -150,6 +168,9 @@ If UAT fails, record the exact observation, return to implementation, and repeat
 mechanical and sanity checks before presenting UAT again. Silence, model agreement, or a
 commit is not acceptance.
 
+Keep the isolated branch and provisional commits through UAT. The human is judging the
+finished implication, not accepting an integration target or a checkpoint series.
+
 ## Normalize after accepted UAT
 
 Final history normalization happens only after explicit human acceptance of all required
@@ -170,10 +191,16 @@ After normalization:
 4. Confirm status contains no unexplained owned changes.
 
 Only then invoke `denubis-plan-and-execute:finishing-a-development-branch` for the
-already-authorised integration route, or ask one pointed integration question. Report
+already-authorised integration route, or ask one pointed integration question. For skill
+or plugin development, `commit, marketplace, push` and `ship` are direct-delivery routes:
+finish release metadata, integrate into the intended default branch, push and verify that
+branch, then clean the task-owned branch or worktree. They never mean “push whichever
+branch is currently checked out.” Report
 implemented outcomes, changed scope, exact evidence, accepted UAT, normalized history,
 and any blocker. Do not publish or deploy unless separately authorised.
 
-If context becomes genuinely depleted, update the existing durable plan or tracker with
-the current outcome, owned changes, last positive evidence, provisional commits, UAT
-state, and next unresolved condition. On resume, re-resolve paths, status, and evidence.
+If context becomes genuinely depleted, update `todo.md` with unresolved work and
+`worklog.md` with completed work, last positive evidence, provisional commits, and UAT
+state. Return only a pointer-style resume instruction naming the absolute working root,
+plan, todo, and worklog paths plus this skill invocation. Do not restate their contents in
+the resume text. On resume, re-resolve paths, status, and evidence.

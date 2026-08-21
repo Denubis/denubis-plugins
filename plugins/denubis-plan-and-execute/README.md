@@ -7,7 +7,9 @@ procedures.
         ↓
     accepted design
         ↓
-    coherent implementation outcomes
+    stable plan + pending todo + completed worklog
+        ↓
+    coherent implementation outcomes in task-owned isolation
         ↓
     mechanically verified finished surface
         ↓
@@ -32,25 +34,38 @@ when implementation changes the system.
 
     /denubis-plan-and-execute:starting-an-implementation-plan <absolute-design-path>
 
-Planning defaults to one implementation-plan file. It splits files only when independently
-resumable outcomes make that useful. Outcomes keep an interface with its first consumer,
-tests, failure behavior, and documentation. Boundary-flow, verification, and UAT
-appendices exist only when they have a real cross-outcome consumer.
+Planning creates one directory with `plan.md`, `todo.md`, and `worklog.md`. The plan owns
+stable outcomes, the todo owns unresolved work, and the worklog owns completed work and
+evidence. It splits outcome files only when independently resumable loading makes that
+useful. Boundary-flow, verification, and UAT appendices exist only when they have a real
+cross-outcome consumer.
 
 ### Execution and acceptance
 
     /denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-path> <absolute-working-directory>
+
+Before editing, execution applies an isolation rubric. Concurrent agents, overlapping
+files, or unrelated dirty state require a task-owned worktree. An existing task-owned
+branch or worktree is suitable. Work on the default branch begins only after a warning and
+human assent.
 
 The main session executes directly by default. Behavior changes use the project-native
 red-green-refactor cycle; operational work uses a real consumer or positive probe.
 Mechanical gates, an independent sanity pass, documentation reconciliation, and complete
 diff/status inspection precede human UAT.
 
-Executing an approved plan authorises private checkpoint commits on its isolated feature
+Executing an approved plan authorises private checkpoint commits on its isolated task
 branch without routine prompts. It does not authorise pushing or publication. Fix rounds
 and superseded checkpoints fold into coherent outcomes only after the human accepts UAT on
 the finished implication. Normalization must preserve the exact accepted tree and is
-reverified before integration.
+reverified before integration. A selected delivery route integrates the accepted tree,
+pushes the intended branch when authorised, verifies the remote ref, and removes only the
+task-owned branch or worktree. Skill-development requests such as `commit, marketplace,
+push` mean that complete delivery, not publication of the current feature ref.
+
+During execution, finished items move from `todo.md` to `worklog.md`; the files never
+become a mixed checked-task ledger. A resume instruction points to the plan, todo, worklog,
+and working root rather than copying their contents.
 
 ## Explicit lifecycle skills
 

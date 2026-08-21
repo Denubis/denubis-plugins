@@ -45,14 +45,24 @@ small design may yield one and a large design may yield more.
 
 ## Artifact shape
 
-Default to one file:
+Create one plan directory with distinct semantic owners:
 
 ```text
-docs/implementation-plans/YYYY-MM-DD-<slug>.md
+docs/implementation-plans/YYYY-MM-DD-<slug>/
+  plan.md
+  todo.md
+  worklog.md
 ```
 
-Use a directory with an `index.md` and one file per outcome only when independent loading
-or interruption recovery materially helps. Create a boundary-flow appendix, verification
+`plan.md` owns the stable outcomes, dependencies, acceptance criteria, and evidence design.
+`todo.md` owns only pending, in-progress, or blocked work. `worklog.md` owns completed work,
+changed surfaces, decisions reached during execution, and exact evidence. When work
+completes, remove it from `todo.md` and append it to `worklog.md`; do not keep a checked-off
+copy in the task list.
+
+Split `plan.md` into an `index.md` and one file per outcome only when independent loading
+or interruption recovery materially helps. Keep `todo.md` and `worklog.md` separate either
+way. Create a boundary-flow appendix, verification
 appendix, or UAT appendix only when its content is shared by several outcomes or has a
 real consumer outside the outcome that owns it. Do not create empty or “not applicable”
 paperwork.
@@ -85,7 +95,9 @@ and acceptance criteria. For each outcome include:
 <human UAT action, judgment, and falsifier, or “None: automated evidence settles it.”>
 ```
 
-Tasks may be nested where dependency detail helps execution, but do not add parser markers
+Initialize `todo.md` from the executable work and leave `worklog.md` with its heading and
+any already-established evidence. Do not copy the plan narrative into either file. Tasks
+may be nested where dependency detail helps execution, but do not add parser markers
 or phase types unless a real consumer requires them. Never leave `if present`, unresolved
 TODOs, speculative paths, or an interface that becomes valid only in a later outcome.
 
@@ -132,16 +144,22 @@ informed observers could reasonably disagree. Give the human a concrete action o
 built surface and a falsifying experience. Do not ask for per-outcome UAT when later work
 changes the surface, and do not disguise deterministic checks with words such as “feels.”
 
-When the human invokes execution of the approved plan, that instruction authorises local
-private checkpoint commits for the plan on an isolated feature branch unless project or
-human instructions explicitly prohibit them. Checkpoints may be frequent and require no
-routine prompt. They do not authorise pushing, publication, deployment, or rewriting
-inherited or published history.
+Before choosing a checkout, record the intended integration branch. Concurrent agents,
+overlapping files, or unrelated dirty state require a task-owned worktree. An existing
+task-owned branch or worktree is suitable. If execution would begin on the default branch,
+warn and obtain human assent before the first edit there.
 
-Fix rounds and superseded checkpoints fold into their owning outcome. Final history
-normalization waits until the human has accepted finished-work UAT. It must preserve the
-exact accepted tree, then rerun the relevant diff audit and verification. A plan should
-state these lifecycle boundaries, not prescribe a commit-count quota.
+When the human invokes execution of the approved plan, that instruction authorises local
+private checkpoint commits on the isolated task branch. Checkpoints may be frequent and
+require no routine prompt. They do not authorise pushing, publication, deployment, or
+rewriting inherited or published history.
+
+Fix rounds and superseded checkpoints fold into their owning outcome only after the human
+accepts finished-work UAT. Normalization must preserve the exact accepted tree, then rerun
+the relevant diff audit and verification. A subsequent direct-delivery request integrates
+that tree into the intended branch, pushes that branch when authorised, verifies the
+remote ref, and cleans the task-owned branch or worktree. A plan should state these
+lifecycle boundaries, not prescribe a commit-count quota.
 
 ## Integrity and handoff
 
@@ -156,10 +174,14 @@ Before handoff, verify directly that:
 - no publication, deployment, credential use, or final history rewrite exceeds granted
   authority.
 
-Report the exact plan path and working root. When no blocker remains, provide:
+Report the exact plan, todo, and worklog paths plus the working root. When no blocker
+remains, provide:
 
 ```text
-/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-path> <absolute-working-directory>
+/denubis-plan-and-execute:executing-an-implementation-plan <absolute-plan-directory> <absolute-working-directory>
 ```
+
+This invocation is also the resume form. Point to the durable owners; do not paste their
+current tasks, completed work, or evidence into a second resume narrative.
 
 Do not claim that planned behavior or tests already exist.

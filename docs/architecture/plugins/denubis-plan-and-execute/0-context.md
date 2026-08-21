@@ -10,7 +10,7 @@ invocation without duplicating the method.
 
     Human
       └─ intent, decisions, UAT, integration authority → Plan-and-execute methods
-           ├─ designs, plans, code, tests, private history ↔ Project repository
+           ├─ designs, plans, todo, worklog, code, tests, private history ↔ Project repository
            ├─ bounded brief → Optional agent role → diff or evidence leads
            ├─ loaded by Claude Code host
            │    └─ SessionStart transcript identity → Live-marker adapter
@@ -22,16 +22,20 @@ invocation without duplicating the method.
 - Workflow entry routes consequential work to the procedure that owns its next decision.
 - Design resolves intent and material trade-offs into an accepted project artifact.
 - Implementation planning groups work by independently understandable, usable or
-  verifiable outcomes rather than chronological phases.
+  verifiable outcomes rather than chronological phases. Stable plan content, unresolved
+  tasks, and completed work/evidence have separate durable files.
 - Execution uses project-native TDD or positive operational probes, creates recoverable
-  private checkpoints, and assembles the complete surface. The top-level executor owns
-  this ordinary lifecycle directly and loads another procedure only for a concrete
-  unresolved condition.
+  private checkpoints in task-owned isolation, and assembles the complete surface. Its
+  workspace rubric requires a worktree for concurrent or overlapping work and human
+  assent before beginning on the default branch. The top-level executor owns this
+  ordinary lifecycle directly and loads another procedure only for a concrete unresolved
+  condition.
 - Verification completes mechanical gates, independent sanity checks, boundary
   reconciliation, documentation, and diff/status inspection before human UAT.
 - UAT asks the human to interact with an irreducible implication of the finished surface.
 - Post-UAT normalization folds fixes and superseded checkpoints into coherent outcomes
-  while preserving the accepted tree.
+  while preserving the accepted tree. Selected delivery then integrates and optionally
+  publishes the intended branch before removing only task-owned isolation.
 - Architecture maintenance maps current implementation and updates its existing semantic
   owner directly; there is no second architecture-writer skill or compulsory template set.
 
@@ -68,14 +72,18 @@ the tmux-codex-quota Byobu cell.
 
 - Project files, Git state, tests, builds, and runtime observations establish technical
   results; task labels, commits, and model verdicts do not.
-- An approved execution request permits private checkpoints only on its feature branch.
-  Push, publication, deployment, inherited-history rewriting, and destructive cleanup are
-  separate actions.
+- An approved execution request permits private checkpoints only on its task-owned branch.
+  A skill/plugin `commit, marketplace, push` or `ship` request selects complete default-
+  branch delivery after accepted UAT; it does not select the current feature branch.
+  Other publication, deployment, inherited-history rewriting, and destructive cleanup
+  remain separate actions.
 - Human UAT happens after complete mechanical and sanity evidence. A failed observation
   returns to implementation and invalidates affected evidence.
 - Investigation, tracking, secondary checks, and progress reporting have a current
-  consumer. A supplied one-outcome plan is not copied into another tracker, and routine
-  execution does not search historical chats or narrate each command transition.
+  consumer. Pending work lives in `todo.md`; completed work and evidence live in
+  `worklog.md`; stable outcomes remain in the plan. Resume text points to those owners
+  rather than copying them. Routine execution does not search historical chats or narrate
+  each command transition.
 - An optional agent receives an exact brief and returns a diff or cited leads. The main
   session verifies them before continuing.
 - The live-marker adapter and crash-recovery consumer can drift independently; their

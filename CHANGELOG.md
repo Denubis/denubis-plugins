@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.3
+
+**Changed:**
+- Active work stays in task-owned isolation through human UAT; accepted work is then
+  normalized and delivered to the intended integration branch instead of leaving a
+  published checkpoint branch behind.
+- Implementation state is split between stable `plan.md`, pending `todo.md`, and
+  completed-evidence `worklog.md`; resume instructions point to those owners rather
+  than duplicating their content.
+- Workspace selection now applies an explicit concurrency and dirty-tree rubric, and
+  requires warning plus human assent before work begins on the default branch.
+
+## [denubis-git-commit] 1.3.1
+
+**Changed:**
+- Checkpoints stay on task-owned isolation, while an authorized skill or plugin release
+  request routes accepted work through explicit default-branch integration, remote
+  verification, and cleanup instead of inferring that the current feature branch is the
+  delivery target.
+
 ## [denubis-project-notes] 0.1.2
 
 **Changed:**

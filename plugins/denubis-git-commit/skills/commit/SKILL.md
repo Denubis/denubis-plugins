@@ -9,13 +9,21 @@ user-invocable: true
 ## Authority
 
 An explicit commit request authorises local commits for the named work. Executing an
-approved implementation plan authorises private checkpoint commits on its feature branch
+approved implementation plan authorises private checkpoint commits on its isolated task branch
 without routine prompts when that plan's lifecycle says so. Neither route authorises
 pushing, publishing, deploying, force-rewriting published history, or committing unrelated
 work.
 
-Do not commit on a protected base branch unless the human explicitly named that branch and
-action. Preserve pre-existing changes.
+Before the first project edit, a session on the default branch must warn the human and
+obtain assent to work there; concurrent agents, overlapping files, or unrelated dirty
+state instead require task-owned isolation. At commit time, do not invent a feature branch
+to relocate work already completed on the default branch. Disclose the branch, preserve
+pre-existing changes, and apply the authority the human actually granted.
+
+A combined skill/plugin request such as `commit, marketplace, push`, `release`, or `ship`
+is broader than this local commit procedure. Complete the release metadata here, then hand
+the accepted tree to the integration workflow; never interpret it as permission to push
+the current non-default branch.
 
 ## Inspect the real scope
 

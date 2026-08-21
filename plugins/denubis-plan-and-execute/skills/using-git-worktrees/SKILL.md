@@ -1,11 +1,28 @@
 ---
 name: using-git-worktrees
-description: Use when the human requests an isolated worktree or overlapping changes require one - creates the exact checkout, applies documented local setup, and verifies its baseline
+description: Use when the human requests isolation or concurrent agents, overlapping changes, or unrelated dirty state require a separate worktree - selects, creates, and verifies the exact checkout
 user-invocable: true
 argument-hint: "[task, branch, or exact worktree path]"
 ---
 
 # Create an Isolated Git Worktree
+
+## Decide whether isolation is required
+
+Inspect the current branch, worktrees, status, active task ownership, and known concurrent
+agents before the first project edit.
+
+| Observed state | Action |
+|---|---|
+| Another agent may edit the same repository, files overlap, or unrelated changes occupy the checkout | Create or reuse a task-owned worktree. |
+| A clean existing branch or worktree already belongs to this task and no concurrent writer shares it | Continue there. |
+| The only checkout is the default branch and no isolation trigger exists | Warn that work would occur on the default branch and wait for explicit human assent. |
+| The human explicitly requested the default branch after that warning | Stay there; do not create a ceremonial branch. |
+
+Do not treat a current non-default branch as task-owned merely because it is checked out.
+Resolve its purpose and diff first. When several agents are active, prefer separate
+worktrees even if their intended file sets appear disjoint; hidden generated or metadata
+surfaces can still overlap.
 
 ## Resolve the target
 
@@ -19,7 +36,9 @@ that the parent directory is ignored from the main repository using `git check-i
 a positive control. If it is not ignored, ask before editing `.gitignore` or choose an
 explicit out-of-tree path supplied by the human.
 
-Resolve the exact target path and branch. Refuse an existing non-worktree directory, an
+Resolve the intended integration branch as well as the exact target path and task branch.
+Record both so the delivery workflow can return the accepted tree and clean the temporary
+checkout. Refuse an existing non-worktree directory, an
 already-checked-out branch, a missing base, or a path outside the authorised location.
 Do not remove an existing worktree or repurpose it for a different branch.
 
@@ -55,6 +74,7 @@ Run the documented baseline checks from the new worktree. If they fail, compare 
 base checkout only through safe read-only evidence; do not start feature fixes inside the
 setup task.
 
-Report the exact worktree path, branch, base object ID, setup actions, and baseline results.
+Report the exact worktree path, task branch, intended integration branch, base object ID,
+setup actions, and baseline results.
 Leave the caller able to change into that path. Do not commit setup files, remove another
 worktree, or imply future cleanup authority.
