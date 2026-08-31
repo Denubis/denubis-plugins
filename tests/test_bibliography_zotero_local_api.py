@@ -144,3 +144,61 @@ def test_doi_citekeys_skips_matches_without_a_citekey():
         _stock_hit("NOCK0002", doi=doi),
     ]
     assert zla.doi_citekeys(items, doi) == ["hasKey2020"]
+
+
+# search_doi_field over search_doi_items --------------------------------------
+#
+# search_doi_field keeps its list[str] contract for ingest.py while the richer
+# search_doi_items carries the failed libraries a caller needs to tell "no item
+# carries this DOI" apart from "part of the corpus was never searched". The
+# httpx sweep itself stays live-verified per this module's docstring; what is
+# pinned here is the delegation, which is what ingest.py depends on.
+
+
+def _stub_items(monkeypatch, items, failed_libraries=()):
+    monkeypatch.setattr(
+        zla,
+        "search_doi_items",
+        lambda _doi: zla.DoiSearch(
+            items=tuple(items), failed_libraries=tuple(failed_libraries)
+        ),
+    )
+
+
+def test_search_doi_field_returns_deduped_citekeys(monkeypatch):
+    doi = "10.1002/9780470567333.ch7"
+    _stub_items(
+        monkeypatch,
+        [
+            _stock_hit("YLIDC5RW", doi=doi, citekey="collinsLanza2010Ch07RMLCAandLTA"),
+            _stock_hit("7UZWGA92", doi=doi, citekey="collinsLanza2010Ch07RMLCAandLTA"),
+            _stock_hit("QQQQ1111", doi=doi, citekey="someOtherCopy2010"),
+        ],
+    )
+    assert zla.search_doi_field(doi) == [
+        "collinsLanza2010Ch07RMLCAandLTA",
+        "someOtherCopy2010",
+    ]
+
+
+def test_search_doi_field_warns_on_stderr_when_a_library_was_unsearchable(
+    monkeypatch, capsys
+):
+    _stub_items(
+        monkeypatch,
+        [],
+        failed_libraries=("http://localhost:23119/api/groups/14/items: timeout",),
+    )
+
+    assert zla.search_doi_field("10.1/x") == []
+    assert "inconclusive" in capsys.readouterr().err
+
+
+def test_search_doi_field_is_silent_when_every_library_was_searched(
+    monkeypatch, capsys
+):
+    """Positive control: the warning marks a real failure, not every empty result."""
+    _stub_items(monkeypatch, [])
+
+    assert zla.search_doi_field("10.1/x") == []
+    assert capsys.readouterr().err == ""

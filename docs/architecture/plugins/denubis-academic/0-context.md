@@ -66,6 +66,6 @@ flowchart LR
 ## Cross-references
 
 - **Plugin manifests:** `plugins/denubis-academic/.claude-plugin/plugin.json` and
-  `plugins/denubis-academic/.codex-plugin/plugin.json`, version 0.15.0.
+  `plugins/denubis-academic/.codex-plugin/plugin.json`, version 0.15.1.
 - **Bundled bibliography:** `plugins/denubis-academic/references.bib` (`42a3287`).
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

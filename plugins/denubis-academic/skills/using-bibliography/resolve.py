@@ -50,7 +50,7 @@ from pathlib import Path
 # the PEP 723 deps — unit tests load this module and exercise pure functions
 # directly. This mirrors fetch.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from zotero_local_api import search_doi_field
+from zotero_local_api import DoiSearch, search_doi_items
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
@@ -613,33 +613,103 @@ def probe_zotero() -> None:
         )
 
 
-def search_by_doi(doi: str) -> list[Paper]:
+def paper_from_local_item(item: dict) -> Paper:
+    """Normalise a stock local API item envelope into a Paper.
+
+    The stock envelope names things differently from a BBT item.search hit:
+    fields sit under `data`, the citekey is `citationKey` (not `citation-key`),
+    creators carry `lastName` (not CSL `family`), the date is a string (not a CSL
+    `issued` object), and the library is an object whose `name` is the same human
+    library name BBT reports — verified live on 2026-08-31 for the group copy
+    C7SKNPAE, whose envelope named "2026-ailoc-stage1" exactly as BBT did.
+
+    library_id stays None, as in normalize_bbt_hit. The id in this envelope is
+    the Zotero user/group id (My Library is 305867 on this machine), NOT the BBT
+    library id (My Library is 1) that enrich_paper's attachment lookup needs.
+    Reporting the wrong id space would be worse than reporting none; the library
+    NAME is what enrich_paper resolves against, and it is shared by both APIs.
+    """
+    data = item.get("data") or {}
+    authors: list[str] = []
+    for creator in data.get("creators") or []:
+        # Two-field creators carry lastName; single-field (institutional) ones
+        # carry `name`. normalize_bbt_hit drops the CSL `literal` equivalent of
+        # the latter, but keeping it here can only ADD matches — matches_query
+        # compares surnames for equality — and silently dropping an author is
+        # the class of failure this module exists to remove.
+        surname = (creator.get("lastName") or creator.get("name") or "").strip()
+        if surname:
+            authors.append(surname)
+    return Paper(
+        citekey=(data.get("citationKey") or "").strip(),
+        doi=(data.get("DOI") or "").strip(),
+        title=data.get("title") or "",
+        authors=tuple(authors),
+        year=_year_from_date(data.get("date")),
+        library=(item.get("library") or {}).get("name") or "",
+        library_id=None,
+        collection_keys=tuple(data.get("collections") or ()),
+    )
+
+
+def search_by_doi(doi: str) -> tuple[list[Paper], list[str]]:
     """Locate Zotero items by exact DOI field, server-side, without Crossref.
 
     Candidates come from the stock local API DOI-field search; each citekey is
     then resolved through BBT so every library copy is reported and Paper
-    normalisation stays on one path. Returns all hits whose DOI matches exactly
-    (case-insensitive). A DOI can appear in more than one library.
+    normalisation stays on one path. Returns (papers, errors): all hits whose DOI
+    matches exactly (case-insensitive), and every search or hydration call that
+    failed. A DOI can appear in more than one library.
+
+    The errors are the point. BOTH halves of this search can fail — a library the
+    stock API could not reach, and a BBT hydration call that raises — and until
+    2026-08-31 both failures vanished here, leaving the DOI branch of
+    print_no_match asserting that no item carries the DOI. Reproduced that day on
+    Zotero 10.0.1: BBT answered item.search with -32603 "ZoteroInvalidDataError:
+    Invalid condition 'blockStart' in hasOperator()" for a paper the stock API
+    had just located (10.1007/s44204-025-00247-1, key PP8QJM56, citekey
+    kudinaUseLargeLanguage2025). A present paper reported as a confirmed absence
+    is the exact overclaim this resolver exists to prevent.
+
+    BBT stays the preferred hydration path: it reports every library copy of a
+    citekey from one call. When it fails, the stock envelope is used instead —
+    the local API has already returned the whole item, so the copy it proved
+    exists is reported rather than dropped.
     """
-    candidates_seen: set[str] = set()
+    found: DoiSearch = search_doi_items(doi)
+    errors = [f"DOI-field search {failure}" for failure in found.failed_libraries]
+
+    # Group the envelopes by citekey: BBT resolves a citekey across every library
+    # at once, so one hydration call covers all of that key's copies.
+    by_citekey: dict[str, list[dict]] = {}
+    for item in found.items:
+        citekey = ((item.get("data") or {}).get("citationKey") or "").strip()
+        if citekey:
+            by_citekey.setdefault(citekey, []).append(item)
+
+    seen: set[str] = set()
     papers: list[Paper] = []
 
-    for citekey in search_doi_field(doi):
+    def keep(paper: Paper) -> None:
+        """Apply the one dedup-then-exact-DOI rule to both hydration paths."""
+        dedup_key = f"{paper.citekey}|{paper.library}"
+        if dedup_key in seen:
+            return
+        seen.add(dedup_key)
+        if paper.doi.lower() == doi.lower():
+            papers.append(paper)
+
+    for citekey, envelopes in by_citekey.items():
         try:
             hits = rpc("item.search", [citekey]) or []
-        except Exception:  # noqa: S112
-            # Best-effort: a failed citekey query must not abort the others.
+        except Exception as e:
+            errors.append(f"item.search {citekey!r}: {e}")
+            for envelope in envelopes:
+                keep(paper_from_local_item(envelope))
             continue
         for h in hits:
-            key = h.get("citation-key") or ""
-            lib = h.get("library") or ""
-            dedup_key = f"{key}|{lib}"
-            if dedup_key in candidates_seen:
-                continue
-            candidates_seen.add(dedup_key)
-            if (h.get("DOI") or "").lower() == doi.lower():
-                papers.append(normalize_bbt_hit(h))
-    return papers
+            keep(normalize_bbt_hit(h))
+    return papers, errors
 
 
 def build_library_map() -> dict[str, int]:
@@ -926,7 +996,20 @@ def print_no_match(
             "not a confirmed absence.",
             flush=True,
         )
-    if doi:
+    if doi and search_errors:
+        # The DOI path's confident form is earned by having searched the DOI
+        # field of every library successfully. Once any call above failed, that
+        # premise is gone and the confident sentence would be a false absence.
+        print(
+            "  DOI path: this searches the DOI field itself across every library,\n"
+            "  but the call(s) above failed, so it did NOT see the whole corpus.\n"
+            "  This no-match is inconclusive — it does not establish that no item\n"
+            "  carries this DOI. Re-run once Zotero and Better BibTeX are healthy,\n"
+            "  or retry with --citekey, --author, or a distinctive --title word,\n"
+            "  before concluding it is absent.",
+            flush=True,
+        )
+    elif doi:
         print(
             "  DOI path: this searched the DOI field itself across every library,\n"
             "  so a no-match means no item carries this DOI. The item may still be\n"
@@ -1158,9 +1241,11 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     search_errors: list[str] = []
     if args.doi:
         # BBT can't search the DOI field; the stock local API can, via
-        # qmode=fields. No Crossref round trip.
+        # qmode=fields. No Crossref round trip. Its failures join search_errors
+        # so a no-match below is qualified exactly like the citekey path's.
         tokens = [args.doi]
-        papers = search_by_doi(args.doi)
+        papers, doi_errors = search_by_doi(args.doi)
+        search_errors.extend(doi_errors)
     else:
         tokens = search_tokens(
             citekey=args.citekey,

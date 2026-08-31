@@ -821,3 +821,176 @@ def test_print_duplicate_note_silent_without_variants(capsys):
     resolve.print_duplicate_note(near)
     assert capsys.readouterr().out == ""
 
+
+# DOI path: no-match honesty and BBT-hydration failure ------------------------
+#
+# The DOI path is the workflow's front door, and it made the one claim this
+# resolver exists to prevent: a CONFIRMED absence for a paper that is present.
+#
+# Mechanism reproduced live on 2026-08-31 (Zotero 10.0.1, DOI
+# 10.1007/s44204-025-00247-1, Zotero key PP8QJM56, citekey
+# kudinaUseLargeLanguage2025): the stock local API finds the citekey by DOI
+# field, `search_by_doi` then re-hydrates it through BBT `item.search`, and
+# Better BibTeX answered -32603 "ZoteroInvalidDataError: Invalid condition
+# 'blockStart' in hasOperator()". The hydration error was swallowed, so the DOI
+# branch of `print_no_match` still asserted that no item carries the DOI.
+#
+# Two separate obligations are pinned below: the search must SURFACE the failure
+# (and still report the copies the stock API already proved exist), and the
+# no-match message must not claim a confirmed absence once anything errored.
+
+_KUDINA_DOI = "10.1007/s44204-025-00247-1"
+_KUDINA_CITEKEY = "kudinaUseLargeLanguage2025"
+_KUDINA_TITLE = "The use of large language models as scaffolds for proleptic reasoning"
+
+# The BBT fault in the shape rpc() raises it: RuntimeError(error_object).
+_BBT_ITEM_SEARCH_FAULT = RuntimeError(
+    {
+        "code": -32603,
+        "message": (
+            "ZoteroInvalidDataError: Invalid condition 'blockStart' in hasOperator()"
+        ),
+    }
+)
+
+
+def _kudina_local_item(library_name, *, citekey=_KUDINA_CITEKEY):
+    """A stock local API envelope, shaped as the live one for PP8QJM56."""
+    return {
+        "key": "PP8QJM56",
+        "library": {"type": "user", "id": 305867, "name": library_name},
+        "data": {
+            "key": "PP8QJM56",
+            "itemType": "journalArticle",
+            "title": _KUDINA_TITLE,
+            "creators": [
+                {"creatorType": "author", "lastName": "Kudina", "firstName": "Olya"},
+                {"creatorType": "author", "lastName": "Ballsun-Stanton"},
+                {"creatorType": "author", "lastName": "Alfano"},
+            ],
+            "date": "2025-02-01",
+            "DOI": _KUDINA_DOI,
+            "citationKey": citekey,
+            "collections": ["JCDGG2Z7", "5BPN2U2H"],
+        },
+    }
+
+
+def _fail_rpc(*_args, **_kwargs):
+    raise _BBT_ITEM_SEARCH_FAULT
+
+
+def _stub_doi_items(monkeypatch, items, failed_libraries=()):
+    monkeypatch.setattr(
+        resolve,
+        "search_doi_items",
+        lambda _doi: resolve.DoiSearch(
+            items=tuple(items), failed_libraries=tuple(failed_libraries)
+        ),
+    )
+
+
+def test_search_by_doi_reports_the_bbt_hydration_failure(monkeypatch):
+    """A swallowed hydration error is what turned a present paper into 'absent'."""
+    _stub_doi_items(monkeypatch, [_kudina_local_item("My Library")])
+    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+
+    _papers, errors = resolve.search_by_doi(_KUDINA_DOI)
+
+    assert errors, "a failed BBT hydration must be reported, never swallowed"
+    assert _KUDINA_CITEKEY in errors[0]
+
+
+def test_search_by_doi_falls_back_to_the_stock_envelope_when_bbt_fails(monkeypatch):
+    """The stock API already returned the item; BBT failing must not lose it."""
+    _stub_doi_items(
+        monkeypatch,
+        [_kudina_local_item("My Library"), _kudina_local_item("2026-ailoc-stage1")],
+    )
+    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+
+    papers, _errors = resolve.search_by_doi(_KUDINA_DOI)
+
+    assert [(p.citekey, p.library) for p in papers] == [
+        (_KUDINA_CITEKEY, "My Library"),
+        (_KUDINA_CITEKEY, "2026-ailoc-stage1"),
+    ]
+    assert papers[0].doi == _KUDINA_DOI
+    assert papers[0].authors == ("Kudina", "Ballsun-Stanton", "Alfano")
+    assert papers[0].year == 2025
+    assert papers[0].title == _KUDINA_TITLE
+
+
+def test_search_by_doi_fallback_drops_a_copy_whose_doi_does_not_match(monkeypatch):
+    """The fallback keeps the DOI equality rule the BBT path applies."""
+    other = _kudina_local_item("My Library")
+    other["data"] = {**other["data"], "DOI": "10.9999/not-the-one"}
+    _stub_doi_items(monkeypatch, [other])
+    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+
+    papers, errors = resolve.search_by_doi(_KUDINA_DOI)
+
+    assert papers == []
+    assert errors, "the hydration failure is still reported for an empty result"
+
+
+def test_search_by_doi_prefers_bbt_hydration_while_it_works(monkeypatch):
+    """Positive control: the healthy path is unchanged, and reports no errors."""
+    _stub_doi_items(monkeypatch, [_kudina_local_item("My Library")])
+    bbt_hit = {
+        "citation-key": _KUDINA_CITEKEY,
+        "library": "2026-SARDI-LLM-Lecture-BallsunStanton",
+        "DOI": _KUDINA_DOI,
+        "title": _KUDINA_TITLE,
+        "author": [{"family": "Kudina"}],
+        "issued": {"date-parts": [[2025, 2, 1]]},
+    }
+    monkeypatch.setattr(resolve, "rpc", lambda *_a, **_k: [bbt_hit])
+
+    papers, errors = resolve.search_by_doi(_KUDINA_DOI)
+
+    assert errors == []
+    # The BBT hit's library, not the stock envelope's, proves BBT was used.
+    assert [(p.citekey, p.library) for p in papers] == [
+        (_KUDINA_CITEKEY, "2026-SARDI-LLM-Lecture-BallsunStanton")
+    ]
+
+
+def test_search_by_doi_reports_a_library_that_could_not_be_searched(monkeypatch):
+    """An unsearched library makes an empty result inconclusive, not an absence."""
+    _stub_doi_items(
+        monkeypatch,
+        [],
+        failed_libraries=("http://localhost:23119/api/groups/14/items: timeout",),
+    )
+    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+
+    papers, errors = resolve.search_by_doi(_KUDINA_DOI)
+
+    assert papers == []
+    assert errors and "groups/14" in errors[0]
+
+
+def test_doi_no_match_is_inconclusive_when_a_search_errored(capsys):
+    """The reported defect: a confirmed-absence claim over a failed search."""
+    resolve.print_no_match(
+        [_KUDINA_DOI],
+        doi=_KUDINA_DOI,
+        search_errors=[f"item.search {_KUDINA_CITEKEY!r}: ZoteroInvalidDataError"],
+    )
+    out = capsys.readouterr().out
+
+    assert "no item carries this DOI" not in out
+    assert "inconclusive" in out
+
+
+def test_doi_no_match_still_concludes_absence_when_every_search_succeeded(capsys):
+    """Positive control: without errors the DOI field search IS conclusive.
+
+    Without this the test above could pass against a resolver that had simply
+    stopped making the claim at all, which would be a different defect.
+    """
+    resolve.print_no_match([_KUDINA_DOI], doi=_KUDINA_DOI, search_errors=[])
+    out = capsys.readouterr().out
+
+    assert "no item carries this DOI" in out

@@ -32,6 +32,7 @@ impossible for six weeks, and the capability was there the whole time.
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 
 LOCAL_API_BASE = "http://localhost:23119/api"
 
@@ -124,29 +125,65 @@ def fetch_doi_page(url: str, doi: str, timeout: float = 30.0) -> list[dict]:
         start += _PAGE
 
 
-def search_doi_field(doi: str) -> list[str]:
-    """Distinct citekeys whose DOI field is exactly `doi`, across all libraries.
+@dataclass(frozen=True)
+class DoiSearch:
+    """Exact DOI-field matches across every library, and the libraries that failed.
 
-    A library whose query fails is counted and reported on stderr. An empty
-    result from a library that was never successfully searched is
-    indistinguishable from a genuine absence.
+    items: the matching PARENT envelopes in first-seen order, one per library
+      copy. Attachment children and `contains` over-matches are already dropped
+      by select_doi_matches, so every element is a resolved paper.
+    failed_libraries: '<url>: <error>' for each library whose query raised.
+
+    Both fields are needed to answer honestly. An empty `items` means "no item
+    carries this DOI" ONLY when `failed_libraries` is empty; otherwise the search
+    never saw part of the corpus and the result is inconclusive. Returning the
+    count alone (or printing it and discarding it) leaves the caller unable to
+    tell those two apart, which is how a present paper gets reported as absent.
+    """
+
+    items: tuple[dict, ...]
+    failed_libraries: tuple[str, ...]
+
+
+def search_doi_items(doi: str) -> DoiSearch:
+    """Every item whose DOI field is exactly `doi`, across all libraries.
+
+    Returns the full stock envelopes rather than only their citekeys. The
+    envelope already carries the title, creators, date, DOI and the library's
+    human name, so a caller whose richer hydration path (BBT `item.search`) is
+    unavailable can still report the copies this search has already proved
+    exist, instead of dropping them.
+
+    A failure to list the groups still raises, per library_item_urls: searching
+    an unknown subset of the corpus and calling that an answer is the failure
+    this module exists to remove.
     """
     import httpx  # noqa: PLC0415
 
-    citekeys: list[str] = []
-    seen: set[str] = set()
-    failed = 0
+    items: list[dict] = []
+    failed: list[str] = []
     for url in library_item_urls():
         try:
-            items = fetch_doi_page(url, doi)
-        except httpx.HTTPError:
-            failed += 1
+            page = fetch_doi_page(url, doi)
+        except httpx.HTTPError as e:
+            failed.append(f"{url}: {e}")
             continue
-        for citekey in doi_citekeys(items, doi):
-            if citekey not in seen:
-                seen.add(citekey)
-                citekeys.append(citekey)
-    if failed:
+        items.extend(select_doi_matches(page, doi))
+    return DoiSearch(items=tuple(items), failed_libraries=tuple(failed))
+
+
+def search_doi_field(doi: str) -> list[str]:
+    """Distinct citekeys whose DOI field is exactly `doi`, across all libraries.
+
+    A library whose query fails is reported on stderr. An empty result from a
+    library that was never successfully searched is indistinguishable from a
+    genuine absence, and this signature cannot hand that distinction back — a
+    caller that must branch on it uses search_doi_items and reports the failures
+    itself.
+    """
+    found = search_doi_items(doi)
+    if found.failed_libraries:
+        failed = len(found.failed_libraries)
         plural = "library" if failed == 1 else "libraries"
         print(
             f"  warning: {failed} {plural} could not be searched, so a no-match "
@@ -154,4 +191,4 @@ def search_doi_field(doi: str) -> list[str]:
             file=sys.stderr,
             flush=True,
         )
-    return citekeys
+    return doi_citekeys(found.items, doi)

@@ -1,5 +1,34 @@
 # Changelog
 
+## [denubis-academic] 0.15.1
+
+**Fixed:**
+- `using-bibliography` resolution by `--doi` no longer reports a paper that IS in
+  Zotero as a confirmed absence. `search_by_doi` swallowed every Better BibTeX
+  hydration failure, so a failed `item.search` left the DOI branch of the no-match
+  report asserting that no item carries the DOI. Reproduced live on 2026-08-31
+  against Zotero 10.0.1 for `10.1007/s44204-025-00247-1`, a paper held in eight
+  libraries.
+- Both halves of the DOI search now record their failures — a library the stock
+  local API could not reach, and a failed Better BibTeX hydration call — and a DOI
+  no-match is reported as inconclusive whenever either occurred. This is the
+  qualification the citekey path already emitted.
+
+**New:**
+- `search_doi_items` returns the matching stock local API envelopes together with
+  the libraries that could not be searched, so a caller can distinguish "no item
+  carries this DOI" from "part of the corpus was never searched".
+  `search_doi_field` keeps its citekey-list contract for `ingest.py`.
+- DOI resolution falls back to the stock local API envelope when Better BibTeX
+  `item.search` fails, instead of dropping a copy the local API had already
+  returned. Verified live against Zotero 10.0.1 with that fault injected: all
+  eight library copies still resolve.
+
+**Known gap:**
+- Citekey, author, title and free-term resolution still depend on Better BibTeX
+  `item.search`. Those paths already report an inconclusive result when it fails,
+  but they gain no stock local API fallback in this release.
+
 ## [denubis-project-notes] 0.1.4
 
 **Added:**
