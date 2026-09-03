@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.1.6
+
+**Fixed:**
+- `dba-reviewer` no longer abandons a review when the brief asks for a report file. Its
+  toolset is Read, Grep, Glob and Bash by design, so a `report.md` request had no route,
+  and on 2026-09-02 the agent returned "I cannot produce report.md" instead of its leads.
+  The agent now states that its final message is the review, returns the leads there, and
+  writes a file only under a throwaway path the caller named, through a shell heredoc.
+
 ## [denubis-academic] 0.15.1
 
 **Fixed:**
