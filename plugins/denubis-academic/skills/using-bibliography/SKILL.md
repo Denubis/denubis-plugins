@@ -50,8 +50,9 @@ Before any bibliography operation:
 
 1. Read the project `AGENTS.md`, `CLAUDE.md`, and named `.notes/` files. The
    project may tighten write or note conventions.
-2. Confirm Zotero is running. Better BibTeX (BBT) is required for citekey and
-   library resolution.
+2. Confirm Zotero is running. Search uses Zotero's stock local API; Better
+   BibTeX (BBT) is still required for citekeys, exports, collections and
+   attachments.
 3. Confirm `~/.config/denubis-academic-research/config.toml` exists and its
    `zettelkasten_root` exists. Do not silently create either.
 4. Use Python 3.14+ and `uv`. The resolver declares Python 3.14 in its inline
@@ -75,10 +76,15 @@ uv run "$BIB/resolve.py" --doi 10.1007/s13347-024-00760-w
 ```
 
 A bare DOI is classified as a DOI; a citekey-shaped value is classified as a
-citekey. Prefer an exact citekey once the resolver has returned it. BBT search
-is first-author-oriented and can miss co-author or multi-token searches, so a
-no-match is not proof that Zotero lacks the paper. Retry with the first author's
-surname or one distinctive title token before classifying it absent.
+citekey. Prefer an exact citekey once the resolver has returned it. Search is
+Zotero's own quicksearch through the stock local API, swept across every
+library: each word of a token must match a title, a creator surname, a year or
+a citekey (verified on Zotero 9.0.6 and 10.0.1; earlier versions unverified).
+Better BibTeX's search is not used, so a co-author's surname works. A no-match
+is still not proof that Zotero lacks the paper: a title filed differently from
+how it was typed returns nothing, and a `could not be searched` warning makes
+the result inconclusive. Retry with one distinctive title token, a surname, or
+the exact citekey from the `.bib` before classifying it absent.
 
 Interpret exit status and state explicitly:
 

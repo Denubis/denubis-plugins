@@ -5,14 +5,19 @@ state, and (by default) render it so it can be asked questions.
 
 This is the front door for "ask a paper a question": it makes *a paper*
 available. It is citekey-capable and fully live: resolution queries the
-*running* Zotero database via BBT JSON-RPC and the stock local API, never the
-cached `.bib` export. That removes both failure modes of the old DOI-only path,
-the Crossref dependency (empty-author DOIs, whole journal-DOI classes) and
-stale-file ghosts (a paper present in Zotero reported as missing because the
-on-disk `.bib` lagged).
+*running* Zotero database through its stock local API, never the cached `.bib`
+export. That removes both failure modes of the old DOI-only path, the Crossref
+dependency (empty-author DOIs, whole journal-DOI classes) and stale-file ghosts
+(a paper present in Zotero reported as missing because the on-disk `.bib`
+lagged).
 
-`--doi` searches the DOI *field* through the stock local API (`qmode=fields`),
-because BBT `item.search` does not index DOI. Crossref is no longer involved.
+Search is Zotero's own quicksearch (`qmode=titleCreatorYear`: title, creators,
+year and citekey, word-ANDed) swept across every library; `--doi` searches the
+DOI *field* (`qmode=fields`). Better BibTeX is consulted only after a match, for
+collections, attachments and exports: its JSON-RPC `item.search` errors on every
+query under Zotero 10 (BBT issue #3587) and indexed only the first author
+anyway. Verified against Zotero 9.0.6 and 10.0.1 `search.js`; earlier versions
+are unverified.
 
 For each match it reports the libraries AND collections the paper is in, whether
 a PDF is attached and on disk, and whether it has been rendered — and renders it
@@ -50,7 +55,7 @@ from pathlib import Path
 # the PEP 723 deps — unit tests load this module and exercise pure functions
 # directly. This mirrors fetch.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from zotero_local_api import DoiSearch, search_doi_items
+from zotero_local_api import LibrarySearch, search_doi_items, search_items
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
@@ -77,26 +82,26 @@ _DOI_RE = re.compile(r"^10\.\d+/")
 def _ascii_fold(s: str) -> str:
     """Strip diacritics via NFKD, dropping combining marks. Case preserved.
 
-    BBT item.search matches against an ASCII-folded index, so the correctly
-    spelled "Frühwirth" misses the folded "fruhwirth" record while the paper is
-    present. Folding both the search token and the matches_query comparison makes
-    the accented name and its ASCII form resolve to the same paper. NFKD handles
-    the Latin diacritics this corpus carries (ü, é, ñ, ä); the rarer non-composing
-    letters (ø, ß) pass through unchanged, which is acceptable here.
+    A record may be filed as "Frühwirth" or as the folded "Fruhwirth", and
+    Zotero's `contains` search is not known to fold accents, so the token is
+    searched in both forms and matches_query compares folded surnames. NFKD
+    handles the Latin diacritics this corpus carries (ü, é, ñ, ä); the rarer
+    non-composing letters (ø, ß) pass through unchanged, which is acceptable.
     """
     return "".join(
         c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)
     )
 
 
-def select_citekey_matches(hits: list[dict], citekey: str) -> list[dict]:
-    """From BBT item.search hits, return only those whose citekey matches exactly.
+def select_citekey_matches(papers: list[Paper], citekey: str) -> list[Paper]:
+    """From search results, return only the papers whose citekey matches exactly.
 
-    item.search is AND-token fuzzy and returns near-misses; the citekey is the
-    one exact key. A citekey can legitimately match in more than one library
-    (My Library + a group), so this returns every exact-match hit, not just one.
+    A citekey token is word-matched against title, creators, year and citekey,
+    so it returns near-misses; the citekey is the one exact key. A citekey can
+    legitimately match in more than one library (My Library + a group), so this
+    returns every exact-match copy, not just one.
     """
-    return [h for h in hits if h.get("citation-key") == citekey]
+    return [p for p in papers if p.citekey == citekey]
 
 
 # Trailing disambiguator: BBT breaks a citekey collision by appending a/b/...
@@ -157,22 +162,22 @@ def classify_citekey(
 
 @dataclass(frozen=True)
 class ScoredHit:
-    """A BBT item.search hit tagged with how its citekey matched the query."""
+    """A found paper tagged with how its citekey matched the query."""
 
-    hit: dict
+    paper: Paper
     kind: str
     score: float
 
 
 def _candidate_sort_key(s: ScoredHit) -> tuple[int, float, str]:
     """Kind confidence, then score descending, then citekey for stable output."""
-    return (_CITEKEY_KIND_RANK[s.kind], -s.score, s.hit.get("citation-key") or "")
+    return (_CITEKEY_KIND_RANK[s.kind], -s.score, s.paper.citekey)
 
 
 def rank_citekey_candidates(
-    hits: list[dict], query: str, *, fuzzy_threshold: float = 0.85
+    papers: list[Paper], query: str, *, fuzzy_threshold: float = 0.85
 ) -> list[ScoredHit]:
-    """Classify every hit's citekey against query, drop non-candidates, rank them.
+    """Classify every paper's citekey against query, drop non-candidates, rank.
 
     Ordered by kind confidence (exact, variant, prefix, fuzzy), then score
     descending, then citekey for stable output. This is the near-match layer the
@@ -180,12 +185,12 @@ def rank_citekey_candidates(
     near match hands back the real citekey for the caller to re-run against.
     """
     scored: list[ScoredHit] = []
-    for h in hits:
+    for paper in papers:
         kind, score = classify_citekey(
-            query, h.get("citation-key") or "", fuzzy_threshold=fuzzy_threshold
+            query, paper.citekey, fuzzy_threshold=fuzzy_threshold
         )
         if kind != "none":
-            scored.append(ScoredHit(hit=h, kind=kind, score=score))
+            scored.append(ScoredHit(paper=paper, kind=kind, score=score))
     scored.sort(key=_candidate_sort_key)
     return scored
 
@@ -197,18 +202,19 @@ def search_tokens(
     freeterm: str | None = None,
     title: str | None = None,
 ) -> list[str]:
-    """Every token worth driving a BBT item.search on, in priority order, deduped.
+    """Every token worth driving a search on, in priority order, deduped.
 
-    BBT item.search indexes only the FIRST author surname and is AND-fuzzy, so
-    choosing ONE key to search (the old elif chain) silently returned zero
-    whenever that key was a co-author (Ghahramani in "Wade, Ghahramani") or a
-    title that had drifted — reporting present papers as absent. We instead
-    search EVERY supplied key and union the hits in the shell; matches_query then
-    applies the strict AND filter. Recall comes from the union, precision from
-    the filter. A multi-word title is searched as the whole string: BBT
-    AND-matches the words within the single title field, and any title that
-    survives matches_query's substring check is, by construction, found by that
-    search — so no per-word fallback is needed.
+    Choosing ONE key to search (the old elif chain) silently returned zero
+    whenever that key was a co-author or a title that had drifted — reporting
+    present papers as absent. We instead search EVERY supplied key and union the
+    hits in the shell; matches_query then applies the strict AND filter. Recall
+    comes from the union, precision from the filter. Zotero's quicksearch
+    matches any creator, but the union is kept at one sweep per token: a
+    drifted title still needs the author token to surface the paper. A
+    multi-word title is searched as the whole string: Zotero ANDs its words over
+    the searched fields, and any title that survives matches_query's substring
+    check is, by construction, found by that search — so no per-word fallback
+    is needed.
     """
     tokens: list[str] = []
 
@@ -218,8 +224,8 @@ def search_tokens(
             return
         if tok not in tokens:
             tokens.append(tok)
-        # BBT's index is ASCII-folded, so search the folded form too — otherwise
-        # a query carrying diacritics ("Frühwirth") never surfaces the paper.
+        # A record may be filed with or without its diacritics, so search the
+        # folded form too — otherwise "Frühwirth" never surfaces "Fruhwirth".
         folded = _ascii_fold(tok)
         if folded != tok and folded not in tokens:
             tokens.append(folded)
@@ -311,51 +317,6 @@ def classify_state(
 def collection_names(keys, key_to_name: dict[str, str]) -> list[str]:
     """Map collection keys to human names; pass an unknown key through verbatim."""
     return [key_to_name.get(k, k) for k in keys]
-
-
-def _year_from_issued(issued: dict | None) -> int | None:
-    """Extract a 4-digit year from a CSL 'issued' object.
-
-    CSL shape: {"date-parts": [[YYYY, MM, DD], ...]}. The year is the first
-    element of the first inner list. Returns None for any missing, empty, or
-    non-integer value — never raises.
-    """
-    if not issued:
-        return None
-    parts = issued.get("date-parts")
-    if not parts:
-        return None
-    first = parts[0]
-    if not first:
-        return None
-    try:
-        return int(first[0])
-    except TypeError, ValueError, IndexError:
-        return None
-
-
-def normalize_bbt_hit(hit: dict) -> Paper:
-    """Normalise a BBT item.search hit into a Paper.
-
-    BBT item.search hits use CSL field names: 'citation-key' (not 'citationKey'),
-    'author' (list of {'family': str, 'given': str}), 'issued' (CSL date object),
-    'DOI', 'title', 'library' (the human library NAME string).
-
-    library_id is always None here — search hits carry no numeric ID; resolve
-    it later via user.groups. collection_keys is always () — search hits carry
-    no collection membership.
-    """
-    authors = tuple(a["family"] for a in (hit.get("author") or []) if a.get("family"))
-    return Paper(
-        citekey=hit.get("citation-key", "") or "",
-        doi=hit.get("DOI", "") or "",
-        title=hit.get("title", "") or "",
-        authors=authors,
-        year=_year_from_issued(hit.get("issued")),
-        library=hit.get("library", "") or "",
-        library_id=None,
-        collection_keys=(),
-    )
 
 
 # --- make-citeable consumer: pure core ---------------------------------------
@@ -655,60 +616,62 @@ def paper_from_local_item(item: dict) -> Paper:
 def search_by_doi(doi: str) -> tuple[list[Paper], list[str]]:
     """Locate Zotero items by exact DOI field, server-side, without Crossref.
 
-    Candidates come from the stock local API DOI-field search; each citekey is
-    then resolved through BBT so every library copy is reported and Paper
-    normalisation stays on one path. Returns (papers, errors): all hits whose DOI
-    matches exactly (case-insensitive), and every search or hydration call that
-    failed. A DOI can appear in more than one library.
+    The stock local API DOI-field search returns the full envelope for every
+    library copy, and paper_from_local_item turns each into a Paper directly.
+    Returns (papers, errors): every copy whose DOI matches exactly
+    (case-insensitive), and every library the search could not reach.
 
-    The errors are the point. BOTH halves of this search can fail — a library the
-    stock API could not reach, and a BBT hydration call that raises — and until
-    2026-08-31 both failures vanished here, leaving the DOI branch of
-    print_no_match asserting that no item carries the DOI. Reproduced that day on
-    Zotero 10.0.1: BBT answered item.search with -32603 "ZoteroInvalidDataError:
-    Invalid condition 'blockStart' in hasOperator()" for a paper the stock API
-    had just located (10.1007/s44204-025-00247-1, key PP8QJM56, citekey
-    kudinaUseLargeLanguage2025). A present paper reported as a confirmed absence
-    is the exact overclaim this resolver exists to prevent.
-
-    BBT stays the preferred hydration path: it reports every library copy of a
-    citekey from one call. When it fails, the stock envelope is used instead —
-    the local API has already returned the whole item, so the copy it proved
-    exists is reported rather than dropped.
+    The errors are the point: until 2026-08-31 a failed lookup vanished here,
+    leaving the DOI branch of print_no_match asserting that no item carries the
+    DOI — a present paper reported as a confirmed absence, the exact overclaim
+    this resolver exists to prevent. Better BibTeX is no longer consulted at
+    all: its item.search errors on every query under Zotero 10 (issue #3587),
+    and the envelope already carries everything a Paper needs.
     """
-    found: DoiSearch = search_doi_items(doi)
+    found: LibrarySearch = search_doi_items(doi)
     errors = [f"DOI-field search {failure}" for failure in found.failed_libraries]
 
-    # Group the envelopes by citekey: BBT resolves a citekey across every library
-    # at once, so one hydration call covers all of that key's copies.
-    by_citekey: dict[str, list[dict]] = {}
-    for item in found.items:
-        citekey = ((item.get("data") or {}).get("citationKey") or "").strip()
-        if citekey:
-            by_citekey.setdefault(citekey, []).append(item)
-
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     papers: list[Paper] = []
-
-    def keep(paper: Paper) -> None:
-        """Apply the one dedup-then-exact-DOI rule to both hydration paths."""
-        dedup_key = f"{paper.citekey}|{paper.library}"
-        if dedup_key in seen:
-            return
-        seen.add(dedup_key)
+    for item in found.items:
+        paper = paper_from_local_item(item)
+        dedup = (paper.citekey or item.get("key") or "", paper.library)
+        if dedup in seen:
+            continue
+        seen.add(dedup)
         if paper.doi.lower() == doi.lower():
             papers.append(paper)
+    return papers, errors
 
-    for citekey, envelopes in by_citekey.items():
-        try:
-            hits = rpc("item.search", [citekey]) or []
-        except Exception as e:
-            errors.append(f"item.search {citekey!r}: {e}")
-            for envelope in envelopes:
-                keep(paper_from_local_item(envelope))
-            continue
-        for h in hits:
-            keep(normalize_bbt_hit(h))
+
+def search_papers(tokens: list[str]) -> tuple[list[Paper], list[str]]:
+    """Search every token across every library and union the results.
+
+    Each token is one stock quicksearch sweep (search_items). Copies are
+    deduplicated on (Zotero item key, library name): the same paper found by
+    two tokens is one Paper, while the same citekey in two libraries stays two,
+    because only some copies carry the PDF. Returns (papers, errors), where
+    errors names each library a token's sweep could not reach — one token's
+    failure must not sink the whole resolve, and the no-match message needs the
+    failure to qualify an empty result as inconclusive rather than absent.
+
+    A failure to list the groups still raises, per library_item_urls: searching
+    an unknown subset of the corpus and calling that an answer is the failure
+    this path exists to remove.
+    """
+    seen: set[tuple[str, str]] = set()
+    papers: list[Paper] = []
+    errors: list[str] = []
+    for tok in tokens:
+        found = search_items(tok)
+        errors.extend(f"{tok!r} {failure}" for failure in found.failed_libraries)
+        for item in found.items:
+            library = (item.get("library") or {}).get("name") or ""
+            dedup = (item.get("key") or "", library)
+            if dedup in seen:
+                continue
+            seen.add(dedup)
+            papers.append(paper_from_local_item(item))
     return papers, errors
 
 
@@ -748,11 +711,7 @@ def enrich_paper(paper: Paper, library_map: dict[str, int]) -> dict:
     else:
         try:
             attachments = rpc("item.attachments", [paper.citekey, library_id]) or []
-            pdf_paths = [
-                Path(a["path"])
-                for a in attachments
-                if a.get("path")
-            ]
+            pdf_paths = [Path(a["path"]) for a in attachments if a.get("path")]
             pdf_paths.sort(
                 key=lambda path: (
                     path.suffix.lower() != ".pdf",
@@ -976,11 +935,12 @@ def print_no_match(
 ) -> None:
     """Report a no-match honestly: a no-match here is NOT proof of absence.
 
-    item.search is AND-fuzzy and (live-verified) indexes only the first author
-    surname, so a query keyed on a co-author, or on a title that has drifted from
-    how it is filed, returns zero while the paper is present. State that, show what
-    was searched, and point at the move that works — rather than asserting the
-    paper is absent, which is the overclaim this resolver exists to avoid.
+    Zotero's quicksearch ANDs every word of a token over title, creators, year
+    and citekey, so a title typed differently from how it is filed, or a name
+    spelled differently, returns zero while the paper is present. State that,
+    show what was searched, and point at the move that works — rather than
+    asserting the paper is absent, which is the overclaim this resolver exists
+    to avoid.
     """
     print("No matches surfaced in Zotero for this query.", flush=True)
     searched = ", ".join(repr(t) for t in tokens) or "(nothing searchable)"
@@ -992,7 +952,7 @@ def print_no_match(
             flush=True,
         )
         print(
-            "  Zotero/BBT may be unreachable, so this result is inconclusive, "
+            "  Part of Zotero could not be searched, so this result is inconclusive, "
             "not a confirmed absence.",
             flush=True,
         )
@@ -1004,7 +964,7 @@ def print_no_match(
             "  DOI path: this searches the DOI field itself across every library,\n"
             "  but the call(s) above failed, so it did NOT see the whole corpus.\n"
             "  This no-match is inconclusive — it does not establish that no item\n"
-            "  carries this DOI. Re-run once Zotero and Better BibTeX are healthy,\n"
+            "  carries this DOI. Re-run once every Zotero library is reachable,\n"
             "  or retry with --citekey, --author, or a distinctive --title word,\n"
             "  before concluding it is absent.",
             flush=True,
@@ -1020,11 +980,11 @@ def print_no_match(
         )
     else:
         print(
-            "  A no-match is NOT proof of absence: item.search is AND-fuzzy and\n"
-            "  indexes only the FIRST author surname, so a query keyed on a\n"
-            "  co-author, or on a title filed differently than typed, returns zero\n"
-            "  while the paper is present. Retry with the first author's surname,\n"
-            "  or a distinctive single word from the title (e.g. --title BayesLCA).",
+            "  A no-match is NOT proof of absence: every word of a token must\n"
+            "  match, so a title filed differently than typed, or a name spelled\n"
+            "  differently, returns zero while the paper is present. Retry with a\n"
+            "  distinctive single word from the title (e.g. --title BayesLCA), an\n"
+            "  author surname, or the exact citekey from the .bib.",
             flush=True,
         )
 
@@ -1071,7 +1031,7 @@ def report_near_matches(
 ) -> None:
     """Report near citekey matches for a query that had NO exact hit.
 
-    These are returned, never rendered: BBT held the paper under a slightly
+    These are returned, never rendered: Zotero holds the paper under a slightly
     different key (a missing disambiguation suffix, a truncation, a typo), so we
     surface the real key, its library, and its PDF/render state, and let the
     caller re-run resolve with the exact key. Each candidate is enriched for its
@@ -1083,7 +1043,7 @@ def report_near_matches(
         flush=True,
     )
     for cand in near:
-        paper = normalize_bbt_hit(cand.hit)
+        paper = cand.paper
         info = enrich_paper(paper, library_map)
         info = check_rendered(info, papers_dir)
         state = classify_state(
@@ -1116,8 +1076,8 @@ def print_duplicate_note(near: list[ScoredHit]) -> None:
         return
     print("\n  possible duplicate(s) of this citekey in Zotero:", flush=True)
     for c in variants:
-        lib = c.hit.get("library") or "(unknown library)"
-        print(f"    {c.hit.get('citation-key')}  in {lib}", flush=True)
+        lib = c.paper.library or "(unknown library)"
+        print(f"    {c.paper.citekey}  in {lib}", flush=True)
     print("    merge these in Zotero if they are the same paper.", flush=True)
 
 
@@ -1232,17 +1192,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     # Recall comes from searching EVERY supplied key and unioning the hits;
     # precision comes from matches_query below. The old code searched a single
     # key chosen by priority (citekey > author > freeterm > title), which
-    # silently returned zero whenever that key was a co-author (BBT item.search
-    # indexes only the first author surname) or a title that had drifted — the
-    # bug that reported present papers as absent.
+    # silently returned zero whenever that key was a co-author or a title that
+    # had drifted — the bug that reported present papers as absent.
     papers: list[Paper]
     tokens: list[str]
     near: list[ScoredHit] = []
     search_errors: list[str] = []
     if args.doi:
-        # BBT can't search the DOI field; the stock local API can, via
-        # qmode=fields. No Crossref round trip. Its failures join search_errors
-        # so a no-match below is qualified exactly like the citekey path's.
+        # The DOI field is reached only through qmode=fields. Its failures join
+        # search_errors so a no-match below is qualified exactly like the
+        # citekey path's.
         tokens = [args.doi]
         papers, doi_errors = search_by_doi(args.doi)
         search_errors.extend(doi_errors)
@@ -1253,30 +1212,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             freeterm=freeterm,
             title=args.title,
         )
-        # Widen recall for citekey near-matching: BBT prefix-matches the base key
-        # (surfacing disambiguation siblings) and the author surname reaches a
-        # typo'd key's neighbourhood. rank_citekey_candidates filters precision back.
+        # Widen recall for citekey near-matching: the base key (without the
+        # disambiguation suffix) surfaces siblings by substring, and the author
+        # surname reaches a typo'd key's neighbourhood. rank_citekey_candidates
+        # filters precision back.
         if args.citekey:
             for extra in (citekey_base(args.citekey), citekey_author(args.citekey)):
                 if extra and extra not in tokens:
                     tokens.append(extra)
-        seen: set[tuple[str, str]] = set()
-        raw_hits: list[dict] = []
-        for tok in tokens:
-            try:
-                hits = rpc("item.search", [tok]) or []
-            except Exception as e:
-                # One token's RPC failing must not sink the whole resolve — the
-                # other tokens may still find the paper. Record it so the
-                # no-match message can flag an inconclusive (vs absent) result.
-                search_errors.append(f"{tok!r}: {e}")
-                continue
-            for h in hits:
-                dedup = (h.get("citation-key") or "", h.get("library") or "")
-                if dedup in seen:
-                    continue
-                seen.add(dedup)
-                raw_hits.append(h)
+        papers, token_errors = search_papers(tokens)
+        search_errors.extend(token_errors)
 
         # A citekey query: exact matches are render-eligible (the unchanged happy
         # path via select_citekey_matches). The NEAR matches (variant/prefix/fuzzy)
@@ -1285,12 +1230,10 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         if args.citekey:
             near = [
                 c
-                for c in rank_citekey_candidates(raw_hits, args.citekey)
+                for c in rank_citekey_candidates(papers, args.citekey)
                 if c.kind != "exact"
             ]
-            raw_hits = select_citekey_matches(raw_hits, args.citekey)
-
-        papers = [normalize_bbt_hit(h) for h in raw_hits]
+            papers = select_citekey_matches(papers, args.citekey)
 
     # --- Filter by matches_query (AND of all supplied strict keys) -----------
     papers = [

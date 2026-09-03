@@ -5,7 +5,6 @@ Covers the functional core of the annotate-back workflow: turning a citation
 zotero-api-plus add-highlight endpoint in rects (position) mode.
 
 The pure functions tested here:
-  - extract_item_key       BBT item.search `id` URI -> Zotero item key
   - quote_fingerprint      stable dedup key for a passage (whitespace/case proof)
   - build_annotation_comment   note + pandoc cite + embedded dedup marker
   - marker_present         has this passage already been annotated? (idempotency)
@@ -47,34 +46,6 @@ def _load_annotate():
 
 
 annotate = _load_annotate()
-
-
-# --- extract_item_key -------------------------------------------------------
-
-
-def test_extract_item_key_from_user_library_uri():
-    uri = "http://zotero.org/users/305867/items/MAAT7PA5"
-    assert annotate.extract_item_key(uri) == "MAAT7PA5"
-
-
-def test_extract_item_key_from_group_library_uri():
-    uri = "http://zotero.org/groups/6549571/items/ABCD1234"
-    assert annotate.extract_item_key(uri) == "ABCD1234"
-
-
-def test_extract_item_key_passes_through_a_bare_key():
-    # Tolerate being handed an already-extracted key.
-    assert annotate.extract_item_key("MAAT7PA5") == "MAAT7PA5"
-
-
-def test_extract_item_key_tolerates_trailing_slash():
-    uri = "http://zotero.org/users/305867/items/MAAT7PA5/"
-    assert annotate.extract_item_key(uri) == "MAAT7PA5"
-
-
-def test_extract_item_key_rejects_empty():
-    with pytest.raises(ValueError):
-        annotate.extract_item_key("")
 
 
 # --- quote_fingerprint ------------------------------------------------------
@@ -308,3 +279,88 @@ def test_choose_resolution_raises_listing_libraries_when_no_pdf():
 def test_choose_resolution_raises_on_no_candidates():
     with pytest.raises(annotate.ResolveError):
         annotate.choose_resolution([])
+
+
+# resolve_item: stock search replaced BBT item.search ---------------------------
+#
+# The same citekey can live in several libraries. The stock envelope carries the
+# Zotero item key directly (no `id` URI to parse) and the library's human name,
+# which user.groups maps to the BBT library id that item.export still needs for
+# the attachment path. BBT's item.search errors on every query under Zotero 10
+# (issue #3587), so it must never be reached from here.
+
+_CITEKEY = "kudinaUseLargeLanguage2025"
+
+
+def _envelope(key, citekey, library, *, group_id=None):
+    lib = {
+        "type": "group" if group_id else "user",
+        "id": group_id or 305867,
+        "name": library,
+    }
+    data = {"key": key, "itemType": "journalArticle", "citationKey": citekey}
+    return {"key": key, "library": lib, "data": data}
+
+
+def _no_rpc(method, *_a, **_k):
+    raise AssertionError(f"BBT JSON-RPC {method!r} must not run here")
+
+
+def test_resolve_item_uses_stock_search_and_the_envelope_key(monkeypatch):
+    found = annotate.LibrarySearch(
+        items=(
+            _envelope("NEARMISS", "kudinaOtherPaper2020", "My Library"),
+            _envelope("NOPDF001", _CITEKEY, "My Library"),
+            _envelope("HASPDF02", _CITEKEY, "2026-ailoc-stage1", group_id=6624981),
+        ),
+        failed_libraries=(),
+    )
+    monkeypatch.setattr(annotate, "search_items", lambda _q, **_k: found)
+    calls = []
+
+    def fake_rpc(method, params):
+        calls.append((method, params))
+        if method == "user.groups":
+            return [
+                {"id": 1, "name": "My Library"},
+                {"id": 7, "name": "2026-ailoc-stage1"},
+            ]
+        if method == "item.export":
+            _keys, _fmt, library_id = params
+            if library_id == 7:
+                return [
+                    "@article{k,\n  file = {PDF:/papers/kudina.pdf:application/pdf}\n}"
+                ]
+            return ["@article{k,\n}"]
+        raise AssertionError(f"unexpected RPC {method!r}")
+
+    monkeypatch.setattr(annotate, "_rpc", fake_rpc)
+
+    item_key, library_id, pdf = annotate.resolve_item(_CITEKEY)
+
+    assert (item_key, library_id, pdf) == ("HASPDF02", 7, Path("/papers/kudina.pdf"))
+    # Only the exact-citekey copies are exported; the near-miss never reaches
+    # BBT, and nothing here is a search.
+    assert [p for m, p in calls if m == "item.export"] == [
+        [[_CITEKEY], "Better BibLaTeX", 1],
+        [[_CITEKEY], "Better BibLaTeX", 7],
+    ]
+    assert not any(m == "item.search" for m, _p in calls)
+
+
+def test_resolve_item_reports_no_exact_match_and_unsearched_libraries(monkeypatch):
+    found = annotate.LibrarySearch(
+        items=(_envelope("NEARMISS", "kudinaOtherPaper2020", "My Library"),),
+        failed_libraries=("http://localhost:23119/api/groups/14/items: timeout",),
+    )
+    monkeypatch.setattr(annotate, "search_items", lambda _q, **_k: found)
+    monkeypatch.setattr(annotate, "_rpc", _no_rpc)
+
+    with pytest.raises(annotate.ResolveError) as ei:
+        annotate.resolve_item(_CITEKEY)
+
+    msg = str(ei.value)
+    assert _CITEKEY in msg
+    # A library that could not be searched makes the miss inconclusive, and the
+    # annotate path WRITES to the library, so the caller must see it.
+    assert "groups/14" in msg

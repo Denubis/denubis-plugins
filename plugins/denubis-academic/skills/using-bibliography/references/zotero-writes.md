@@ -22,8 +22,9 @@ their specific endpoint and stop on an older build.
 
 Requires `zotero-api-plus` 0.3.0+.
 
-1. Search Zotero with the resolver by DOI, first author, and a distinctive title
-   token. A single BBT no-match is not absence.
+1. Search Zotero with the resolver by DOI, an author surname, and a distinctive
+   title token. A single no-match is not absence, and a `could not be
+   searched` warning makes it inconclusive.
 2. Preview the identifier list and resolved destination without writing:
 
    ```bash

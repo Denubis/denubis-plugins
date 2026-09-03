@@ -32,6 +32,11 @@ import json
 import sys
 from pathlib import Path
 
+# The stock local API sweep is shared with resolve.py and ingest.py; it imports
+# httpx lazily, so the pure core here stays importable without the PEP 723 deps.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from zotero_local_api import LibrarySearch, item_citekey, item_library, search_items
+
 # httpx and pymupdf (fitz) are imported lazily inside the shell functions so the
 # pure core stays importable without the PEP 723 deps — the unit tests load this
 # module and exercise the pure functions directly.
@@ -63,20 +68,6 @@ class HighlightError(Exception):
 
 class ResolveError(Exception):
     """A citekey could not be resolved to a Zotero item with an attached PDF."""
-
-
-def extract_item_key(id_uri: str) -> str:
-    """Zotero item key from a BBT item.search `id` URI.
-
-    `item.search` returns `id` as e.g.
-    'http://zotero.org/users/305867/items/MAAT7PA5' (or
-    '.../groups/<groupID>/items/<KEY>'). The endpoints want just the item key.
-    A value that is already a bare key passes through unchanged.
-    """
-    key = id_uri.rstrip("/").rsplit("/", 1)[-1].strip()
-    if not key:
-        raise ValueError(f"could not extract an item key from {id_uri!r}")
-    return key
 
 
 def _normalise_quote(quote: str) -> str:
@@ -249,29 +240,35 @@ def probe_plus() -> None:
 def resolve_item(citekey: str) -> tuple[str, int, Path]:
     """Resolve a citekey to (item_key, libraryID, pdf_path).
 
-    The same citekey can exist in several libraries; each item.search hit's `id`
-    URI carries the Zotero item key and its `library` name maps to a libraryID
-    via user.groups. We export every copy and let choose_resolution pick the one
-    with a PDF — the same file Zotero has attached, so PyMuPDF and Zotero's
-    reader share a coordinate basis.
+    The same citekey can exist in several libraries. Each stock envelope
+    carries the Zotero item key and the library's human name, which
+    user.groups maps to the BBT libraryID that item.export needs. Every copy
+    is exported and choose_resolution picks the one with a PDF — the same file
+    Zotero has attached, so PyMuPDF and Zotero's reader share a coordinate
+    basis. Search is Zotero's own quicksearch (zotero_local_api.search_items):
+    BBT's item.search errors on every query under Zotero 10 (issue #3587).
     """
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import bbt
 
-    hits = _rpc("item.search", [citekey]) or []
-    matches = [h for h in hits if h.get("citation-key") == citekey]
+    found: LibrarySearch = search_items(citekey)
+    matches = [item for item in found.items if item_citekey(item) == citekey]
     if not matches:
-        raise ResolveError(
-            f"no Zotero item with citekey {citekey!r} "
-            f"(item.search returned {len(hits)} hit(s), none an exact citekey match)"
+        detail = (
+            f"search returned {len(found.items)} item(s), none an exact citekey match"
         )
+        if found.failed_libraries:
+            # This path WRITES to the library, so a miss over a partly
+            # unsearched corpus must not read as a confirmed absence.
+            unsearched = "; ".join(found.failed_libraries)
+            detail += f"; inconclusive, could not search: {unsearched}"
+        raise ResolveError(f"no Zotero item with citekey {citekey!r} ({detail})")
 
     groups = _rpc("user.groups", []) or []
     name_to_id = {g["name"]: g["id"] for g in groups}
 
     candidates: list[dict] = []
-    for hit in matches:
-        library_name = hit.get("library", "")
+    for item in matches:
+        library_name = item_library(item)
         library_id = name_to_id.get(library_name)
         if library_id is None:
             continue  # cannot export without a libraryID; skip this copy
@@ -279,7 +276,7 @@ def resolve_item(citekey: str) -> tuple[str, int, Path]:
         bib = bibs[0] if isinstance(bibs, list) else bibs
         candidates.append(
             {
-                "item_key": extract_item_key(hit["id"]),
+                "item_key": item.get("key") or "",
                 "library_id": library_id,
                 "library": library_name,
                 "pdf_paths": bbt.parse_pdf_paths(bib or ""),

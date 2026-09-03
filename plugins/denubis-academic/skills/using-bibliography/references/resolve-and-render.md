@@ -9,24 +9,27 @@ BIB="${PLUGIN_DIR}/skills/using-bibliography"
 
 ## Resolve first
 
-`resolve.py` queries the running Zotero database through Better BibTeX JSON-RPC
-and the stock local API. It does not use a potentially stale project `.bib` as
-evidence that an item exists.
+`resolve.py` queries the running Zotero database through the stock local API
+for search, and through Better BibTeX JSON-RPC for collections, attachments and
+exports. It does not use a potentially stale project `.bib` as evidence that an
+item exists.
 
 ```bash
 uv run "$BIB/resolve.py" <bare-doi-or-citekey>
 uv run "$BIB/resolve.py" --citekey <exact-key>
-uv run "$BIB/resolve.py" --author <first-author> --year <year>
+uv run "$BIB/resolve.py" --author <author-surname> --year <year>
 uv run "$BIB/resolve.py" --title "<distinctive title words>"
 uv run "$BIB/resolve.py" --doi <exact-doi>
 uv run "$BIB/resolve.py" --citekey <key> --library "<exact library>" --no-render
 ```
 
 The resolver searches every supplied key and unions candidates before applying
-strict filters. `--doi` uses Zotero's DOI field because BBT `item.search` does
-not index DOI. `--author` handles diacritic folding and hyphen components, but
-BBT's search remains first-author-oriented. If a lookup fails, retry with a
-distinctive title word before concluding anything about absence.
+strict filters. Search is Zotero's quicksearch (title, any creator, year and
+citekey, word-ANDed; verified on Zotero 9.0.6 and 10.0.1), so `--author`
+accepts a co-author's surname; `--doi` searches the DOI field. Diacritics are
+searched folded and unfolded. If a lookup fails, retry with a distinctive title
+word before concluding anything about absence, and treat a `could not be
+searched` warning as an inconclusive result rather than a no-match.
 
 Always copy the exact `citation-key` returned by Zotero. BBT disambiguation
 suffixes cannot be safely guessed. Exit `2` means near matches were surfaced but

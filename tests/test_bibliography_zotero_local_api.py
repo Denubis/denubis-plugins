@@ -159,7 +159,7 @@ def _stub_items(monkeypatch, items, failed_libraries=()):
     monkeypatch.setattr(
         zla,
         "search_doi_items",
-        lambda _doi: zla.DoiSearch(
+        lambda _doi: zla.LibrarySearch(
             items=tuple(items), failed_libraries=tuple(failed_libraries)
         ),
     )
@@ -202,3 +202,81 @@ def test_search_doi_field_is_silent_when_every_library_was_searched(
 
     assert zla.search_doi_field("10.1/x") == []
     assert capsys.readouterr().err == ""
+
+
+# search_items: the stock quicksearch sweep that replaced BBT item.search --------
+#
+# Zotero 10 removed the `blockStart` quicksearch marker that BBT's JSON-RPC
+# item.search still emits (BBT issue #3587; still present in 9.0.63 and on master
+# on 2026-09-02), so resolution runs on Zotero's own quicksearch instead. Both
+# Zotero 9.0.6 and 10.0.1 expand `quicksearch-titleCreatorYear` over title,
+# publicationTitle, shortTitle, court, year, citationKey and EVERY creator, and
+# set noChildren (search.js in each). The sweep is the same per-library,
+# paginated walk the DOI path uses. Pinned here: every library is visited,
+# children never surface as papers, and a library that could not be searched is
+# reported rather than silently treated as empty.
+
+
+def test_select_parent_items_drops_attachment_and_note_children():
+    items = [
+        _stock_hit("PARENT01", citekey="vehtari2017"),
+        _stock_hit("CHILD001", item_type="attachment", parent="PARENT01"),
+        _stock_hit("CHILD002", item_type="note", parent="PARENT01"),
+        _stock_hit("CHILD003", item_type="annotation", parent="CHILD001"),
+    ]
+    assert [i["key"] for i in zla.select_parent_items(items)] == ["PARENT01"]
+
+
+def _stub_sweep(monkeypatch, pages):
+    """Stub the library list and the per-library page fetch.
+
+    `pages` maps a library items-URL to the envelopes it returns, or to the
+    LibraryQueryError it raises.
+    """
+    monkeypatch.setattr(zla, "library_item_urls", lambda **_k: list(pages))
+
+    def fake_fetch(url, query, *, qmode, timeout=30.0):
+        assert query == "Giner-Sorolla"
+        assert qmode == "titleCreatorYear"
+        page = pages[url]
+        if isinstance(page, Exception):
+            raise page
+        return page
+
+    monkeypatch.setattr(zla, "fetch_search_page", fake_fetch)
+
+
+def test_search_items_sweeps_every_library_and_keeps_only_parents(monkeypatch):
+    mine = "http://localhost:23119/api/users/0/items"
+    group = "http://localhost:23119/api/groups/6624981/items"
+    _stub_sweep(
+        monkeypatch,
+        {
+            mine: [_stock_hit("BRANDT14", citekey="brandtReplicationRecipeWhat2014")],
+            group: [
+                _stock_hit("GINER24", citekey="giner-sorollaPowerDetectWhat2024"),
+                _stock_hit("GINERPDF", item_type="attachment", parent="GINER24"),
+            ],
+        },
+    )
+
+    found = zla.search_items("Giner-Sorolla")
+
+    assert [i["key"] for i in found.items] == ["BRANDT14", "GINER24"]
+    assert found.failed_libraries == ()
+
+
+def test_search_items_reports_a_library_that_could_not_be_searched(monkeypatch):
+    mine = "http://localhost:23119/api/users/0/items"
+    group = "http://localhost:23119/api/groups/14/items"
+    _stub_sweep(
+        monkeypatch,
+        {mine: [], group: zla.LibraryQueryError("timeout")},
+    )
+
+    found = zla.search_items("Giner-Sorolla")
+
+    assert found.items == ()
+    assert len(found.failed_libraries) == 1
+    assert "groups/14" in found.failed_libraries[0]
+    assert "timeout" in found.failed_libraries[0]

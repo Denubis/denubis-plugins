@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Ingest a set of DOIs from Zotero: locate via BBT JSON-RPC, render the
+"""Ingest a set of DOIs from Zotero: locate each by DOI field through the stock
+local API, export the attachment path through Better BibTeX, and render the
 attached PDFs to per-page markdown under <zettelkasten_root>/papers/<citekey>/.
 
 Usage:
@@ -35,7 +36,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bbt import parse_attachment_paths
 from renderer import NeedsMocr, mocr_server, render_attachment
-from zotero_local_api import search_doi_field
+from zotero_local_api import (
+    LibrarySearch,
+    item_citekey,
+    item_library,
+    search_doi_items,
+    warn_unsearched_libraries,
+)
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -98,39 +105,37 @@ def probe_zotero() -> None:
 
 
 def find_by_doi(doi: str) -> dict | None:
-    """Locate an item in Zotero by exact DOI field.
+    """Locate an item in Zotero by exact DOI field; return its stock envelope.
 
-    BBT `item.search` does not index the DOI field, but the stock local API
-    does, via `qmode=fields` (see zotero_local_api). Candidates come from
-    there; each citekey is then resolved through BBT and gated on an exact DOI
-    match, so the returned hit keeps the BBT shape the rest of this script
-    expects.
+    The stock local API is the only search that reaches the DOI field
+    (`qmode=fields`, see zotero_local_api), and its envelope already carries
+    the citekey and library name the rest of this script needs, so the first
+    exact match is returned as-is. Better BibTeX is reached only later, for
+    the export that carries the attachment path: its `item.search` errors on
+    every query under Zotero 10 (BBT issue #3587) and never indexed DOI.
 
     No Crossref round trip. The old chain resolved the DOI to a first-author
     surname and searched that, which returned nothing whenever Crossref carried
     no author (Wiley chapter DOIs such as 10.1002/<book>.chN) and reported
     papers that ARE in Zotero as absent.
-    """
-    candidates_seen: set[str] = set()
 
-    for citekey in search_doi_field(doi):
-        try:
-            hits = rpc("item.search", [citekey]) or []
-        except Exception:  # noqa: S112 (skip a query that errors; try the next)
-            continue
-        for h in hits:
-            key = h.get("citation-key") or h.get("id") or ""
-            if key in candidates_seen:
-                continue
-            candidates_seen.add(key)
-            if (h.get("DOI") or "").lower() == doi.lower():
-                return h
+    A library that could not be searched is reported on stderr: an empty
+    result over a partly unsearched corpus is inconclusive, not the
+    "NOT FOUND" the caller prints.
+    """
+    found: LibrarySearch = search_doi_items(doi)
+    warn_unsearched_libraries(found)
+    want = doi.strip().lower()
+    for item in found.items:
+        data = item.get("data") or {}
+        if (data.get("DOI") or "").strip().lower() == want:
+            return item
     return None
 
 
 def resolve_pdf(item: dict, library_map: dict[str, int]) -> Path | None:
-    citekey = item["citation-key"]
-    library_name = item["library"]
+    citekey = item_citekey(item)
+    library_name = item_library(item)
     library_id = library_map.get(library_name)
     if library_id is None:
         raise RuntimeError(
@@ -236,13 +241,15 @@ def main() -> int:
                     print("  NOT FOUND in Zotero", flush=True)
                     failures += 1
                     continue
-                citekey = item["citation-key"]
-                library = item["library"]
+                citekey = item_citekey(item)
+                library = item_library(item)
                 print(f"  cite key: {citekey}", flush=True)
                 print(f"  library:  {library}", flush=True)
                 pdf = resolve_pdf(item, library_map)
                 if pdf is None:
-                    print("  no PDF or HTML snapshot attachment in this item", flush=True)
+                    print(
+                        "  no PDF or HTML snapshot attachment in this item", flush=True
+                    )
                     failures += 1
                     continue
                 if not pdf.is_file():

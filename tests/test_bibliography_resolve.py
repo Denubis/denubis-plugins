@@ -1,9 +1,10 @@
 """Tests for plugins/denubis-academic/skills/using-bibliography/resolve.py.
 
-Covers the pure functional core of citekey-first resolution: selecting the exact
-citekey matches out of BBT `item.search` hits (which are fuzzy/AND-token and
-return near-misses alongside the real item). The HTTP shell that talks to BBT is
-verified live, not exercised here.
+Covers the pure functional core of citekey-first resolution: turning stock
+local API envelopes into Papers, selecting the exact citekey matches out of a
+word-ANDed quicksearch (which returns near-misses alongside the real item), and
+the sweep/union/dedup seams with the HTTP transport stubbed. The HTTP shell that
+talks to Zotero is verified live, not exercised here.
 """
 
 from __future__ import annotations
@@ -34,57 +35,62 @@ def _load_resolve():
 resolve = _load_resolve()
 
 
-# Shape mirrors a live BBT item.search hit: each carries `citation-key`,
-# `library` (the human library NAME, not id), and `DOI`. A citekey query is
-# AND-token fuzzy, so it returns near-misses next to the exact item.
-HITS = [
-    {
-        "citation-key": "vehtariPracticalBayesianModel2017",
-        "library": "My Library",
-        "DOI": "10.1007/s11222-016-9696-4",
-        "title": "Practical Bayesian model evaluation using LOO-CV and WAIC",
-    },
-    {
-        "citation-key": "vehtariRankNormalizationFolding2021",
-        "library": "My Library",
-        "DOI": "10.1214/20-BA1221",
-        "title": "Rank-normalization, folding, and localization",
-    },
+def _paper(citekey, library="My Library", *, doi="", title=""):
+    """A Paper as the stock local API sweep produces it (no numeric library id)."""
+    return resolve.Paper(
+        citekey=citekey,
+        doi=doi,
+        title=title,
+        authors=(),
+        year=None,
+        library=library,
+        library_id=None,
+        collection_keys=(),
+    )
+
+
+# A token search is word-ANDed over title, creators, year and citekey, so a
+# citekey query returns near-misses (the same author's other papers, a
+# disambiguation sibling) next to the exact item.
+PAPERS = [
+    _paper(
+        "vehtariPracticalBayesianModel2017",
+        doi="10.1007/s11222-016-9696-4",
+        title="Practical Bayesian model evaluation using LOO-CV and WAIC",
+    ),
+    _paper(
+        "vehtariRankNormalizationFolding2021",
+        doi="10.1214/20-BA1221",
+        title="Rank-normalization, folding, and localization",
+    ),
 ]
 
 # Same citekey present in two libraries (the real multi-library duplicate case:
 # a paper lives in My Library AND a group, only some copies with a PDF).
-HITS_MULTI = [
-    {"citation-key": "sharedKey2020", "library": "My Library", "DOI": "10.1/x"},
-    {
-        "citation-key": "sharedKey2020",
-        "library": "2026-example-library-1",
-        "DOI": "10.1/x",
-    },
-    {"citation-key": "otherKey2020", "library": "My Library", "DOI": "10.2/y"},
+PAPERS_MULTI = [
+    _paper("sharedKey2020", "My Library", doi="10.1/x"),
+    _paper("sharedKey2020", "2026-example-library-1", doi="10.1/x"),
+    _paper("otherKey2020", "My Library", doi="10.2/y"),
 ]
 
 
 def test_selects_only_exact_citekey_match():
-    out = resolve.select_citekey_matches(HITS, "vehtariPracticalBayesianModel2017")
+    out = resolve.select_citekey_matches(PAPERS, "vehtariPracticalBayesianModel2017")
     assert len(out) == 1
-    assert out[0]["library"] == "My Library"
-    assert out[0]["DOI"] == "10.1007/s11222-016-9696-4"
+    assert out[0].library == "My Library"
+    assert out[0].doi == "10.1007/s11222-016-9696-4"
 
 
 def test_returns_every_library_copy_of_a_citekey():
-    out = resolve.select_citekey_matches(HITS_MULTI, "sharedKey2020")
+    out = resolve.select_citekey_matches(PAPERS_MULTI, "sharedKey2020")
     assert len(out) == 2
-    assert {h["library"] for h in out} == {
-        "My Library",
-        "2026-example-library-1",
-    }
+    assert {p.library for p in out} == {"My Library", "2026-example-library-1"}
 
 
 def test_no_match_returns_empty():
     assert (
         resolve.select_citekey_matches(
-            HITS, "lakatosFalsificationMethodologyScientific1970a"
+            PAPERS, "lakatosFalsificationMethodologyScientific1970a"
         )
         == []
     )
@@ -203,108 +209,71 @@ def test_render_cmd_appends_allow_mocr():
     assert cmd[-1] == "--allow-mocr"
 
 
-# --- _year_from_issued / normalize_bbt_hit (new pure functions) --------------
+# --- paper_from_local_item: the one Paper producer ---------------------------
+#
+# Every search now returns stock local API envelopes (fields under `data`,
+# citekey as `citationKey`, creators with `lastName`/`name`, the date a string,
+# the library an object with the human `name`). The shape below mirrors the live
+# envelope for PP8QJM56 (kudinaUseLargeLanguage2025), captured 2026-08-31.
 
-# A well-formed BBT item.search hit (the shape the live API produces).
-BBT_HIT = {
-    "citation-key": "vehtariPracticalBayesianModel2017",
-    "citekey": "vehtariPracticalBayesianModel2017",
-    "DOI": "10.1007/s11222-016-9696-4",
-    "title": "Practical Bayesian model evaluation using LOO-CV and WAIC",
-    "author": [
-        {"family": "Vehtari", "given": "Aki"},
-        {"family": "Gelman", "given": "Andrew"},
-    ],
-    "issued": {"date-parts": [[2017, 9]]},
-    "library": "My Library",
-    "type": "article-journal",
+LOCAL_ITEM = {
+    "key": "PP8QJM56",
+    "library": {"type": "user", "id": 305867, "name": "My Library"},
+    "data": {
+        "key": "PP8QJM56",
+        "itemType": "journalArticle",
+        "title": "The use of large language models as scaffolds",
+        "creators": [
+            {"creatorType": "author", "lastName": "Kudina", "firstName": "Olya"},
+            {"creatorType": "author", "lastName": "Ballsun-Stanton"},
+            {"creatorType": "author", "name": "Macquarie University"},
+        ],
+        "date": "2025-02-01",
+        "DOI": "10.1007/s44204-025-00247-1",
+        "citationKey": "kudinaUseLargeLanguage2025",
+        "collections": ["JCDGG2Z7", "5BPN2U2H"],
+    },
 }
 
 
-# _year_from_issued -----------------------------------------------------------
-
-
-def test_year_from_issued_normal():
-    assert resolve._year_from_issued({"date-parts": [[2017, 9]]}) == 2017
-
-
-def test_year_from_issued_year_only():
-    assert resolve._year_from_issued({"date-parts": [[2021]]}) == 2021
-
-
-def test_year_from_issued_missing_issued():
-    assert resolve._year_from_issued(None) is None
-    assert resolve._year_from_issued({}) is None
-
-
-def test_year_from_issued_empty_date_parts():
-    assert resolve._year_from_issued({"date-parts": []}) is None
-    assert resolve._year_from_issued({"date-parts": [[]]}) is None
-
-
-def test_year_from_issued_non_int_year():
-    # A non-integer first element should not crash — return None.
-    assert resolve._year_from_issued({"date-parts": [["unknown"]]}) is None
-
-
-# normalize_bbt_hit -----------------------------------------------------------
-
-
-def test_normalize_bbt_hit_extracts_all_fields():
-    p = resolve.normalize_bbt_hit(BBT_HIT)
-    assert p.citekey == "vehtariPracticalBayesianModel2017"
-    assert p.doi == "10.1007/s11222-016-9696-4"
-    assert p.title == "Practical Bayesian model evaluation using LOO-CV and WAIC"
-    assert p.authors == ("Vehtari", "Gelman")
-    assert p.year == 2017
+def test_paper_from_local_item_extracts_all_fields():
+    p = resolve.paper_from_local_item(LOCAL_ITEM)
+    assert p.citekey == "kudinaUseLargeLanguage2025"
+    assert p.doi == "10.1007/s44204-025-00247-1"
+    assert p.title == "The use of large language models as scaffolds"
+    # Two-field creators by surname; a single-field (institutional) creator by
+    # its name. Dropping an author is the class of failure the resolver exists
+    # to remove, and matches_query compares surnames for equality anyway.
+    assert p.authors == ("Kudina", "Ballsun-Stanton", "Macquarie University")
+    assert p.year == 2025
     assert p.library == "My Library"
+    # The envelope's numeric id is Zotero's user/group id, not the BBT library
+    # id enrich_paper resolves against, so it is deliberately not reported.
     assert p.library_id is None
-    assert p.collection_keys == ()
+    assert p.collection_keys == ("JCDGG2Z7", "5BPN2U2H")
 
 
-def test_normalize_bbt_hit_missing_author_list():
-    hit = {**BBT_HIT, "author": []}
-    p = resolve.normalize_bbt_hit(hit)
-    assert p.authors == ()
-
-
-def test_normalize_bbt_hit_author_without_family_skipped():
-    hit = {
-        **BBT_HIT,
-        "author": [{"given": "Anonymous"}, {"family": "Gelman", "given": "Andrew"}],
-    }
-    p = resolve.normalize_bbt_hit(hit)
-    assert p.authors == ("Gelman",)
-
-
-def test_normalize_bbt_hit_missing_doi_defaults_empty():
-    hit = {k: v for k, v in BBT_HIT.items() if k != "DOI"}
-    p = resolve.normalize_bbt_hit(hit)
+def test_paper_from_local_item_tolerates_missing_fields():
+    bare = {"key": "X", "library": {}, "data": {"itemType": "book"}}
+    p = resolve.paper_from_local_item(bare)
+    assert p.citekey == ""
     assert p.doi == ""
-
-
-def test_normalize_bbt_hit_missing_title_defaults_empty():
-    hit = {k: v for k, v in BBT_HIT.items() if k != "title"}
-    p = resolve.normalize_bbt_hit(hit)
     assert p.title == ""
-
-
-def test_normalize_bbt_hit_missing_library_defaults_empty():
-    hit = {k: v for k, v in BBT_HIT.items() if k != "library"}
-    p = resolve.normalize_bbt_hit(hit)
-    assert p.library == ""
-
-
-def test_normalize_bbt_hit_missing_issued_year_is_none():
-    hit = {k: v for k, v in BBT_HIT.items() if k != "issued"}
-    p = resolve.normalize_bbt_hit(hit)
+    assert p.authors == ()
     assert p.year is None
-
-
-def test_normalize_bbt_hit_collection_keys_always_empty_tuple():
-    # BBT item.search hits carry no collection info — always empty.
-    p = resolve.normalize_bbt_hit(BBT_HIT)
+    assert p.library == ""
     assert p.collection_keys == ()
+
+
+def test_paper_from_local_item_skips_a_creator_with_no_name():
+    item = {
+        **LOCAL_ITEM,
+        "data": {
+            **LOCAL_ITEM["data"],
+            "creators": [{"creatorType": "author", "firstName": "Anonymous"}],
+        },
+    }
+    assert resolve.paper_from_local_item(item).authors == ()
 
 
 # --- search_tokens (union of every supplied key; Bug B) ----------------------
@@ -622,9 +591,7 @@ def test_trigger_autoexport_retries_while_starting_then_succeeds(monkeypatch):
     monkeypatch.setattr(
         resolve, "post_run_autoexport", lambda _p, **_k: next(responses)
     )
-    out = resolve._trigger_autoexport(
-        Path("/p.bib"), starting_retries=3, retry_delay=0
-    )
+    out = resolve._trigger_autoexport(Path("/p.bib"), starting_retries=3, retry_delay=0)
     assert out is not None
     assert out.kind == "triggered"
 
@@ -635,9 +602,7 @@ def test_trigger_autoexport_gives_up_after_starting_retries(monkeypatch):
         "post_run_autoexport",
         lambda _p, **_k: (503, '{"status": "bbt-starting"}'),
     )
-    out = resolve._trigger_autoexport(
-        Path("/p.bib"), starting_retries=2, retry_delay=0
-    )
+    out = resolve._trigger_autoexport(Path("/p.bib"), starting_retries=2, retry_delay=0)
     assert out is not None
     assert out.kind == "bbt-starting"
 
@@ -666,7 +631,9 @@ _CHENG_CONSTRUCTED = "chengGenerativeAIRequirements2026"  # the key the session 
 
 def test_citekey_base_strips_disambiguator_after_year():
     assert resolve.citekey_base(_CHENG_REAL) == _CHENG_CONSTRUCTED
-    assert resolve.citekey_base("dignathHowCanPrimary2008a") == "dignathHowCanPrimary2008"
+    assert (
+        resolve.citekey_base("dignathHowCanPrimary2008a") == "dignathHowCanPrimary2008"
+    )
 
 
 def test_citekey_base_leaves_bare_year_unchanged():
@@ -751,33 +718,33 @@ def test_classify_citekey_threshold_is_tunable():
 
 # rank_citekey_candidates -----------------------------------------------------
 
-_RANK_HITS = [
-    {"citation-key": "vehtariPracticalBayesianModel2017", "library": "My Library"},
-    {"citation-key": _CHENG_REAL, "library": "2026-LegoGrant"},
-    {"citation-key": "chengGenerativeAIRequirement2026", "library": "My Library"},
+_RANK_PAPERS = [
+    _paper("vehtariPracticalBayesianModel2017", "My Library"),
+    _paper(_CHENG_REAL, "2026-LegoGrant"),
+    _paper("chengGenerativeAIRequirement2026", "My Library"),
 ]
 
 
 def test_rank_citekey_candidates_orders_by_kind_then_drops_none():
-    ranked = resolve.rank_citekey_candidates(_RANK_HITS, _CHENG_CONSTRUCTED)
+    ranked = resolve.rank_citekey_candidates(_RANK_PAPERS, _CHENG_CONSTRUCTED)
     kinds = [c.kind for c in ranked]
-    # The unrelated Vehtari hit is dropped (none); the real key is a variant, the
-    # typo'd key is fuzzy; variant sorts before fuzzy.
+    # The unrelated Vehtari paper is dropped (none); the real key is a variant,
+    # the typo'd key is fuzzy; variant sorts before fuzzy.
     assert "none" not in kinds
     assert kinds[0] == "variant"
-    assert ranked[0].hit["citation-key"] == _CHENG_REAL
+    assert ranked[0].paper.citekey == _CHENG_REAL
     assert "fuzzy" in kinds
 
 
 def test_rank_citekey_candidates_exact_sorts_first():
-    hits = [{"citation-key": _CHENG_REAL, "library": "2026-LegoGrant"}]
-    ranked = resolve.rank_citekey_candidates(hits, _CHENG_REAL)
+    papers = [_paper(_CHENG_REAL, "2026-LegoGrant")]
+    ranked = resolve.rank_citekey_candidates(papers, _CHENG_REAL)
     assert ranked[0].kind == "exact"
 
 
 def test_rank_citekey_candidates_empty_when_nothing_close():
-    hits = [{"citation-key": "vehtariPracticalBayesianModel2017", "library": "x"}]
-    assert resolve.rank_citekey_candidates(hits, _CHENG_CONSTRUCTED) == []
+    papers = [_paper("vehtariPracticalBayesianModel2017", "x")]
+    assert resolve.rank_citekey_candidates(papers, _CHENG_CONSTRUCTED) == []
 
 
 # print_duplicate_note --------------------------------------------------------
@@ -791,12 +758,12 @@ def test_rank_citekey_candidates_empty_when_nothing_close():
 def test_print_duplicate_note_lists_only_variant_siblings(capsys):
     near = [
         resolve.ScoredHit(
-            hit={"citation-key": "dignathHowCanPrimary2008b", "library": "My Library"},
+            paper=_paper("dignathHowCanPrimary2008b", "My Library"),
             kind="variant",
             score=0.98,
         ),
         resolve.ScoredHit(
-            hit={"citation-key": "dignathHowCanOther2009", "library": "Group-X"},
+            paper=_paper("dignathHowCanOther2009", "Group-X"),
             kind="fuzzy",
             score=0.9,
         ),
@@ -813,7 +780,7 @@ def test_print_duplicate_note_lists_only_variant_siblings(capsys):
 def test_print_duplicate_note_silent_without_variants(capsys):
     near = [
         resolve.ScoredHit(
-            hit={"citation-key": "somethingClose2020", "library": "x"},
+            paper=_paper("somethingClose2020", "x"),
             kind="fuzzy",
             score=0.88,
         )
@@ -822,36 +789,25 @@ def test_print_duplicate_note_silent_without_variants(capsys):
     assert capsys.readouterr().out == ""
 
 
-# DOI path: no-match honesty and BBT-hydration failure ------------------------
+# DOI path: stock envelopes only, and no-match honesty --------------------------
 #
-# The DOI path is the workflow's front door, and it made the one claim this
+# The DOI path is the workflow's front door, and it once made the one claim this
 # resolver exists to prevent: a CONFIRMED absence for a paper that is present.
+# Reproduced live on 2026-08-31 (Zotero 10.0.1, DOI 10.1007/s44204-025-00247-1,
+# key PP8QJM56, citekey kudinaUseLargeLanguage2025): the stock local API found
+# the item by DOI field, `search_by_doi` re-hydrated it through BBT
+# `item.search`, BBT answered "Invalid condition 'blockStart'", and the swallowed
+# error left `print_no_match` asserting that no item carries the DOI.
 #
-# Mechanism reproduced live on 2026-08-31 (Zotero 10.0.1, DOI
-# 10.1007/s44204-025-00247-1, Zotero key PP8QJM56, citekey
-# kudinaUseLargeLanguage2025): the stock local API finds the citekey by DOI
-# field, `search_by_doi` then re-hydrates it through BBT `item.search`, and
-# Better BibTeX answered -32603 "ZoteroInvalidDataError: Invalid condition
-# 'blockStart' in hasOperator()". The hydration error was swallowed, so the DOI
-# branch of `print_no_match` still asserted that no item carries the DOI.
-#
-# Two separate obligations are pinned below: the search must SURFACE the failure
-# (and still report the copies the stock API already proved exist), and the
-# no-match message must not claim a confirmed absence once anything errored.
+# BBT is no longer consulted: the stock envelope carries everything a Paper
+# needs, and BBT's item.search is broken on Zotero 10 for good (issue #3587).
+# Two obligations remain pinned below: the search reports every copy the stock
+# API proved exists, and a library that could not be searched is surfaced so the
+# no-match message cannot claim a confirmed absence.
 
 _KUDINA_DOI = "10.1007/s44204-025-00247-1"
 _KUDINA_CITEKEY = "kudinaUseLargeLanguage2025"
 _KUDINA_TITLE = "The use of large language models as scaffolds for proleptic reasoning"
-
-# The BBT fault in the shape rpc() raises it: RuntimeError(error_object).
-_BBT_ITEM_SEARCH_FAULT = RuntimeError(
-    {
-        "code": -32603,
-        "message": (
-            "ZoteroInvalidDataError: Invalid condition 'blockStart' in hasOperator()"
-        ),
-    }
-)
 
 
 def _kudina_local_item(library_name, *, citekey=_KUDINA_CITEKEY):
@@ -876,41 +832,41 @@ def _kudina_local_item(library_name, *, citekey=_KUDINA_CITEKEY):
     }
 
 
-def _fail_rpc(*_args, **_kwargs):
-    raise _BBT_ITEM_SEARCH_FAULT
-
-
 def _stub_doi_items(monkeypatch, items, failed_libraries=()):
     monkeypatch.setattr(
         resolve,
         "search_doi_items",
-        lambda _doi: resolve.DoiSearch(
+        lambda _doi: resolve.LibrarySearch(
             items=tuple(items), failed_libraries=tuple(failed_libraries)
         ),
     )
 
 
-def test_search_by_doi_reports_the_bbt_hydration_failure(monkeypatch):
-    """A swallowed hydration error is what turned a present paper into 'absent'."""
-    _stub_doi_items(monkeypatch, [_kudina_local_item("My Library")])
-    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+def _forbid_bbt(monkeypatch):
+    """Search must never touch Better BibTeX.
 
-    _papers, errors = resolve.search_by_doi(_KUDINA_DOI)
+    BBT's JSON-RPC `item.search` errors on every query under Zotero 10 (issue
+    #3587, unfixed in 9.0.63 and on master on 2026-09-02), and the stock
+    envelope already carries everything a Paper needs. A search path that
+    still reaches for BBT is the regression this guard exists to catch.
+    """
 
-    assert errors, "a failed BBT hydration must be reported, never swallowed"
-    assert _KUDINA_CITEKEY in errors[0]
+    def explode(method, *_a, **_k):
+        raise AssertionError(f"BBT JSON-RPC {method!r} must not run during search")
+
+    monkeypatch.setattr(resolve, "rpc", explode)
 
 
-def test_search_by_doi_falls_back_to_the_stock_envelope_when_bbt_fails(monkeypatch):
-    """The stock API already returned the item; BBT failing must not lose it."""
+def test_search_by_doi_returns_every_stock_copy_without_bbt(monkeypatch):
     _stub_doi_items(
         monkeypatch,
         [_kudina_local_item("My Library"), _kudina_local_item("2026-ailoc-stage1")],
     )
-    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+    _forbid_bbt(monkeypatch)
 
-    papers, _errors = resolve.search_by_doi(_KUDINA_DOI)
+    papers, errors = resolve.search_by_doi(_KUDINA_DOI)
 
+    assert errors == []
     assert [(p.citekey, p.library) for p in papers] == [
         (_KUDINA_CITEKEY, "My Library"),
         (_KUDINA_CITEKEY, "2026-ailoc-stage1"),
@@ -919,41 +875,20 @@ def test_search_by_doi_falls_back_to_the_stock_envelope_when_bbt_fails(monkeypat
     assert papers[0].authors == ("Kudina", "Ballsun-Stanton", "Alfano")
     assert papers[0].year == 2025
     assert papers[0].title == _KUDINA_TITLE
+    assert papers[0].collection_keys == ("JCDGG2Z7", "5BPN2U2H")
 
 
-def test_search_by_doi_fallback_drops_a_copy_whose_doi_does_not_match(monkeypatch):
-    """The fallback keeps the DOI equality rule the BBT path applies."""
+def test_search_by_doi_drops_a_copy_whose_doi_does_not_match(monkeypatch):
+    """qmode=fields is `contains`; the equality rule holds on the way out too."""
     other = _kudina_local_item("My Library")
     other["data"] = {**other["data"], "DOI": "10.9999/not-the-one"}
     _stub_doi_items(monkeypatch, [other])
-    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+    _forbid_bbt(monkeypatch)
 
     papers, errors = resolve.search_by_doi(_KUDINA_DOI)
 
     assert papers == []
-    assert errors, "the hydration failure is still reported for an empty result"
-
-
-def test_search_by_doi_prefers_bbt_hydration_while_it_works(monkeypatch):
-    """Positive control: the healthy path is unchanged, and reports no errors."""
-    _stub_doi_items(monkeypatch, [_kudina_local_item("My Library")])
-    bbt_hit = {
-        "citation-key": _KUDINA_CITEKEY,
-        "library": "2026-SARDI-LLM-Lecture-BallsunStanton",
-        "DOI": _KUDINA_DOI,
-        "title": _KUDINA_TITLE,
-        "author": [{"family": "Kudina"}],
-        "issued": {"date-parts": [[2025, 2, 1]]},
-    }
-    monkeypatch.setattr(resolve, "rpc", lambda *_a, **_k: [bbt_hit])
-
-    papers, errors = resolve.search_by_doi(_KUDINA_DOI)
-
     assert errors == []
-    # The BBT hit's library, not the stock envelope's, proves BBT was used.
-    assert [(p.citekey, p.library) for p in papers] == [
-        (_KUDINA_CITEKEY, "2026-SARDI-LLM-Lecture-BallsunStanton")
-    ]
 
 
 def test_search_by_doi_reports_a_library_that_could_not_be_searched(monkeypatch):
@@ -963,7 +898,7 @@ def test_search_by_doi_reports_a_library_that_could_not_be_searched(monkeypatch)
         [],
         failed_libraries=("http://localhost:23119/api/groups/14/items: timeout",),
     )
-    monkeypatch.setattr(resolve, "rpc", _fail_rpc)
+    _forbid_bbt(monkeypatch)
 
     papers, errors = resolve.search_by_doi(_KUDINA_DOI)
 
@@ -994,3 +929,65 @@ def test_doi_no_match_still_concludes_absence_when_every_search_succeeded(capsys
     out = capsys.readouterr().out
 
     assert "no item carries this DOI" in out
+
+
+# search_papers: the token sweep that replaced the BBT item.search loop --------
+#
+# Recall comes from searching EVERY supplied token and unioning the hits;
+# precision comes from matches_query afterwards. The sweep itself is stock
+# Zotero quicksearch (zotero_local_api.search_items). Pinned here: the union,
+# the per-library-copy dedup, and that a library failure is recorded against
+# its token rather than silently narrowing the corpus.
+
+
+def _stub_search_items(monkeypatch, by_token):
+    """by_token: token -> (envelopes, failed_libraries)."""
+
+    def fake(query, *, qmode="titleCreatorYear"):
+        assert qmode == "titleCreatorYear"
+        items, failed = by_token[query]
+        return resolve.LibrarySearch(items=tuple(items), failed_libraries=tuple(failed))
+
+    monkeypatch.setattr(resolve, "search_items", fake)
+
+
+def test_search_papers_unions_tokens_and_dedups_library_copies(monkeypatch):
+    mine = _kudina_local_item("My Library")
+    group = _kudina_local_item("2026-ailoc-stage1")
+    _stub_search_items(
+        monkeypatch,
+        {
+            _KUDINA_CITEKEY: ([mine, group], []),
+            "kudina": ([mine], []),  # the same My Library copy, found again
+        },
+    )
+    _forbid_bbt(monkeypatch)
+
+    papers, errors = resolve.search_papers([_KUDINA_CITEKEY, "kudina"])
+
+    assert errors == []
+    assert [(p.citekey, p.library) for p in papers] == [
+        (_KUDINA_CITEKEY, "My Library"),
+        (_KUDINA_CITEKEY, "2026-ailoc-stage1"),
+    ]
+
+
+def test_search_papers_records_a_failed_library_against_its_token(monkeypatch):
+    _stub_search_items(
+        monkeypatch,
+        {
+            "Ghahramani": ([], ["http://localhost:23119/api/groups/14/items: timeout"]),
+            "wade": ([_kudina_local_item("My Library")], []),
+        },
+    )
+    _forbid_bbt(monkeypatch)
+
+    papers, errors = resolve.search_papers(["Ghahramani", "wade"])
+
+    # One token's failure must not sink the whole resolve: the other token's
+    # hits still arrive, and the failure is reported so a no-match is
+    # qualified as inconclusive rather than absent.
+    assert [p.citekey for p in papers] == [_KUDINA_CITEKEY]
+    assert len(errors) == 1
+    assert "Ghahramani" in errors[0]
+    assert "groups/14" in errors[0]

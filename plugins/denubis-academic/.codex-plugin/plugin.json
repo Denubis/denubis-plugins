@@ -1,6 +1,6 @@
 {
   "name": "denubis-academic",
-  "version": "0.15.1",
+  "version": "0.16.0",
   "description": "Academic writing, manuscript review, and Zotero-backed source workflows.",
   "author": {
     "name": "Brian Ballsun-Stanton",

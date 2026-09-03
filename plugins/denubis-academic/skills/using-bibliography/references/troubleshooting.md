@@ -33,8 +33,8 @@ and obtaining confirmation. Run it outside Claude Code, then restart.
 | Zotero ping fails | Desktop app/local API unavailable | Start Zotero and verify `http://localhost:23119/connector/ping` |
 | Config missing | Skill does not know the zettelkasten root | Ask the user to create the documented config; do not create it silently |
 | Exit `2` with near matches | Citekey is inexact | Copy and retry the exact returned key |
-| No match by co-author | BBT indexes the first author for this search path | Retry first author or distinctive title token |
-| No match by DOI in BBT search | BBT `item.search` does not index DOI | Use `resolve.py --doi`, which searches Zotero fields |
+| No match by author or title word | Zotero's quicksearch ANDs every word over title, creators, year and citekey; a title filed differently returns nothing | Retry with one distinctive title token, a surname, or the exact citekey from the `.bib` |
+| `warning: … could not be searched` | Part of the corpus was unreachable, so a no-match is inconclusive | Check the failing library URL in the message, then retry |
 | `pdf-unknown` | Attachment truth was not established | Diagnose library/attachment lookup; do not collapse to `no-pdf` |
 | `no-pdf` | Item exists without a usable attachment | Ask for connector attachment or preview a confirmed fetch |
 | API Plus helper reports endpoint absent | Installed extension is too old or unavailable | Upgrade the extension or use the non-writing fallback; do not hand-roll the endpoint |

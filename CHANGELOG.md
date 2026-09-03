@@ -9,6 +9,30 @@
   The agent now states that its final message is the review, returns the leads there, and
   writes a file only under a throwaway path the caller named, through a shell heredoc.
 
+## [denubis-academic] 0.16.0
+
+**Changed:**
+- `using-bibliography` no longer searches through Better BibTeX. Zotero 10
+  removed the `blockStart` quicksearch marker that BBT's JSON-RPC `item.search`
+  still emits, so every search errored with "Invalid condition 'blockStart'"
+  (BBT issue #3587; the call is still present in release 9.0.63 and on master,
+  checked 2026-09-02). Resolution, DOI ingest and annotate now run on Zotero's
+  own quicksearch through the stock local API (`qmode=titleCreatorYear`, swept
+  across every library), which matches title, any creator, year and citekey
+  and excludes child items. Verified against Zotero 9.0.6 and 10.0.1
+  `search.js`; earlier versions are unverified. Better BibTeX is still used
+  for citekeys, collections, attachments, exports and auto-export.
+- A co-author's surname now finds the paper; BBT indexed only the first author.
+- Every search reports the libraries it could not reach, and a no-match over a
+  partly unsearched corpus is reported as inconclusive on every path (resolve,
+  ingest, annotate).
+
+**Removed:**
+- The BBT hit shape (`citation-key`, CSL `author`/`issued`) as an internal
+  contract: `normalize_bbt_hit`, `_year_from_issued`, `extract_item_key`, and
+  the DOI path's BBT hydration fallback. Papers are built from stock envelopes
+  only (`paper_from_local_item`). `DoiSearch` is now `LibrarySearch`.
+
 ## [denubis-academic] 0.15.1
 
 **Fixed:**
