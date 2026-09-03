@@ -58,6 +58,12 @@ import argparse
 import json
 import sys
 
+# Zotero 10 authenticates every local-API write in the base class each endpoint
+# inherits, and the dry run is a POST too (the endpoint computes the diff on a
+# clone), so BOTH the preview and the apply need credentials. zotero_auth.post
+# attaches them; on Zotero 7-9 there is no server ID and nothing changes.
+import zotero_auth
+
 # Library resolution is shared with copy_item.py rather than reimplemented: the
 # name -> libraryID mapping is the step that used to be hand-rolled and broke.
 from copy_item import ResolutionError, find_library, get_libraries, find_items
@@ -355,7 +361,7 @@ def update_item(payload: dict) -> dict:
     import httpx
 
     try:
-        reply = httpx.post(UPDATE_ITEM_ENDPOINT, json=payload, timeout=30.0)
+        reply = zotero_auth.post(UPDATE_ITEM_ENDPOINT, json=payload, timeout=30.0)
     except httpx.HTTPError as exc:
         raise UpdateError(
             f"cannot reach update-item at {UPDATE_ITEM_ENDPOINT}: {exc}. "
@@ -536,4 +542,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except zotero_auth.AuthorizationError as exc:
+        # Zotero answered the authorisation request with a denial or a rate
+        # limit. Retrying only re-prompts, so report it and stop.
+        sys.exit(str(exc))

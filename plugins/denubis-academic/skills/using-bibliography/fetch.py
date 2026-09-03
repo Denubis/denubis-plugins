@@ -49,9 +49,16 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# httpx is imported lazily inside the shell functions (probe_plus / get_libraries
-# / add_item) so the functional core stays importable without the PEP 723 deps —
-# the unit tests load this module and exercise the pure functions directly.
+# Zotero 10 authenticates every local-API write in the base class each endpoint
+# inherits, so the write goes out through zotero_auth.post, which attaches the
+# credentials and owns the retry. Zotero 7-9 are unaffected: no server ID header
+# means no credential headers, and the request is what it always was.
+import zotero_auth
+
+# httpx is imported lazily inside the shell functions (probe_plus /
+# get_libraries) so the functional core stays importable without the PEP 723
+# deps — the unit tests load this module and exercise the pure functions
+# directly. zotero_auth follows the same rule.
 
 PLUS_PROBE = "http://localhost:23119/api/plus"
 LIBRARIES_ENDPOINT = "http://localhost:23119/api/plus/libraries"
@@ -250,14 +257,12 @@ def get_libraries() -> list[dict]:
 
 
 def add_item(identifier: str, group_id: int | None, collection_key: str | None) -> dict:
-    import httpx
-
     payload: dict = {"identifier": identifier}
     if group_id is not None:
         payload["groupID"] = group_id
     if collection_key is not None:
         payload["collectionKey"] = collection_key
-    r = httpx.post(ADD_ITEM_ENDPOINT, json=payload, timeout=60)
+    r = zotero_auth.post(ADD_ITEM_ENDPOINT, json=payload, timeout=60)
     return parse_add_item_response(
         r.status_code, r.text, r.headers.get("content-type", "")
     )
@@ -449,4 +454,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except zotero_auth.AuthorizationError as exc:
+        # Zotero answered the authorisation request with a denial or a rate
+        # limit. Retrying only re-prompts, so report it and stop.
+        sys.exit(str(exc))

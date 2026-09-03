@@ -92,6 +92,7 @@ ignore = [
     "PLR0915",
 ]
 "plugins/denubis-academic/skills/using-bibliography/renderer.py" = ["PLC0415"]
+"plugins/denubis-academic/skills/using-bibliography/zotero_auth.py" = ["PLC0415"]
 "plugins/denubis-academic/skills/using-bibliography/ingest.py" = [
     "PLR0912",
     "PLR0915",

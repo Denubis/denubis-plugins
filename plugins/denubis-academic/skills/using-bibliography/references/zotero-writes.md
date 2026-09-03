@@ -18,6 +18,30 @@ curl -sS --max-time 3 http://localhost:23119/api/plus
 The expected banner is `Zotero Local API Plus is running.` Helpers also probe
 their specific endpoint and stop on an older build.
 
+## Zotero 10: writes need a one-time authorisation
+
+Zotero 10 authenticates every local-API write in the base class each endpoint
+inherits, so the rule covers all `zotero-api-plus` `POST` endpoints and runs
+before their own validation. `GET` is ungated, and Zotero 7-9 have no such
+rule. The helpers handle it in `zotero_auth.py`; nothing here is manual.
+
+1. The server ID is read once per run from the `Zotero-Server-ID` response
+   header of `GET /api/`. No header means Zotero 7-9, and nothing changes.
+2. A key is obtained once per machine from `POST /api/local/authorize` with
+   `{"appName": "denubis-academic"}`. **Zotero shows a modal — tell the user to
+   choose "Always Allow".** "Allow" issues a single-use key that is consumed by
+   its first write, so the next command prompts again.
+3. Both travel on every write as `Zotero-Server-ID` and `Zotero-API-Key`.
+
+Reusable keys are stored in
+`~/.config/denubis-academic-research/zotero-local-api-keys.json`, mode `0600`,
+keyed by server ID. That file is skill-owned; the neighbouring `config.toml` is
+the user's and is never written. `DENUBIS_ZOTERO_KEY_STORE` overrides the path.
+
+The prompt appears at the first *writing* command, which for `update_item.py`
+and `copy_item.py` is the preview — both send a `POST` that changes nothing.
+Say so before running one, so an unexpected Zotero modal is not a surprise.
+
 ## Fetch a genuinely missing paper
 
 Requires `zotero-api-plus` 0.3.0+.

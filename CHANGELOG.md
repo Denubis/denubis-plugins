@@ -1,5 +1,41 @@
 # Changelog
 
+## [denubis-academic] 0.17.0
+
+**Fixed:**
+- `using-bibliography` writes work again on Zotero 10. Zotero 10 authenticates
+  every local-API write in `LocalAPIEndpoint`, the base class each endpoint
+  inherits, so the rule covers all `zotero-api-plus` `POST` endpoints and runs
+  before their own validation: no `Zotero-Server-ID` header is refused with
+  `428`, a mismatched one with `412`, and a missing or consumed key with `401`
+  (verified in Zotero 10.0.1's `server_localAPI.js`, `_validateServerID` and
+  `_authenticateWriteRequest`, on 2026-09-03). Every helper posted bare, so
+  `fetch.py`, `copy_item.py`, `update_item.py`, `annotate.py` and `resolve.py`
+  all failed with `HTTP 428` — including `update_item.py`'s dry run, which is a
+  `POST` because the endpoint computes the diff on a clone.
+
+**Added:**
+- `zotero_auth.py` owns the credential contract for every write: it reads the
+  server ID once per run from `GET /api/`, obtains a key once per machine from
+  `POST /api/local/authorize` as `denubis-academic`, and sends both on each
+  write. On `428`/`412` it re-reads the server ID and retries once; on `401` it
+  discards the stored key, re-authorises and retries once; it never loops
+  further, and the endpoint's own `400`/`404`/`500` are returned untouched so a
+  landed write is never repeated.
+- Reusable ("Always Allow") keys persist in
+  `~/.config/denubis-academic-research/zotero-local-api-keys.json`, mode `0600`,
+  keyed by server ID. Single-use ("Allow") keys are held in memory only, since
+  Zotero consumes them on first use. The store is skill-owned; the neighbouring
+  user-owned `config.toml` is still never written. `DENUBIS_ZOTERO_KEY_STORE`
+  overrides the path.
+- Before the prompt, the helper says on stderr that Zotero is asking for
+  permission and that "Always Allow" is the answer that lasts.
+
+**Unchanged:**
+- Zotero 7-9 emit no `Zotero-Server-ID` header, so no credential headers are
+  sent, no key store is created, and the requests are what they always were.
+  `GET` endpoints and Better BibTeX's own JSON-RPC are ungated and untouched.
+
 ## [denubis-plan-and-execute] 4.1.6
 
 **Fixed:**

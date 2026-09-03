@@ -43,6 +43,26 @@ and obtaining confirmation. Run it outside Claude Code, then restart.
 near citekey matches, and `1` for absence or error. Always interpret its printed
 state with the exit code.
 
+## Zotero 10 write credentials
+
+Zotero 10 refuses an uncredentialed local-API write in the base class each
+endpoint inherits. `zotero_auth.py` handles all three refusals, retrying once
+and only for a refusal a credential can fix. Seeing one in a helper's output
+means the retry also failed.
+
+| Symptom | Meaning | What the helper did, and what to check |
+|---|---|---|
+| `HTTP 428: Zotero-Server-ID not provided` | The write carried no server ID | Re-read the ID from `GET /api/` and retried once. A repeat means the probe found no `Zotero-Server-ID` header on a Zotero that gates writes; check `curl -s -D - -o /dev/null http://localhost:23119/api/` |
+| `HTTP 412: Zotero-Server-ID does not match this server` | The cached ID is not this Zotero's | Re-read the ID and retried once. A repeat usually means two Zotero instances on one port; confirm which is answering 23119 |
+| `HTTP 401: API key required …` or `Invalid or expired API key` | No key, or a single-use key already consumed | Discarded the stored key, re-authorised (a Zotero modal), and retried once. A repeat means the prompt was denied or unanswered — re-run and choose "Always Allow" |
+| `Zotero denied local API access … (403)` | Deny was clicked | Nothing was written. Re-run and choose "Always Allow" |
+| `could not obtain a Zotero local API key (HTTP 429)` | Zotero's authorise rate limit | Wait for its `Retry-After` and re-run; do not loop the command |
+| Zotero prompts on a *preview* | `update_item.py` and `copy_item.py` preview through a `POST` | Expected. Approve it; the preview still writes nothing |
+
+The stored key lives in
+`~/.config/denubis-academic-research/zotero-local-api-keys.json` (mode `0600`).
+Deleting it only forces one more prompt. Zotero 7-9 never reach this path.
+
 ## Render failures
 
 | Symptom | Correct response |

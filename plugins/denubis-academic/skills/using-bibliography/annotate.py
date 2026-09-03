@@ -35,11 +35,17 @@ from pathlib import Path
 # The stock local API sweep is shared with resolve.py and ingest.py; it imports
 # httpx lazily, so the pure core here stays importable without the PEP 723 deps.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Zotero 10 authenticates every local-API write in the base class each endpoint
+# inherits, so add-note and add-highlight go out through zotero_auth.post, which
+# attaches the credentials. Zotero 7-9 are unaffected: no server ID header means
+# no credential headers, and the request is what it always was.
+import zotero_auth
 from zotero_local_api import LibrarySearch, item_citekey, item_library, search_items
 
 # httpx and pymupdf (fitz) are imported lazily inside the shell functions so the
 # pure core stays importable without the PEP 723 deps — the unit tests load this
-# module and exercise the pure functions directly.
+# module and exercise the pure functions directly. zotero_auth follows the same
+# rule for httpx.
 
 # Dedup marker embedded in every annotation comment. `ax` = annotate. The
 # fingerprint identifies the passage independent of spacing/case drift between
@@ -316,9 +322,7 @@ def highlight_rects(
 
 
 def post_highlight(payload: dict) -> dict:
-    import httpx
-
-    r = httpx.post(ADD_HIGHLIGHT_ENDPOINT, json=payload, timeout=30)
+    r = zotero_auth.post(ADD_HIGHLIGHT_ENDPOINT, json=payload, timeout=30)
     return parse_highlight_response(
         r.status_code, r.text, r.headers.get("content-type", "")
     )
@@ -327,14 +331,12 @@ def post_highlight(payload: dict) -> dict:
 def post_note(
     item_key: str, page: int, text: str, library_id: int | None, color: str | None
 ) -> dict:
-    import httpx
-
     payload: dict = {"key": item_key, "page": page, "text": text}
     if library_id is not None:
         payload["libraryID"] = library_id
     if color is not None:
         payload["color"] = color
-    r = httpx.post(ADD_NOTE_ENDPOINT, json=payload, timeout=30)
+    r = zotero_auth.post(ADD_NOTE_ENDPOINT, json=payload, timeout=30)
     return parse_highlight_response(
         r.status_code, r.text, r.headers.get("content-type", "")
     )
@@ -498,4 +500,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except zotero_auth.AuthorizationError as exc:
+        # Zotero answered the authorisation request with a denial or a rate
+        # limit. Retrying only re-prompts, so report it and stop.
+        sys.exit(str(exc))

@@ -55,6 +55,11 @@ from pathlib import Path
 # the PEP 723 deps — unit tests load this module and exercise pure functions
 # directly. This mirrors fetch.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Zotero 10 authenticates every local-API write in the base class each endpoint
+# inherits, so run-autoexport goes out through zotero_auth.post, which attaches
+# the credentials. Better BibTeX's own JSON-RPC endpoint is served outside that
+# base class and stays a bare POST. Zotero 7-9 are unaffected either way.
+import zotero_auth
 from zotero_local_api import LibrarySearch, search_doi_items, search_items
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -803,7 +808,7 @@ def post_run_autoexport(bib_path: str, timeout: float = 30.0) -> tuple[int, str]
     import httpx  # noqa: PLC0415
 
     try:
-        r = httpx.post(
+        r = zotero_auth.post(
             RUN_AUTOEXPORT_ENDPOINT, json={"path": bib_path}, timeout=timeout
         )
     except httpx.TransportError:
@@ -1340,4 +1345,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except zotero_auth.AuthorizationError as exc:
+        # Zotero answered the authorisation request with a denial or a rate
+        # limit. Retrying only re-prompts, so report it and stop.
+        sys.exit(str(exc))

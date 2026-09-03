@@ -61,6 +61,14 @@ Before any bibliography operation:
 5. Treat `zotero-api-plus` as an optional, capability-probed extension. Pure
    resolution and rendering do not require it; Zotero writes and forced BBT
    refreshes do.
+6. On Zotero 10, every local-API write needs a one-time authorisation. The
+   first writing command on a machine makes Zotero show an Allow / Always
+   Allow / Deny prompt: tell the user to choose **Always Allow**, or every
+   later write re-prompts. The helpers then reuse the key from
+   `~/.config/denubis-academic-research/zotero-local-api-keys.json` (mode
+   `0600`), which they own; `config.toml` is never written. Zotero 7-9 have no
+   such gate and are unaffected. See
+   [Zotero writes](references/zotero-writes.md).
 
 ## Front door
 
@@ -138,6 +146,11 @@ change user-owned state and require the procedure's preview and confirmation:
 
 Never treat a request to ingest, read, or cite papers as consent to add items to
 Zotero. Never hand-edit a BBT-generated bibliography.
+
+On Zotero 10 the previews are themselves credentialed `POST`s — `update_item.py`
+computes its diff server-side, and `copy_item.py` probes the endpoint — so the
+authorisation prompt appears at the preview, before anything is written. The
+preview still writes nothing; the write gate in the table above is unchanged.
 
 ## Completion evidence
 

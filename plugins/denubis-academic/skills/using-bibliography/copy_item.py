@@ -54,9 +54,15 @@ import json
 import sys
 from dataclasses import dataclass
 
+# Zotero 10 authenticates every local-API write in the base class each endpoint
+# inherits, so every POST here goes out through zotero_auth.post, which attaches
+# the credentials. Zotero 7-9 are unaffected: no server ID header means no
+# credential headers, and the request is what it always was.
+import zotero_auth
+
 # httpx is imported lazily inside the shell functions so the functional core
 # stays importable without the PEP 723 deps — the unit tests load this module
-# and exercise the pure functions directly.
+# and exercise the pure functions directly. zotero_auth follows the same rule.
 
 PLUS_PROBE = "http://localhost:23119/api/plus"
 LIBRARIES_ENDPOINT = "http://localhost:23119/api/plus/libraries"
@@ -260,7 +266,14 @@ def copy_succeeded(response: dict) -> bool:
 
 def probe_copy_item() -> None:
     """Confirm the endpoint exists. An empty body yields 400 when present and
-    Zotero's generic 404 when the installed build predates it."""
+    Zotero's generic 404 when the installed build predates it.
+
+    The probe is itself a POST, so on Zotero 10 it is credentialed like any
+    other write — an unauthenticated probe would answer 428 and the 400/404
+    distinction above would no longer hold. That also means the one-time
+    Zotero authorisation prompt appears here, during a command that writes
+    nothing, rather than partway through a copy.
+    """
     import httpx
 
     try:
@@ -271,7 +284,7 @@ def probe_copy_item() -> None:
             "Start Zotero with the zotero-api-plus plugin installed."
         )
     try:
-        r = httpx.post(COPY_ITEM_ENDPOINT, json={}, timeout=5)
+        r = zotero_auth.post(COPY_ITEM_ENDPOINT, json={}, timeout=5)
     except Exception as e:
         sys.exit(f"copy-item probe failed: {e}")
     if r.status_code == 404:
@@ -336,12 +349,8 @@ def find_items(query: str) -> list[dict]:
 
 
 def copy_item(payload: dict) -> dict:
-    import httpx
-
-    r = httpx.post(COPY_ITEM_ENDPOINT, json=payload, timeout=120)
-    return parse_copy_response(
-        r.status_code, r.text, r.headers.get("content-type", "")
-    )
+    r = zotero_auth.post(COPY_ITEM_ENDPOINT, json=payload, timeout=120)
+    return parse_copy_response(r.status_code, r.text, r.headers.get("content-type", ""))
 
 
 def _print_plan(payload: dict, target: CopyTarget, source_label: str) -> None:
@@ -465,4 +474,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except zotero_auth.AuthorizationError as exc:
+        # Zotero answered the authorisation request with a denial or a rate
+        # limit. Retrying only re-prompts, so report it and stop.
+        sys.exit(str(exc))
