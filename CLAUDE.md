@@ -6,7 +6,14 @@ Claude Code plugins for design, implementation, and development workflows.
 
 - Application and packaged-tool Python targets 3.14 or newer. Modern 3.14 syntax,
   including parenthesis-free multi-exception clauses, is intentional. PEP 723
-  `requires-python` declarations must match the syntax a script uses.
+  `requires-python` declarations must match the syntax a script uses. `ruff format`
+  runs at the 3.14 target and silently rewrites `except (A, B):` into that
+  parenthesis-free form, which is a SyntaxError below 3.14, so a script declaring
+  `>=3.11` (the five `using-bibliography` helpers) and any module it imports must
+  catch one exception per clause unless the file is listed in
+  `[tool.ruff.per-file-target-version]`. Evidence: the `except OSError` comment in
+  `plugins/denubis-academic/skills/using-bibliography/zotero_auth.py`, caught on
+  2026-09-03 when the formatter produced the rewrite.
 - Hook programs under `plugins/*/hooks/*.py` must parse and import on Python 3.9 or
   newer. Keep annotations runtime-safe with `from __future__ import annotations` and
   use portable exception clauses. Hooks run through the caller's resolved Python, not a
