@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-external-agents] 0.16.4
+
+**Fixed:**
+- Codex `/clear` and `/compact` supervision no longer treats the mutable pane title as
+  session identity. Each command reads the labelled session UUID from fresh `/status`
+  panels while retaining the selected pane and foreground process group; `/clear`
+  requires the UUID to change and `/compact` requires it to remain unchanged.
+- A Codex `PermissionRequest` hook wakes the monitor without claiming that an approval
+  remains pending. The monitor now reports an approval only when a subsequent pane
+  capture still shows the live dialog, so another policy hook can resolve a request
+  without producing a stale notification.
+
 ## [denubis-academic] 0.17.0
 
 **Fixed:**

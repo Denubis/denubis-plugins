@@ -26,7 +26,6 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
-import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -925,46 +924,47 @@ def test_topology_tracker_rejects_replaced_codex_process(
     assert result.crash.kind is watch.ObservationKind.CRASH
 
 
-def test_permission_hook_uses_command_keyed_sanitized_event(
+def test_permission_hook_is_an_unscoped_activity_wakeup(
     watch: ModuleType,
 ) -> None:
-    first = watch.normalize_hook(
+    observation = watch.normalize_hook(
         {
             "hook_event_name": "PermissionRequest",
             "turn_id": "turn-1",
             "tool_name": "Bash",
             "tool_input": {"command": "git status"},
-        }
-    )
-    repeated = watch.normalize_hook(
-        {
-            "hook_event_name": "PermissionRequest",
-            "turn_id": "turn-1",
-            "tool_name": "Bash",
-            "tool_input": {"command": "git status"},
-        }
-    )
-    second = watch.normalize_hook(
-        {
-            "hook_event_name": "PermissionRequest",
-            "turn_id": "turn-1",
-            "tool_name": "Bash",
-            "tool_input": {"command": "git diff"},
         }
     )
 
-    assert first is not None
-    assert repeated is not None
-    assert second is not None
-    assert first.kind is watch.ObservationKind.APPROVAL
-    assert first.key == repeated.key
-    assert first.key != second.key
-    assert json.loads(watch.serialize_observation(first)) == {
-        "correlation_key": first.correlation_key,
-        "kind": "approval",
-        "key": first.key,
-        "scoped": True,
-    }
+    assert observation == watch.Observation(watch.ObservationKind.BUSY)
+
+
+def test_an_auto_resolved_permission_request_emits_no_approval(
+    watch: ModuleType,
+) -> None:
+    """Another PermissionRequest hook may allow or deny before a dialog exists."""
+    state = watch.MonitorState(seen_activity=True)
+    observations = [
+        watch.normalize_hook(
+            {
+                "hook_event_name": "PermissionRequest",
+                "turn_id": "turn-1",
+                "tool_name": "Bash",
+                "tool_input": {"command": "git status"},
+            }
+        ),
+        watch.classify_snapshot("Working | repo", "• Ran git status"),
+    ]
+
+    actions = []
+    for observation in observations:
+        assert observation is not None
+        transition = watch.advance(state, observation)
+        state = transition.state
+        if transition.action is not None:
+            actions.append(transition.action.kind)
+
+    assert actions == []
 
 
 @given(st.text(min_size=1))
@@ -986,13 +986,15 @@ def test_hook_transport_never_contains_raw_private_fields(
 
     assert observation is not None
     transported = json.loads(watch.serialize_observation(observation))
-    assert set(transported) == {"correlation_key", "kind", "key", "scoped"}
-    assert transported["kind"] == "approval"
-    assert re.fullmatch(r"[0-9a-f]{64}", transported["key"])
-    assert re.fullmatch(r"[0-9a-f]{64}", transported["correlation_key"])
+    assert transported == {
+        "correlation_key": None,
+        "kind": "busy",
+        "key": None,
+        "scoped": False,
+    }
 
 
-def test_hook_and_snapshot_of_same_action_deduplicate(
+def test_permission_wakeup_then_live_snapshot_emits_one_approval(
     watch: ModuleType,
 ) -> None:
     state = watch.MonitorState(seen_activity=True)
@@ -1004,15 +1006,7 @@ def test_hook_and_snapshot_of_same_action_deduplicate(
             "tool_input": {"command": "git status"},
         }
     )
-    hook_stop = watch.normalize_hook(
-        {
-            "hook_event_name": "Stop",
-            "turn_id": "turn-2",
-            "last_assistant_message": "Finished cleanly.",
-        }
-    )
     assert hook_approval is not None
-    assert hook_stop is not None
 
     observations = [
         hook_approval,
@@ -1020,8 +1014,6 @@ def test_hook_and_snapshot_of_same_action_deduplicate(
             "Action Required",
             "Would you like to run this command?\n$ git status\nPress enter to confirm",
         ),
-        hook_stop,
-        watch.classify_snapshot("Ready", "• Finished cleanly."),
     ]
     actions = []
     for observation in observations:
@@ -1030,13 +1022,10 @@ def test_hook_and_snapshot_of_same_action_deduplicate(
         if transition.action is not None:
             actions.append(transition.action.kind)
 
-    assert actions == [
-        watch.ObservationKind.APPROVAL,
-        watch.ObservationKind.DONE,
-    ]
+    assert actions == [watch.ObservationKind.APPROVAL]
 
 
-def test_snapshot_then_hook_of_same_action_deduplicates(
+def test_live_approval_then_permission_wakeup_does_not_emit_again(
     watch: ModuleType,
 ) -> None:
     state = watch.MonitorState(seen_activity=True)
@@ -1061,7 +1050,28 @@ def test_snapshot_then_hook_of_same_action_deduplicates(
     assert second.action is None
 
 
-def test_identical_hook_actions_in_different_turns_each_emit(
+def test_stop_hook_and_snapshot_of_same_action_deduplicate(
+    watch: ModuleType,
+) -> None:
+    state = watch.MonitorState(seen_activity=True)
+    hook = watch.normalize_hook(
+        {
+            "hook_event_name": "Stop",
+            "turn_id": "turn-2",
+            "last_assistant_message": "Finished cleanly.",
+        }
+    )
+    assert hook is not None
+    snapshot = watch.classify_snapshot("Ready", "• Finished cleanly.")
+
+    first = watch.advance(state, hook)
+    second = watch.advance(first.state, snapshot)
+
+    assert first.action is not None
+    assert second.action is None
+
+
+def test_permission_hooks_in_different_turns_remain_silent(
     watch: ModuleType,
 ) -> None:
     state = watch.MonitorState(seen_activity=True)
@@ -1087,8 +1097,8 @@ def test_identical_hook_actions_in_different_turns_each_emit(
     first_transition = watch.advance(state, first)
     second_transition = watch.advance(first_transition.state, second)
 
-    assert first_transition.action is not None
-    assert second_transition.action is not None
+    assert first_transition.action is None
+    assert second_transition.action is None
 
 
 def test_identical_stop_messages_in_different_turns_each_emit(

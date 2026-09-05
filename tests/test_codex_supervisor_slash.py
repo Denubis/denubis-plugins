@@ -3,17 +3,19 @@
 The supervisor exposes dedicated verbs for slash commands. A message containing a
 slash command is still a message, so it cannot establish that the TUI ran the command.
 
-Every fixture below was captured from pane %55 on 2026-08-01, codex v0.144.5, at 90
-columns. Three properties of the real TUI drive the design:
+Most fixtures below were captured from pane %55 on 2026-08-01, codex v0.144.5, at 90
+columns. Current named-title fixtures were captured from v0.152.0. Three properties of
+the real TUI drive the design:
 
 The composer opens a completion list on `/`, and a *partial* command leaves the wrong
 entry selected: typing `/c` lists `/compact`, `/copy`, `/clear` in that order with
 `/compact` highlighted, so Enter would compact a pane you meant to clear. Typing the
 command in full narrows the list to exactly one entry.
 
-`/clear` rotates the session id in the pane title (`…fbc55` to `…fbc57` when observed)
-and `/compact` leaves it alone, which is what tells the two apart afterwards rather
-than an absence check over the transcript.
+Current pane titles carry a mutable thread name rather than a session id. A fresh
+`/status` panel still exposes the immutable id: `/clear` rotates it and `/compact`
+leaves it alone, which is what tells the two apart afterwards rather than an absence
+check over the transcript.
 
 The footer carries `Context N% left`, which is the meter the operator ruling says to
 read in place of codex's own claim. It is truncated at the pane width, so a narrower
@@ -60,6 +62,10 @@ _TITLE_AFTER_CLEAR_READY = (
 _TITLE_WORKING = (
     "⠋ Working | brian-ed3d-plugins | extract-denubis-academic | weekly 99% left | "
     "019fbc55-f624-7b50-a0ae-6f3cc5ffce64 | gpt-5.6-sol xhigh"
+)
+_NAMED_TITLE_READY = (
+    "Ready | brian-ed3d-plugins | main | Verify supervising plugin session | "
+    "gpt-5.6-sol xhigh"
 )
 _ID_BEFORE = "019fbc55-f624-7b50-a0ae-6f3cc5ffce64"
 _ID_AFTER = "019fbc57-05eb-7d33-b188-4e3740a4f53d"
@@ -186,6 +192,19 @@ _STATUS_ECHOED = ["/status", "", *_STATUS_PANEL]
 # The same panel with the echo beneath it, which is a stale reading and not this one.
 _STATUS_STALE = [*_STATUS_PANEL, "", "/status"]
 
+# Current Codex (v0.152.0) shows a mutable thread name in configured terminal titles,
+# while `/status` still exposes the immutable session UUID. The extra Thread name row
+# is material: the parser must select the labelled Session row, not whichever identity-
+# looking presentation field happens to precede it.
+_NAMED_STATUS_PANEL = [
+    "╭──────────────────────────────────────────────────────────────────╮",
+    "│  >_ OpenAI Codex (v0.152.0)                                      │",
+    "│                                                                  │",
+    "│  Thread name:              Verify supervising plugin session    │",
+    f"│  Session:                  {_ID_BEFORE}  │",
+    "╰──────────────────────────────────────────────────────────────────╯",
+]
+
 _PENDING_APPROVAL_PANE = "\n".join(
     [
         "  Would you like to run the following command?",
@@ -244,8 +263,19 @@ def _install(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     pane: _Pane,
+    *,
+    session_ids: list[str] | None = None,
 ) -> _Pane:
-    monkeypatch.setattr(watch, "joined_pane", lambda: "%55")
+    target = watch.PaneRef("%55", 5055)
+    identities = iter(session_ids or [_ID_BEFORE, _ID_BEFORE])
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "joined_pane", lambda: target.pane_id)
+    monkeypatch.setattr(
+        watch,
+        "_probe_session_identity",
+        lambda _target: next(identities),
+        raising=False,
+    )
     monkeypatch.setattr(watch, "run_command", pane.run)
     monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
 
@@ -280,15 +310,65 @@ def test_a_pane_with_no_footer_reports_no_reading(watch: ModuleType) -> None:
 # ------------------------------------------------------------ reading the session id
 
 
-def test_the_session_id_is_found_by_shape_not_position(watch: ModuleType) -> None:
-    """A clear drops the `weekly` segment, so counting separators reads the wrong
-    field."""
-    assert watch.session_identity(_TITLE_BEFORE_CLEAR) == _ID_BEFORE
-    assert watch.session_identity(_TITLE_AFTER_CLEAR) == _ID_AFTER
+def test_the_session_id_is_read_from_a_fresh_status_panel(
+    watch: ModuleType,
+) -> None:
+    content = _pane(body=["/status", "", *_NAMED_STATUS_PANEL])
+
+    assert watch.status_session_identity(content, below="/status") == _ID_BEFORE
 
 
-def test_a_title_without_an_id_reports_none(watch: ModuleType) -> None:
-    assert watch.session_identity("Ready | google-live | main") is None
+def test_a_status_panel_above_the_current_echo_is_stale(watch: ModuleType) -> None:
+    content = _pane(body=[*_NAMED_STATUS_PANEL, "", "/status"])
+
+    assert watch.status_session_identity(content, below="/status") is None
+
+
+def test_the_session_probe_runs_status_and_reads_its_fresh_panel(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    named_title = (
+        "Ready | brian-ed3d-plugins | main | Verify supervising plugin session | "
+        "gpt-5.6-sol xhigh"
+    )
+    pane = _Pane(
+        [named_title],
+        [
+            _pane(),
+            _TYPED_STATUS,
+            _pane(body=["/status", "", *_NAMED_STATUS_PANEL]),
+        ],
+    )
+    target = watch.PaneRef("%55", 5055)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(watch, "joined_target", lambda: target, raising=False)
+
+    assert watch._probe_session_identity(target) == _ID_BEFORE
+    assert pane.keys == [
+        ("tmux", "send-keys", "-t", "%55", "-l", "/status"),
+        ("tmux", "send-keys", "-t", "%55", "Enter"),
+    ]
+
+
+def test_the_session_probe_does_not_reuse_a_panel_while_status_is_still_typed(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stale_while_typed = "\n".join([*_STATUS_ECHOED, "", _TYPED_STATUS])
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [_pane(), _TYPED_STATUS, stale_while_typed],
+    )
+    target = watch.PaneRef("%55", 5055)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "RESPONSE_POLLS", 2)
+
+    with pytest.raises(watch.MonitorError, match="no fresh session identity"):
+        watch._probe_session_identity(target)
 
 
 # --------------------------------------------------------------- the completion list
@@ -340,6 +420,7 @@ def test_clearing_types_the_command_and_never_pastes_it(
             [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
             [_pane(), _TYPED_CLEAR],
         ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
     watch.run_slash_command("/clear")
@@ -349,6 +430,25 @@ def test_clearing_types_the_command_and_never_pastes_it(
         ("tmux", "send-keys", "-t", "%55", "Enter"),
     ], pane.keys
     assert not pane.pasted, "a slash command must never go through the paste buffer"
+
+
+def test_clearing_a_named_thread_is_confirmed_by_status_session_rotation(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install(
+        watch,
+        monkeypatch,
+        _Pane(
+            [_NAMED_TITLE_READY],
+            [_pane(), _TYPED_CLEAR, _pane(percent=100)],
+        ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
+    )
+
+    result = watch.run_slash_command("/clear")
+
+    assert _ID_BEFORE in result and _ID_AFTER in result, result
 
 
 def test_clearing_is_confirmed_by_the_session_id_rotating(
@@ -363,6 +463,7 @@ def test_clearing_is_confirmed_by_the_session_id_rotating(
             [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
             [_pane(), _TYPED_CLEAR],
         ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
     result = watch.run_slash_command("/clear")
@@ -477,6 +578,56 @@ def test_a_compaction_codex_never_acknowledged_is_not_reported_as_done(
         watch.run_slash_command("/compact")
 
 
+def test_a_compaction_refuses_if_the_status_session_changes(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    compacted = _pane(
+        percent=100,
+        body=["• acknowledged", "", "• Context compacted"],
+    )
+    _install(
+        watch,
+        monkeypatch,
+        _Pane(
+            [_NAMED_TITLE_READY],
+            [_pane(percent=96), _TYPED_COMPACT, compacted],
+        ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
+    )
+
+    with pytest.raises(watch.MonitorError, match="session changed"):
+        watch.run_slash_command("/compact")
+
+
+def test_a_context_command_refuses_if_the_foreground_codex_changes(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    compacted = _pane(
+        percent=100,
+        body=["• acknowledged", "", "• Context compacted"],
+    )
+    _install(
+        watch,
+        monkeypatch,
+        _Pane(
+            [_NAMED_TITLE_READY],
+            [_pane(percent=96), _TYPED_COMPACT, compacted],
+        ),
+    )
+    targets = iter(
+        [
+            watch.PaneRef("%55", 5055),
+            watch.PaneRef("%55", 6066),
+        ]
+    )
+    monkeypatch.setattr(watch, "joined_target", lambda: next(targets))
+
+    with pytest.raises(watch.MonitorError, match="target changed"):
+        watch.run_slash_command("/compact")
+
+
 def test_no_slash_command_is_typed_into_a_pending_approval(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -570,6 +721,7 @@ def test_a_clear_hands_back_a_pane_that_is_ready_to_take_the_next_prompt(
             [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
             [_pane(), _TYPED_CLEAR, _pane(percent=100)],
         ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
     result = watch.run_slash_command("/clear")
@@ -578,21 +730,20 @@ def test_a_clear_hands_back_a_pane_that_is_ready_to_take_the_next_prompt(
     assert "100" in result, result
 
 
-def test_a_clear_that_is_still_booting_is_reported_as_such(
+def test_a_clear_that_never_returns_ready_cannot_be_confirmed(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The clear did happen, so this reports a slow pane rather than a failure."""
+    """Without Ready the post-command status identity cannot safely be requested."""
     _install(
         watch,
         monkeypatch,
         _Pane([_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR], [_pane(), _TYPED_CLEAR]),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
-    result = watch.run_slash_command("/clear")
-
-    assert _ID_AFTER in result, result
-    assert "not Ready" in result or "still" in result, result
+    with pytest.raises(watch.MonitorError, match="did not return Ready"):
+        watch.run_slash_command("/clear")
 
 
 def test_a_compaction_hands_back_a_pane_that_is_ready(
@@ -658,6 +809,7 @@ def test_a_clear_waits_for_the_footer_to_be_redrawn_before_reading_the_meter(
             [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
             [_pane(), _TYPED_CLEAR, bare, _pane(percent=100)],
         ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
     result = watch.run_slash_command("/clear")
@@ -825,9 +977,10 @@ def test_the_floor_does_not_block_the_verbs_that_relieve_it(
         watch,
         monkeypatch,
         _Pane(
-            [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR],
-            [_pane(percent=4), _TYPED_CLEAR],
+            [_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
+            [_pane(percent=4), _TYPED_CLEAR, _pane(percent=100)],
         ),
+        session_ids=[_ID_BEFORE, _ID_AFTER],
     )
 
     assert _ID_AFTER in watch.run_slash_command("/clear")

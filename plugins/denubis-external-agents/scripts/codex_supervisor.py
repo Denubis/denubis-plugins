@@ -756,24 +756,6 @@ def capture_snapshot(
     return classify_snapshot(title, content)
 
 
-def _permission_material(payload: Mapping[str, object]) -> str:
-    tool_input = payload.get("tool_input")
-    if isinstance(tool_input, Mapping):
-        for field in ("command", "cmd", "patch"):
-            value = tool_input.get(field)
-            if isinstance(value, str):
-                return value
-    return json.dumps(
-        {
-            "tool_name": payload.get("tool_name"),
-            "tool_input": tool_input,
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-
-
 def _hook_action(
     kind: ObservationKind,
     material: str,
@@ -810,15 +792,16 @@ def normalize_hook(payload: object) -> Observation | None:
         return None
     hook_payload = cast("Mapping[str, object]", payload)
     event_name = hook_payload.get("hook_event_name")
-    if event_name in {"SessionStart", "UserPromptSubmit", "PostToolUse"}:
+    # PermissionRequest says that Codex consulted its hook chain, not that a dialog
+    # survived it. A sibling policy hook may return allow or deny, so only a later
+    # pane snapshot can establish that an approval is still waiting for a human.
+    if event_name in {
+        "SessionStart",
+        "UserPromptSubmit",
+        "PermissionRequest",
+        "PostToolUse",
+    }:
         return Observation(ObservationKind.BUSY)
-    if event_name == "PermissionRequest":
-        material = _permission_material(hook_payload)
-        return _hook_action(
-            ObservationKind.APPROVAL,
-            material,
-            hook_payload,
-        )
     if event_name == "Stop":
         raw_message = hook_payload.get("last_assistant_message")
         message = raw_message if isinstance(raw_message, str) else ""
@@ -1214,9 +1197,25 @@ def _caller_pane() -> str:
     return pane
 
 
+def joined_target() -> PaneRef:
+    """Return the joined Codex pane and foreground process-group identities."""
+    return discover_codex_pane(_caller_pane())
+
+
 def joined_pane() -> str:
     """Return the joined Codex pane ID under the same-window uniqueness rule."""
-    return discover_codex_pane(_caller_pane()).pane_id
+    return joined_target().pane_id
+
+
+def _require_joined_target(expected: PaneRef) -> None:
+    """Refuse when the joined pane or its foreground Codex process has changed."""
+    current = joined_target()
+    if current != expected:
+        raise MonitorError(
+            f"joined Codex target changed from {expected.pane_id}/"
+            f"{expected.process_group_id} to {current.pane_id}/"
+            f"{current.process_group_id}; inspect with --tail"
+        )
 
 
 def pane_tail(lines: int) -> str:
@@ -1357,9 +1356,10 @@ def _plain(snapshot: str) -> str:
 
 
 _CONTEXT_METER = re.compile(r"Context\s+(\d{1,3})%")
-_SESSION_ID = re.compile(
-    r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
-    re.IGNORECASE,
+_UUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_STATUS_SESSION_ID = re.compile(
+    rf"^[\s│|]*Session:\s*({_UUID_PATTERN})\b",
+    re.IGNORECASE | re.MULTILINE,
 )
 _COMPLETION = re.compile(r"^\s{1,4}(/[a-z][a-z0-9-]*)\s{2,}\S")
 
@@ -1377,16 +1377,21 @@ def context_left(content: str) -> int | None:
     return int(readings[-1]) if readings else None
 
 
-def session_identity(title: str) -> str | None:
-    """Return the Codex session id carried in the pane title.
-
-    `/clear` starts a new session and the id changes with it, which is what
-    confirms a clear afterwards. It is found by its shape because the title drops
-    its `weekly` segment while Codex restarts, so counting separators reads the
-    wrong field at exactly the moment the answer matters.
-    """
-    found = _SESSION_ID.search(title)
-    return found[0] if found else None
+def status_session_identity(
+    content: str,
+    *,
+    below: str | None = None,
+) -> str | None:
+    """Return the session UUID from a `/status` panel belonging to this invocation."""
+    lines = _plain(content).splitlines()
+    start = 0
+    if below is not None:
+        echoes = [index for index, line in enumerate(lines) if line.strip() == below]
+        if not echoes:
+            return None
+        start = echoes[-1] + 1
+    found = _STATUS_SESSION_ID.search("\n".join(lines[start:]))
+    return found[1] if found else None
 
 
 def slash_completions(content: str) -> list[str]:
@@ -1660,6 +1665,20 @@ def _confirm_selection(pane_id: str, snapshot: str, command: str) -> None:
     )
 
 
+def _type_slash_command(target: PaneRef, command: str) -> str:
+    """Submit one verified slash command to the retained Codex target."""
+    pane_id = target.pane_id
+    _, snapshot = _preflight_pane(pane_id)
+    _require_joined_target(target)
+    run_command(("tmux", "send-keys", "-t", pane_id, "-l", command))
+    time.sleep(SUBMIT_POLL_SECONDS)
+    typed = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
+    _confirm_selection(pane_id, typed, command)
+    _require_joined_target(target)
+    run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
+    return snapshot
+
+
 def _wait_ready(pane_id: str) -> str | None:
     """Wait for the pane to come back to `Ready`, or report that it never did.
 
@@ -1675,6 +1694,37 @@ def _wait_ready(pane_id: str) -> str | None:
             return title
         time.sleep(SUBMIT_POLL_SECONDS)
     return None
+
+
+def _probe_session_identity(target: PaneRef) -> str:
+    """Read the joined thread UUID from a fresh `/status` invocation."""
+    _require_joined_target(target)
+    _type_slash_command(target, "/status")
+    capture: Command = (
+        "tmux",
+        "capture-pane",
+        "-p",
+        "-e",
+        "-t",
+        target.pane_id,
+    )
+    for _ in range(RESPONSE_POLLS):
+        content = run_command(capture)
+        if _composer_is_empty(content):
+            current = status_session_identity(content, below="/status")
+            if current is not None:
+                if _wait_ready(target.pane_id) is None:
+                    raise MonitorError(
+                        f"{target.pane_id} reported its session but did not return "
+                        f"Ready; inspect with --tail"
+                    )
+                _require_joined_target(target)
+                return current
+        time.sleep(SUBMIT_POLL_SECONDS)
+    raise MonitorError(
+        f"{target.pane_id} drew no fresh session identity for /status; "
+        f"inspect with --tail"
+    )
 
 
 # The panel's own wording. A second model's allowance is reported beneath the first and
@@ -1763,24 +1813,23 @@ def _settled_meter(pane_id: str) -> int | None:
     return None
 
 
-def _confirm_clear(pane_id: str, previous_id: str) -> str:
-    """Confirm a clear by the session id rotating, which only `/clear` does."""
-    rotated: str | None = None
-    for _ in range(RESPONSE_POLLS):
-        current = session_identity(pane_status(pane_id))
-        if current is not None and current != previous_id:
-            rotated = current
-            break
-        time.sleep(SUBMIT_POLL_SECONDS)
-    if rotated is None:
+def _confirm_clear(target: PaneRef, previous_id: str) -> str:
+    """Confirm a clear by reading a different session UUID from fresh status."""
+    pane_id = target.pane_id
+    if _wait_ready(pane_id) is None:
+        raise MonitorError(
+            f"{pane_id} did not return Ready after /clear, so its new session "
+            f"could not be checked; inspect with --tail"
+        )
+    _require_joined_target(target)
+    left = _settled_meter(pane_id)
+    rotated = _probe_session_identity(target)
+    if rotated == previous_id:
         raise MonitorError(
             f"session {previous_id} is still current on {pane_id}, so /clear did not "
             f"run; inspect with --tail"
         )
     cleared = f"cleared {pane_id}: session {previous_id} -> {rotated}"
-    if _wait_ready(pane_id) is None:
-        return f"{cleared}; still starting, not Ready yet"
-    left = _settled_meter(pane_id)
     meter = f"context {left}% left" if left is not None else "meter unreadable"
     return f"{cleared}; Ready, {meter}"
 
@@ -1843,31 +1892,36 @@ def run_slash_command(command: str) -> str:
         raise MonitorError(
             f"unsupported slash command {command!r}; this sends {offered}"
         )
-    pane_id = joined_pane()
-    title, snapshot = _preflight_pane(pane_id)
+    target = joined_target()
+    pane_id = target.pane_id
     # Deliberately no context-floor check: these are the two verbs that relieve it,
     # and gating them would leave an exhausted pane with no way back.
-    previous_id = session_identity(title)
-    if command == "/clear" and previous_id is None:
-        raise MonitorError(
-            f"no session id in the title of {pane_id}, so a clear could not be "
-            f"confirmed: {title!r}"
-        )
+    previous_id = (
+        _probe_session_identity(target) if command in {"/clear", "/compact"} else None
+    )
+    snapshot = _type_slash_command(target, command)
     before = context_left(snapshot)
     seen = _bullet_texts(_plain(snapshot))
 
-    run_command(("tmux", "send-keys", "-t", pane_id, "-l", command))
-    time.sleep(SUBMIT_POLL_SECONDS)
-    typed = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
-    _confirm_selection(pane_id, typed, command)
-    run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
-
     if command == "/clear":
-        # previous_id is not None here; the guard above returned otherwise.
-        return _confirm_clear(pane_id, cast("str", previous_id))
+        if previous_id is None:
+            raise MonitorError("internal error: /clear has no pre-command session")
+        return _confirm_clear(target, previous_id)
     if command == "/status":
-        return _confirm_quota(pane_id)
-    return _confirm_compact(pane_id, before, seen)
+        result = _confirm_quota(pane_id)
+        _require_joined_target(target)
+        return result
+    if previous_id is None:
+        raise MonitorError("internal error: /compact has no pre-command session")
+    result = _confirm_compact(pane_id, before, seen)
+    _require_joined_target(target)
+    current_id = _probe_session_identity(target)
+    if current_id != previous_id:
+        raise MonitorError(
+            f"session changed from {previous_id} to {current_id} while compacting "
+            f"{pane_id}; inspect with --tail"
+        )
+    return f"{result}; session {current_id} unchanged"
 
 
 def send_prompt(prompt_file: str, *, under_floor: bool = False) -> str:
@@ -1951,16 +2005,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--clear",
         action="store_true",
         help=(
-            "start codex on a fresh session, confirmed by the session id in the "
-            "pane title changing"
+            "start codex on a fresh session, confirmed by fresh /status probes "
+            "showing its session id changed"
         ),
     )
     action.add_argument(
         "--compact",
         action="store_true",
         help=(
-            "have codex summarise its transcript, confirmed by its context meter "
-            "going up rather than by what codex says it did"
+            "summarise codex's transcript, confirmed in the same /status session "
+            "by its marker and context meter"
         ),
     )
     action.add_argument(

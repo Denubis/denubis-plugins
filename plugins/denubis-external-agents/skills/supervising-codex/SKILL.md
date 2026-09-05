@@ -93,8 +93,8 @@ The verbs, read from the parser rather than from memory:
 | `--spawn [--label NAME]` | open a Codex pane beside this one |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
-| `--clear` | start codex on a fresh session, confirmed by its session id changing |
-| `--compact` | have codex summarise its transcript, confirmed by the context meter |
+| `--clear` | start codex on a fresh session, confirmed by its `/status` session id changing |
+| `--compact` | summarise its transcript, confirmed in the same session by marker and meter |
 | `--quota` | run `/status` and report the weekly allowance and its reset |
 | `--under-floor` | dispatch below the 30% context floor, carrying a human ruling |
 | `--tail [N]` | print the joined pane's non-blank tail (default 12 lines) |
@@ -348,20 +348,20 @@ a supervisor round to discover something the verb already knew.
 **Each is confirmed by evidence, and the evidence differs because the two commands do
 different things.**
 
-`/clear` does not wipe a screen. It ends codex's session and starts another one, and the
-pane title carries that session's id:
+Pane titles are presentation, not identity: current codex titles carry a mutable thread
+name and may be truncated. Before either verb, the supervisor runs a fresh `/status` and
+reads the labelled `Session:` UUID from the panel below that invocation's exact command
+echo. It retains the resolved tmux pane id and foreground process group while doing so.
+After the command settles it runs the same guarded probe again. A missing or malformed
+panel, a replaced foreground process, or a pane that does not return `Ready` is a refusal,
+not an inferred success.
 
-```
-Ready | brian-ed3d-plugins | main | weekly 99% left | 019fbc8c-ac0b-79d3-… | gpt-5.6-sol
-                                                      ^^^^^^^^^^^^^^^^^^^ the session id
-```
+`/clear` ends codex's session and starts another one, so `--clear` requires the second
+`/status` UUID to differ and reports both ids.
 
-So a clear that ran leaves a different id there from the one that was there before, and
-`--clear` reads it either side and reports both.
-
-`/compact` keeps the same session and the same transcript, so its id is unchanged and
-cannot say anything. What moves instead is the context meter, and `--compact` reports it
-either side and refuses when the figure has fallen.
+`/compact` keeps the same session and transcript, so `--compact` requires the UUID to
+remain unchanged. It also requires codex's new compaction marker and reports the context
+meter either side, refusing when the figure has fallen.
 
 The confirmations cannot be shared, and that is what makes them worth having. Codex's
 completion list puts `/compact` first on the prefix `/c`, so a `/clear` typed one
@@ -508,6 +508,11 @@ stops. They are installed **globally**, once per machine, rather than per projec
 ```sh
 uv run "$plugin_root/skills/supervising-codex/hooks/install-codex-hooks.py"
 ```
+
+A `PermissionRequest` hook is a wake-up, not evidence that an approval dialog remains.
+Another policy hook may allow or deny the request in the same hook chain, removing the
+dialog before a driver could answer it. The monitor emits `NEEDS APPROVAL` only after its
+pane capture still shows a live dialog; `--approve` applies the same live-state guard.
 
 A project-local `.codex/hooks.json` only wakes the monitor in directories somebody set up
 in advance, which leaves a Codex started in a fresh directory unsupervised exactly when
