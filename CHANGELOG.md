@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-token-estimator] 0.2.1
+
+**Fixed:**
+- The skill, the `/estimate` command and the README now run `estimate.py` and
+  `verify.py` as `uv run --no-project python3 …` instead of bare `python3`,
+  the same form `scanning-project-notes` uses. Found by a 2026-09-12 audit of
+  every plugin recipe an agent types into Bash; this was the only plugin
+  still using the bare interpreter.
+
+## [denubis-project-notes] 0.1.5
+
+**Fixed:**
+- `scanning-project-notes` runs its inventory helper as
+  `uv run --no-project python3 …` instead of bare `python3`. Brian's settings
+  deny `Bash(python3 *)`, so the bare recipe was refused on every invocation
+  and the skill could not complete its first step. `--no-project` runs the
+  stdlib-only helper under the ambient interpreter without syncing whatever
+  project the working directory sits in.
+
 ## [denubis-external-agents] 0.16.4
 
 **Fixed:**

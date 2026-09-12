@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Use when the human asks to commit, or an approved execution lifecycle authorises a private checkpoint - stages owned changes intentionally and records coherent outcomes without publishing
+description: Use when the human asks to commit, or an approved execution lifecycle authorises a private checkpoint - stages owned changes and records coherent outcomes without publishing
 user-invocable: true
 ---
 

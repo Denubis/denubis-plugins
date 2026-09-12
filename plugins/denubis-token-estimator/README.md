@@ -64,7 +64,7 @@ resolve (the logs already recorded them). After each move, **append** the new pa
 Use the live verifier to check the implementation and a separate audit actor to attack
 the method itself.
 
-- `python3 scripts/verify.py` — re-derives every headline figure from the live logs;
+- `uv run --no-project python3 scripts/verify.py` — re-derives every headline figure from the live logs;
   PASS/FAIL on structural invariants, `[base]` on point-in-time counts that drift.
 - `docs/AUDIT-BRIEF.md` + `docs/findings.schema.json` — give the brief, but not the
   evaluator-only `docs/AUDIT-ORACLE.md`, to a different engine for a read-only audit.

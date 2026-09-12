@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,17 @@ INVENTORY = (
 )
 
 
+def _git_clean_env() -> dict[str, str]:
+    """The environment without git's own state.
+
+    A pre-commit hook inherits `GIT_INDEX_FILE=.git/index` and friends from
+    the commit that runs it. Inside the fixture's freshly added worktree
+    `.git` is a file, so that relative path fails with "Not a directory" and
+    the suite goes red only when run from a hook (2026-09-12).
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
@@ -27,6 +39,7 @@ def _run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
         check=True,
         capture_output=True,
         text=True,
+        env=_git_clean_env(),
     )
 
 
@@ -37,6 +50,7 @@ def _inventory(cwd: Path) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env=_git_clean_env(),
     )
 
 

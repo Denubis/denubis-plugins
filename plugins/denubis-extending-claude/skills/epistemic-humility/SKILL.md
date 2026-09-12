@@ -1,6 +1,6 @@
 ---
 name: epistemic-humility
-description: Use when presenting results, conclusions, or findings, or when assessing whether a proposed skill, agent, or automation earns its existence - tempers claims to the evidence and screens scope first
+description: Use when presenting results or findings, or assessing whether a proposed skill, agent, or automation earns its existence - tempers claims to the evidence and screens scope first
 user-invocable: false
 ---
 

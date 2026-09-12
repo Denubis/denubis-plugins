@@ -1,6 +1,6 @@
 ---
 name: academic-writing
-description: Use when drafting or revising academic prose - loads the project's attested register, removes manuscript-management scar tissue, and rebuilds overloaded sentences without changing evidential strength
+description: Use when drafting or revising academic prose - loads the project's attested register, removes manuscript scar tissue, and rebuilds overloaded sentences without changing evidential strength
 ---
 
 # Academic Writing

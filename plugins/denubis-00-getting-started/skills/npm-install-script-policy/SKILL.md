@@ -1,6 +1,6 @@
 ---
 name: npm-install-script-policy
-description: Use when an npm install is blocked by install scripts or git dependencies - ESTRICTALLOWSCRIPTS, EALLOWSCRIPTS, Refusing to fetch, allowScripts, postinstall - or when setting npm supply-chain defaults
+description: Use when an npm install is blocked by install scripts or git dependencies - ESTRICTALLOWSCRIPTS, EALLOWSCRIPTS, Refusing to fetch, allowScripts, postinstall - or to set npm supply-chain defaults
 user-invocable: true
 ---
 

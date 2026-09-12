@@ -1,6 +1,6 @@
 ---
 name: writing-claude-directives
-description: Use when writing instructions that guide Claude behavior - skills, CLAUDE.md files, agent prompts, system prompts. Covers token efficiency, compliance techniques, and discovery optimization.
+description: Use when writing instructions that guide Claude behavior - skills, CLAUDE.md files, agent prompts, system prompts. Covers token efficiency, compliance, and discovery optimization.
 user-invocable: false
 ---
 

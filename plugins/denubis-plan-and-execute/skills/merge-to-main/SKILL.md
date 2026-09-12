@@ -1,6 +1,6 @@
 ---
 name: merge-to-main
-description: Use when the human requests integration into the default branch, optionally including an explicit push and cleanup - verifies both sides, integrates, reruns gates, and reads back every authorized state change
+description: Use when the human requests integration into the default branch, with optional push and cleanup - verifies both sides, integrates, reruns gates, and reads back each authorized state change
 user-invocable: true
 disable-model-invocation: true
 ---

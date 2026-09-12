@@ -9,7 +9,7 @@ argument-hint: "[--dir <path> | --person <name> | --all] [--month | --start <ISO
 Run the estimator and present its table to the user. Execute via Bash:
 
 ```
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/estimate.py" $ARGUMENTS
+uv run --no-project python3 "${CLAUDE_PLUGIN_ROOT}/scripts/estimate.py" $ARGUMENTS
 ```
 
 (If `${CLAUDE_PLUGIN_ROOT}` is not set in your shell, resolve it to this plugin's
@@ -35,7 +35,7 @@ with `--month`. `--csv <file>` also writes the tidy
 Present the table as-is; call out the subagent share and the human-word total. The grand
 total equals the sum of the monthly rows by construction. If a figure looks surprising,
 re-derive the headline numbers from the live logs with
-`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify.py"`.
+`uv run --no-project python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify.py"`.
 
 People-roots come from `~/.token-estimator`; without it the tool scopes to the local
 directory. This is read-only over `~/.claude` and `~/.codex` logs.

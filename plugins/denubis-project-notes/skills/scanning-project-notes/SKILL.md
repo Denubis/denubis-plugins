@@ -26,7 +26,7 @@ filename listing, keyword search, or remembered inventory.
 
 ```bash
 PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
-python3 "$PLUGIN_DIR/skills/scanning-project-notes/scripts/inventory.py" --cwd "$PWD"
+uv run --no-project python3 "$PLUGIN_DIR/skills/scanning-project-notes/scripts/inventory.py" --cwd "$PWD"
 ```
 
 The helper resolves the main repository root through Git's common directory so linked

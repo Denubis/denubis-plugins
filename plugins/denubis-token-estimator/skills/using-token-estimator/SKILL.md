@@ -21,13 +21,13 @@ Resolve the provider-supplied plugin root, then invoke the report script:
 
 ```bash
 PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
-python3 "$PLUGIN_DIR/scripts/estimate.py"                     # current project
-python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --month
-python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> \
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py"                     # current project
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --month
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> \
   --start 2026-08-11T05:37:40Z --end 2026-08-16T07:44:15Z
-python3 "$PLUGIN_DIR/scripts/estimate.py" --person <name>
-python3 "$PLUGIN_DIR/scripts/estimate.py" --all
-python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --csv out.csv
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --person <name>
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --all
+uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --csv out.csv
 ```
 
 `--start` and `--end` must be provided together as timezone-aware ISO timestamps.
@@ -105,7 +105,7 @@ old paths so historical log entries still resolve.
 Run the live implementation checks:
 
 ```bash
-python3 "$PLUGIN_DIR/scripts/verify.py"
+uv run --no-project python3 "$PLUGIN_DIR/scripts/verify.py"
 ```
 
 Require positive population evidence: thread/file inventory, Codex counter modes,

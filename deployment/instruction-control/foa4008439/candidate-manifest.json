@@ -250,8 +250,8 @@
     "project_claude": {
       "path": "CLAUDE.md",
       "live_path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
-      "bytes": 2775,
-      "sha256": "fa562d7746a8cb5680c81b4b5fd6ef897c6b862e93a5040fa20bf548e962e062",
+      "bytes": 3308,
+      "sha256": "e211b06279c8a519f5dc67e3a7bf5205603488704385bd85a4975200fe19504b",
       "authority_actions": ["global_instruction_control", "project_uv_execution"]
     },
     "settings": {

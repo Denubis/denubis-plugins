@@ -1,6 +1,6 @@
 ---
 name: starting-an-implementation-plan
-description: Use when an accepted design is ready for implementation planning - resolves the design and workspace, writes outcome-owned work, verifies its evidence, and returns an exact execution invocation
+description: Use when an accepted design is ready for implementation planning - resolves the design and workspace, writes outcome-owned work, verifies its evidence, and returns the execution invocation
 user-invocable: true
 ---
 

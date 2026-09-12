@@ -1,6 +1,6 @@
 ---
 name: coding-effectively
-description: Use for direct code work when no more specific execution, debugging, or refactoring workflow already owns the method - inspects project conventions and routes only genuinely needed specialist guidance
+description: Use for direct code work when no more specific execution, debugging, or refactoring workflow already owns the method - inspects project conventions and routes only needed specialist guidance
 ---
 
 # Coding Effectively
