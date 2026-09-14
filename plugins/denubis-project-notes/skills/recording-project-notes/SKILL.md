@@ -12,6 +12,11 @@ has approved the exact proposal. Approval must name the path, semantic content, 
 consequence, and resolvable evidence. Without that approval, return to the proposal gate
 without writing.
 
+Two records are exempt from the approval gate because they exist so that questions and
+rulings reach the human instead of waiting on the human: the open-questions ticket file
+and the decision records. See *Open questions and decisions* below. Every other note
+waits for approval.
+
 ## Resolve the destination
 
 Resolve the main repository root from `git rev-parse --git-common-dir` as the scanning
@@ -52,6 +57,37 @@ messages; preserve exact locators rather than paraphrasing them into authority.
 
 If the evidence or wording changed after approval, stop and present the changed proposal
 instead of widening the authorized write.
+
+## Open questions and decisions
+
+Any agent, including a dispatched subagent, that is unclear about scope, premise, or
+approach pauses and records the question rather than assuming. Pausing is always welcome;
+silent assumption never resolves anything. The record is a ticket appended to
+`<main-repository-root>/.notes/project_open-questions.md`. Create the file, with the
+frontmatter below, if it does not exist; no approval is needed for that.
+
+```yaml
+---
+name: open-questions
+description: Durable queue of questions awaiting a human answer, with each answer beside its question
+type: project
+---
+```
+
+Each ticket carries the question, why it blocks, the evidence, and who raised it. A ticket
+closes only when the human answers it; write the answer beside the question verbatim, with
+the question it answered. Compaction, `/clear`, scroll, elapsed time, or repetition never
+closes a ticket. An answered ticket stays in the file as the record.
+
+Anything the human rules is also a decision record. The default register is
+`<main-repository-root>/.notes/decisions/`, with an index at
+`.notes/decisions/README.md`; a project that already keeps its register elsewhere, such
+as `docs/architecture/decisions/`, keeps it there. Follow that register's format and
+authority-evidence rule. Creating a decision record needs no approval; the ruling it
+records did.
+
+`.notes/` is durable passive memory, never transport. Prompt exchange with an external
+agent, mail, and other operational state stay in their own gitignored directories.
 
 ## Verify the new owner
 

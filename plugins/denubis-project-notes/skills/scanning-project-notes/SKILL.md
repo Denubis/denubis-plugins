@@ -43,6 +43,14 @@ notes set. Outside Git the helper treats the requested working directory as the 
 root. If `.notes/` is absent, record that bounded result and continue unless prior-chat
 recovery is independently required.
 
+## 1a. Rediscover open tickets
+
+If the inventory lists `.notes/project_open-questions.md`, open it before anything else
+and read every ticket without an answer. An open ticket that bears on the current task
+blocks the dependent work until the human answers it; the task's other parts proceed.
+Losing a question from context never settled it, so this rediscovery runs on every task
+entry and after every compaction or clear.
+
 ## 2. Read before selecting
 
 Consider every returned frontmatter block before choosing which bodies could change the
@@ -115,10 +123,21 @@ Wait for the user to approve that proposal before editing the note or ADR. After
 apply only the agreed change and verify every evidence pointer. If no durable change clears
 this gate, finish without proposing or writing project memory.
 
+Two writes bypass the proposal gate, because they carry questions and rulings to the human
+rather than waiting on the human: appending a ticket to
+`.notes/project_open-questions.md` when the work is unclear, and recording a ruling the
+human has already made in the decision register (`.notes/decisions/` by default, or the
+project's existing register). `recording-project-notes` owns both formats. Raise open
+tickets to the human one at a time, marked as a question for them and placed last; an
+indifferent answer is not delegation, so think its implications through with the human
+before recording anything.
+
 ## Completion check
 
 - The helper reported the main-repository notes path, every project-memory Markdown
   entry, and any excluded operational Markdown count.
+- Open tickets in `.notes/project_open-questions.md`, if present, were read before the
+  work, and any that bear on the task were raised rather than assumed away.
 - Every returned frontmatter block was considered before body selection.
 - Relevant note bodies were opened.
 - Prior chats were searched only when independently required, with reported coverage.

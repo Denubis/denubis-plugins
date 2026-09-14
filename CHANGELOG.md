@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-project-notes] 0.2.0
+
+**Added:**
+- Questions for the human are tickets in `.notes/project_open-questions.md`, created
+  without approval, closed only by a human answer, and rediscovered at every task entry
+  (`scanning-project-notes` step 1a). Decision records default to `.notes/decisions/`;
+  an existing register is kept. Both writes bypass the proposal gate. ADR 0005.
+
+## [denubis-external-agents] 0.17.0
+
+**Changed:**
+- `supervising-codex` requires the open-questions ticket file alongside the ADR register,
+  creates either default without asking, and tells Codex to file questions as tickets
+  rather than leave them in the pane. `codex-prompts/` stays outside `.notes/`. ADR 0005.
+
 ## [denubis-token-estimator] 0.2.1
 
 **Fixed:**

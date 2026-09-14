@@ -57,13 +57,21 @@ the loop works, and neither is optional (Brian, 2026-07-28):
 - **An ADR register.** Anything ruled along the way belongs in the project's decision
   records, indexed. Codex is told to say so when a prompt produces a ruling, because a
   decision that lives only in a pane is a decision that gets re-litigated next week. The
-  project names its own location (`docs/decisions/adr-register.md` and
-  `docs/architecture/decisions/` are both in use across Brian's repos); the skill requires
-  that one exist, not that it sit anywhere in particular.
+  default register is `.notes/decisions/` in the main checkout, indexed by its
+  `README.md` (ruled 2026-09-14, ADR 0005); a project that already keeps one elsewhere
+  (`docs/decisions/adr-register.md` and `docs/architecture/decisions/` are both in use
+  across Brian's repos) keeps it there. A project with none gets the default created,
+  without asking, before the first prompt is written.
+- **An open-questions ticket file**, `.notes/project_open-questions.md` in the main
+  checkout. Codex's questions, and the supervisor's, are appended there as tickets rather
+  than left in a pane to scroll past. A ticket closes only when the human answers it;
+  compaction, `/clear`, scroll, or elapsed time never does. Create it, without asking, the
+  first time a question arises; `denubis-project-notes:recording-project-notes` owns the
+  format.
 
-If either is missing, say so and stop rather than improvising a substitute. A prompt
-directory that is tracked leaks working drafts into history; a project with no register
-turns every ruling into oral tradition.
+If the prompt directory is missing, say so and stop rather than improvising a substitute:
+a prompt directory that is tracked leaks working drafts into history. `.notes/` is durable
+passive memory, never transport, so `codex-prompts/` never lives inside it.
 
 ## Invoking the supervisor
 
@@ -141,10 +149,13 @@ left as a documented licence to improvise.
      what you could not check rather than inferring it; never assert an absence from a
      single search; if there is any uncertainty, stop and ask the human one specific,
      critical, pointed question at a time, never bundled and never resolved by silent
-     assumption, until the uncertainty resolves; and anything ruled along the way probably
-     belongs in the project's decision records, indexed in its ADR register*. The
-     one-question rule binds the supervisor too: when it is unsure, it asks the human
-     the same way;
+     assumption, until the uncertainty resolves; pausing to push back on scope, premise,
+     or approach is always welcome; each question is appended as a ticket to
+     `.notes/project_open-questions.md` so it survives the pane; and anything ruled along
+     the way probably belongs in the project's decision records, indexed in its ADR
+     register*. The one-question rule binds the supervisor too: when it is unsure, it
+     asks the human the same way, and it raises Codex's tickets to the human one at a
+     time, marked as a question for them and placed last;
    - **the write scope, stated by the prompt itself.** A drafting stage writes one
      document under `codex-prompts/out/`; a code phase writes source, tests, and generated
      data into its own worktree. Neither the skill nor the sending tool may assert one

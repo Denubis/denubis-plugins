@@ -1,7 +1,7 @@
 {
   "name": "denubis-project-notes",
   "description": "Task-entry inspection and human-approved, evidence-linked creation or maintenance of project notes and ADRs, with conditional prior-chat recovery.",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "github": "denubis"
