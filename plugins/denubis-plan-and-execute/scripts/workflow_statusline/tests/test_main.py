@@ -474,7 +474,7 @@ class TestTmuxIntegration:
 class TestQuotaSnapshotSideEffect:
     def test_writes_quota_snapshots_for_both_windows(self, tmp_path, monkeypatch):
         """main() persists timestamp|used_pct|resets_at per window, read by
-        tmux-codex-quota/claude_quota.py."""
+        workflow_statusline.claude_quota."""
         monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
         payload = _base_payload(
             rate_limits={

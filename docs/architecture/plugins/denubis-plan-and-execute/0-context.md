@@ -65,8 +65,13 @@ explicit empty `hooks/codex-hooks.json`, so Codex cannot load the Claude crash-l
 through default hook discovery. The wrapper and statusline are observed runtime utilities,
 not execution gates. On each Claude statusline render, the statusline persists the
 per-window `timestamp|used_pct|resets_at` quota snapshot under
-`$XDG_CACHE_HOME/claude-statusline/quota-*`; that file is an external contract consumed by
-the tmux-codex-quota Byobu cell.
+`$XDG_CACHE_HOME/claude-statusline/quota-*`. The same `workflow-statusline` package
+provides `byobu-claude-quota` to read the weekly snapshot and `byobu-codex-quota` to
+read the newest main-pool weekly quota from Codex's local state database and rollouts.
+Both cells compare usage with a local active-hours pace target and show the reset
+weekday, switching to its local clock time at 24 hours remaining. The package's
+`byobu/30_*_quota` launchers resolve their symlink targets and run the commands through
+uv; no separate Byobu reporter repository or quota API polling is required.
 
 ## Evidence and failure boundaries
 

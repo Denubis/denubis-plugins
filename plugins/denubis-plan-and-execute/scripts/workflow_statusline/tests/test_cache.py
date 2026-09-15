@@ -313,7 +313,7 @@ class TestDefaultCachePath:
 
 class TestQuotaSnapshot:
     """The quota snapshot is the external contract read by the byobu cell
-    (tmux-codex-quota/claude_quota.py): one line, ``timestamp|used_pct|resets_at``.
+    (workflow_statusline.claude_quota): one line, ``timestamp|used_pct|resets_at``.
     """
 
     def test_path_lives_beside_rate_cache(

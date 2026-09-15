@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+script=$(readlink -f -- "$0")
+project=$(dirname -- "$(dirname -- "$script")")
+exec uv run --frozen --project "$project" --package workflow-statusline byobu-codex-quota

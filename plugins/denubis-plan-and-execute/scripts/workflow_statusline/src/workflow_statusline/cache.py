@@ -23,8 +23,8 @@ def rate_cache_path(window_key: str) -> str:
 def quota_snapshot_path(window_key: str) -> str:
     """Return the per-user snapshot file path for a rate-limit window.
 
-    Sits beside the rate-sample buffers. The file is an external contract:
-    tmux-codex-quota's claude_quota.py reads it to render the byobu cell.
+    Sits beside the rate-sample buffers. The packaged claude_quota command
+    reads this snapshot to render the Byobu cell.
     """
     xdg = os.environ.get("XDG_CACHE_HOME")
     base = xdg or str(Path(os.environ.get("HOME", "/tmp")) / ".cache")

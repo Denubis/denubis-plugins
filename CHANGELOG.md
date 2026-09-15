@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.2.0
+
+**Added:**
+- The workflow-statusline package now owns the Claude and Codex Byobu quota
+  reporters, their tests, and symlink-safe 30-second launchers. Installation no
+  longer requires the separate `tmux-codex-quota` repository.
+- Both Byobu cells show the reset weekday, switching to local `HH:MM` at 24 hours
+  remaining. The Claude cell retains the overall weekly quota; Fable reporting is
+  deferred because Claude Code 2.1.268 omits it from statusline JSON.
+
+**Fixed:**
+- The Codex cell selects the main quota pool and compares quota-event timestamps
+  across recent threads. Spark activity can no longer replace the main quota
+  with an unrelated or older reading.
+
 ## [denubis-project-notes] 0.2.0
 
 **Added:**

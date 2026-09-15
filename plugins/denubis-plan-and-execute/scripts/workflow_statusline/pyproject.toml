@@ -6,6 +6,8 @@ requires-python = ">=3.14"
 
 [project.scripts]
 workflow-statusline = "workflow_statusline.__main__:main"
+byobu-codex-quota = "workflow_statusline.codex_quota:main"
+byobu-claude-quota = "workflow_statusline.claude_quota:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

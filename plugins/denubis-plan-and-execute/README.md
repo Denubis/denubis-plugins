@@ -99,4 +99,9 @@ live-transcript marker current, plus the claudew wrapper and workflow statusline
 live-marker contract is Claude-specific and is not part of provider-neutral planning
 semantics. Textual pre-write quality detectors are not shipped.
 
+The [workflow-statusline package](scripts/workflow_statusline/README.md) also ships the
+Claude and Codex Byobu quota cells, including installation instructions for their
+30-second launchers. They read local quota data and show usage, active-hours pace,
+and the reset weekday or time.
+
 See the [architecture context](../../docs/architecture/plugins/denubis-plan-and-execute/0-context.md).
