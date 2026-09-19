@@ -70,8 +70,13 @@ CODEX_LABEL_OPTION = "@codex_label"
 CODEX_PING_INSTRUCTION = (
     "If anything is unclear, ambiguous, or contradictory, stop and ask one "
     "specific, critical, and pointed question at a time until you have "
-    "sufficient information. Surface any decision rather than deciding it "
-    "silently, so the supervisor documents it."
+    "sufficient information. Ask it as plain text in this conversation, and "
+    "never through request_user_input or request_user_input_async: a queued "
+    "question holds this pane's title at Action Required, cannot be answered "
+    "from outside the pane, and expires unanswered, which turns the question "
+    "you stopped to ask into the silent assumption you stopped to avoid. "
+    "Surface any decision rather than deciding it silently, so the supervisor "
+    "documents it."
 )
 BUSY_SPINNERS = frozenset(
     "\u280b\u2819\u2839\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
@@ -215,6 +220,13 @@ _DIALOG_CHROME = re.compile(
     re.IGNORECASE,
 )
 _STATUS_BULLET = re.compile(r"^(?:working|thinking|waiting)\b", re.IGNORECASE)
+# Codex 0.154's `request_user_input_async` draws a collapsed widget above the
+# composer — `• Queued follow-up inputs`, `? 1 question · 15s`, `alt + , to answer` —
+# and holds `[ ! ] Action Required` in the pane title while the footer still reads
+# `Working`. Only the count is read: the `· 15s` expiry ticks once a second, and the
+# whole-screen material the approval branch falls back to therefore made every tick a
+# new waiting thing (nineteen announcements in thirty minutes on %161, 2026-09-19).
+_QUEUED_QUESTIONS = re.compile(r"^\s*\?\s+(\d+)\s+questions?\b", re.MULTILINE)
 
 
 def _normalized(text: str) -> str:
@@ -527,11 +539,53 @@ def approval_choice(content: str) -> str:
     raise MonitorError(f"{complaint}, so this one is yours to answer: {rendered}")
 
 
+def queued_questions(title: str, recent_content: str) -> int | None:
+    """Return how many questions Codex's queued-input widget is holding, if any.
+
+    The title is required as well as the widget text, because the title is what
+    tracks the widget's life: Codex sets `[ ! ] Action Required` while a question is
+    queued and drops it when the queue clears, whereas the drawn block can still be
+    sitting in the scrollback afterwards. Reading the block alone would leave a pane
+    announcing a question nobody is waiting on.
+    """
+    if re.search(r"action required", title, re.IGNORECASE) is None:
+        return None
+    found = _QUEUED_QUESTIONS.search(recent_content)
+    return int(found[1]) if found else None
+
+
+def _action_required_observation(
+    title: str,
+    content: str,
+    recent_content: str,
+) -> Observation:
+    """Tell an approval dialog from a queued question under the same title.
+
+    Codex draws `[ ! ] Action Required` for both, and only one of them is an
+    approval: `--approve` refuses a queued question outright, correctly, because no
+    dialog is pending, so announcing it as NEEDS APPROVAL names an action the driver
+    cannot take. A live dialog still wins, because it blocks the run, where a queued
+    question expires after thirty seconds and lets Codex carry on.
+    """
+    queued = queued_questions(title, recent_content)
+    if queued is not None and not _approval_is_pending(recent_content):
+        material = f"{queued} queued follow-up question(s)"
+        key = _action_key(ObservationKind.QUESTION, material)
+        return Observation(
+            ObservationKind.QUESTION,
+            key,
+            f"{queued} queued in Codex's own input widget, which no verb answers; "
+            f"answer it in the pane with alt + , before it expires",
+            correlation_key=key,
+        )
+    return _action_observation(ObservationKind.APPROVAL, _approval_material(content))
+
+
 def classify_snapshot(title: str, content: str) -> Observation:
     """Classify a bounded TUI snapshot, defaulting unknown states to busy."""
+    recent_content = "\n".join(content.splitlines()[-12:])
     if re.search(r"action required", title, re.IGNORECASE):
-        material = _approval_material(content)
-        return _action_observation(ObservationKind.APPROVAL, material)
+        return _action_required_observation(title, content, recent_content)
 
     if any(spinner in title for spinner in BUSY_SPINNERS) or re.search(
         r"\bworking\b|\bwaiting\b",
@@ -540,7 +594,6 @@ def classify_snapshot(title: str, content: str) -> Observation:
     ):
         return Observation(ObservationKind.BUSY)
 
-    recent_content = "\n".join(content.splitlines()[-12:])
     # A pending approval is checked before the title, because Codex's steady-state
     # title is "Ready" and it keeps saying Ready while drawing an approval prompt.
     # Returning on the title first reported those as DONE, telling the supervisor
@@ -1218,14 +1271,56 @@ def _require_joined_target(expected: PaneRef) -> None:
         )
 
 
-def pane_tail(lines: int) -> str:
-    """Return the joined pane's non-blank tail, for triaging before acting."""
-    captured = run_command(("tmux", "capture-pane", "-p", "-t", joined_pane()))
+def _nonblank_tail(captured: str, lines: int) -> str:
     kept = [line for line in captured.splitlines() if line.strip()]
     return "\n".join(kept[-lines:])
 
 
-def spawn_pane(label: str | None = None) -> str:
+def pane_tail(lines: int) -> str:
+    """Return the joined pane's non-blank tail, for triaging before acting."""
+    return _nonblank_tail(
+        run_command(("tmux", "capture-pane", "-p", "-t", joined_pane())),
+        lines,
+    )
+
+
+def _spawn_directory(pane: str, requested: str | None) -> Path:
+    """Resolve where the spawned Codex will run, refusing anything that is not there.
+
+    tmux reads a pane's own path from `/proc/<pid>/cwd`, so a directory deleted under
+    a live shell arrives with the kernel's literal ` (deleted)` suffix. `split-window
+    -c` falls back to `$HOME` without complaining when its argument does not resolve,
+    and the pane then starts codex with `-s workspace-write` rooted at the home
+    directory: a sandbox over everything the operator owns, announced by nothing.
+    Observed 2026-09-19 on a pane whose worktree had been removed under it.
+
+    An explicit directory is how a supervisor in exactly that position still starts
+    Codex where the work is (Brian, 2026-09-19), so the pane's own path is not read
+    at all when one is given. Either way the result is resolved to an absolute path,
+    because `-c` interprets a relative one against the tmux server's directory rather
+    than this process's, which would relocate the sandbox just as quietly.
+    """
+    reported = requested
+    if reported is None:
+        reported = run_command(
+            ("tmux", "display-message", "-p", "-t", pane, "#{pane_current_path}")
+        ).strip()
+    candidate = Path(reported)
+    if not candidate.is_dir():
+        source = (
+            "--cwd names"
+            if requested is not None
+            else "the calling pane reports its working directory as"
+        )
+        raise MonitorError(
+            f"{source} {reported!r}, which is not a directory, and tmux would "
+            f"silently start codex in $HOME with a workspace-write sandbox over it; "
+            f"pass --cwd with a directory that exists"
+        )
+    return candidate.resolve()
+
+
+def spawn_pane(label: str | None = None, cwd: str | None = None) -> str:
     """Open a Codex pane beside this one, refusing when one already runs."""
     pane = _caller_pane()
     try:
@@ -1234,9 +1329,7 @@ def spawn_pane(label: str | None = None) -> str:
         existing = ""
     if existing:
         raise MonitorError(f"Codex already runs at {existing}; close it first")
-    cwd = run_command(
-        ("tmux", "display-message", "-p", "-t", pane, "#{pane_current_path}")
-    ).strip()
+    workdir = _spawn_directory(pane, cwd)
     pane_id = run_command(
         (
             "tmux",
@@ -1245,14 +1338,14 @@ def spawn_pane(label: str | None = None) -> str:
             "-t",
             pane,
             "-c",
-            cwd,
+            str(workdir),
             "-P",
             "-F",
             "#{pane_id}",
             CODEX_SPAWN_COMMAND,
         )
     ).strip()
-    pane_label = label or Path(cwd).name or "codex"
+    pane_label = label or workdir.name or "codex"
     run_command(
         (
             "tmux",
@@ -1434,6 +1527,31 @@ def selected_completion(content: str) -> str | None:
     return highlighted[0] if len(highlighted) == 1 else None
 
 
+def _not_ready_complaint(pane_id: str, title: str) -> str:
+    """Say why a pane is not Ready, naming a queued question when one is holding it.
+
+    `request_user_input_async` holds the title at `[ ! ] Action Required` for as long
+    as its question is queued, while Codex works on underneath it. The bare title
+    reads exactly like a sandbox dialog, so the refusal sent the supervisor to
+    `--approve`, which then refused as well because no dialog was pending; on
+    2026-09-19 a human ruling could not be delivered at all and went into a ticket
+    file instead. Nothing this tool can type answers that widget: Codex's own hint
+    on screen says `alt + , to answer`.
+    """
+    recent = "\n".join(
+        run_command(("tmux", "capture-pane", "-p", "-t", pane_id)).splitlines()[-12:]
+    )
+    queued = queued_questions(title, recent)
+    if queued is None:
+        return f"joined Codex pane {pane_id} is not Ready: {title!r}"
+    return (
+        f"joined Codex pane {pane_id} is holding {queued} question(s) queued in "
+        f"Codex's own input widget, so its title reads {title!r}. That is not an "
+        f"approval: read it with --question, take it to the human, and reply with "
+        f"--answer TEXT rather than sending into the pane"
+    )
+
+
 def _preflight_pane(pane_id: str) -> tuple[str, str]:
     """Return the pane's title and coloured snapshot once it is safe to type into.
 
@@ -1444,7 +1562,7 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
     """
     title = pane_status(pane_id)
     if re.search(r"\bready\b", title, re.IGNORECASE) is None:
-        raise MonitorError(f"joined Codex pane {pane_id} is not Ready: {title!r}")
+        raise MonitorError(_not_ready_complaint(pane_id, title))
     snapshot = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
     content = _plain(snapshot)
     if _approval_is_pending("\n".join(content.splitlines()[-12:])):
@@ -1634,6 +1752,107 @@ def approve_pending() -> str:
             return f"approved on {pane_id}: {command}\n{reply}"
         time.sleep(SUBMIT_POLL_SECONDS)
     return f"approved on {pane_id}: {command}\nstill working; nothing reported yet"
+
+
+# tmux's name for alt+comma, which is what Codex binds `edit_queued_message` to
+# (`[tui.keymap.chat] edit_queued_message = ["alt-,"]`, and the widget's own hint on
+# screen reads `alt + , to answer`).
+QUESTION_KEY = "M-,"
+
+
+def _widget_pane(verb: str) -> tuple[str, int]:
+    """Resolve the joined pane and refuse unless a queued question is genuinely up.
+
+    The approval check runs first and for the same reason it does in
+    `_preflight_pane`: every keystroke answers whatever dialog is on screen, and the
+    expansion key is a keystroke like any other. The widget check is second, because
+    neither verb has anything to do to a pane with no question queued, and a
+    keystroke sent to one goes somewhere nobody predicted.
+    """
+    pane_id = joined_pane()
+    title = pane_status(pane_id)
+    recent = "\n".join(
+        _plain(
+            run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
+        ).splitlines()[-12:]
+    )
+    if _approval_is_pending(recent):
+        raise MonitorError(
+            f"joined Codex pane {pane_id} holds a pending approval, and any keystroke "
+            f"would answer it; clear it with --approve or read it with --tail"
+        )
+    queued = queued_questions(title, recent)
+    if queued is None:
+        raise MonitorError(
+            f"no queued question on joined Codex pane {pane_id} ({title!r}), so "
+            f"{verb} has nothing to act on; inspect with --tail"
+        )
+    return pane_id, queued
+
+
+def open_queued_question() -> str:
+    """Press Codex's own expansion key and read back what the widget then shows.
+
+    Deliberately one keystroke and nothing else, so the supervisor reads the
+    question before anything is typed at it (Brian, 2026-09-19: "multiple fucking
+    calls to open it and answer"). What the expanded widget looks like has never
+    been captured; this verb exists to go and look.
+    """
+    pane_id, _ = _widget_pane("--question")
+    run_command(("tmux", "send-keys", "-t", pane_id, QUESTION_KEY))
+    time.sleep(SUBMIT_POLL_SECONDS)
+    shown = _nonblank_tail(
+        run_command(("tmux", "capture-pane", "-p", "-t", pane_id)), 20
+    )
+    return f"opened the queued question on {pane_id}; answer it with --answer\n{shown}"
+
+
+def answer_queued_question(text: str) -> str:
+    """Type one answer into the opened widget and confirm the question is gone.
+
+    Built 2026-09-19 against a single after-the-fact observation: once Brian pressed
+    alt+, by hand, the composer held the question as a quoted line and his answer
+    beneath it, so an answer is keystrokes plus a separate Enter, exactly as
+    `send_message` submits. The expanded widget itself has never been captured, so
+    the confirmation is deliberately not "the screen looks right": it is the queued
+    question being gone from the pane, which holds whatever the layout turns out to
+    be. A pane that still shows the question is reported as a failure with its tail.
+    """
+    if not text:
+        raise MonitorError("refusing to send an empty answer")
+    if "\n" in text:
+        raise MonitorError(
+            "refusing a multi-line answer: it goes in as keystrokes, so every "
+            "newline would submit what had been typed so far; send one line"
+        )
+    pane_id, before = _widget_pane("--answer")
+    run_command(("tmux", "send-keys", "-t", pane_id, "-l", text))
+    time.sleep(SUBMIT_POLL_SECONDS)
+    typed = _plain(run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id)))
+    if text not in typed:
+        # The composer may hold a quoted question above the answer, so this looks for
+        # the text anywhere on screen rather than reading the composer line. A pane
+        # narrow enough to wrap the answer will also fail here, which is a refusal
+        # rather than a blind Enter.
+        raise MonitorError(
+            f"the answer is not on screen on {pane_id} after typing it, so nothing "
+            f"was submitted; inspect with --tail\n{_nonblank_tail(typed, 20)}"
+        )
+    run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
+    for _ in range(SUBMIT_POLLS):
+        time.sleep(SUBMIT_POLL_SECONDS)
+        title = pane_status(pane_id)
+        captured = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+        remaining = queued_questions(title, "\n".join(captured.splitlines()[-12:]))
+        if remaining is None or remaining < before:
+            left = "none" if remaining is None else str(remaining)
+            return f"answered on {pane_id}: {before} queued -> {left}"
+    stuck = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
+    raise MonitorError(
+        f"{before} question(s) still queued on {pane_id} after the answer was "
+        f"submitted, so it did not land; inspect with --tail\n"
+        f"{_nonblank_tail(stuck, 20)}"
+    )
 
 
 def _clear_composer(pane_id: str) -> None:
@@ -1948,12 +2167,22 @@ def send_prompt(prompt_file: str, *, under_floor: bool = False) -> str:
     return f"{result}: {path.name}"
 
 
+def _widget_verb(args: argparse.Namespace) -> str | None:
+    """Run whichever queued-question verb was asked for, or report that neither was."""
+    if args.question:
+        return open_queued_question()
+    if args.answer is not None:
+        answer = sys.stdin.read() if args.answer == "-" else args.answer
+        return answer_queued_question(answer.strip())
+    return None
+
+
 def run_verb(args: argparse.Namespace) -> int | None:
     """Run a one-shot verb, or return None to fall through to the monitor."""
     if args.resolve:
         print(joined_pane())
     elif args.spawn:
-        print(spawn_pane(args.label))
+        print(spawn_pane(args.label, args.cwd))
     elif args.send is not None:
         print(send_prompt(args.send, under_floor=args.under_floor))
     elif args.tail is not None:
@@ -1965,6 +2194,8 @@ def run_verb(args: argparse.Namespace) -> int | None:
         print(send_message(joined_pane(), text, under_floor=args.under_floor))
     elif args.approve:
         print(approve_pending())
+    elif (widget := _widget_verb(args)) is not None:
+        print(widget)
     elif args.clear:
         print(run_slash_command("/clear"))
     elif args.compact:
@@ -1996,10 +2227,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="NAME",
         help="label a spawned pane (default: working-directory name)",
     )
+    parser.add_argument(
+        "--cwd",
+        metavar="PATH",
+        help=(
+            "start a spawned codex in this directory instead of the calling pane's "
+            "own (which may no longer exist); refused unless it is a directory"
+        ),
+    )
     action.add_argument(
         "--approve",
         action="store_true",
         help="answer a pending approval and report what codex did next",
+    )
+    action.add_argument(
+        "--question",
+        action="store_true",
+        help="open codex's queued-question widget and print what it shows",
+    )
+    action.add_argument(
+        "--answer",
+        metavar="TEXT",
+        help="answer an opened queued question ('-' reads stdin)",
     )
     action.add_argument(
         "--clear",

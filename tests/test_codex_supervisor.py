@@ -51,6 +51,19 @@ MODULE_PATH = (
 FOOTER = "  weekly 99% left · google-live · main · Context 96% left · R…"
 
 
+def _spawn_workdir(tmp_path: Path) -> Path:
+    """A working directory that exists, because a live pane's cwd normally does.
+
+    `spawn_pane` refuses a `#{pane_current_path}` that does not resolve, since tmux
+    answers a deleted directory with a ` (deleted)` suffix and `split-window -c`
+    then falls back to `$HOME`. The fixtures below therefore need a real path; the
+    name is kept so the default-label assertion still reads as it did.
+    """
+    workdir = tmp_path / "postgres-schema-53"
+    workdir.mkdir()
+    return workdir
+
+
 @pytest.fixture(scope="module")
 def watch() -> ModuleType:
     """Load the monitor only after proving its implementation exists."""
@@ -359,11 +372,22 @@ def test_spawn_refuses_multiple_joined_codex_panes(
     assert all(call[:2] != ("tmux", "split-window") for call in calls)
 
 
-def test_spawn_execs_codex_and_sets_default_pane_label(
+def test_spawn_refuses_a_working_directory_that_no_longer_exists(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
+    """A deleted cwd must stop the spawn, not relocate the sandbox to $HOME.
+
+    tmux reads the pane's working directory from `/proc/<pid>/cwd`, so a directory
+    deleted under a live shell comes back as `<path> (deleted)`. `split-window -c`
+    silently falls back to `$HOME` when its argument does not resolve, and the pane
+    then starts codex with `-s workspace-write` rooted at the home directory — a
+    sandbox over everything the operator owns, announced by nothing. Observed
+    2026-09-19 on a pane whose worktree had been removed under it.
+    """
     calls: list[tuple[str, ...]] = []
+    removed = tmp_path / "worktrees" / "breeze-simplify"
 
     def no_joined_pane() -> str:
         raise watch.NoCodexPaneError("no Codex pane")
@@ -371,7 +395,143 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
         if argv[-1] == "#{pane_current_path}":
-            return "/worktrees/postgres-schema-53\n"
+            return f"{removed} (deleted)\n"
+        if argv[:2] == ("tmux", "split-window"):
+            return "%10\n"
+        return ""
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+
+    with pytest.raises(watch.MonitorError) as caught:
+        watch.spawn_pane()
+
+    assert str(removed) in str(caught.value), (
+        f"the refusal does not name the directory it could not use: {caught.value}"
+    )
+    assert all(call[:2] != ("tmux", "split-window") for call in calls), (
+        "codex was spawned anyway, and tmux put its sandbox in $HOME"
+    )
+
+
+def test_spawn_starts_codex_in_an_explicit_cwd(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """`--cwd` is what lets a supervisor whose own pane is unusable still spawn.
+
+    Ruled by Brian, 2026-09-19: "being able to set cwd would be nice". The pane's
+    own working directory is then not consulted at all, which is the point — the
+    case that produced the ruling was a supervisor pane sitting in a deleted
+    worktree, where reading that path is exactly what must not happen.
+    """
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        if argv[:2] == ("tmux", "split-window"):
+            return "%10\n"
+        return ""
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+
+    assert watch.spawn_pane(cwd=str(workdir)) == "%10"
+
+    assert all(call[-1] != "#{pane_current_path}" for call in calls), (
+        f"an explicit --cwd still read the pane's own path: {calls}"
+    )
+    split = next(argv for argv in calls if argv[:2] == ("tmux", "split-window"))
+    assert str(workdir) in split, f"split-window did not get the given cwd: {split}"
+    assert calls[-1][-1] == workdir.name, (
+        f"the default label should be the given directory's name: {calls[-1]}"
+    )
+
+
+def test_spawn_refuses_an_explicit_cwd_that_does_not_exist(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A typo in `--cwd` must refuse for the same reason a deleted pane path does."""
+    calls: list[tuple[str, ...]] = []
+    missing = tmp_path / "no-such-worktree"
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        return "%10\n"
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+
+    with pytest.raises(watch.MonitorError) as caught:
+        watch.spawn_pane(cwd=str(missing))
+
+    assert str(missing) in str(caught.value)
+    assert all(call[:2] != ("tmux", "split-window") for call in calls)
+
+
+def test_spawn_hands_tmux_an_absolute_cwd(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A relative `--cwd` means this process's cwd, not the tmux server's.
+
+    `split-window -c` resolves a relative path against whatever the server's
+    directory happens to be, so a path that passed the existence check here could
+    still start codex somewhere else entirely — the same silent relocation the
+    deleted-directory guard exists to stop.
+    """
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        return "%10\n"
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    monkeypatch.chdir(tmp_path)
+
+    watch.spawn_pane(cwd=workdir.name)
+
+    split = next(argv for argv in calls if argv[:2] == ("tmux", "split-window"))
+    handed = split[split.index("-c") + 1]
+    assert Path(handed).is_absolute(), f"tmux was handed a relative path: {handed!r}"
+    assert Path(handed).samefile(workdir)
+
+
+def test_spawn_execs_codex_and_sets_default_pane_label(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        if argv[-1] == "#{pane_current_path}":
+            return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
             return "%10\n"
         return ""
@@ -392,7 +552,7 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
             "-t",
             "%4",
             "-c",
-            "/worktrees/postgres-schema-53",
+            str(workdir),
             "-P",
             "-F",
             "#{pane_id}",
@@ -416,6 +576,7 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
 def test_spawn_contains_codex_rather_than_asking_per_command(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Containment is the sandbox, not a dialog for every command.
 
@@ -426,6 +587,7 @@ def test_spawn_contains_codex_rather_than_asking_per_command(
     leave the workspace.
     """
     calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
 
     def no_joined_pane() -> str:
         raise watch.NoCodexPaneError("no Codex pane")
@@ -433,7 +595,7 @@ def test_spawn_contains_codex_rather_than_asking_per_command(
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
         if argv[-1] == "#{pane_current_path}":
-            return "/worktrees/postgres-schema-53\n"
+            return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
             return "%10\n"
         return ""
@@ -456,8 +618,10 @@ def test_spawn_contains_codex_rather_than_asking_per_command(
 def test_spawn_sets_explicit_pane_label(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
 
     def no_joined_pane() -> str:
         raise watch.NoCodexPaneError("no Codex pane")
@@ -465,7 +629,7 @@ def test_spawn_sets_explicit_pane_label(
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
         if argv[-1] == "#{pane_current_path}":
-            return "/worktrees/postgres-schema-53\n"
+            return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
             return "%10\n"
         return ""
@@ -487,21 +651,27 @@ def test_spawn_sets_explicit_pane_label(
     )
 
 
-def test_label_option_reaches_spawn(
+def test_label_and_cwd_options_reach_spawn(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    labels: list[str | None] = []
+    received: list[tuple[str | None, str | None]] = []
 
-    def fake_spawn(label: str | None = None) -> str:
-        labels.append(label)
+    def fake_spawn(label: str | None = None, cwd: str | None = None) -> str:
+        received.append((label, cwd))
         return "%10"
 
     monkeypatch.setattr(watch, "spawn_pane", fake_spawn)
 
-    args = watch.parse_args(["--spawn", "--label", "lesson-schema"])
+    args = watch.parse_args(
+        ["--spawn", "--label", "lesson-schema", "--cwd", "/srv/lesson-schema"]
+    )
     assert watch.run_verb(args) == 0
-    assert labels == ["lesson-schema"]
+    assert received == [("lesson-schema", "/srv/lesson-schema")]
+
+    bare = watch.parse_args(["--spawn"])
+    assert watch.run_verb(bare) == 0
+    assert received[-1] == (None, None), "an unpassed --cwd must stay unset"
 
 
 def test_send_refuses_non_ready_pane_before_loading_text(
@@ -881,6 +1051,23 @@ def test_send_prompt_leaves_write_scope_to_prompt(
         )
     ]
     assert result == "submitted to %8: 04-implement.md"
+
+
+def test_the_standard_ping_sends_questions_through_the_transcript(
+    watch: ModuleType,
+) -> None:
+    """A question asked through Codex's own tool cannot reach the supervisor.
+
+    `request_user_input_async` queues the question in a TUI widget, locks the pane
+    title to `[ ! ] Action Required`, and expires after thirty seconds; Codex's own
+    default-mode template then tells it to "continue with best judgment", which is
+    the silent assumption the standing rules exist to prevent. A plain-text question
+    leaves the pane `Ready`, so `--message` can carry the human's ruling back.
+    """
+    assert "request_user_input_async" in watch.CODEX_PING_INSTRUCTION, (
+        "the ping tells codex to ask questions but not which channel to avoid, so "
+        "the question it asks may be one no supervisor can answer"
+    )
 
 
 def test_one_shot_verbs_are_mutually_exclusive(watch: ModuleType) -> None:

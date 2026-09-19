@@ -1,5 +1,30 @@
 # Changelog
 
+## [denubis-external-agents] 0.18.0
+
+**Added:**
+- `codex_supervisor.py --spawn --cwd PATH` starts Codex in a named directory instead of
+  the calling pane's.
+- `--question` and `--answer TEXT` open and answer Codex's queued-question widget
+  (`request_user_input_async`) as two guarded calls. Both refuse without a detected
+  widget and under a pending approval; `--answer` reports success only once the queued
+  question is gone. Built from one after-the-fact observation and unproven against a
+  live pane: watch the first use with `--tail`.
+
+**Changed:**
+- The standard ping and `supervising-codex` standing rules tell Codex to ask questions as
+  plain text, never through its question tool, which holds the pane title off `Ready`
+  and expires into a silent assumption.
+- `supervising-codex` covers hosts whose Monitor has no `persistent` field and requires a
+  timeout: use the cap and re-arm on the expiry notice.
+
+**Fixed:**
+- `--spawn` refuses a working directory that no longer exists. A deleted pane directory
+  previously made tmux fall back to `$HOME`, starting a `workspace-write` sandbox there.
+- The monitor reports the queued-question widget as `QUESTION`, not `NEEDS APPROVAL`,
+  and its expiry countdown no longer raises a new event on every tick.
+- `--send` and `--message` refusals name the queued question and the verbs that answer it.
+
 ## [denubis-plan-and-execute] 4.2.0
 
 **Added:**

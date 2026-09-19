@@ -98,12 +98,14 @@ The verbs, read from the parser rather than from memory:
 |---|---|
 | *(none)* | run the watch loop, emitting only actionable events |
 | `--resolve` | print the joined Codex pane ID |
-| `--spawn [--label NAME]` | open a Codex pane beside this one |
+| `--spawn [--label NAME] [--cwd PATH]` | open a Codex pane beside this one |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
 | `--clear` | start codex on a fresh session, confirmed by its `/status` session id changing |
 | `--compact` | summarise its transcript, confirmed in the same session by marker and meter |
 | `--quota` | run `/status` and report the weekly allowance and its reset |
+| `--question` | open codex's queued-question widget and print what it shows |
+| `--answer TEXT` | answer an opened queued question (`-` reads stdin) |
 | `--under-floor` | dispatch below the 30% context floor, carrying a human ruling |
 | `--tail [N]` | print the joined pane's non-blank tail (default 12 lines) |
 | `--status` | print the joined pane's status line |
@@ -149,8 +151,10 @@ left as a documented licence to improvise.
      what you could not check rather than inferring it; never assert an absence from a
      single search; if there is any uncertainty, stop and ask the human one specific,
      critical, pointed question at a time, never bundled and never resolved by silent
-     assumption, until the uncertainty resolves; pausing to push back on scope, premise,
-     or approach is always welcome; each question is appended as a ticket to
+     assumption, until the uncertainty resolves; **ask it as plain text in the
+     transcript, never through `request_user_input` or `request_user_input_async`**;
+     pausing to push back on scope, premise, or approach is always welcome; each
+     question is appended as a ticket to
      `.notes/project_open-questions.md` so it survives the pane; and anything ruled along
      the way probably belongs in the project's decision records, indexed in its ADR
      register*. The one-question rule binds the supervisor too: when it is unsure, it
@@ -174,8 +178,13 @@ left as a documented licence to improvise.
    Read codex-prompts/NN-<task>.md and carry out that task exactly. If
    anything is unclear, ambiguous, or contradictory, stop and ask one
    specific, critical, and pointed question at a time until you have
-   sufficient information. Surface any decision rather than deciding it
-   silently, so the supervisor documents it.
+   sufficient information. Ask it as plain text in this conversation, and
+   never through request_user_input or request_user_input_async: a queued
+   question holds this pane's title at Action Required, cannot be answered
+   from outside the pane, and expires unanswered, which turns the question
+   you stopped to ask into the silent assumption you stopped to avoid.
+   Surface any decision rather than deciding it silently, so the supervisor
+   documents it.
    ```
 
    The host agent does not drive Codex unless the human has explicitly said this session may. When
@@ -283,6 +292,88 @@ command on screen. A `Yes, and don't ask again` is refused and goes to the human
 because a standing grant changes the posture of the whole session. Two affirmatives that
 both read as narrow are refused on the same grounds, so a standing grant worded in some
 way the verb does not recognise reaches the human rather than being pressed.
+
+## Codex's queued-question widget, which nobody outside the pane can answer
+
+Codex 0.154.0 has an async question tool, `request_user_input_async`. When the model
+uses it the TUI draws a collapsed widget above the composer and holds the pane title at
+`[ ! ] Action Required` while the footer still says `Working`:
+
+```
+• Queued follow-up inputs
+  ? 1 question · 15s
+    alt + , to answer
+```
+
+**Two verbs answer it, in two calls** (Brian, 2026-09-19: "make it be able to alt , and
+just type in answers"):
+
+```sh
+codex_supervisor.py --question          # press alt+, and print what the widget shows
+codex_supervisor.py --answer "option B" # type one answer and confirm it landed
+```
+
+`--question` sends exactly one keystroke, `M-,`, and reads the pane back; it types
+nothing. `--answer` types literally, checks its own text is on screen, presses Enter as
+a separate call, and reports success only once the queued question is gone from the
+pane — a pane that still shows it is raised as a failure with its tail. Both refuse
+unless a queued question is detected, and both refuse a pending approval dialog first,
+because the expansion key answers a dialog like any other keystroke. A multi-line answer
+is refused: it goes in as keystrokes, so a newline would submit half of it.
+
+**Both are UNPROVEN against a live pane.** They were built on 2026-09-19 from one
+after-the-fact observation — after Brian pressed alt+, himself, the composer held the
+question as a quoted `> Question for Brian: …` line with his answer typed beneath — and
+from the collapsed widget's own hint. The *expanded* widget has never been captured. So
+watch the first live use: `--tail` before and after each call, and expect
+`--answer` to refuse rather than misfire if the layout differs, since its guards key on
+the queued-question line and its confirmation on that line going away.
+
+`--approve` refuses this state, correctly, because no dialog is pending; `--message` and
+`--send` still refuse because the title is not `Ready`, and they name `--question` and
+`--answer` as the way through. The monitor reports it as `QUESTION`, which is what it is
+— a question
+for the human — and reports it once rather than once per redraw, because the `· 15s`
+expiry ticks and used to key a fresh `NEEDS APPROVAL` each time: about nineteen in
+thirty minutes on one pane on 2026-09-19, for a state no driver could act on.
+
+The expiry is the real hazard. It is thirty seconds by the source read below, and
+Codex's own default-mode
+instructions tell it to "continue with best judgment" when a queued question returns no
+answer, so an unanswered question becomes exactly the silent assumption the standing
+rules exist to prevent. That is why both the standing rules and `--send`'s ping tell
+Codex to ask in plain text instead: a plain-text question leaves the pane `Ready`, so
+the supervisor can carry the human's ruling straight back with `--message`.
+
+**No feature flag switches it off, and the instruction above is a mitigation rather
+than prevention** — it asks the model not to reach for a tool it still has. `codex
+features list` on the installed 0.154.0 offers only `default_mode_request_user_input`,
+which is the *blocking* variant and is already false. The async tool is registered
+whenever the model advertises `request_user_input_async` or `send_user_message_async` in
+its catalog entry's `experimental_supported_tools` and the thread is not a sub-agent
+(`codex-rs/core/src/tools/spec_plan.rs`, read on `main` 2026-09-19; **not verified
+against the 0.154.0 tag**).
+
+**Which catalog is in play is the whole of it.** Measured on the installed 0.154.0,
+2026-09-19:
+
+```sh
+codex debug models --bundled   # gpt-5.6-sol: experimental_supported_tools = []
+codex debug models             # gpt-5.6-sol: ["send_user_message_async", "clock"]
+```
+
+The binary ships a catalog that does not advertise the tool for this model; the catalog
+Codex refreshes from the server does. `model_catalog_json`, documented as "Optional path
+to a JSON model catalog loaded on startup", replaces the catalog for that process, so a
+pinned catalog without that advertisement would mean the tool is never registered —
+prevention rather than a request. That is **not** wired into `--spawn`: pinning a catalog
+also freezes model metadata, and which catalog a session runs on is the operator's
+decision, not the tool's. Until it is ruled on, the widget can appear and the paragraphs
+above are what to do when it does.
+
+When a queued question appears, tell the human. Do not wait it out: if it expires, Codex
+proceeds on its own judgement and the fact that it had a question is gone from everything
+but the scrollback.
 
 ## Checking the quota before you dispatch
 
@@ -406,8 +497,19 @@ Launch the joined Codex pane through the monitor rather than assembling a tmux c
 hand:
 
 ```sh
-codex_supervisor.py --spawn --label <name>
+codex_supervisor.py --spawn --label <name> [--cwd <dir>]
 ```
+
+**Where it spawns.** By default the new pane inherits the calling pane's own working
+directory. That directory can be gone — a worktree deleted under a live shell — and tmux
+reports it as `<path> (deleted)` while `split-window -c` silently falls back to `$HOME`,
+which starts Codex with a `workspace-write` sandbox over the whole home directory and
+says nothing. Observed 2026-09-19. `--spawn` now refuses any working directory that is
+not a directory, and `--cwd PATH` names one explicitly (Brian, 2026-09-19), which is how
+a supervisor sitting in a deleted worktree still starts Codex where the work is. An
+explicit `--cwd` skips reading the pane's path entirely, is refused on the same terms if
+it does not exist, and is resolved to an absolute path before tmux sees it, because
+`-c` would otherwise read a relative path against the tmux server's directory.
 
 `--label` is optional and defaults to the spawned pane's working-directory name. The label
 is stored as the pane-local tmux user option `@codex_label`; inspect it with
@@ -449,14 +551,22 @@ nothing else:
 | Monitor field | Value |
 |---|---|
 | `command` | `uv run --no-project --no-config python "<resolved>/codex_supervisor.py"` |
-| `persistent` | `true` |
+| `persistent` | `true`, where the host's Monitor tool has that field |
 | `description` | what is being supervised, e.g. `codex prompt 08 cross-check` |
 
 No other field. In particular:
 
-- **No `timeout_ms`.** Supervision lasts as long as the session, so it is a persistent
-  watch. A timeout kills the monitor mid-prompt, and a dead monitor is indistinguishable
-  from a pane with nothing to say.
+- **No `timeout_ms`, where `persistent` exists.** Supervision lasts as long as the
+  session, so it is a persistent watch. A timeout kills the monitor mid-prompt, and a
+  dead monitor is indistinguishable from a pane with nothing to say.
+- **Where the host has no `persistent` field and requires `timeout_ms`**, as Claude
+  Code's Monitor tool does — it rejects the call without one and caps it at thirty
+  minutes (observed 2026-09-19) — set it to that cap and **re-arm on every expiry
+  notice**. The rule is unchanged and is simply paid for in re-arms; what is forbidden
+  is a short timeout chosen to bound the watch. An expiry that arrives having emitted
+  nothing is a reason to check the pane with `--tail` before re-arming, not evidence
+  that nothing happened, because expiry and silence look identical from outside. Say in
+  the reply that the monitor was re-armed, so a gap the human can see is a gap you named.
 - **No `2>&1`.** The tool puts events on stdout and diagnostics on stderr deliberately.
   Merging them turns every diagnostic into a notification.
 - **No `| grep`, `| tail`, `while` loop, or filter of any kind.** The monitor already
@@ -666,8 +776,9 @@ in frozen snapshots are load-bearing; never edit them.
 | Situation | Action |
 |---|---|
 | Starting a codex session | `codex_supervisor.py --spawn --label <name>` |
+| Your pane's directory is gone or wrong | `codex_supervisor.py --spawn --cwd <dir>` |
 | Checking weekly headroom | `codex_supervisor.py --quota` |
-| Watching it | `codex_supervisor.py` under Monitor, `persistent: true`, nothing else added |
+| Watching it | `codex_supervisor.py` under Monitor, `persistent: true` (or max `timeout_ms`, re-armed), nothing else added |
 | Checking what a pane holds | `codex_supervisor.py --tail` |
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
 | Between prompts | `codex_supervisor.py --clear` |
@@ -675,6 +786,7 @@ in frozen snapshots are load-bearing; never edit them.
 | Dispatch refused below 30% | `--compact`, or `--clear` and restate the prompt |
 | The human rules to push on anyway | add `--under-floor` to that one dispatch |
 | Codex asks to run a command | `codex_supervisor.py --approve` |
+| Codex queues a question in its widget | `--question`, take the answer to the human, then `--answer TEXT` |
 | The approval wants a ruling, not a keypress | that one is the human's |
 | Codex reports done | wait for size and mtime to settle, then verify |
 | Tempted to reach for `tmux send-keys` | tell the human what the verbs do not cover |
@@ -702,7 +814,10 @@ in frozen snapshots are load-bearing; never edit them.
 - "The verbs don't cover this, so I'll use `tmux send-keys` this once." That is the bug
   report. Say what you were about to type and let the human rule.
 - "I'll add a timeout / `2>&1` / a grep to the monitor command." Every addition is a
-  hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`.
+  hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`, or at
+  the host's maximum `timeout_ms` where that field is mandatory, re-armed on expiry.
+- "The monitor expired quietly, so Codex has nothing to say." Those two look identical
+  from outside. Re-arm, and `--tail` the pane before you believe the quiet.
 - "Context is at 22%, but this prompt is small." The floor is not a suggestion about
   prompt size. Compact, or clear and restate, or get the ruling.
 - "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.
