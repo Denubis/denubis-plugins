@@ -56,14 +56,36 @@ _PYMUPDF_PICTURE_MARKER_RE = re.compile(
 )
 
 Progress = Callable[[str], None]
+RENDER_VERSION = 2
+
+
+def render_metadata_is_current(meta: dict) -> bool:
+    """Old PDF renders may hide OCR or merge text across physical pages."""
+    return (
+        meta.get("renderer") not in {"pymupdf4llm", "docling"}
+        or meta.get("render_version") == RENDER_VERSION
+    )
 
 
 class _SnapshotText(HTMLParser):
     """Small HTML-to-text reader for Zotero snapshots; scripts stay out."""
 
     BLOCKS = {
-        "article", "blockquote", "br", "div", "h1", "h2", "h3", "h4",
-        "h5", "h6", "li", "main", "p", "section", "tr",
+        "article",
+        "blockquote",
+        "br",
+        "div",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "li",
+        "main",
+        "p",
+        "section",
+        "tr",
     }
 
     def __init__(self) -> None:
@@ -101,9 +123,7 @@ def render_snapshot(snapshot: Path, out_dir: Path) -> dict:
     )
     if not text:
         raise RuntimeError(f"snapshot contains no readable text: {snapshot}")
-    return _write_outputs(
-        [text], snapshot, out_dir, "html.parser", False, []
-    )
+    return _write_outputs([text], snapshot, out_dir, "html.parser", False, [])
 
 
 def render_attachment(source: Path, out_dir: Path, **pdf_options) -> dict:
@@ -122,7 +142,9 @@ def render_attachment(source: Path, out_dir: Path, **pdf_options) -> dict:
         )
     except (FileNotFoundError, subprocess.CalledProcessError) as error:
         detail = getattr(error, "stderr", "") or str(error)
-        raise RuntimeError(f"pandoc could not render {source}: {detail.strip()}") from error
+        raise RuntimeError(
+            f"pandoc could not render {source}: {detail.strip()}"
+        ) from error
     if not result.stdout.strip():
         raise RuntimeError(f"pandoc produced no readable text for {source}")
     return _write_outputs([result.stdout.strip()], source, out_dir, "pandoc", False, [])
@@ -136,16 +158,31 @@ def _strip_structural_markers(page_text: str) -> str:
 
 
 def _render_with_pymupdf4llm(pdf: Path) -> list[str]:
+    import pymupdf
     import pymupdf4llm
 
-    pages = pymupdf4llm.to_markdown(str(pdf), page_chunks=True)
-    return [p["text"] if isinstance(p, dict) else p for p in pages]
+    # Layout mode enables OCR by default. This tier must really be non-OCR;
+    # scanned pages go through the explicitly labelled OCR tier below.
+    with pymupdf.open(pdf) as doc:
+        pages = pymupdf4llm.to_markdown(
+            doc, page_chunks=True, use_ocr=False, header=True, footer=True
+        )
+        if len(pages) != len(doc) or any(
+            page["metadata"]["page_number"] != number
+            for number, page in enumerate(pages, start=1)
+        ):
+            raise RuntimeError(
+                "PyMuPDF returned incomplete or misordered physical pages"
+            )
+    return [page["text"] for page in pages]
 
 
 def _render_with_docling(pdf: Path, ocr: bool) -> list[str]:
+    import pymupdf
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling_core.types.doc import ContentLayer, DocItemLabel
 
     # Pin EasyOCR explicitly: recent docling builds default to RapidOCR, which
     # downloads models from modelscope.cn at first use - unreliable from
@@ -158,9 +195,24 @@ def _render_with_docling(pdf: Path, ocr: bool) -> list[str]:
     conv = DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
     )
-    doc = conv.convert(str(pdf)).document
-    page_numbers = sorted(doc.pages.keys())
-    return [doc.export_to_markdown(page_no=i) for i in page_numbers]
+    # Whole-document conversion merges paragraphs across page boundaries;
+    # page_no filters the merged item, not its text. Isolate pages before that
+    # merge, and include furniture so printed page numbers remain available.
+    with pymupdf.open(pdf) as source:
+        page_count = len(source)
+    pages = []
+    for number in range(1, page_count + 1):
+        doc = conv.convert(str(pdf), page_range=(number, number)).document
+        if set(doc.pages) != {number}:
+            raise RuntimeError(f"Docling did not return physical page {number}")
+        pages.append(
+            doc.export_to_markdown(
+                labels=set(DocItemLabel),
+                included_content_layers=set(ContentLayer),
+                traverse_pictures=True,
+            )
+        )
+    return pages
 
 
 def quality_assessment(pages: list[str]) -> dict:
@@ -256,6 +308,7 @@ def _write_outputs(
     (out_dir / "full.md").write_text("".join(full_parts), encoding="utf-8")
 
     meta: dict = {
+        "render_version": RENDER_VERSION,
         "page_count": len(pages),
         "sha256_prefix": hashlib.sha256(source.read_bytes()).hexdigest()[:16],
         "renderer": renderer,

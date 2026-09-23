@@ -7,9 +7,13 @@ case), marker + content pages (Vanlissa 2024 case), U+FFFD ratio
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -34,6 +38,155 @@ def _load_renderer():
 
 renderer = _load_renderer()
 qa = renderer.quality_assessment
+
+
+def test_pymupdf_disables_implicit_ocr_and_checks_page_identity(tmp_path, monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "pymupdf",
+        SimpleNamespace(
+            open=lambda _: nullcontext([1, 2]),
+        ),
+    )
+    chunks = [
+        {"metadata": {"page_number": n}, "text": f"Printed page {n}. " * 10}
+        for n in (1, 2)
+    ]
+
+    def to_markdown(doc, **options):
+        assert options == {
+            "page_chunks": True,
+            "use_ocr": False,
+            "header": True,
+            "footer": True,
+        }
+        return chunks
+
+    monkeypatch.setitem(
+        sys.modules, "pymupdf4llm", SimpleNamespace(to_markdown=to_markdown)
+    )
+    out = tmp_path / "out"
+    meta = renderer.render_pdf_with_fallback(_fake_pdf(tmp_path), out)
+    assert meta["ocr"] is False
+    assert (
+        json.loads((out / "meta.json").read_text())["render_version"]
+        == renderer.RENDER_VERSION
+    )
+    assert renderer._render_with_pymupdf4llm(tmp_path / "x.pdf") == [
+        chunk["text"] for chunk in chunks
+    ]
+    chunks.reverse()
+    with pytest.raises(RuntimeError, match="misordered"):
+        renderer._render_with_pymupdf4llm(tmp_path / "x.pdf")
+    chunks.pop()
+    with pytest.raises(RuntimeError, match="incomplete"):
+        renderer._render_with_pymupdf4llm(tmp_path / "x.pdf")
+
+
+def test_docling_isolates_pages_before_paragraph_merge_and_keeps_furniture(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "pymupdf",
+        SimpleNamespace(
+            open=lambda _: nullcontext([1, 2]),
+        ),
+    )
+    calls = []
+    texts = {1: "A paragraph ending on page 296.", 2: "Its continuation on page 297."}
+
+    class Converter:
+        def __init__(self, **kwargs):
+            pass
+
+        def convert(self, path, *, page_range):
+            calls.append(page_range)
+            first, last = page_range
+            assert first == last  # merging must never see adjacent pages
+
+            def export_to_markdown(**options):
+                assert options["included_content_layers"] == {"body", "furniture"}
+                assert "page_footer" in options["labels"]
+                assert options["traverse_pictures"] is True
+                return texts[first] + f"\n{295 + first}"
+
+            return SimpleNamespace(
+                document=SimpleNamespace(
+                    pages={first: object()},
+                    export_to_markdown=export_to_markdown,
+                )
+            )
+
+    modules = {
+        "docling.datamodel.base_models": SimpleNamespace(
+            InputFormat=SimpleNamespace(PDF="pdf")
+        ),
+        "docling.datamodel.pipeline_options": SimpleNamespace(
+            EasyOcrOptions=lambda **kw: kw,
+            PdfPipelineOptions=lambda **kw: kw,
+        ),
+        "docling.document_converter": SimpleNamespace(
+            DocumentConverter=Converter,
+            PdfFormatOption=lambda **kw: kw,
+        ),
+        "docling_core.types.doc": SimpleNamespace(
+            ContentLayer={"body", "furniture"},
+            DocItemLabel={"text", "page_footer"},
+        ),
+    }
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
+    pages = renderer._render_with_docling(Path("paper.pdf"), ocr=False)
+    assert calls == [(1, 1), (2, 2)]
+    assert pages == [texts[1] + "\n296", texts[2] + "\n297"]
+
+
+@pytest.mark.parametrize("backend", ["pymupdf4llm", "docling"])
+def test_legacy_pdf_render_is_not_current(backend):
+    assert not renderer.render_metadata_is_current({"renderer": backend, "ocr": False})
+    assert renderer.render_metadata_is_current(
+        {
+            "renderer": backend,
+            "render_version": renderer.RENDER_VERSION,
+        }
+    )
+    assert renderer.render_metadata_is_current({"renderer": "mocr", "ocr": True})
+
+
+@pytest.mark.parametrize("backend", ["pymupdf4llm", "docling"])
+def test_both_cache_readers_reject_legacy_pdf_metadata(tmp_path, monkeypatch, backend):
+    monkeypatch.syspath_prepend(str(_RENDERER.parent))
+    import ingest
+    import resolve
+
+    pdf = _fake_pdf(tmp_path)
+    out = tmp_path / "cache"
+    out.mkdir()
+    (out / "full.md").write_text("Cached paper")
+    meta = {
+        "renderer": backend,
+        "ocr": False,
+        "sha256_prefix": hashlib.sha256(pdf.read_bytes()).hexdigest()[:16],
+    }
+    (out / "meta.json").write_text(json.dumps(meta))
+    assert not resolve.render_is_present(out)
+    assert not ingest.current_render_matches(out, pdf)
+    meta["render_version"] = renderer.RENDER_VERSION
+    (out / "meta.json").write_text(json.dumps(meta))
+    assert resolve.render_is_present(out)
+    assert ingest.current_render_matches(out, pdf)
+
+
+def test_explicit_ocr_fallback_is_labelled(tmp_path, monkeypatch):
+    monkeypatch.setattr(renderer, "_render_with_pymupdf4llm", lambda pdf: [""])
+    monkeypatch.setattr(
+        renderer,
+        "_render_with_docling",
+        lambda pdf, ocr: ["Recovered scanned text. " * 10] if ocr else [""],
+    )
+    meta = renderer.render_pdf_with_fallback(_fake_pdf(tmp_path), tmp_path / "out")
+    assert meta["renderer"] == "docling"
+    assert meta["ocr"] is True
+
 
 MARKER = "**==> picture [480 x 720] intentionally omitted <==**"
 MARKER_SMALL = "**==> picture [12 x 19] intentionally omitted <==**"

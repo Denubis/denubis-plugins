@@ -1,6 +1,6 @@
 ---
 name: using-bibliography
-description: Use for Zotero resolution, rendering, quote verification, annotations, item copying or repair, bib refresh, literature notes, and academic plugin install or migration errors.
+description: Use for Zotero, PDF rendering, quote checks, bibliography refresh, literature notes, or academic plugin setup.
 ---
 
 # Using Bibliography
@@ -114,6 +114,14 @@ test -s "<zettelkasten-root>/papers/<citekey>/meta.json"
 ```
 
 ## Source-fidelity rule
+
+Acquire scholarly source documents as Zotero-managed attachments, then use the
+managed rendering workflow. Do not download standalone PDFs into scratch or
+project evidence directories, including open-access papers fetched only for
+bibliographic verification. Full HTML papers use the same source-management
+boundary; metadata landing pages and abstracts may be inspected without import.
+Reference managed sources in evidence records rather than creating another PDF
+or full-text extraction corpus. This boundary also applies to delegated reviewers.
 
 `meta.json` decides what a quotation claim can mean:
 

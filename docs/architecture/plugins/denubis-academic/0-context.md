@@ -29,6 +29,8 @@ flowchart LR
 
 | Component | Responsibility |
 |---|---|
+| `literature-scout` skill | Searches scholarly indexes, traces citations, and separates candidate discovery from metadata verification through a read-only standard-library helper. |
+| `annotated-bibliography` skill | Drafts source-grounded entries against the existing resolved cache, checks literal evidence spans, and keeps interpretation review and OCR visual checks separate. |
 | `academic-writing` skill | Loads project register notes before drafting or revising, then applies the portable prose and revision discipline (`plugins/denubis-academic/skills/academic-writing/SKILL.md`, `8dae417`). |
 | `paper-review` skill | Selects relevant review facets, orders them by evidence dependency, and keeps defects, concerns, competing readings, and uncertainty distinct (`plugins/denubis-academic/skills/paper-review/SKILL.md`). |
 | `using-bibliography` skill | Routes Zotero resolution, rendering, source-fidelity checks, confirmed writes, bibliography refresh, notes, and installation recovery (`plugins/denubis-academic/skills/using-bibliography/SKILL.md`). |
@@ -66,6 +68,6 @@ flowchart LR
 ## Cross-references
 
 - **Plugin manifests:** `plugins/denubis-academic/.claude-plugin/plugin.json` and
-  `plugins/denubis-academic/.codex-plugin/plugin.json`, version 0.15.1.
+  `plugins/denubis-academic/.codex-plugin/plugin.json`.
 - **Bundled bibliography:** `plugins/denubis-academic/references.bib` (`42a3287`).
 - **Cross-cutting instruction control:** [`../../instruction-control/0-context.md`](../../instruction-control/0-context.md).

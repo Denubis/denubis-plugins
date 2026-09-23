@@ -1,0 +1,7 @@
+interface:
+  display_name: "Annotated Bibliography"
+  short_description: "Draft source-grounded bibliography entries"
+  default_prompt: "Use $annotated-bibliography to draft and check entries against these sources and the project question."
+
+policy:
+  allow_implicit_invocation: true

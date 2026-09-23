@@ -1,6 +1,6 @@
 ---
 name: paper-review
-description: Use for critical-friend or adversarial manuscript review - tests argument, validity, transparency, source fidelity, coherence, register, and concision against one evidence boundary
+description: Use for critical-friend or adversarial review of manuscript argument, validity, reporting, and source fidelity.
 ---
 
 # Paper Review
@@ -53,6 +53,8 @@ Apply only facets relevant to the brief, but do not let one substitute for anoth
   warrant, qualification, orientation, or voice.
 
 The detailed facet questions live in [review-lanes.md](references/review-lanes.md).
+Use the [focused study-design checks](references/study-design.md) when reviewing
+empirical definitions, interventions, exclusions, or inferential claims.
 They are lenses, not a fixed
 schedule, score, or requirement to fill every cell with CLEAR.
 The [evidence base](references/evidence-base.md) records the methodological sources and

@@ -60,6 +60,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # the credentials. Better BibTeX's own JSON-RPC endpoint is served outside that
 # base class and stays a bare POST. Zotero 7-9 are unaffected either way.
 import zotero_auth
+from renderer import render_metadata_is_current
 from zotero_local_api import LibrarySearch, search_doi_items, search_items
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -532,17 +533,18 @@ def render_is_present(out_dir: Path) -> bool:
 
     A render is keyed on the PAPER (citekey), not on any one copy's PDF bytes:
     copies of the same citekey across libraries share this one dir, so the paper
-    renders once and is never re-rendered or clobbered by another copy. Use
+    renders once and is never re-rendered or clobbered by another copy. Legacy
+    renders with unreliable OCR/page provenance are invalidated. Otherwise use
     --force to re-render (e.g. after a PDF genuinely changes).
     """
     meta = out_dir / "meta.json"
     if not (out_dir / "full.md").exists() or not meta.exists():
         return False
     try:
-        json.loads(meta.read_text(encoding="utf-8"))
+        metadata = json.loads(meta.read_text(encoding="utf-8"))
     except Exception:
         return False
-    return True
+    return isinstance(metadata, dict) and render_metadata_is_current(metadata)
 
 
 def rpc(method: str, params: list, timeout: float = 30.0):

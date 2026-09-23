@@ -21,6 +21,8 @@ or a colleague-machine migration, use the
 |---|---|---|
 | `academic-writing` | `/denubis-academic:academic-writing` | Draft and revise academic prose after reading project register rules |
 | `paper-review` | `/denubis-academic:paper-review` | Critical-friend and adversarial manuscript review |
+| `literature-scout` | `/denubis-academic:literature-scout` | Bounded literature discovery, citation tracing, and metadata verification |
+| `annotated-bibliography` | `/denubis-academic:annotated-bibliography` | Source-grounded annotations with separate quotation and interpretation checks |
 | `using-bibliography` | `/denubis-academic:using-bibliography` | Resolve and render Zotero papers, verify quotations, manage confirmed Zotero writes, refresh bibliographies, and create source-grounded notes |
 
 The plugin name comes from `.claude-plugin/plugin.json`; each skill name comes
@@ -28,6 +30,10 @@ from its skill directory and frontmatter. `denubis-bibliography` is retired and
 `denubis-bib` is not a valid marketplace or skill identifier.
 
 ## Bibliography requirements
+
+Literature scouting uses read-only scholarly APIs through a Python standard-library
+helper. Zotero is needed when handing selected sources into the bibliography
+workflow. Annotated bibliographies reuse its resolved, page-keyed source cache.
 
 The bibliography skill requires Zotero, Better BibTeX, `uv`, Python 3.14+, a
 configured zettelkasten root, and rendering dependencies acquired through the

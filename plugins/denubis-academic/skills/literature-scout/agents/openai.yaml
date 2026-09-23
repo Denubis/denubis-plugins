@@ -1,0 +1,7 @@
+interface:
+  display_name: "Literature Scout"
+  short_description: "Find and verify sources for a research question"
+  default_prompt: "Use $literature-scout to find and verify candidate sources for this research question."
+
+policy:
+  allow_implicit_invocation: true

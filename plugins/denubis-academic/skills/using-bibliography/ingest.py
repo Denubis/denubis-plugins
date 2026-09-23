@@ -35,7 +35,12 @@ from pathlib import Path
 # unit tests load it. Mirrors resolve.py's idiom.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bbt import parse_attachment_paths
-from renderer import NeedsMocr, mocr_server, render_attachment
+from renderer import (
+    NeedsMocr,
+    mocr_server,
+    render_attachment,
+    render_metadata_is_current,
+)
 from zotero_local_api import (
     LibrarySearch,
     item_citekey,
@@ -157,7 +162,11 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
     except Exception:
         return False
     expected = hashlib.sha256(pdf.read_bytes()).hexdigest()[:16]
-    return m.get("sha256_prefix") == expected
+    return (
+        isinstance(m, dict)
+        and render_metadata_is_current(m)
+        and m.get("sha256_prefix") == expected
+    )
 
 
 def render_pdf(

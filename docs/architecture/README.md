@@ -44,7 +44,7 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 
 - [`denubis-project-notes/0-context.md`](plugins/denubis-project-notes/0-context.md) —
   explicit main-agent recovery of named project memory and relevant prior chats.
-- [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — three
+- [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — five
   academic skills, one output style, and bibliography helper scripts.
 - [`denubis-token-estimator/0-context.md`](plugins/denubis-token-estimator/0-context.md)
   — one shared methodology skill, provider entry points, and read-only Claude/Codex log

@@ -1,5 +1,26 @@
 # Changelog
 
+## [denubis-academic] 0.18.0
+
+**Added:**
+- `literature-scout` for bounded discovery and metadata verification through
+  Crossref, DataCite and Semantic Scholar, with private per-user API settings,
+  shared local request pacing and exponential backoff.
+- `annotated-bibliography` for source-grounded entries, page-specific quotation
+  checks and separate interpretation review.
+- Optional study-design checks in `paper-review`.
+
+**Changed:**
+- Scout sources worth reading enter a dedicated Zotero subcollection. Missing
+  managed full text is escalated before reading; standalone PDF downloads are
+  prohibited. Identity handoffs retain publisher evidence and registry conflicts.
+
+**Fixed:**
+- PDF rendering disables implicit OCR in the non-OCR tier, preserves printed
+  page labels and prevents Docling from moving passages between page files.
+- Resolver and ingestion invalidate legacy PyMuPDF/Docling renders with
+  unreliable OCR or page provenance.
+
 ## [denubis-external-agents] 0.18.0
 
 **Added:**
