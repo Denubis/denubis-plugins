@@ -13,7 +13,7 @@ vendor pages when a model alias or product surface changes.
 
 | Role | Model | API ID |
 |---|---|---|
-| Highest available capability | Fable 5 | `claude-fable-5` |
+| Explicit human consultation only | Fable 5 | `claude-fable-5` |
 | Complex agentic and judgement work | Opus 5 | `claude-opus-5` |
 | Default dispatch tier | Sonnet 5 | `claude-sonnet-5` |
 | Fastest tier; unsanctioned here | Haiku 4.5 | `claude-haiku-4-5-20251001` |
@@ -39,10 +39,15 @@ Authority records:
 - `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/28ff5c79-c20e-4039-bd82-c4ed1478bce3.jsonl:1116`
   (`cc-search-chats context 4766cd4c-359f-4644-a9b9-6baae0e43796 --json`)
 
-### Fable cost gate
+### Astra and Fable invocation gate
 
-Fable work is human-triggered only. No skill, agent, hook, command, or unattended run may
-auto-dispatch it. The Fable consultation skill therefore disables model invocation.
+Astra and Fable require a human instruction explicitly selecting both model and effort
+for the particular task. No skill, agent, hook, command, or unattended run may infer
+either selection from difficulty, review needs, a parent model, or configured defaults.
+For example, "Go run this at Astra on medium" supplies both. A request naming the model
+without effort requires a question; do not fill the gap from defaults. The Fable
+consultation skill disables model invocation. This rule also applies to advisors and
+subagents of a session already running either model.
 
 Authority record:
 

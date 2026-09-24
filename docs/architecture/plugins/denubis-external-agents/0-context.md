@@ -49,6 +49,15 @@ flowchart LR
 
 ## Boundary and failure modes
 
+- Peer review defaults to Sol/xhigh independently of host config. The Fable launcher
+  requires model and effort operands; it supplies neither automatically. These argument
+  checks cannot authenticate the human request, which the calling skill must preserve.
+- `--spawn` defaults to `gpt-6-sol` with `xhigh` reasoning and accepts explicit model
+  and effort overrides. Those options are rejected on other verbs. Command arguments
+  are shell-quoted; the spawned Codex owns model availability validation. The operator
+  checks the resulting session settings after spawn and clear.
+- Same-model supervision provides process separation. A review requiring a different
+  model must explicitly select one; the session boundary alone does not establish it.
 - The plugin supplies mechanisms for heterogeneous review and supervision. It does not
   make a model report authoritative.
 - A staged repository can omit gitignored or external evidence. The review procedure
@@ -56,7 +65,8 @@ flowchart LR
   authorises inclusion.
 - A pane monitor proves an observed pane transition. It does not prove the task was
   correctly understood or completed.
-- Fable use is human-triggered. No other skill, hook, or agent may silently cross that
+- Astra and Fable require an explicit human request naming both model and effort for
+  the particular task. No other skill, hook, or agent may silently cross that
   cost boundary. The source pointer and resolver are in the consultation skill.
 - The pane launcher's deny list can fail open when the upstream tool namespace changes.
   Its per-consultation surface probe is evidence about that invocation, not a permanent

@@ -1,19 +1,33 @@
 {
   "name": "denubis-hook-code-quality-guard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Block concrete browser-test, schema-migration, and shell-authorship violations.",
-  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
   "repository": "https://github.com/denubis/denubis-plugins",
   "license": "CC-BY-SA-4.0",
-  "keywords": ["hooks", "testing", "playwright", "alembic", "shell", "safety"],
+  "keywords": [
+    "hooks",
+    "testing",
+    "playwright",
+    "alembic",
+    "shell",
+    "safety"
+  ],
   "hooks": "./hooks/codex-hooks.json",
   "interface": {
     "displayName": "Code Quality Guard",
     "shortDescription": "Block concrete invalid code-write methods",
-    "longDescription": "Block JavaScript injection in user-surface tests, direct schema creation outside Alembic migrations, and Claude Bash heredocs used to author files.",
+    "longDescription": "Block JavaScript injection in user-surface tests and direct schema creation outside Alembic migrations.",
     "developerName": "Brian Ballsun-Stanton",
     "category": "Developer Tools",
-    "capabilities": ["Hooks"],
-    "defaultPrompt": ["Guard file edits against the concrete test and migration methods this plugin owns."]
+    "capabilities": [
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Guard file edits against the concrete test and migration methods this plugin owns."
+    ]
   }
 }

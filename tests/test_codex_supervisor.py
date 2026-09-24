@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -558,7 +559,8 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
             "#{pane_id}",
             (
                 "exec codex -c check_for_update_on_startup=false "
-                "-s workspace-write -a on-request"
+                "-s workspace-write -a on-request --model gpt-6-sol "
+                "-c 'model_reasoning_effort=\"xhigh\"'"
             ),
         ),
         (
@@ -651,27 +653,78 @@ def test_spawn_sets_explicit_pane_label(
     )
 
 
-def test_label_and_cwd_options_reach_spawn(
+def test_spawn_model_arguments_are_literal_shell_words(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        return "%10" if argv[:2] == ("tmux", "split-window") else ""
+
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
+    monkeypatch.setattr(watch, "run_command", fake_run)
+    model = "custom; $(touch unwanted)"
+    watch.spawn_pane(cwd=str(tmp_path), model=model, reasoning_effort="high")
+    command = next(call[-1] for call in calls if call[:2] == ("tmux", "split-window"))
+    words = shlex.split(command)
+    assert words[words.index("--model") + 1] == model
+    assert words[-2:] == ["-c", 'model_reasoning_effort="high"']
+
+
+def test_label_cwd_and_model_options_reach_spawn(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    received: list[tuple[str | None, str | None]] = []
+    received: list[tuple[str | None, str | None, str, str]] = []
 
-    def fake_spawn(label: str | None = None, cwd: str | None = None) -> str:
-        received.append((label, cwd))
+    def fake_spawn(
+        label: str | None = None,
+        cwd: str | None = None,
+        *,
+        model: str,
+        reasoning_effort: str,
+    ) -> str:
+        received.append((label, cwd, model, reasoning_effort))
         return "%10"
 
     monkeypatch.setattr(watch, "spawn_pane", fake_spawn)
 
     args = watch.parse_args(
-        ["--spawn", "--label", "lesson-schema", "--cwd", "/srv/lesson-schema"]
+        [
+            "--spawn",
+            "--label",
+            "lesson-schema",
+            "--cwd",
+            "/srv/lesson-schema",
+            "--model",
+            "gpt-6-astra",
+            "--reasoning-effort",
+            "high",
+        ]
     )
     assert watch.run_verb(args) == 0
-    assert received == [("lesson-schema", "/srv/lesson-schema")]
+    assert received == [("lesson-schema", "/srv/lesson-schema", "gpt-6-astra", "high")]
 
     bare = watch.parse_args(["--spawn"])
     assert watch.run_verb(bare) == 0
-    assert received[-1] == (None, None), "an unpassed --cwd must stay unset"
+    assert received[-1] == (None, None, "gpt-6-sol", "xhigh")
+
+
+@pytest.mark.parametrize("option", ["--model", "--reasoning-effort"])
+def test_model_options_require_spawn(
+    watch: ModuleType, option: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as error:
+        watch.parse_args(["--clear", option, "high"])
+    assert error.value.code == 2
+    assert "require --spawn" in capsys.readouterr().err
 
 
 def test_send_refuses_non_ready_pane_before_loading_text(
@@ -1386,3 +1439,12 @@ def test_hook_sender_wakes_matching_pane_receiver(
             runtime_dir=tmp_path,
         )
         assert receiver.receive(0.1) == expected
+
+
+@pytest.mark.parametrize(
+    "model", ["gpt-6-astra", "gpt-6-astra-2026-09-24", "astra", "claude-fable-5"]
+)
+def test_restricted_model_needs_explicit_effort(watch: ModuleType, model: str) -> None:
+    with pytest.raises(SystemExit) as error:
+        watch.parse_args(["--spawn", "--model", model])
+    assert error.value.code == 2

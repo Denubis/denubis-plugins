@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -59,6 +60,8 @@ CONTEXT_FLOOR_PERCENT = 30
 # Typed into the composer as keystrokes, never pasted. Codex reads a pasted or narrated
 # instruction as a task, so it reads files to answer it and the meter goes down.
 SLASH_COMMANDS = ("/clear", "/compact", "/status")
+DEFAULT_MODEL = "gpt-6-sol"
+DEFAULT_REASONING_EFFORT = "xhigh"
 CODEX_SPAWN_COMMAND = (
     # Containment is the sandbox rather than a dialog per command: `workspace-write`
     # bounds writes to the working tree, and `on-request` leaves codex to escalate
@@ -88,6 +91,18 @@ CommandRunner = Callable[[Command], str]
 
 class MonitorError(RuntimeError):
     """An operational condition that prevents safe monitoring."""
+
+
+class PaneNotReadyError(MonitorError):
+    """A preflight refusal carrying the title that was actually observed."""
+
+    def __init__(self, title: str, message: str) -> None:
+        super().__init__(message)
+        self.title = title
+
+
+class PaneComposerUnavailableError(MonitorError):
+    """A preflight refusal because no composer was drawn in the pane."""
 
 
 class NoCodexPaneError(MonitorError):
@@ -1320,8 +1335,25 @@ def _spawn_directory(pane: str, requested: str | None) -> Path:
     return candidate.resolve()
 
 
-def spawn_pane(label: str | None = None, cwd: str | None = None) -> str:
+def _spawn_effort(model: str, requested: str | None) -> str:
+    if requested is None and any(
+        name in model.casefold() for name in ("astra", "fable")
+    ):
+        raise MonitorError(
+            "Astra/Fable require an explicit effort from the human request"
+        )
+    return requested if requested is not None else DEFAULT_REASONING_EFFORT
+
+
+def spawn_pane(
+    label: str | None = None,
+    cwd: str | None = None,
+    *,
+    model: str = DEFAULT_MODEL,
+    reasoning_effort: str | None = None,
+) -> str:
     """Open a Codex pane beside this one, refusing when one already runs."""
+    reasoning_effort = _spawn_effort(model, reasoning_effort)
     pane = _caller_pane()
     try:
         existing = joined_pane()
@@ -1330,6 +1362,14 @@ def spawn_pane(label: str | None = None, cwd: str | None = None) -> str:
     if existing:
         raise MonitorError(f"Codex already runs at {existing}; close it first")
     workdir = _spawn_directory(pane, cwd)
+    model_options = shlex.join(
+        (
+            "--model",
+            model,
+            "-c",
+            f"model_reasoning_effort={json.dumps(reasoning_effort)}",
+        )
+    )
     pane_id = run_command(
         (
             "tmux",
@@ -1342,7 +1382,7 @@ def spawn_pane(label: str | None = None, cwd: str | None = None) -> str:
             "-P",
             "-F",
             "#{pane_id}",
-            CODEX_SPAWN_COMMAND,
+            f"{CODEX_SPAWN_COMMAND} {model_options}",
         )
     ).strip()
     pane_label = label or workdir.name or "codex"
@@ -1562,7 +1602,7 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
     """
     title = pane_status(pane_id)
     if re.search(r"\bready\b", title, re.IGNORECASE) is None:
-        raise MonitorError(_not_ready_complaint(pane_id, title))
+        raise PaneNotReadyError(title, _not_ready_complaint(pane_id, title))
     snapshot = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
     content = _plain(snapshot)
     if _approval_is_pending("\n".join(content.splitlines()[-12:])):
@@ -1577,8 +1617,8 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
         # sends the reader hunting for typed text that was never there: on
         # 2026-08-09 a 127x5 pane produced "composer is not empty" and cost an
         # hour, while a 182x41 pane of the same build drew its composer and
-        # passed. No capture flag recovers this, because the composer was never
-        # drawn and so is not in the scrollback either.
+        # passed. A clearing pane can also report Ready before its composer
+        # redraws. No capture flag recovers a composer that was never drawn.
         # Height and the window's pane count come back in one call, because the
         # usual cause is layout pressure rather than a deliberately short pane:
         # panes get squeezed when a window accumulates agent panes.
@@ -1593,7 +1633,7 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
             )
         ).strip()
         height, _, panes = geometry.partition(" ")
-        raise MonitorError(
+        raise PaneComposerUnavailableError(
             f"no composer drawn on joined Codex pane {pane_id} ({height} lines "
             f"tall, sharing its window with {panes} panes), so its contents "
             f"cannot be read; close a pane or re-run the layout to give it "
@@ -2033,24 +2073,51 @@ def _settled_meter(pane_id: str) -> int | None:
 
 
 def _confirm_clear(target: PaneRef, previous_id: str) -> str:
-    """Confirm a clear by reading a different session UUID from fresh status."""
+    """Confirm a clear by reading a different session UUID from fresh status.
+
+    Retry only the startup and missing-composer states caused by redraw. Each
+    status attempt still passes the approval and composer preflight before typing.
+    """
     pane_id = target.pane_id
-    if _wait_ready(pane_id) is None:
+    ready_at_last_observation = False
+    last_composer_error: PaneComposerUnavailableError | None = None
+    for _ in range(SETTLE_POLLS):
+        title = pane_status(pane_id)
+        if re.search(r"\bready\b", title, re.IGNORECASE) is None:
+            ready_at_last_observation = False
+            time.sleep(SUBMIT_POLL_SECONDS)
+            continue
+        ready_at_last_observation = True
+        _require_joined_target(target)
+        try:
+            rotated = _probe_session_identity(target)
+        except PaneComposerUnavailableError as error:
+            last_composer_error = error
+        except PaneNotReadyError as error:
+            if re.search(r"\bstarting\b", error.title, re.IGNORECASE) is None:
+                raise
+            ready_at_last_observation = False
+        else:
+            last_composer_error = None
+            if rotated != previous_id:
+                left = _settled_meter(pane_id)
+                cleared = f"cleared {pane_id}: session {previous_id} -> {rotated}"
+                meter = (
+                    f"context {left}% left" if left is not None else "meter unreadable"
+                )
+                return f"{cleared}; Ready, {meter}"
+        time.sleep(SUBMIT_POLL_SECONDS)
+    if not ready_at_last_observation:
         raise MonitorError(
             f"{pane_id} did not return Ready after /clear, so its new session "
             f"could not be checked; inspect with --tail"
         )
-    _require_joined_target(target)
-    left = _settled_meter(pane_id)
-    rotated = _probe_session_identity(target)
-    if rotated == previous_id:
-        raise MonitorError(
-            f"session {previous_id} is still current on {pane_id}, so /clear did not "
-            f"run; inspect with --tail"
-        )
-    cleared = f"cleared {pane_id}: session {previous_id} -> {rotated}"
-    meter = f"context {left}% left" if left is not None else "meter unreadable"
-    return f"{cleared}; Ready, {meter}"
+    if last_composer_error is not None:
+        raise last_composer_error
+    raise MonitorError(
+        f"session {previous_id} is still current on {pane_id}, so /clear did not "
+        f"run; inspect with --tail"
+    )
 
 
 def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
@@ -2182,7 +2249,14 @@ def run_verb(args: argparse.Namespace) -> int | None:
     if args.resolve:
         print(joined_pane())
     elif args.spawn:
-        print(spawn_pane(args.label, args.cwd))
+        print(
+            spawn_pane(
+                args.label,
+                args.cwd,
+                model=args.model,
+                reasoning_effort=args.reasoning_effort,
+            )
+        )
     elif args.send is not None:
         print(send_prompt(args.send, under_floor=args.under_floor))
     elif args.tail is not None:
@@ -2221,6 +2295,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     action.add_argument(
         "--spawn", action="store_true", help="open a Codex pane beside this one"
+    )
+    parser.add_argument(
+        "--model",
+        metavar="MODEL",
+        help=f"model for --spawn (default: {DEFAULT_MODEL})",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("none", "low", "medium", "high", "xhigh", "max"),
+        help=f"reasoning effort for --spawn (default: {DEFAULT_REASONING_EFFORT})",
     )
     parser.add_argument(
         "--label",
@@ -2295,7 +2379,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="N",
         help="print the joined pane's non-blank tail (default 12 lines)",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not args.spawn and (args.model is not None or args.reasoning_effort is not None):
+        parser.error("--model and --reasoning-effort require --spawn")
+    if args.model is not None and not args.model.strip():
+        parser.error("--model must not be empty")
+    args.model = args.model if args.model is not None else DEFAULT_MODEL
+    try:
+        args.reasoning_effort = _spawn_effort(args.model, args.reasoning_effort)
+    except MonitorError as error:
+        parser.error(str(error))
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:

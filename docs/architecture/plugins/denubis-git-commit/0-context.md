@@ -1,6 +1,6 @@
 # denubis-git-commit — Context (Level 0)
 
-> System boundary: one explicit-only shared skill that records an authorized coherent
+> System boundary: one discoverable shared skill that records an authorized coherent
 > outcome as a local Git commit without publishing it.
 
 ## Context
@@ -27,11 +27,14 @@ flowchart LR
 | Outcome | Stage one coherent completed outcome rather than files grouped by authoring chronology. If the changes cannot be explained as one outcome, separate them by behavior and dependency. |
 | Preflight | Inspect repository root, branch, worktree status, staged and unstaged diffs, untracked files, recent message convention, and applicable project instructions before mutation. |
 | Documentation | Update living documentation when the changed behavior makes it false. Do not turn commit messages into the only durable design or operating documentation. |
-| Verification | Run the checks that own the staged behavior, inspect the exact staged diff, commit through a message file, then verify the resulting commit and remaining status. |
+| Verification | Run the checks that own the staged behavior, inspect the exact staged diff, commit through literal stdin or a message file, then verify the resulting commit and remaining status. |
 | Lifecycle | Private checkpoints may be frequent on an isolated task branch. Fix rounds and superseded checkpoints fold into their coherent outcome only after accepted finished-work human UAT; integration, publication, and cleanup are verified delivery steps. |
 
-The skill is explicit-only in Codex metadata. Claude's `/commit` entry remains a direct
-human invocation. Neither provider may infer permission to push from permission to commit.
+The skill is discoverable in Codex metadata and can also be invoked explicitly.
+Discovery supplies the procedure; commit authority still comes from the human or an
+approved lifecycle. Claude's `/commit` remains available. A quoted Bash heredoc can
+supply the message to `git commit -F -`; other hosts may use a literal message file.
+Neither provider may infer permission to push from permission to commit.
 
 ## Packaging
 

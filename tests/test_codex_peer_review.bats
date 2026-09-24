@@ -13,8 +13,7 @@ RUBRIC_SRC="$SKILL_DIR/review-method.md"
 
 setup() {
     export TEST_DIR="$(mktemp -d)"
-    # Hermetic codex config: the runner reads the operator's default model from
-    # $CODEX_HOME/config.toml, so tests must never depend on the real one.
+    # Hermetic config proves the runner does not inherit the operator's model.
     export CODEX_HOME="$TEST_DIR/codex-home"
     mkdir -p "$CODEX_HOME"
     export CODEX_ARGS_FILE="$TEST_DIR/codex-args"
@@ -353,63 +352,36 @@ make_repo() {
     run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
     # The reviewer must stay clear of the operator's MCP servers, hooks and
-    # instructions; only the model tracks their config.
+    # instructions; model selection is explicit.
     grep -qx -- "--ignore-user-config" "$CODEX_ARGS_FILE"
 }
 
-# ── Model resolution: track the operator's codex default, never pin ──
+# ── Explicit model routing ──
 
-@test "model comes from the operator's codex config, not a hardcoded pin" {
+@test "review defaults to sol xhigh despite astra in user config" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    printf 'model = "gpt-9.9-fictional"\n' > "$CODEX_HOME/config.toml"
+    printf 'model = "gpt-6-astra"\n' > "$CODEX_HOME/config.toml"
     run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
-    grep -qx -- "-m"                 "$CODEX_ARGS_FILE"
-    grep -qx -- "gpt-9.9-fictional"  "$CODEX_ARGS_FILE"
+    grep -qx -- "gpt-6-sol" "$CODEX_ARGS_FILE"
+    grep -Fqx -- 'model_reasoning_effort="xhigh"' "$CODEX_ARGS_FILE"
+    [ "$(field model)" = "gpt-6-sol" ]
 }
 
-@test "no model key in config: -m is omitted so codex picks its own default" {
+@test "explicit astra medium is passed without upgrading effort" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    printf 'model_reasoning_effort = "xhigh"\n' > "$CODEX_HOME/config.toml"
-    run bash "$SCRIPT" docs/target.md
+    run bash "$SCRIPT" docs/target.md --model gpt-6-astra --reasoning-effort medium
     [ "$status" -eq 0 ]
-    ! grep -qx -- "-m" "$CODEX_ARGS_FILE"
+    grep -qx -- "gpt-6-astra" "$CODEX_ARGS_FILE"
+    grep -Fqx -- 'model_reasoning_effort="medium"' "$CODEX_ARGS_FILE"
 }
 
-@test "absent config file: -m is omitted rather than erroring" {
+@test "astra without explicit effort refuses before invoking codex" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    [ ! -e "$CODEX_HOME/config.toml" ]
-    run bash "$SCRIPT" docs/target.md
-    [ "$status" -eq 0 ]
-    ! grep -qx -- "-m" "$CODEX_ARGS_FILE"
-}
-
-@test "a model key inside a [section] is not mistaken for the top-level default" {
-    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    cat > "$CODEX_HOME/config.toml" <<'TOML'
-model_reasoning_effort = "xhigh"
-
-[profiles.other]
-model = "gpt-should-not-be-used"
-TOML
-    run bash "$SCRIPT" docs/target.md
-    [ "$status" -eq 0 ]
-    ! grep -qx -- "gpt-should-not-be-used" "$CODEX_ARGS_FILE"
-}
-
-@test "reports the resolved model so the review can be labelled accurately" {
-    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    printf 'model = "gpt-9.9-fictional"\n' > "$CODEX_HOME/config.toml"
-    run bash "$SCRIPT" docs/target.md
-    [ "$status" -eq 0 ]
-    [ "$(field model)" = "gpt-9.9-fictional" ]
-}
-
-@test "reports the fallback plainly when no model is configured" {
-    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
-    run bash "$SCRIPT" docs/target.md
-    [ "$status" -eq 0 ]
-    [[ "$(field model)" == *"codex default"* ]]
+    run bash "$SCRIPT" docs/target.md --model gpt-6-astra
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"explicit effort"* ]]
+    [ ! -e "$CODEX_ARGS_FILE" ]
 }
 
 # ── Provenance smoke-check ──

@@ -1,11 +1,19 @@
 {
   "name": "denubis-basic-agents",
-  "version": "2.2.2",
+  "version": "3.0.0",
   "description": "Choose functional roles for general-purpose and domain-specific delegated work.",
-  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "url": "https://github.com/denubis"
+  },
   "repository": "https://github.com/denubis/denubis-plugins",
   "license": "CC-BY-SA-4.0",
-  "keywords": ["agents", "delegation", "python", "academic"],
+  "keywords": [
+    "agents",
+    "delegation",
+    "python",
+    "academic"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Basic Agents",
@@ -13,7 +21,11 @@
     "longDescription": "Select a provider-native general, Python, or academic subagent by the work it must perform.",
     "developerName": "Brian Ballsun-Stanton",
     "category": "Developer Tools",
-    "capabilities": ["Interactive"],
-    "defaultPrompt": ["Choose the appropriate functional role for this delegated task."]
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Choose the appropriate functional role for this delegated task."
+    ]
   }
 }

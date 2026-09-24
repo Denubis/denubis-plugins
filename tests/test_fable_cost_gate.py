@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -65,14 +66,14 @@ def test_shipped_agent_definitions_do_not_dispatch_fable() -> None:
         if _is_fable_model(_agent_model(path))
     ]
 
-    message = "Fable agent definitions bypass human selection: " + ", ".join(
-        offenders
-    )
+    message = "Fable agent definitions bypass human selection: " + ", ".join(offenders)
     assert not offenders, message
 
 
-def test_unavailable_advisor_does_not_prescribe_an_unrequested_fallback(
+@pytest.mark.parametrize("alive", [False, True])
+def test_advisor_preserves_selection_and_never_falls_back(
     tmp_path: Path,
+    alive: bool,
 ) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -80,6 +81,9 @@ def test_unavailable_advisor_does_not_prescribe_an_unrequested_fallback(
     tmux.write_text(
         """#!/usr/bin/env bash
 if [ \"$1\" = split-window ]; then
+  printf '%s\\n' \"$@\" > \"$ARGS_FILE\"
+  printf '%%99\\n'
+elif [ \"$1\" = list-panes ] && [ \"$ALIVE\" = yes ]; then
   printf '%%99\\n'
 fi
 """,
@@ -93,18 +97,40 @@ fi
         executable.chmod(0o755)
 
     result = subprocess.run(
-        ["bash", str(ADVISOR_LAUNCHER), str(tmp_path), "requested-model"],
+        ["bash", str(ADVISOR_LAUNCHER), str(tmp_path), "requested-model", "medium"],
         capture_output=True,
         check=False,
         env={
             "PATH": f"{bin_dir}:/usr/bin:/bin",
             "TMUX": "fixture",
             "TMUX_PANE": "%1",
+            "ARGS_FILE": str(tmp_path / "args"),
+            "ALIVE": "yes" if alive else "no",
         },
         text=True,
     )
 
+    args = (tmp_path / "args").read_text().splitlines()
+    assert args[args.index("--model") + 1] == "requested-model"
+    assert args[args.index("--effort") + 1] == "medium"
+    if alive:
+        assert result.returncode == 0
+        assert "effort:   medium" in result.stdout
+        return
     assert result.returncode == 2
     assert "'requested-model'" in result.stderr
     assert "no fallback model was selected" in result.stderr.casefold()
     assert "opus" not in result.stderr.casefold()
+
+
+@pytest.mark.parametrize("arguments", [[], ["."], [".", "claude-fable-5"]])
+def test_advisor_requires_explicit_model_and_effort(arguments: list[str]) -> None:
+    result = subprocess.run(
+        ["bash", str(ADVISOR_LAUNCHER), *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": "/usr/bin:/bin"},
+    )
+    assert result.returncode == 1
+    assert "model and effort" in result.stderr

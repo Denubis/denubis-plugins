@@ -153,7 +153,6 @@ def test_every_exposed_skill_has_valid_codex_metadata() -> None:
 
 def test_consequential_side_effect_skills_require_explicit_invocation() -> None:
     explicit_only = (
-        "plugins/denubis-git-commit/skills/commit",
         "plugins/denubis-plan-and-execute/skills/exec-session-naming",
         "plugins/denubis-plan-and-execute/skills/make-pr",
         "plugins/denubis-plan-and-execute/skills/merge-to-main",

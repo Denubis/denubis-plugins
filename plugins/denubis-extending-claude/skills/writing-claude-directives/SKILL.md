@@ -161,7 +161,7 @@ block. The structure keeps the agent type, description, and prompt as distinct f
 
 ```xml
 <invoke name="Task">
-<parameter name="subagent_type">denubis-basic-agents:sonnet-general-purpose</parameter>
+<parameter name="subagent_type">denubis-basic-agents:general-purpose</parameter>
 <parameter name="description">Short task description</parameter>
 <parameter name="prompt">
 The complete task, evidence boundary, and expected return shape.

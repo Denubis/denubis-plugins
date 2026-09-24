@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -17,7 +18,6 @@ HOOK_PATH = (
     / "hooks"
     / "code-quality-guard.py"
 )
-BASH_WRAPPER_PATH = HOOK_PATH.with_name("pretooluse-bash.sh")
 PLUGIN_ROOT = HOOK_PATH.parents[1]
 CODEX_MANIFEST_PATH = PLUGIN_ROOT / ".codex-plugin" / "plugin.json"
 CODEX_HOOKS_PATH = PLUGIN_ROOT / "hooks" / "codex-hooks.json"
@@ -222,11 +222,10 @@ def test_unrelated_tool_and_malformed_input_are_side_effect_free() -> None:
         "cat <<'EOF' | tee evidence.txt\nmodel-authored evidence\nEOF",
     ],
 )
-def test_bash_heredoc_file_write_is_explained_and_denied(command: str) -> None:
+def test_bash_heredoc_write_is_left_to_host_destination_policy(command: str) -> None:
     result = _run_bash_hook(command)
 
-    reason = _assert_explained_deny(result)
-    assert "structured Write/Edit" in reason
+    assert (result.returncode, result.stdout) == (0, "")
 
 
 @pytest.mark.parametrize(
@@ -246,24 +245,38 @@ def test_non_authoring_shell_io_is_allowed(command: str) -> None:
     assert result.stdout == ""
 
 
-def test_dispatcher_wrapper_routes_bash_payload_to_shared_guard() -> None:
-    hook_input = {
-        "tool_name": "Bash",
-        "tool_input": {
-            "command": "cat <<'EOF' > evidence.txt\nmodel-authored evidence\nEOF"
-        },
-    }
-
-    result = subprocess.run(
-        [str(BASH_WRAPPER_PATH)],
-        input=json.dumps(hook_input),
-        text=True,
-        capture_output=True,
-        check=False,
+def test_dispatcher_discovers_other_hooks_but_not_quality_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = (
+        REPO_ROOT
+        / "plugins/denubis-hook-pretooluse-dispatcher/hooks"
+        / "pretooluse-bash-dispatcher.py"
     )
-
-    reason = _assert_explained_deny(result)
-    assert "structured Write/Edit" in reason
+    spec = importlib.util.spec_from_file_location("quality_dispatch_fixture", path)
+    assert spec is not None and spec.loader is not None
+    dispatcher = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dispatcher)
+    (tmp_path / "fixture").symlink_to(REPO_ROOT, target_is_directory=True)
+    settings = tmp_path / "settings.json"
+    settings.write_text(
+        json.dumps(
+            {
+                "enabledPlugins": {
+                    "denubis-hook-code-quality-guard@fixture": True,
+                    "denubis-hook-gh-fork-guard@fixture": True,
+                }
+            }
+        )
+    )
+    monkeypatch.setattr(dispatcher, "MARKETPLACE_DIR", tmp_path)
+    monkeypatch.setattr(dispatcher, "SETTINGS_FILE", settings)
+    monkeypatch.setattr(dispatcher, "DROP_DIR", tmp_path / "no-drops")
+    entries = dispatcher.discover_hooks()
+    assert [entry.split(":", 3)[2] for entry in entries] == [
+        "denubis-hook-gh-fork-guard@fixture"
+    ]
 
 
 def test_codex_patch_denies_javascript_injection_in_user_surface_test() -> None:

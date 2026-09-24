@@ -20,7 +20,9 @@ provider-independent identifier.
 | Combined research | `combined-researcher` | One question genuinely requires both local and external evidence |
 | Remote-code research | `remote-code-researcher` | The answer requires reading an external library's actual source |
 
-Research requires source evaluation, so every research agent uses Sonnet or above.
+On Claude Code, research agents retain the Sonnet floor. On other providers, select
+the corresponding general-purpose or deep-judgment role through `using-generic-agents`;
+"Sonnet or above" is not a portable model identifier or a cross-provider ranking.
 
 Dispatch authority:
 

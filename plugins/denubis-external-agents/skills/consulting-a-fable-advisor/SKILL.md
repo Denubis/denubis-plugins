@@ -9,7 +9,13 @@ disable-model-invocation: true
 
 ## Boundary
 
-Fable work is human-triggered only. Claude's skill frontmatter and Codex's skill metadata
+Fable work requires the human's explicit model and effort selection for this particular
+task. "Go run this at Fable on medium" supplies both; a generic request for an advisor,
+stronger judgment, or even Fable without an effort does not. Ask for the missing level
+before dispatching; never infer it, inherit it, or supply a default. Preserve the exact
+human request in the brief and verify the selected model and effort on the live session.
+
+Claude's skill frontmatter and Codex's skill metadata
 both disable implicit model invocation; on any other provider the agent must enforce the
 same boundary. The authority record is
 `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins--worktrees-skill-skills-upstream-sync/e4421bb3-2615-4b37-944c-86e5dd65eccc.jsonl:12`;
@@ -32,7 +38,7 @@ this loaded SKILL.md path by ascending two directories, rather than assuming the
 at the repository root:
 
 ```fish
-bash "$plugin_root/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh" [cwd] [model]
+bash "$plugin_root/skills/consulting-a-fable-advisor/fable-advisor-spawn.sh" <cwd> <model> <effort>
 bash "$plugin_root/skills/consulting-a-fable-advisor/advisor-send.sh" <pane-id> -
 ```
 

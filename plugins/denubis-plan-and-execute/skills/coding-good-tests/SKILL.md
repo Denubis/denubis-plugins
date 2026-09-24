@@ -32,6 +32,14 @@ the expectation is wrong, demonstrate the contract error and correct it explicit
 
 ## Test behavior, not the edit
 
+Change-detection tests are forbidden. Tests exist to verify functionality, not force a
+second edit whenever an implementation or document changes. Do not lock source text,
+prose wording, private structure, or incidental snapshots to today's implementation.
+Ask: if the implementation changes but its promised behavior is preserved, does this
+test still pass? If not, replace it with a behavioral check or remove it when no useful
+behavioral claim exists. Exact values belong in expectations only when the consumer's
+contract requires them; exercise that consumer rather than duplicate its configuration.
+
 Do not read source or prose, assert that a chosen phrase is present or absent, then write
 that phrase. This observes the change itself. An independent gate exercises public
 behavior, parses a declared format through its consumer, recomputes an invariant, or uses

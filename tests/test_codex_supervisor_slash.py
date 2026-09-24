@@ -267,13 +267,17 @@ def _install(
     session_ids: list[str] | None = None,
 ) -> _Pane:
     target = watch.PaneRef("%55", 5055)
-    identities = iter(session_ids or [_ID_BEFORE, _ID_BEFORE])
+    identities = list(session_ids or [_ID_BEFORE, _ID_BEFORE])
+
+    def session_identity(_target: object) -> str:
+        return identities.pop(0) if len(identities) > 1 else identities[0]
+
     monkeypatch.setattr(watch, "joined_target", lambda: target)
     monkeypatch.setattr(watch, "joined_pane", lambda: target.pane_id)
     monkeypatch.setattr(
         watch,
         "_probe_session_identity",
-        lambda _target: next(identities),
+        session_identity,
         raising=False,
     )
     monkeypatch.setattr(watch, "run_command", pane.run)
@@ -730,6 +734,140 @@ def test_a_clear_hands_back_a_pane_that_is_ready_to_take_the_next_prompt(
     assert "100" in result, result
 
 
+def test_clear_survives_old_ready_title_before_new_session_starts(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The old Ready title can linger after Enter, then change to Starting."""
+    target = watch.PaneRef("%55", 5055)
+
+    class RestartingPane:
+        def __init__(self) -> None:
+            self.typed = ""
+            self.cleared = False
+            self.title_reads_after_clear = 0
+            self.status_pending = False
+            self.keys: list[tuple[str, ...]] = []
+
+        def title(self) -> str:
+            if not self.cleared:
+                return _TITLE_BEFORE_CLEAR
+            self.title_reads_after_clear += 1
+            if self.title_reads_after_clear == 1:
+                return _TITLE_BEFORE_CLEAR
+            if self.title_reads_after_clear == 2:
+                return _TITLE_AFTER_CLEAR
+            return _TITLE_AFTER_CLEAR_READY
+
+        def capture(self) -> str:
+            if self.typed == "/status":
+                return _TYPED_STATUS
+            if self.typed == "/clear":
+                return _TYPED_CLEAR
+            if self.status_pending:
+                self.status_pending = False
+                panel = _NAMED_STATUS_PANEL
+                if self.cleared:
+                    panel = [line.replace(_ID_BEFORE, _ID_AFTER) for line in panel]
+                return _pane(body=["/status", "", *panel])
+            return _pane(percent=100 if self.cleared else 96)
+
+        def run(self, argv: tuple[str, ...]) -> str:
+            if argv[-1] == "#{pane_title}":
+                return self.title()
+            if "send-keys" in argv:
+                self.keys.append(argv)
+                if "-l" in argv:
+                    self.typed = argv[-1]
+                elif argv[-1] == "Enter":
+                    self.status_pending = self.typed == "/status"
+                    self.cleared |= self.typed == "/clear"
+                    self.typed = ""
+                return ""
+            if "capture-pane" in argv:
+                return self.capture()
+            return ""
+
+    pane = RestartingPane()
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+
+    result = watch.run_slash_command("/clear")
+
+    assert f"{_ID_BEFORE} -> {_ID_AFTER}" in result
+    assert "Ready, context 100% left" in result
+    assert pane.title_reads_after_clear >= 2
+    assert pane.keys.count(("tmux", "send-keys", "-t", "%55", "Enter")) == 3
+
+
+def test_clear_waits_for_a_transient_missing_composer_before_status_probe(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ready can appear before the restarted TUI has redrawn its composer."""
+    target = watch.PaneRef("%55", 5055)
+    bare = "• Codex is starting\n"
+    pane = _Pane(
+        [_TITLE_AFTER_CLEAR_READY],
+        [bare, _pane(percent=100)],
+    )
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+
+    def probe(_target: object) -> str:
+        watch._preflight_pane(target.pane_id)
+        return _ID_AFTER
+
+    monkeypatch.setattr(watch, "_probe_session_identity", probe)
+
+    result = watch._confirm_clear(target, _ID_BEFORE)
+
+    assert f"{_ID_BEFORE} -> {_ID_AFTER}" in result
+    assert "Ready, context 100% left" in result
+    assert pane.keys == []
+
+
+def test_initial_clear_preflight_still_refuses_a_missing_composer(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pane = _install(
+        watch,
+        monkeypatch,
+        _Pane([_TITLE_BEFORE_CLEAR], ["• Codex is starting\n"]),
+    )
+
+    with pytest.raises(watch.MonitorError, match="no composer drawn"):
+        watch.run_slash_command("/clear")
+
+    assert pane.keys == []
+
+
+def test_clear_does_not_confirm_a_pane_whose_composer_never_redraws(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = watch.PaneRef("%55", 5055)
+    pane = _Pane([_TITLE_AFTER_CLEAR_READY], ["• Codex is starting\n"])
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(watch, "SETTLE_POLLS", 3)
+
+    def probe(_target: object) -> str:
+        watch._preflight_pane(target.pane_id)
+        return _ID_AFTER
+
+    monkeypatch.setattr(watch, "_probe_session_identity", probe)
+
+    with pytest.raises(watch.MonitorError, match="no composer drawn"):
+        watch._confirm_clear(target, _ID_BEFORE)
+
+    assert pane.keys == []
+
+
 def test_a_clear_that_never_returns_ready_cannot_be_confirmed(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -740,6 +878,24 @@ def test_a_clear_that_never_returns_ready_cannot_be_confirmed(
         monkeypatch,
         _Pane([_TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR], [_pane(), _TYPED_CLEAR]),
         session_ids=[_ID_BEFORE, _ID_AFTER],
+    )
+
+    with pytest.raises(watch.MonitorError, match="did not return Ready"):
+        watch.run_slash_command("/clear")
+
+
+def test_stale_ready_before_permanent_starting_reports_not_ready(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An old Ready reading cannot establish that the new session settled."""
+    _install(
+        watch,
+        monkeypatch,
+        _Pane(
+            [_TITLE_BEFORE_CLEAR, _TITLE_BEFORE_CLEAR, _TITLE_AFTER_CLEAR],
+            [_pane(), _TYPED_CLEAR],
+        ),
     )
 
     with pytest.raises(watch.MonitorError, match="did not return Ready"):

@@ -5,6 +5,10 @@ rationale would otherwise be lost. Format is loosely MADR (Markdown
 Architectural Decision Records): each file has a status, context, decision,
 and consequences section. One ADR per decision.
 
+## Decisions
+
+- [0006 — Astra and Fable require explicit model and effort](0006-astra-fable-require-explicit-model-and-effort.md)
+
 ## Status lifecycle
 
 - **Proposed** — decision drafted during implementation; awaits acceptance

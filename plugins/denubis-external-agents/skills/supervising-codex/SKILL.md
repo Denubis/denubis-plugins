@@ -15,11 +15,10 @@ Codex, or Antigravity may host the skill, but the external Codex process remains
 separate voice. If host and doer use the same model, describe the result as process
 separation, not an independent-model check.
 
-The split exists because a model cannot reliably verify its own work and favours its own
-output. The supervisor must be a different model from the doer, and the doer's self-report
-is never evidence. Field record (2026-07-16/17): codex twice self-reported "zero findings"
-on its own drafts, and the supervision pass found a decision smuggled past the human in
-one and a real collection-breaking defect in the other.
+The doer's self-report is never evidence; verify the resulting artifacts and checks.
+For a task requiring review by a different model, explicitly select different supervisor
+and doer models before dispatch. Ordinary delegation may use the same model in separate
+processes, but cannot be reported as a review by a different model.
 
 **The supervisor is not the trusted party either.** Brian's ruling (2026-07-21): "the
 fundamental task for the various supporters to do is to doubt what you say, and make
@@ -98,7 +97,7 @@ The verbs, read from the parser rather than from memory:
 |---|---|
 | *(none)* | run the watch loop, emitting only actionable events |
 | `--resolve` | print the joined Codex pane ID |
-| `--spawn [--label NAME] [--cwd PATH]` | open a Codex pane beside this one |
+| `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one; defaults to `gpt-6-sol` at `xhigh` |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
 | `--clear` | start codex on a fresh session, confirmed by its `/status` session id changing |
@@ -112,6 +111,23 @@ The verbs, read from the parser rather than from memory:
 
 None of them takes a pane ID. Each resolves the pane itself, for the reasons under
 *Sending a prompt*.
+
+The model defaults are the operator's current routing policy (2026-09-24), not a
+claim that the most expensive model is required. Explicit spawn options override them.
+`--model` and `--reasoning-effort` apply only to `--spawn`; other verbs reject them.
+After `/clear`, verification tolerates the startup/redraw gap and requires a fresh
+`/status` panel with a different session ID; a stale Ready title alone is not success.
+Spawn options do not switch a running pane's model. Inspect the resulting model and effort in
+the pane after spawn and after `/clear`; do not infer them from a prior session or the
+command's success. An unsupported model/effort combination is a startup failure to
+surface, not permission to silently substitute a model.
+
+Astra and Fable require the human to explicitly name both the model and effort for this
+task. Never choose them because the task is difficult, needs another model, or inherits
+their settings from a parent session. Quote the human's request in the dispatch brief.
+If the request omits effort, ask for it; the launcher rejects a restricted model with no
+explicit effort. CLI arguments alone do not prove human authorization. Before sending
+work to an existing Astra/Fable pane, apply the same human-request requirement.
 
 Every verb that types into the pane refuses first unless the title is `Ready`, the
 composer is empty, and **no approval dialog is pending**. That last guard is the tool's

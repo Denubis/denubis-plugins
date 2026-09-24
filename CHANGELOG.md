@@ -1,5 +1,49 @@
 # Changelog
 
+## [denubis-basic-agents] 3.0.0
+
+**Changed:**
+- Rename the provider-specific generic agents to `general-purpose` and `deep-judgment`.
+- Map Codex delegation to explicit Sol/xhigh and Claude deep judgment to Opus 5.5.
+- Require a task-specific human request naming both model and effort before Astra or Fable dispatch.
+
+## [denubis-external-agents] 0.19.0
+
+**Changed:**
+- Supervisor spawns and peer reviews default to `gpt-6-sol` at `xhigh`; explicit options select another model and effort.
+- Astra/Fable launchers require explicit effort, and their skills require the original human authorization.
+
+**Fixed:**
+- `/clear` verification waits through stale Ready titles, Starting, and the temporary missing composer during restart, then confirms a new session ID. Approval and composer checks remain active.
+
+## [denubis-git-commit] 1.4.0
+
+**Fixed:**
+- Make the commit procedure discoverable in Codex without requiring a slash invocation; commit authority still comes from the human.
+- Accept quoted heredocs for literal commit messages without requiring provider-specific Write/Edit tools.
+
+## [denubis-hook-code-quality-guard] 0.3.0
+
+**Changed:**
+- Remove the categorical Bash heredoc guard and its dispatcher entry. Destination permissions still apply.
+- Retain checks for JavaScript injection in user-surface tests and direct schema creation outside migrations.
+
+## [denubis-extending-claude] 1.10.2
+
+**Changed:**
+- Use the provider-neutral general-purpose agent name.
+- Require explicit task-specific human model and effort selection for Astra/Fable.
+
+## [denubis-research-agents] 1.3.4
+
+**Changed:**
+- Express the research dispatch requirement by functional role instead of a Sonnet minimum.
+
+## [denubis-plan-and-execute] 4.2.1
+
+**Changed:**
+- Explicitly forbid change-detection tests that merely require a second edit when source code or prose changes. Verify observable functionality instead.
+
 ## [denubis-academic] 0.18.0
 
 **Added:**

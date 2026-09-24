@@ -67,21 +67,26 @@ reasoning, alternatives, review findings, and verification narratives in project
 documentation rather than the subject line. Do not add a provider-specific co-author
 unless the project or human requires it.
 
-Create `.commit-msg.tmp` in the repository root with the runtime's structured Write/Edit
-primitive. If that path already exists and this operation did not create it, stop and
-inspect it instead of overwriting it. Put the complete commit message in that file; never
-use Bash, `printf`, `echo`, `cat`, command substitution, or a heredoc to construct commit
-text.
-
-Commit and clean up with this fixed command:
+Pass the message as literal data. In a Bash execution tool, use a quoted heredoc directly
+on Git's standard input:
 
 ```bash
-git commit -F .commit-msg.tmp && rm -f .commit-msg.tmp
+git commit -F - <<'COMMIT_MESSAGE'
+Describe the coherent outcome
+COMMIT_MESSAGE
 ```
 
-The fixed shell text contains no varying message content. If the commit fails, `&&` leaves
-`.commit-msg.tmp` available for inspection. Remove only the file created by this operation,
-and only after the commit succeeds.
+Choose a delimiter that does not occur as a complete line in the message. Quoting it
+preserves backticks, dollar signs, and command substitutions as text. Do not embed the
+message in an interpolated shell argument. This Bash example is for the execution tool;
+fish has no heredoc syntax. For a fish terminal or a runtime without stdin support, write
+the literal message to a task-owned file using an available editor or quoted heredoc in
+Bash, then use `git commit -F <path>`. Preserve a pre-existing file, and remove only your
+own message file after success.
+
+Heredocs, patches, and native file editors are valid authoring routes under the host's
+destination permissions. No particular provider's Write/Edit tool is required. Loading
+this discoverable skill supplies a procedure, not permission to commit.
 
 Do not bypass hooks, disable signing, amend, or rewrite history unless the human named that
 action. A rejected commit never existed; fix the demonstrated cause, restage, and create

@@ -4,4 +4,4 @@ interface:
   default_prompt: "Use $commit to inspect and commit the coherent outcome I have authorized."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

@@ -12,16 +12,24 @@
 # work. Read the response from the JSONL transcript, not the TUI viewport. No
 # fallback model is selected automatically.
 #
-# Usage: fable-advisor-spawn.sh [cwd] [model]
-#          cwd    directory the advisor starts in (default: $PWD)
-#          model  advisor model (default: claude-fable-5)
+# Usage: fable-advisor-spawn.sh <cwd> <model> <effort>
+# Model and effort must both come from the human's explicit request.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-cwd="${1:-$PWD}"
-model="${2:-claude-fable-5}"
+[ "$#" -eq 3 ] && [ -n "${2:-}" ] && [ -n "${3:-}" ] || {
+  echo "explicit model and effort required: fable-advisor-spawn.sh <cwd> <model> <effort>" >&2
+  exit 1
+}
+cwd="$1"
+model="$2"
+effort="$3"
+case "$effort" in
+  low|medium|high|xhigh|max) ;;
+  *) echo "unsupported effort: $effort" >&2; exit 1 ;;
+esac
 
 [ -d "$cwd" ] || { echo "cwd not found: $cwd" >&2; exit 1; }
 [ -n "${TMUX:-}" ] || { echo "not inside tmux — the advisor needs a pane" >&2; exit 1; }
@@ -53,7 +61,7 @@ Report only findings that could change the decision. For each, state the consequ
 # Target the caller's pane; tmux's active window may be unrelated.
 pane="$(tmux split-window -h -c "$cwd" -P -F '#{pane_id}' \
   ${TMUX_PANE:+-t "$TMUX_PANE"} \
-  claude --model "$model" \
+  claude --model "$model" --effort "$effort" \
          --disallowed-tools "${DENIED[@]}" \
          --disable-slash-commands \
          --append-system-prompt "$BRIEF")"
@@ -71,6 +79,7 @@ fi
 
 echo "pane:     $pane"
 echo "model:    $model"
+echo "effort:   $effort"
 echo "cwd:      $cwd"
 echo "denied:   ${#DENIED[@]} tools incl. Bash/Write/Edit/Workflow/Cron*/Skill"
 echo "VERIFY:   ask the advisor to enumerate its surface and attempt a write."

@@ -31,13 +31,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUBRIC="$SCRIPT_DIR/review-method.md"       # bundled copy of critical-peer-review.md
 PROMPT_FILE="$SCRIPT_DIR/peer-review-smoke-prompt.md"
 
-usage='usage: codex-peer-review.sh <file-or-dir-to-review> ["one-line focus note"] [--include <path>]... [--include-confirmed]'
+usage='usage: codex-peer-review.sh <file-or-dir-to-review> ["one-line focus note"] [--include <path>]... [--include-confirmed] [--model MODEL] [--reasoning-effort EFFORT]'
 target="${1:?$usage}"
 shift
 focus=""
 focus_set=0
 includes=()
 include_confirmed=0
+MODEL="gpt-6-sol"
+effort=""
 # Unrecognised arguments are fatal. A tolerant parser that took the first bare
 # token as the focus note and dropped the rest turned `--includ evidence.md`
 # into a focus note reading "--includ" and silently discarded the evidence, so
@@ -46,6 +48,11 @@ include_confirmed=0
 # ignoring a named path is the opposite of the intent.
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --model|--reasoning-effort)
+      [ "$#" -ge 2 ] && [ -n "$2" ] || { echo "value required after $1" >&2; exit 1; }
+      if [ "$1" = --model ]; then MODEL="$2"; else effort="$2"; fi
+      shift 2
+      ;;
     --include)
       [ "$#" -ge 2 ] || { echo "include path required after --include" >&2; exit 1; }
       includes+=("$2")
@@ -81,26 +88,17 @@ done
 
 target_abs="$(cd "$(dirname "$target")" && pwd)/$(basename "$target")"
 
-# Model: track whatever the operator has codex set to, never pin a version here.
-# `--ignore-user-config` (below) keeps the reviewer clear of their MCP servers,
-# hooks and custom instructions, so the model is read out of config.toml
-# explicitly and passed back in — the one setting allowed through the isolation.
-# Only the top-level key counts; parsing stops at the first [section] header so a
-# profile's model is never mistaken for the default. No key, no -m: codex then
-# picks its own default, which is the right answer when the operator has not
-# expressed one.
-codex_home="${CODEX_HOME:-$HOME/.codex}"
-MODEL="$(awk '
-  /^[[:space:]]*\[/ { exit }
-  /^[[:space:]]*model[[:space:]]*=/ {
-      line = $0
-      sub(/^[^=]*=[[:space:]]*/, "", line)
-      sub(/[[:space:]]*$/, "", line)
-      gsub(/^"|"$/, "", line)
-      print line
-      exit
-  }
-' "$codex_home/config.toml" 2>/dev/null || true)"
+# Never inherit a restricted model or effort from host configuration.
+case "${MODEL,,}" in
+  *astra*|*fable*)
+    [ -n "$effort" ] || { echo "Astra/Fable require an explicit effort from the human request" >&2; exit 1; }
+    ;;
+esac
+effort="${effort:-xhigh}"
+case "$effort" in
+  none|low|medium|high|xhigh|max) ;;
+  *) echo "unsupported effort: $effort" >&2; exit 1 ;;
+esac
 
 # Throwaway staging codex reads from (-C points here); not persisted.
 work="$(mktemp -d /tmp/codex-review.XXXXXX)"
@@ -209,12 +207,8 @@ done
 [ -n "$focus" ] && echo "focus:    $focus"
 # Printed so the reviewer can be attributed to the model that actually ran;
 # the skill's presentation step labels the review with this value.
-if [ -n "$MODEL" ]; then
-  echo "model:    $MODEL"
-  echo "source:   your codex default ($codex_home/config.toml)"
-else
-  echo "model:    codex default (no top-level model key in $codex_home/config.toml)"
-fi
+echo "model:    $MODEL"
+echo "effort:   $effort"
 # Disclosure gate. Everything above this line is local: staging writes into a
 # throwaway /tmp package and nothing has left the machine. `codex exec` below is
 # the transmission, so the decision belongs here, while it can still be refused.
@@ -265,7 +259,8 @@ echo
   | codex exec \
       -s read-only \
       --ignore-user-config \
-      ${MODEL:+-m "$MODEL"} \
+      -m "$MODEL" \
+      -c "model_reasoning_effort=\"$effort\"" \
       --ephemeral \
       --skip-git-repo-check \
       -C "$work" \

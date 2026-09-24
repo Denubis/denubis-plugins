@@ -45,7 +45,7 @@ User types, their goals, access patterns, and constraints.
    user-surface tests and direct schema creation outside Alembic migrations; contextual
    issues remain the responsibility of tests, project tools, and review.
 4. **Reading academic literature.** Adds a paper to Zotero. Invokes `denubis-academic:using-bibliography` to render the PDF into per-page markdown and emit page-keyed blockquotes.
-5. **Generic agent dispatch.** Uses `denubis-basic-agents` (haiku/sonnet/opus general-purpose, python-developer, academic-researcher) when a fresh subagent without specific tooling is the right move; `using-generic-agents` is the selection guide.
+5. **Generic agent dispatch.** Uses `denubis-basic-agents` (general-purpose, deep-judgment, python-developer, academic-researcher) when a fresh subagent without specific tooling is the right move; `using-generic-agents` is the selection guide.
 
 ## Persona Relationships
 

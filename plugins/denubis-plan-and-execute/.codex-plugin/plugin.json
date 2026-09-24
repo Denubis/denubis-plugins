@@ -1,6 +1,6 @@
 {
   "name": "denubis-plan-and-execute",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures.",
   "author": {
     "name": "Brian Ballsun-Stanton",
@@ -8,7 +8,13 @@
   },
   "repository": "https://github.com/denubis/denubis-plugins",
   "license": "CC-BY-SA-4.0",
-  "keywords": ["planning", "tdd", "debugging", "verification", "git"],
+  "keywords": [
+    "planning",
+    "tdd",
+    "debugging",
+    "verification",
+    "git"
+  ],
   "skills": "./skills/",
   "hooks": "./hooks/codex-hooks.json",
   "interface": {
@@ -17,7 +23,12 @@
     "longDescription": "A coherent workflow for design, implementation planning, test-driven execution, debugging, verification, human UAT, and intentional Git integration.",
     "developerName": "Brian Ballsun-Stanton",
     "category": "Developer Tools",
-    "capabilities": ["Interactive", "Write"],
-    "defaultPrompt": ["Design and execute this change through verified human UAT."]
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Design and execute this change through verified human UAT."
+    ]
   }
 }
