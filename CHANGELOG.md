@@ -1,5 +1,11 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.2.2
+
+**Changed:**
+- Verification now checks for output omitted by producer-supplied lists, using a bounded task through the delivered artifact.
+- Re-derive consequential claims from sources and calibrate new verification methods with known defects and valid controls. The bounded trial demonstrated detection, not improvement over the previous skill.
+
 ## [denubis-basic-agents] 3.0.0
 
 **Changed:**

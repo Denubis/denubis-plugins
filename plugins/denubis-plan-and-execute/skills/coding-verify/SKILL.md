@@ -26,6 +26,42 @@ Run the check after the last change that could affect it. Fresh evidence means t
 code and environment being reported were exercised after that change; an earlier run or a
 different checkout is historical evidence.
 
+## Check what the first check could miss
+
+Use this pass before a consequential completion claim when the existing checks follow a
+narrow list: changed files, registered claims, selected examples, or expected consumers.
+Keep it bounded to the omitted surface that could change the decision.
+
+1. Name what the existing check actually examines and what it cannot see. A checklist
+   supplied by the producer is not proof of complete coverage.
+2. Choose another route through the delivered artifact. Derive that route from what the
+   user receives: installed commands, rendered pages, narrative claims, or exported data.
+   For example, enumerate commands from the installed help rather than the changed-file
+   list; inspect figures in prose as well as the registered tables.
+3. Use the artifact to produce a concrete result: run a documented workflow, reconstruct
+   a total from raw records, or build a timeline from source events. Record contradictions,
+   missing information, and steps that cannot be completed. Re-ground findings in source
+   evidence; an awkward step or stage-specific definition is a finding to investigate,
+   not automatically a defect. Do not invent a resolution to make the result fit.
+4. When introducing or changing this verification method, trial it on known defects and
+   a valid control. Record misses and false alarms as well as catches. A method that
+   misses the seeded defect is unproven for that defect; do not generalise from a pass
+   count or one successful trial.
+
+A fresh context can reduce inherited assumptions, but another model walking the same
+list can miss the same items. Use a task-specific second pass; do not add a generic
+verifier agent or mandatory delegation. Existing model authorization still applies.
+
+Saved summaries and handoffs are pointers. Re-derive consequential specifics from their
+sources before relying on them; a resolving path or citation establishes existence, not
+support for the claim. When correcting a claim, inspect its appearances in the delivered
+artifact as well as the dependencies already recorded in a register.
+
+Adapted from Shawn Ross's [apparatus inventory](https://github.com/saross/personal-assistant/blob/main/wiki/docs/anti-confabulation-apparatus.md)
+and [orthogonal-verification proposal](https://github.com/saross/personal-assistant/blob/main/wiki/docs/orthogonal-verification.md),
+read 2026-09-25. These documents describe practices and proposals; their reported catches
+do not establish how many errors escaped.
+
 ## Read the result
 
 Inspect exit status, failure and error counts, relevant output, and the target actually

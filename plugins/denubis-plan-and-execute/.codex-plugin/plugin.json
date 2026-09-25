@@ -1,6 +1,6 @@
 {
   "name": "denubis-plan-and-execute",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures.",
   "author": {
     "name": "Brian Ballsun-Stanton",
