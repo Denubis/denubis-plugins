@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-external-agents] 0.20.0
+
+**Changed:**
+- `--clear` and `--compact` confirm through the session locks the pane's Codex process holds, read from `/proc`, and no longer type `/status` first. They fall back to the `/status` probe when no lock can be read.
+- `--quota` reads the plain weekly allowance from the main thread's session file, types nothing, and prints the reading's age. Sub-agent files, other allowances, and records whose reset has passed are ignored. It falls back to `/status` when the file cannot answer, including on a pane that has just been cleared.
+- The supervising-codex skill documents that a file reading is an upper bound on what is left, because every pane draws on the same allowance.
+
+**Fixed:**
+- Slash-command verbs refused on codex-cli 0.157.0, which marks the selected completion with the prompt marker and no indent. The selection check reads both layouts and still refuses a highlight on another command.
+- A pane too short to show the whole `/status` panel reported "drew no status panel". The error now says the pane is too short and gives its height.
+
 ## [denubis-plan-and-execute] 4.2.2
 
 **Changed:**

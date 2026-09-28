@@ -100,9 +100,9 @@ The verbs, read from the parser rather than from memory:
 | `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one; defaults to `gpt-6-sol` at `xhigh` |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
-| `--clear` | start codex on a fresh session, confirmed by its `/status` session id changing |
+| `--clear` | start codex on a fresh session, confirmed by its process taking a new session lock |
 | `--compact` | summarise its transcript, confirmed in the same session by marker and meter |
-| `--quota` | run `/status` and report the weekly allowance and its reset |
+| `--quota` | report the weekly allowance and its reset from codex's session file, typing `/status` only when the file cannot say |
 | `--question` | open codex's queued-question widget and print what it shows |
 | `--answer TEXT` | answer an opened queued question (`-` reads stdin) |
 | `--under-floor` | dispatch below the 30% context floor, carrying a human ruling |
@@ -115,8 +115,8 @@ None of them takes a pane ID. Each resolves the pane itself, for the reasons und
 The model defaults are the operator's current routing policy (2026-09-24), not a
 claim that the most expensive model is required. Explicit spawn options override them.
 `--model` and `--reasoning-effort` apply only to `--spawn`; other verbs reject them.
-After `/clear`, verification tolerates the startup/redraw gap and requires a fresh
-`/status` panel with a different session ID; a stale Ready title alone is not success.
+After `/clear`, verification tolerates the startup/redraw gap and requires a session id
+the pane's codex did not hold before; a stale Ready title alone is not success.
 Spawn options do not switch a running pane's model. Inspect the resulting model and effort in
 the pane after spawn and after `/clear`; do not infer them from a prior session or the
 command's success. An unsupported model/effort combination is a startup failure to
@@ -396,13 +396,49 @@ but the scrollback.
 Codex meters a weekly allowance. The pane title carries a percentage, and a percentage on
 its own cannot say whether you are on track: half the allowance left on day two is a
 problem, and the same figure on day six is fine. What settles it is the reset date, which
-`/status` reports and the title does not.
+the title does not carry.
 
 ```sh
 codex_supervisor.py --quota
 ```
 
-It reports both halves of the answer and nothing else:
+It reads the figures from codex's own session file and types nothing into the pane. The
+pane's codex process holds a lock for its session and, once it has made a model call,
+that session's rollout file, and every `token_count` record in the file carries a rate
+limit (observed on codex-cli 0.157.0, 2026-09-28). One file interleaves several
+allowances, though: a reserve allowance and a five-hour Spark allowance sit beside the
+plain weekly one, and on 2026-09-28 the newest record in one pane's file was a reserve
+allowance at 0% used while the weekly one stood near half. So the verb reads the newest
+record of the allowance the panel labels plain `Weekly limit:` (limit id `codex`, no
+name, a one-week window) and ignores the rest. It reports both halves of the answer and
+how old the reading is, because a file is only as fresh as the last model call:
+
+```
+quota on %58: weekly 52% left, resets 03:58 on 4 Oct; read from the session file, 3m old; Ready
+```
+
+**Read an old figure as "at most".** Every pane draws on the same allowance, and a pane
+that has gone idle stops writing to its file, while the others keep spending. Within one
+week usage only rises, so a file reading is an upper bound on what is left, and the older
+it is the more it overstates. On 2026-09-28, six panes read at once gave 44% left from a
+reading a minute old and 66% from one four and a half hours old, all against the same
+reset. Weigh the age before you weigh the percentage.
+
+A long-running pane holds several sessions at once, because its sub-agent threads have
+their own. Each rollout's first record says which session it belongs to: on every pane
+checked on 2026-09-28, exactly one named itself as its own session and the rest were
+sub-agents. The verb reads the one that names itself and ignores sub-agent files (Brian,
+2026-09-28: "we don't care about codex's own subagents").
+
+When the file cannot say, the verb falls back to typing `/status` and reading its panel:
+no `/proc`, no lock held (some live panes held none on 2026-09-28, cause unverified), no
+rollout file yet (a pane that has never been sent a prompt has none), no plain weekly
+record in it whose reset is still ahead (a record from a week that has already reset is
+not a reading; on 2026-09-28 one pane's newest weekly record was a week old and would
+have reported 95% left against the 44% on its title), no file or more than one file naming itself, a first record that cannot be
+read, a held lock with no rollout, or a main thread whose own lock is no longer held. The
+lock-without-rollout case means a freshly cleared pane falls back until its new session
+makes a model call. The fallback reports the figures the same way, without the age:
 
 ```
 quota on %58: weekly 99% left, resets 14:41 on 8 Aug
@@ -410,6 +446,11 @@ quota on %58: weekly 99% left, resets 14:41 on 8 Aug
 
 The panel itself carries the signed-in account and the session id, so the verb reads the
 figures out and leaves the rest on screen rather than carrying it back.
+
+The v0.157.0 panel is about nineteen rows, and codex draws on the alternate screen, so a
+shorter pane cuts off its top, echo line included, and no capture recovers it. On
+2026-09-28 that failed a 25-row pane with "drew no status panel". The fallback now says
+the pane is too short and gives its height; give it more height and run the check again.
 
 Two details of the panel are worth knowing, because both have already caught a naive
 reading. A second model's allowance is reported directly beneath the first, so the
@@ -467,19 +508,29 @@ a supervisor round to discover something the verb already knew.
 different things.**
 
 Pane titles are presentation, not identity: current codex titles carry a mutable thread
-name and may be truncated. Before either verb, the supervisor runs a fresh `/status` and
-reads the labelled `Session:` UUID from the panel below that invocation's exact command
-echo. It retains the resolved tmux pane id and foreground process group while doing so.
-After the command settles it runs the same guarded probe again. A missing or malformed
-panel, a replaced foreground process, or a pane that does not return `Ready` is a refusal,
-not an inferred success.
+name and may be truncated. Before either verb, the supervisor reads the session ids the
+pane's codex holds: codex takes a lock file under `thread-writer-locks/` for each session,
+before it has written anything else, and the ids are read from the files the pane's
+foreground process group holds open under `/proc` (observed on codex-cli 0.157.0,
+2026-09-28). Nothing is typed to read them. It retains the resolved tmux pane id and
+foreground process group while doing so, and reads the held ids again after the command
+settles. A replaced foreground process or a pane that does not return `Ready` is a
+refusal, not an inferred success.
 
-`/clear` ends codex's session and starts another one, so `--clear` requires the second
-`/status` UUID to differ and reports both ids.
+When `/proc` cannot be read or the process holds no lock, the verbs fall back to the
+older probe: a fresh `/status`, reading the labelled `Session:` UUID from the panel below
+that invocation's exact command echo. A missing or malformed panel is then a refusal.
 
-`/compact` keeps the same session and transcript, so `--compact` requires the UUID to
-remain unchanged. It also requires codex's new compaction marker and reports the context
-meter either side, refusing when the figure has fallen.
+`/clear` starts another session, and codex still holds the old session's lock for about
+a minute after it (released 59s later when measured on 2026-09-28), so `--clear` requires
+an id the process did not hold before and reports the ids either side.
+The confirming `Ready` must be read after the new id has appeared: on 2026-09-28 the new
+lock was held 0.22s after Enter while the title still read `Ready`, and the title went to
+`Starting` for about a second after that.
+
+`/compact` keeps the same session and transcript, so `--compact` requires that no new
+session id appeared. It also requires codex's new compaction marker and reports the
+context meter either side, refusing when the figure has fallen.
 
 The confirmations cannot be shared, and that is what makes them worth having. Codex's
 completion list puts `/compact` first on the prefix `/c`, so a `/clear` typed one

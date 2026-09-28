@@ -21,6 +21,7 @@ import tempfile
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -70,6 +71,8 @@ CODEX_SPAWN_COMMAND = (
     "exec codex -c check_for_update_on_startup=false -s workspace-write -a on-request"
 )
 CODEX_LABEL_OPTION = "@codex_label"
+# Where the process table is read from, to find the files a pane's Codex holds open.
+PROC_ROOT = Path("/proc")
 CODEX_PING_INSTRUCTION = (
     "If anything is unclear, ambiguous, or contradictory, stop and ask one "
     "specific, critical, and pointed question at a time until you have "
@@ -1494,7 +1497,10 @@ _STATUS_SESSION_ID = re.compile(
     rf"^[\s│|]*Session:\s*({_UUID_PATTERN})\b",
     re.IGNORECASE | re.MULTILINE,
 )
-_COMPLETION = re.compile(r"^\s{1,4}(/[a-z][a-z0-9-]*)\s{2,}\S")
+# v0.157.0 leads the selected entry with the prompt marker instead of an indent.
+_COMPLETION = re.compile(
+    rf"^(?:\s{{1,4}}|{PROMPT_MARKER}\s{{1,3}})(/[a-z][a-z0-9-]*)\s{{2,}}\S"
+)
 
 
 def context_left(content: str) -> int | None:
@@ -1955,6 +1961,88 @@ def _wait_ready(pane_id: str) -> str | None:
     return None
 
 
+_LOCK_FILE = re.compile(rf"/thread-writer-locks/({_UUID_PATTERN})\.lock$")
+_ROLLOUT_FILE = re.compile(rf"/sessions/.+/rollout-[^/]*-({_UUID_PATTERN})\.jsonl$")
+
+
+@dataclass(frozen=True)
+class HeldSessions:
+    """The Codex sessions a process group holds open, by lock and by rollout file."""
+
+    ids: frozenset[str]
+    rollouts: Mapping[str, Path]
+
+
+def _process_group(stat: str) -> int | None:
+    """Return the process group from a `/proc/<pid>/stat` line.
+
+    The command name sits in parentheses and may itself hold spaces or parentheses,
+    so the fields are counted from the last closing one: state, parent, group.
+    """
+    fields = stat[stat.rfind(")") + 1 :].split()
+    return int(fields[2]) if len(fields) > 2 and fields[2].isdigit() else None
+
+
+def _open_files(pid_dir: Path) -> list[str]:
+    """Return where one process's open descriptors point, or nothing if it is gone."""
+    targets: list[str] = []
+    try:
+        descriptors = list((pid_dir / "fd").iterdir())
+    except OSError:
+        # Another user's process, or one that exited while the table was being read:
+        # either way it holds nothing this pane's Codex could be holding.
+        return targets
+    for descriptor in descriptors:
+        try:
+            targets.append(str(descriptor.readlink()))
+        except OSError:
+            # The descriptor was closed between listing and reading; skip it.
+            continue
+    return targets
+
+
+def held_sessions(process_group_id: int) -> HeldSessions | None:
+    """Return the sessions the pane's foreground Codex holds, read from `/proc`.
+
+    Codex takes a lock under `thread-writer-locks/` for each session before it writes
+    anything, keeps the rollout file of a session that has made a model call open, and
+    still holds an old session's lock after `/clear` adds a new one, releasing it about
+    a minute later (observed on codex-cli 0.157.0, 2026-09-28). The descriptors are
+    read rather than the directories under `~/.codex`, because only the descriptors
+    say which sessions are this pane's, and they hold whatever `CODEX_HOME` the pane
+    was started with.
+
+    The group is the pane's foreground process group, which is the identity every
+    verb already re-checks, so a lock held by another pane's Codex is never counted.
+    None means the table could not be read at all, which is a different answer from
+    a readable table holding no lock.
+    """
+    if not PROC_ROOT.is_dir():
+        return None
+    ids: set[str] = set()
+    rollouts: dict[str, Path] = {}
+    for pid_dir in PROC_ROOT.iterdir():
+        if not pid_dir.name.isdigit():
+            continue
+        try:
+            stat = (pid_dir / "stat").read_text()
+        except OSError:
+            # The process exited while the table was being read.
+            continue
+        if _process_group(stat) != process_group_id:
+            continue
+        for target in _open_files(pid_dir):
+            if (lock := _LOCK_FILE.search(target)) is not None:
+                ids.add(lock[1])
+            elif (rollout := _ROLLOUT_FILE.search(target)) is not None:
+                rollouts[rollout[1]] = Path(target)
+    return HeldSessions(frozenset(ids), rollouts)
+
+
+def _session_list(ids: frozenset[str]) -> str:
+    return ", ".join(sorted(ids))
+
+
 def _probe_session_identity(target: PaneRef) -> str:
     """Read the joined thread UUID from a fresh `/status` invocation."""
     _require_joined_target(target)
@@ -1967,6 +2055,7 @@ def _probe_session_identity(target: PaneRef) -> str:
         "-t",
         target.pane_id,
     )
+    content = ""
     for _ in range(RESPONSE_POLLS):
         content = run_command(capture)
         if _composer_is_empty(content):
@@ -1981,8 +2070,9 @@ def _probe_session_identity(target: PaneRef) -> str:
                 return current
         time.sleep(SUBMIT_POLL_SECONDS)
     raise MonitorError(
-        f"{target.pane_id} drew no fresh session identity for /status; "
-        f"inspect with --tail"
+        _no_panel_complaint(
+            target.pane_id, content, "fresh session identity for /status"
+        )
     )
 
 
@@ -2035,6 +2125,50 @@ def weekly_quota(
     return None
 
 
+def _panel_clipped_at_top(content: str) -> bool:
+    """Report whether a `/status` panel is on screen with its top cut off.
+
+    Codex draws on the alternate screen, so a panel taller than the pane loses its top
+    rows, and the `/status` echo above them, and no capture flag brings them back. Two
+    shapes were seen on 25-row panes on 2026-09-28 (codex-cli 0.157.0): pane %104 lost
+    the echo and the top border, and a scratch pane kept the border with only blank
+    lines above it. A panel with other output above its border was not clipped: its
+    echo would be on screen if it were this invocation's, so it is stale.
+    """
+    lines = _plain(content).splitlines()
+    if any(line.strip() == "/status" for line in lines):
+        return False
+    row = next(
+        (index for index, line in enumerate(lines) if _WEEKLY_LIMIT.match(line)),
+        None,
+    )
+    if row is None:
+        return False
+    side = "\N{BOX DRAWINGS LIGHT VERTICAL}"
+    corner = "\N{BOX DRAWINGS LIGHT ARC DOWN AND RIGHT}"
+    top = row
+    while top > 0 and lines[top - 1].lstrip().startswith(side):
+        top -= 1
+    if top == 0 or not lines[top - 1].lstrip().startswith(corner):
+        return True
+    return not any(line.strip() for line in lines[: top - 1])
+
+
+def _no_panel_complaint(pane_id: str, content: str, missing: str) -> str:
+    """Say why no fresh panel was read, naming a pane too short to show one."""
+    if not _panel_clipped_at_top(content):
+        return f"{pane_id} drew no {missing}; inspect with --tail"
+    height = run_command(
+        ("tmux", "display-message", "-p", "-t", pane_id, "#{pane_height}")
+    ).strip()
+    return (
+        f"{pane_id} is {height} lines tall, too short to show the whole /status "
+        f"panel: its top and the /status echo line are off screen, so a fresh panel "
+        f"cannot be told from a stale one; give the pane more height, or inspect "
+        f"with --tail"
+    )
+
+
 def _confirm_quota(pane_id: str) -> str:
     """Wait for the panel Codex drew for this invocation and read its figures.
 
@@ -2043,15 +2177,205 @@ def _confirm_quota(pane_id: str) -> str:
     and that round is the one the verb exists to save.
     """
     capture: Command = ("tmux", "capture-pane", "-p", "-e", "-t", pane_id)
+    content = ""
     for _ in range(RESPONSE_POLLS):
-        reading = weekly_quota(run_command(capture), below="/status")
+        content = run_command(capture)
+        reading = weekly_quota(content, below="/status")
         if reading is not None:
             left, resets = reading
             when = f", resets {resets}" if resets else ", reset date not on screen"
             state = "Ready" if _wait_ready(pane_id) is not None else "still working"
             return f"quota on {pane_id}: weekly {left}% left{when}; {state}"
         time.sleep(SUBMIT_POLL_SECONDS)
-    raise MonitorError(f"{pane_id} drew no status panel; inspect with --tail")
+    raise MonitorError(_no_panel_complaint(pane_id, content, "status panel"))
+
+
+@dataclass(frozen=True)
+class QuotaReading:
+    """The primary rate limit from Codex's last model call, as its rollout recorded."""
+
+    used_percent: float
+    resets_at: float
+    recorded_at: float
+
+
+def _record_time(stamp: object) -> float | None:
+    """Return a rollout line's UTC timestamp as epoch seconds, if it parses."""
+    if not isinstance(stamp, str):
+        return None
+    try:
+        return datetime.fromisoformat(stamp).timestamp()
+    except ValueError:
+        return None
+
+
+# The allowance the `/status` panel labels plain `Weekly limit:`. One session file
+# interleaves several allowances, and on 2026-09-28 (codex-cli 0.157.0) pane %6's main
+# thread held records for `codex` (unnamed, one week), `base_model_inference`
+# ("gpt-reserve", one week) and `codex_bengalfox` ("GPT-5.3-Codex-Spark", five hours),
+# with a reserve record newest. Codex's own panel code on `main` sorts the `codex`
+# limit first and unprefixed and names its row from the window length. All three are
+# observed properties of the record being matched, not tunable thresholds.
+WEEKLY_LIMIT_ID = "codex"
+WEEKLY_WINDOW_MINUTES = 7 * 24 * 60
+
+
+def _weekly_primary(payload: object) -> dict[str, object] | None:
+    """Return a `token_count` payload's primary window if it is the plain weekly one."""
+    if not isinstance(payload, dict) or payload.get("type") != "token_count":
+        return None
+    limits = payload.get("rate_limits")
+    if not isinstance(limits, dict):
+        return None
+    primary = limits.get("primary")
+    if not isinstance(primary, dict):
+        return None
+    plain_weekly = (
+        limits.get("limit_id") == WEEKLY_LIMIT_ID
+        and limits.get("limit_name") is None
+        and primary.get("window_minutes") == WEEKLY_WINDOW_MINUTES
+    )
+    return primary if plain_weekly else None
+
+
+def _quota_record(line: str) -> QuotaReading | None:
+    """Read one rollout line as a plain weekly reading, or None if it is not one."""
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        # The last line may still be being written; it is not a reading yet.
+        return None
+    if not isinstance(record, dict):
+        return None
+    primary = _weekly_primary(record.get("payload"))
+    if primary is None:
+        return None
+    used = primary.get("used_percent")
+    resets = primary.get("resets_at")
+    recorded = _record_time(record.get("timestamp"))
+    numbers = (int, float)
+    if not isinstance(used, numbers) or not isinstance(resets, numbers):
+        return None
+    if isinstance(used, bool) or isinstance(resets, bool) or recorded is None:
+        return None
+    return QuotaReading(float(used), float(resets), recorded)
+
+
+def rollout_quota(rollout: Path, now: float) -> QuotaReading | None:
+    """Return the newest current plain weekly reading a rollout file holds.
+
+    Every `token_count` record observed on 2026-09-28 (codex-cli 0.157.0) carried
+    `rate_limits.primary` with `used_percent`, `window_minutes` and `resets_at` in
+    epoch seconds, but not every one describes the plain weekly allowance, so the
+    others are skipped rather than reported as the weekly figure. The file is
+    appended to, so the last matching record is the newest.
+
+    A record whose `resets_at` is not after `now` describes a week that has already
+    ended, so it is not a reading at all. On 2026-09-28 pane %6's newest weekly record
+    was from the previous week, and reading it reported 95% left while the pane's own
+    title said 44%. This is what `resets_at` means, not an age limit.
+    """
+    try:
+        text = rollout.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    newest: QuotaReading | None = None
+    for line in text.splitlines():
+        reading = _quota_record(line)
+        if reading is not None and reading.resets_at > now:
+            newest = reading
+    return newest
+
+
+def _thread_parent(rollout: Path) -> tuple[str, str] | None:
+    """Return a rollout's own id and the session it belongs to, from its first record.
+
+    A main thread's `session_meta` names itself as its session; a sub-agent's names
+    the main thread it was started from. Only the first line is read.
+    """
+    try:
+        with rollout.open(encoding="utf-8", errors="replace") as handle:
+            first = handle.readline()
+    except OSError:
+        return None
+    try:
+        record = json.loads(first)
+    except json.JSONDecodeError:
+        return None
+    payload = record.get("payload") if isinstance(record, dict) else None
+    if not isinstance(payload, dict) or record.get("type") != "session_meta":
+        return None
+    own, parent = payload.get("id"), payload.get("session_id")
+    if not isinstance(own, str) or not isinstance(parent, str):
+        return None
+    return own, parent
+
+
+def _main_rollout(held: HeldSessions) -> Path | None:
+    """Return the pane's main-thread rollout, or None when it cannot be told apart.
+
+    Long-running panes hold several sessions at once. Across eight panes on
+    2026-09-28 (codex-cli 0.157.0), each held exactly one rollout whose first record
+    named itself as its own session; the rest were sub-agents naming another thread,
+    and those are ignored (Brian, 2026-09-28: "we don't care about codex's own
+    subagents"). Exactly one self-naming rollout is required, and every held first
+    record must be readable. Two guards go further, and both protect "current": every
+    held lock needs a rollout, because a lock without one (a session just started by
+    `/clear`) could be the current main thread; and the main thread's own lock must
+    still be held. Anything else falls back rather than guessing.
+    """
+    if not held.ids or not held.ids <= held.rollouts.keys():
+        return None
+    mains: list[str] = []
+    for session, rollout in held.rollouts.items():
+        identity = _thread_parent(rollout)
+        if identity is None or identity[0] != session:
+            return None
+        if identity[1] == session:
+            mains.append(session)
+    if len(mains) != 1 or mains[0] not in held.ids:
+        return None
+    return held.rollouts[mains[0]]
+
+
+def _file_quota(target: PaneRef) -> QuotaReading | None:
+    """Read the quota from the pane's main-thread session file, or None to fall back."""
+    held = held_sessions(target.process_group_id)
+    if held is None:
+        return None
+    rollout = _main_rollout(held)
+    return rollout_quota(rollout, time.time()) if rollout is not None else None
+
+
+def _local_reset(epoch: float) -> str:
+    moment = datetime.fromtimestamp(epoch).astimezone()
+    return f"{moment:%H:%M} on {moment.day} {moment:%b}"
+
+
+def report_quota() -> str:
+    """Report the weekly allowance from Codex's own session file, typing nothing.
+
+    A file reading is only as fresh as the last model call, so its age is part of the
+    answer. When the file cannot answer, `/status` is typed and its panel read, which
+    is how this verb worked before 2026-09-28; the panel route failed that day on a
+    pane too short to show the panel's echo line.
+    """
+    target = joined_target()
+    reading = _file_quota(target)
+    if reading is None:
+        return run_slash_command("/status")
+    _require_joined_target(target)
+    pane_id = target.pane_id
+    # Codex renders the figure as `100 - used_percent` to no decimal places.
+    left = f"{100.0 - reading.used_percent:.0f}"
+    age = _humanise_wait(max(0.0, time.time() - reading.recorded_at))
+    title = pane_status(pane_id)
+    state = "Ready" if re.search(r"\bready\b", title, re.IGNORECASE) else "not Ready"
+    return (
+        f"quota on {pane_id}: weekly {left}% left, resets "
+        f"{_local_reset(reading.resets_at)}; read from the session file, {age} old; "
+        f"{state}"
+    )
 
 
 def _settled_meter(pane_id: str) -> int | None:
@@ -2120,6 +2444,52 @@ def _confirm_clear(target: PaneRef, previous_id: str) -> str:
     )
 
 
+def _held_now(target: PaneRef, verb: str) -> frozenset[str]:
+    """Re-read the held sessions once the session-file route has been chosen."""
+    held = held_sessions(target.process_group_id)
+    if held is None:
+        raise MonitorError(
+            f"the process table stopped being readable during {verb} on "
+            f"{target.pane_id}, so its sessions cannot be compared; inspect with --tail"
+        )
+    return held.ids
+
+
+def _confirm_clear_held(target: PaneRef, before: frozenset[str]) -> str:
+    """Confirm a clear by a session lock the pane's Codex did not hold before.
+
+    The old session's lock is still held for a while after `/clear`, so the evidence is
+    an id added, not one replaced. The Ready that confirms it must be read on a later
+    poll than the one that first saw the new lock: on 2026-09-28 (codex-cli 0.157.0)
+    the new lock was held 0.22s after Enter while the title still read Ready, and the
+    title went to Starting for about a second after that.
+    """
+    pane_id = target.pane_id
+    new: frozenset[str] = frozenset()
+    for _ in range(SETTLE_POLLS):
+        ready = re.search(r"\bready\b", pane_status(pane_id), re.IGNORECASE)
+        if new and ready is not None:
+            _require_joined_target(target)
+            left = _settled_meter(pane_id)
+            meter = f"context {left}% left" if left is not None else "meter unreadable"
+            return (
+                f"cleared {pane_id}: session {_session_list(before)} -> "
+                f"{_session_list(new)}; Ready, {meter}"
+            )
+        if not new:
+            new = _held_now(target, "/clear") - before
+        time.sleep(SUBMIT_POLL_SECONDS)
+    if new:
+        raise MonitorError(
+            f"{pane_id} took session {_session_list(new)} but did not return Ready "
+            f"after /clear; inspect with --tail"
+        )
+    raise MonitorError(
+        f"no new session appeared on {pane_id}, which still holds "
+        f"{_session_list(before)}, so /clear did not run; inspect with --tail"
+    )
+
+
 def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
     """Confirm a compaction by Codex's own marker and then by the settled meter.
 
@@ -2182,14 +2552,24 @@ def run_slash_command(command: str) -> str:
     pane_id = target.pane_id
     # Deliberately no context-floor check: these are the two verbs that relieve it,
     # and gating them would leave an exhausted pane with no way back.
+    # Session identity comes from the locks the pane's Codex holds (R2, 2026-09-28),
+    # and from a typed `/status` only when those cannot be read.
+    held_before: frozenset[str] | None = None
+    if command in {"/clear", "/compact"}:
+        held = held_sessions(target.process_group_id)
+        held_before = held.ids if held is not None and held.ids else None
     previous_id = (
-        _probe_session_identity(target) if command in {"/clear", "/compact"} else None
+        _probe_session_identity(target)
+        if command in {"/clear", "/compact"} and held_before is None
+        else None
     )
     snapshot = _type_slash_command(target, command)
     before = context_left(snapshot)
     seen = _bullet_texts(_plain(snapshot))
 
     if command == "/clear":
+        if held_before is not None:
+            return _confirm_clear_held(target, held_before)
         if previous_id is None:
             raise MonitorError("internal error: /clear has no pre-command session")
         return _confirm_clear(target, previous_id)
@@ -2197,10 +2577,18 @@ def run_slash_command(command: str) -> str:
         result = _confirm_quota(pane_id)
         _require_joined_target(target)
         return result
-    if previous_id is None:
-        raise MonitorError("internal error: /compact has no pre-command session")
     result = _confirm_compact(pane_id, before, seen)
     _require_joined_target(target)
+    if held_before is not None:
+        appeared = _held_now(target, "/compact") - held_before
+        if appeared:
+            raise MonitorError(
+                f"session {_session_list(appeared)} appeared while compacting "
+                f"{pane_id}, which is what a clear does; inspect with --tail"
+            )
+        return f"{result}; session {_session_list(held_before)} unchanged"
+    if previous_id is None:
+        raise MonitorError("internal error: /compact has no pre-command session")
     current_id = _probe_session_identity(target)
     if current_id != previous_id:
         raise MonitorError(
@@ -2275,7 +2663,7 @@ def run_verb(args: argparse.Namespace) -> int | None:
     elif args.compact:
         print(run_slash_command("/compact"))
     elif args.quota:
-        print(run_slash_command("/status"))
+        print(report_quota())
     else:
         return None
     return 0
@@ -2338,22 +2726,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--clear",
         action="store_true",
         help=(
-            "start codex on a fresh session, confirmed by fresh /status probes "
-            "showing its session id changed"
+            "start codex on a fresh session, confirmed by its process taking a new "
+            "session lock (a fresh /status probe when /proc cannot say)"
         ),
     )
     action.add_argument(
         "--compact",
         action="store_true",
         help=(
-            "summarise codex's transcript, confirmed in the same /status session "
-            "by its marker and context meter"
+            "summarise codex's transcript, confirmed by its marker and context meter "
+            "with no new session taken"
         ),
     )
     action.add_argument(
         "--quota",
         action="store_true",
-        help=("report how much of the weekly allowance is left and when it resets"),
+        help=(
+            "report how much of the weekly allowance is left and when it resets, "
+            "read from codex's session file (typing /status only when it cannot say)"
+        ),
     )
     parser.add_argument(
         "--under-floor",

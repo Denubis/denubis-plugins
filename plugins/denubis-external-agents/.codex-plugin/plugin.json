@@ -1,6 +1,6 @@
 {
   "name": "denubis-external-agents",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Consult and supervise external model sessions without merging their authority.",
   "author": {
     "name": "Brian Ballsun-Stanton",

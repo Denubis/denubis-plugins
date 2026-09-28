@@ -24,14 +24,19 @@ pane showed `Context 50% …` with the word `left` cut off.
 
 from __future__ import annotations
 
+import calendar
 import importlib.util
+import json
+import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
     from types import ModuleType
 
 _MODULE_PATH = (
@@ -164,6 +169,43 @@ _TYPED_STATUS = "\n".join(
     ]
 )
 
+# Codex v0.157.0 draws the selected entry in reverse video behind the prompt marker,
+# with no leading indent, and sits the composer below the list. Lines verbatim from
+# `tmux capture-pane -p -e` at 180x45 on 2026-09-28 (/tmp/diag-status-0157/).
+_V157_COMPOSER = f"\x1b[1m{_CURSOR}\x1b[0m /status"
+_V157_TYPED_STATUS = "\n".join(
+    [
+        f"\x1b[1;7m{_CURSOR} /status      \x1b[0;7mshow current session configuration "
+        "and token usage\x1b[1m",
+        "\x1b[0m  /\x1b[1mstatus\x1b[0mline  \x1b[2mconfigure which items appear in "
+        "the status line\x1b[0m",
+        "",
+        _V157_COMPOSER,
+    ]
+)
+_V157_TYPED_CLEAR = "\n".join(
+    [
+        f"\x1b[1;7m{_CURSOR} /clear  \x1b[0;7mclear the terminal and start a new "
+        "chat\x1b[1m",
+        "",
+        f"\x1b[0;1m{_CURSOR}\x1b[0m /clear",
+    ]
+)
+# Typing only `/c` on v0.157.0 highlights `/compact`, as it did on v0.144.5.
+_V157_TYPED_AMBIGUOUS = "\n".join(
+    [
+        f"\x1b[1;7m{_CURSOR} /compact  \x1b[0;7msummarize conversation to prevent "
+        "hitting the context limit\x1b[1m",
+        "\x1b[0m  /\x1b[1mc\x1b[0mopy     \x1b[2mcopy the last response or part of "
+        "it\x1b[0m",
+        "  /\x1b[1mc\x1b[0md       \x1b[2mchange the current working directory\x1b[0m",
+        "  /\x1b[1mc\x1b[0mlear    \x1b[2mclear the terminal and start a new "
+        "chat\x1b[0m",
+        "",
+        f"\x1b[1m{_CURSOR}\x1b[0m /c",
+    ]
+)
+
 # The panel `/status` draws, verbatim from pane %58 apart from the account address.
 # Two weekly limits are reported and only the first is the one the quota check is about.
 _STATUS_PANEL = [
@@ -274,6 +316,8 @@ def _install(
 
     monkeypatch.setattr(watch, "joined_target", lambda: target)
     monkeypatch.setattr(watch, "joined_pane", lambda: target.pane_id)
+    # No process table to read, so these verbs take the `/status` screen route.
+    monkeypatch.setattr(watch, "PROC_ROOT", Path("/nonexistent-proc"))
     monkeypatch.setattr(
         watch,
         "_probe_session_identity",
@@ -403,6 +447,65 @@ def test_the_selection_is_read_rather_than_assumed_from_position(
 ) -> None:
     """`/c` highlights `/compact`, which sits above both `/copy` and `/clear`."""
     assert watch.selected_completion(_TYPED_AMBIGUOUS) == "/compact"
+
+
+def test_the_v0157_marked_entry_is_the_one_enter_would_take(watch: ModuleType) -> None:
+    """v0.157.0 marks the selection with the prompt marker instead of an indent."""
+    assert watch.selected_completion(_V157_TYPED_STATUS) == "/status"
+    assert watch.selected_completion(_V157_TYPED_CLEAR) == "/clear"
+    assert watch.slash_completions(_V157_TYPED_STATUS) == ["/status", "/statusline"]
+
+
+def test_the_v0157_status_probe_submits_status(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [
+            _pane(),
+            _V157_TYPED_STATUS,
+            _pane(body=["/status", "", *_NAMED_STATUS_PANEL]),
+        ],
+    )
+    target = watch.PaneRef("%55", 5055)
+    monkeypatch.setattr(watch, "run_command", pane.run)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(watch, "joined_target", lambda: target, raising=False)
+
+    assert watch._probe_session_identity(target) == _ID_BEFORE
+    assert ("tmux", "send-keys", "-t", "%55", "Enter") in pane.keys
+
+
+def test_a_v0157_half_typed_command_is_never_submitted(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`/c` highlights `/compact` on v0.157.0 too, so a `/clear` there must refuse."""
+    pane = _install(
+        watch,
+        monkeypatch,
+        _Pane([_TITLE_BEFORE_CLEAR], [_pane(), _V157_TYPED_AMBIGUOUS]),
+    )
+
+    with pytest.raises(watch.MonitorError, match="Enter would take /compact "):
+        watch.run_slash_command("/clear")
+
+    assert ("tmux", "send-keys", "-t", "%55", "Enter") not in pane.keys
+
+
+def test_a_v0157_highlight_on_another_entry_still_refuses(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Enter takes `/status` here, so a request for `/statusline` must not submit."""
+    pane = _Pane([_NAMED_TITLE_READY], [_V157_TYPED_STATUS])
+    monkeypatch.setattr(watch, "run_command", pane.run)
+
+    with pytest.raises(watch.MonitorError, match="Enter would take /status "):
+        watch._confirm_selection("%55", _V157_TYPED_STATUS, "/statusline")
+
+    assert ("tmux", "send-keys", "-t", "%55", "Enter") not in pane.keys
 
 
 # ------------------------------------------------------------------------- the verbs
@@ -789,6 +892,7 @@ def test_clear_survives_old_ready_title_before_new_session_starts(
             return ""
 
     pane = RestartingPane()
+    monkeypatch.setattr(watch, "PROC_ROOT", Path("/nonexistent-proc"))
     monkeypatch.setattr(watch, "joined_target", lambda: target)
     monkeypatch.setattr(watch, "run_command", pane.run)
     monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
@@ -1140,3 +1244,802 @@ def test_the_floor_does_not_block_the_verbs_that_relieve_it(
     )
 
     assert _ID_AFTER in watch.run_slash_command("/clear")
+
+
+# ------------------------------------------------------- reading Codex's own files
+#
+# Codex keeps a lock per session under `thread-writer-locks/` and appends every model
+# call's token and rate-limit figures to that session's rollout file, and its process
+# holds both open (observed on codex-cli 0.157.0, 2026-09-28). The tests below build a
+# process table and those files under a temporary directory; the record shape is the
+# one observed then, with every value synthetic.
+
+_ID_OTHER = "01a0e6e0-07a1-7320-9111-6f33ec1c3f24"
+_CODEX_PGID = 5055
+
+
+class _Proc:
+    """A process table in the shape `/proc` presents, holding synthetic Codex files."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root / "proc"
+        self.codex_home = root / "codex-home"
+        self.root.mkdir()
+        self._fds: dict[int, int] = {}
+
+    def process(self, pid: int, pgid: int, command: str = "codex") -> None:
+        (self.root / str(pid) / "fd").mkdir(parents=True)
+        # pid (comm) state ppid pgrp session tty_nr tpgid ...
+        stat = f"{pid} ({command}) S 1 {pgid} {pgid} 34816 {pgid} 4194560 0 0\n"
+        (self.root / str(pid) / "stat").write_text(stat)
+        self._fds[pid] = 30
+
+    def _open(self, pid: int, target: Path) -> None:
+        self._fds[pid] += 1
+        (self.root / str(pid) / "fd" / str(self._fds[pid])).symlink_to(target)
+
+    def hold_lock(self, pid: int, session_id: str) -> None:
+        lock = self.codex_home / "thread-writer-locks" / f"{session_id}.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.touch()
+        self._open(pid, lock)
+
+    def hold_rollout(self, pid: int, session_id: str, lines: list[str]) -> Path:
+        rollout = (
+            self.codex_home
+            / "sessions"
+            / "2026"
+            / "09"
+            / "28"
+            / f"rollout-2026-09-28T15-55-49-{session_id}.jsonl"
+        )
+        rollout.parent.mkdir(parents=True, exist_ok=True)
+        rollout.write_text("".join(f"{line}\n" for line in lines))
+        self._open(pid, rollout)
+        return rollout
+
+
+def _session_meta(session_id: str, parent: str | None = None) -> str:
+    """A rollout's first record: a main thread names itself, a sub-agent its parent.
+
+    Observed across eight panes on 2026-09-28 (codex-cli 0.157.0): each held exactly
+    one rollout whose `id` equalled its `session_id`, with `source` "cli", and every
+    other held rollout was a sub-agent whose `session_id` was that main thread's id.
+    """
+    source: object = {"subagent": {"depth": 1}} if parent else "cli"
+    return json.dumps(
+        {
+            "timestamp": "2026-09-28T05:55:49.001Z",
+            "type": "session_meta",
+            "payload": {
+                "id": session_id,
+                "session_id": parent or session_id,
+                "cwd": "/x",
+                "source": source,
+                "thread_source": "subagent" if parent else "user",
+            },
+        }
+    )
+
+
+def _token_count(
+    timestamp: str,
+    used: float,
+    resets_at: int,
+    *,
+    limit_id: str = "codex",
+    limit_name: str | None = None,
+    window_minutes: int = 10080,
+) -> str:
+    """One `token_count` record, in the skeleton observed on 2026-09-28.
+
+    One session file mixes allowances: pane %6's main thread held records for
+    `codex` (unnamed, one week), `base_model_inference` ("gpt-reserve", one week) and
+    `codex_bengalfox` ("GPT-5.3-Codex-Spark", five hours), interleaved.
+    """
+    return json.dumps(
+        {
+            "timestamp": timestamp,
+            "ordinal": 7,
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {"total_token_usage": {"total_tokens": 1}},
+                "rate_limits": {
+                    "limit_id": limit_id,
+                    "limit_name": limit_name,
+                    "primary": {
+                        "used_percent": used,
+                        "window_minutes": window_minutes,
+                        "resets_at": resets_at,
+                    },
+                    "secondary": None,
+                    "credits": {"has_credits": False},
+                    "individual_limit": None,
+                    "spend_control_reached": None,
+                    "plan_type": "pro",
+                    "rate_limit_reached_type": None,
+                },
+            },
+        }
+    )
+
+
+# 1791046701 is 16:58 UTC on 3 Oct 2026 (`date -u -d @1791046701`).
+_RESETS_AT = 1791046701
+_READ_AT = "2026-09-28T05:55:49.123Z"
+_READ_EPOCH = calendar.timegm((2026, 9, 28, 5, 55, 49)) + 0.123
+# The previous week's reset, already past at _READ_EPOCH.
+_RESET_LAST_WEEK = _RESETS_AT - 7 * 86400
+
+
+@pytest.fixture
+def utc() -> Iterator[None]:
+    """Pin local time to UTC, so a reset time renders the same on every machine."""
+    previous = os.environ.get("TZ")
+    os.environ["TZ"] = "UTC"
+    time.tzset()
+    yield
+    if previous is None:
+        del os.environ["TZ"]
+    else:
+        os.environ["TZ"] = previous
+    time.tzset()
+
+
+@pytest.fixture
+def proc(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> _Proc:
+    table = _Proc(tmp_path)
+    table.process(_CODEX_PGID, _CODEX_PGID, "node-MainThread")
+    table.process(_CODEX_PGID + 7, _CODEX_PGID)
+    monkeypatch.setattr(watch, "PROC_ROOT", table.root)
+    return table
+
+
+def _join(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    runner: object,
+) -> None:
+    target = watch.PaneRef("%55", _CODEX_PGID)
+    monkeypatch.setattr(watch, "joined_target", lambda: target)
+    monkeypatch.setattr(watch, "joined_pane", lambda: target.pane_id)
+    monkeypatch.setattr(watch, "run_command", runner)
+    monkeypatch.setattr(watch.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(watch.time, "time", lambda: _READ_EPOCH + 180)
+
+
+def test_the_sessions_a_pane_holds_are_read_from_its_process_group(
+    watch: ModuleType,
+    proc: _Proc,
+) -> None:
+    """Only the pane's own foreground group counts; another Codex's locks do not."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.process(9999, 9999)
+    proc.hold_lock(9999, _ID_OTHER)
+
+    held = watch.held_sessions(_CODEX_PGID)
+
+    assert held is not None
+    assert held.ids == frozenset({_ID_BEFORE})
+
+
+def test_no_process_table_is_no_answer_rather_than_no_sessions(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(watch, "PROC_ROOT", tmp_path / "absent")
+
+    assert watch.held_sessions(_CODEX_PGID) is None
+
+
+def test_the_quota_is_read_from_the_session_file_without_typing(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """The figures come from Codex's last model call, so the reading carries its age."""
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [_session_meta(_ID_BEFORE), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 52% left" in result, result
+    assert "resets 16:58 on 3 Oct" in result, result
+    assert "3m old" in result, result
+    assert pane.keys == [], "a file reading must not type into the pane"
+
+
+def test_the_newest_rate_limit_record_is_the_reading(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """Later records follow later model calls; a half-written last line is skipped."""
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count("2026-09-28T05:40:00.000Z", 10.0, _RESETS_AT),
+            _token_count(_READ_AT, 48.0, _RESETS_AT),
+            json.dumps({"timestamp": _READ_AT, "type": "response_item", "payload": {}}),
+            '{"timestamp":"2026-09-28T05:58:00.000Z","type":"event_msg","payl',
+        ],
+    )
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 52% left" in result, result
+    assert "90%" not in result, result
+
+
+def test_the_main_thread_is_read_when_sub_agents_hold_sessions_too(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """Long-running panes held four sessions each: one main thread, three sub-agents.
+
+    The main thread is told apart by its own first record, not by id order, and its
+    file is the one read even when a sub-agent has recorded a later model call.
+    """
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_OTHER)
+    proc.hold_rollout(
+        pid,
+        _ID_OTHER,
+        [
+            _session_meta(_ID_OTHER, parent=_ID_BEFORE),
+            _token_count("2026-09-28T05:57:00.000Z", 60.0, _RESETS_AT),
+        ],
+    )
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [_session_meta(_ID_BEFORE), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+    proc.hold_lock(pid, _ID_AFTER)
+    proc.hold_rollout(pid, _ID_AFTER, [_session_meta(_ID_AFTER, parent=_ID_BEFORE)])
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 52% left" in result, result
+    assert pane.keys == [], "a file reading must not type into the pane"
+
+
+def test_a_sub_agent_of_another_thread_is_ignored_rather_than_refused(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """Brian, 2026-09-28: "we don't care about codex's own subagents"."""
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [_session_meta(_ID_BEFORE), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+    proc.hold_lock(pid, _ID_AFTER)
+    proc.hold_rollout(pid, _ID_AFTER, [_session_meta(_ID_AFTER, parent=_ID_OTHER)])
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    assert "weekly 52% left" in watch.report_quota()
+    assert pane.keys == []
+
+
+def test_a_newer_record_of_another_allowance_is_not_the_weekly_figure(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """Pane %6, 2026-09-28: the newest record was a reserve allowance at 0% used,
+    which would have reported an untouched week while the plain weekly limit stood at
+    roughly half. The plain `Weekly limit:` row is the unnamed `codex` limit.
+    """
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count(_READ_AT, 48.0, _RESETS_AT),
+            _token_count(
+                "2026-09-28T05:57:00.000Z",
+                3.0,
+                _RESETS_AT,
+                limit_id="codex_bengalfox",
+                limit_name="GPT-5.3-Codex-Spark",
+                window_minutes=300,
+            ),
+            _token_count(
+                "2026-09-28T05:58:00.000Z",
+                0.0,
+                _RESETS_AT + 86400,
+                limit_id="base_model_inference",
+                limit_name="gpt-reserve",
+            ),
+        ],
+    )
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 52% left" in result, result
+    assert "resets 16:58 on 3 Oct" in result, result
+
+
+def test_a_reading_from_a_window_that_has_reset_gives_way_to_a_current_one(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    utc: None,
+) -> None:
+    """A record whose reset has passed describes a week that is over."""
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    proc.hold_rollout(
+        pid,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count("2026-09-21T05:55:49.000Z", 5.0, _RESET_LAST_WEEK),
+            _token_count(_READ_AT, 48.0, _RESETS_AT),
+        ],
+    )
+    pane = _Pane([_NAMED_TITLE_READY], [_pane()])
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 52% left" in result, result
+    assert pane.keys == []
+
+
+def _no_rollout(proc: _Proc) -> None:
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+
+
+def _no_record(proc: _Proc) -> None:
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.hold_rollout(_CODEX_PGID + 7, _ID_BEFORE, [_session_meta(_ID_BEFORE)])
+
+
+def _no_lock(proc: _Proc) -> None:
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [_token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+
+
+def _two_main_sessions(proc: _Proc) -> None:
+    """Two rollouts that each name themselves: which is current is not known."""
+    for session in (_ID_BEFORE, _ID_AFTER):
+        proc.hold_lock(_CODEX_PGID + 7, session)
+        proc.hold_rollout(
+            _CODEX_PGID + 7,
+            session,
+            [_session_meta(session), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+        )
+
+
+def _just_cleared(proc: _Proc) -> None:
+    """The new session's lock has no rollout yet, so it cannot be classified."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [_session_meta(_ID_BEFORE), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+    proc.hold_lock(_CODEX_PGID + 7, _ID_AFTER)
+
+
+def _other_limits_only(proc: _Proc) -> None:
+    """A named or shorter-window allowance is not the weekly figure."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count(
+                _READ_AT,
+                0.0,
+                _RESETS_AT,
+                limit_id="base_model_inference",
+                limit_name="gpt-reserve",
+            ),
+            _token_count(
+                _READ_AT,
+                3.0,
+                _RESETS_AT,
+                limit_id="codex_bengalfox",
+                limit_name="GPT-5.3-Codex-Spark",
+                window_minutes=300,
+            ),
+        ],
+    )
+
+
+def _five_hour_codex_limit(proc: _Proc) -> None:
+    """Codex's panel code names an unnamed `codex` five-hour window "5h limit"."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count(_READ_AT, 20.0, _RESETS_AT, window_minutes=300),
+        ],
+    )
+
+
+def _expired_weekly_only(proc: _Proc) -> None:
+    """Pane %6, 2026-09-28: the only weekly record was from a week already ended."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [
+            _session_meta(_ID_BEFORE),
+            _token_count("2026-09-21T05:55:49.000Z", 5.0, _RESET_LAST_WEEK),
+        ],
+    )
+
+
+def _sub_agents_only(proc: _Proc) -> None:
+    """Sub-agents naming a main thread whose own file is not held here."""
+    proc.hold_lock(_CODEX_PGID + 7, _ID_AFTER)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_AFTER,
+        [
+            _session_meta(_ID_AFTER, parent=_ID_BEFORE),
+            _token_count(_READ_AT, 48.0, _RESETS_AT),
+        ],
+    )
+
+
+def _main_lock_released(proc: _Proc) -> None:
+    """The main thread's file is still open but it no longer holds that lock."""
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_BEFORE,
+        [_session_meta(_ID_BEFORE), _token_count(_READ_AT, 48.0, _RESETS_AT)],
+    )
+    proc.hold_lock(_CODEX_PGID + 7, _ID_AFTER)
+    proc.hold_rollout(
+        _CODEX_PGID + 7,
+        _ID_AFTER,
+        [_session_meta(_ID_AFTER, parent=_ID_BEFORE)],
+    )
+
+
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        _no_rollout,
+        _no_record,
+        _no_lock,
+        _two_main_sessions,
+        _just_cleared,
+        _sub_agents_only,
+        _main_lock_released,
+        _other_limits_only,
+        _five_hour_codex_limit,
+        _expired_weekly_only,
+    ],
+    ids=[
+        "no-rollout-yet",
+        "no-record",
+        "no-lock",
+        "two-main-sessions",
+        "just-cleared",
+        "sub-agents-only",
+        "main-lock-released",
+        "other-limits-only",
+        "five-hour-codex-limit",
+        "expired-weekly-only",
+    ],
+)
+def test_the_quota_falls_back_to_the_status_panel_when_the_file_cannot_answer(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+    arrange: Callable[[_Proc], None],
+) -> None:
+    arrange(proc)
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [_pane(), _TYPED_STATUS, _pane(body=_STATUS_ECHOED)],
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.report_quota()
+
+    assert "weekly 99% left" in result, result
+    assert "14:41 on 8 Aug" in result, result
+    assert ("tmux", "send-keys", "-t", "%55", "-l", "/status") in pane.keys
+
+
+def test_the_quota_falls_back_when_there_is_no_process_table(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(watch, "PROC_ROOT", tmp_path / "absent")
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [_pane(), _TYPED_STATUS, _pane(body=_STATUS_ECHOED)],
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    assert "weekly 99% left" in watch.report_quota()
+
+
+# The v0.157.0 panel is about nineteen rows, so a 25-row pane clips its top, echo line
+# included. Panel rows as observed on 2026-09-28, directory and thread name replaced.
+_CLIPPED_PANEL = [
+    "│                                                                     │",
+    "│ Visit https://chatgpt.com/codex/settings/usage for up-to-date       │",
+    "│ information on rate limits and credits                              │",
+    "│                                                                     │",
+    "│  Model:                       GPT-6-Sol (reasoning xhigh)           │",
+    "│  Directory:                   ~/projects/example                    │",
+    "│  Thread name:                 Example task                          │",
+    f"│  Session:                     {_ID_BEFORE}  │",
+    "│                                                                     │",
+    "│  Weekly limit:                [██████████░░░░░░░░░░] 51% left "
+    "(resets 3:58 AM on 4 Oct)",
+    "│  Luna Reserve Weekly limit:   [████████████████████] 100% left "
+    "(resets 6:11 PM on 5 Oct)",
+    "╰─────────────────────────────────────────────────────────────────────╯",
+]
+_CLIPPED_SCREEN = "\n".join(
+    [
+        *_CLIPPED_PANEL,
+        "",
+        f"\x1b[1m{_CURSOR}\x1b[0m Ask Codex to do anything",
+        "",
+        "  GPT-6-Sol xhigh · Example task · Context 58% left · Ready",
+    ]
+)
+
+
+def test_a_panel_clipped_by_a_short_pane_is_reported_as_too_short(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Observed on pane %104, 2026-09-28: a 25-row pane hid the `/status` echo line.
+
+    The figures were on screen, but without the echo a fresh panel cannot be told from
+    a stale one, so this still refuses; what changes is that the refusal says why.
+    """
+    monkeypatch.setattr(watch, "PROC_ROOT", tmp_path / "absent")
+    monkeypatch.setattr(watch, "RESPONSE_POLLS", 2)
+
+    def run(argv: tuple[str, ...]) -> str:
+        if argv[-1] == "#{pane_height}":
+            return "25\n"
+        return pane.run(argv)
+
+    pane = _Pane([_NAMED_TITLE_READY], [_pane(), _TYPED_STATUS, _CLIPPED_SCREEN])
+    _join(watch, monkeypatch, run)
+
+    with pytest.raises(watch.MonitorError, match=r"25 lines tall.*too short"):
+        watch.report_quota()
+
+
+def test_a_panel_whose_echo_alone_is_cut_off_is_reported_as_too_short(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Observed on a scratch 25-row pane, 2026-09-28: the border fit, its echo not."""
+    monkeypatch.setattr(watch, "PROC_ROOT", tmp_path / "absent")
+    monkeypatch.setattr(watch, "RESPONSE_POLLS", 2)
+    screen = "\n".join(
+        [
+            "",
+            "╭─────────────────────────────────────────────────────────────────────╮",
+            "│  >_ OpenAI Codex (v0.157.0)                                         │",
+            _CLIPPED_SCREEN,
+        ]
+    )
+
+    def run(argv: tuple[str, ...]) -> str:
+        if argv[-1] == "#{pane_height}":
+            return "25\n"
+        return pane.run(argv)
+
+    pane = _Pane([_NAMED_TITLE_READY], [_pane(), _TYPED_STATUS, screen])
+    _join(watch, monkeypatch, run)
+
+    with pytest.raises(watch.MonitorError, match=r"25 lines tall.*too short"):
+        watch.report_quota()
+
+
+def test_a_status_panel_that_never_drew_is_still_not_called_too_short(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A stale panel beneath its own echo is not a clipped one."""
+    monkeypatch.setattr(watch, "PROC_ROOT", tmp_path / "absent")
+    monkeypatch.setattr(watch, "RESPONSE_POLLS", 2)
+    stale = _pane(body=_STATUS_STALE)
+    pane = _Pane([_NAMED_TITLE_READY], [stale, _TYPED_STATUS, stale])
+    _join(watch, monkeypatch, pane.run)
+
+    with pytest.raises(watch.MonitorError, match="drew no status panel"):
+        watch.report_quota()
+
+
+class _ClearingPane(_Pane):
+    """A pane whose Codex takes a new session lock when `/clear` is submitted."""
+
+    def __init__(
+        self,
+        titles: list[str],
+        bodies: list[str],
+        on_clear: Callable[[], None],
+    ) -> None:
+        super().__init__(titles, bodies)
+        self.on_clear = on_clear
+        self.typed = ""
+
+    def run(self, argv: tuple[str, ...]) -> str:
+        if "send-keys" in argv and "-l" in argv:
+            self.typed = argv[-1]
+        elif "send-keys" in argv and argv[-1] == "Enter" and self.typed == "/clear":
+            self.on_clear()
+        return super().run(argv)
+
+
+def test_a_clear_is_confirmed_by_a_new_session_lock_without_typing_status(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+) -> None:
+    """The old lock is still held just after a clear (2026-09-28); one is added."""
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    pane = _ClearingPane(
+        [_NAMED_TITLE_READY, _TITLE_AFTER_CLEAR, _TITLE_AFTER_CLEAR_READY],
+        [_pane(), _TYPED_CLEAR, _pane(percent=100)],
+        lambda: proc.hold_lock(pid, _ID_AFTER),
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.run_slash_command("/clear")
+
+    assert f"{_ID_BEFORE} -> {_ID_AFTER}" in result, result
+    assert "Ready, context 100% left" in result, result
+    assert pane.keys == [
+        ("tmux", "send-keys", "-t", "%55", "-l", "/clear"),
+        ("tmux", "send-keys", "-t", "%55", "Enter"),
+    ]
+
+
+def test_a_new_lock_under_a_stale_ready_title_waits_for_the_restart(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+) -> None:
+    """Observed 2026-09-28: 0.22s after Enter the new lock was held and the title still
+    read Ready; it went to Starting for about a second and then back to Ready. A pane
+    handed back in that window is refused by the next dispatch as not Ready.
+    """
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    pane = _ClearingPane(
+        [
+            _NAMED_TITLE_READY,
+            _NAMED_TITLE_READY,
+            _TITLE_AFTER_CLEAR,
+            _TITLE_AFTER_CLEAR_READY,
+        ],
+        [_pane(), _TYPED_CLEAR, _pane(percent=100)],
+        lambda: proc.hold_lock(pid, _ID_AFTER),
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.run_slash_command("/clear")
+
+    assert _ID_AFTER in result, result
+    assert "Ready" in watch.pane_status("%55"), "handed back while still starting"
+
+
+def test_a_clear_that_took_no_new_session_is_not_reported_as_done(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+) -> None:
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    monkeypatch.setattr(watch, "SETTLE_POLLS", 3)
+    pane = _ClearingPane(
+        [_NAMED_TITLE_READY],
+        [_pane(), _TYPED_CLEAR, _pane()],
+        lambda: None,
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    with pytest.raises(watch.MonitorError, match=r"no new session.*did not run"):
+        watch.run_slash_command("/clear")
+
+
+def test_a_compaction_is_checked_against_the_held_sessions_without_typing_status(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+) -> None:
+    proc.hold_lock(_CODEX_PGID + 7, _ID_BEFORE)
+    compacted = _pane(percent=100, body=["• acknowledged", "", "• Context compacted"])
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [_pane(percent=96), _TYPED_COMPACT, compacted],
+    )
+    _join(watch, monkeypatch, pane.run)
+
+    result = watch.run_slash_command("/compact")
+
+    assert "96% -> 100%" in result, result
+    assert f"session {_ID_BEFORE} unchanged" in result, result
+    assert pane.keys == [
+        ("tmux", "send-keys", "-t", "%55", "-l", "/compact"),
+        ("tmux", "send-keys", "-t", "%55", "Enter"),
+    ]
+
+
+def test_a_compaction_that_took_a_new_session_refuses(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    proc: _Proc,
+) -> None:
+    pid = _CODEX_PGID + 7
+    proc.hold_lock(pid, _ID_BEFORE)
+    compacted = _pane(percent=100, body=["• acknowledged", "", "• Context compacted"])
+    pane = _Pane(
+        [_NAMED_TITLE_READY],
+        [_pane(percent=96), _TYPED_COMPACT, compacted],
+    )
+
+    def run(argv: tuple[str, ...]) -> str:
+        if argv[-1] == "Enter":
+            proc.hold_lock(pid, _ID_AFTER)
+        return pane.run(argv)
+
+    _join(watch, monkeypatch, run)
+
+    with pytest.raises(watch.MonitorError, match=_ID_AFTER):
+        watch.run_slash_command("/compact")
