@@ -1,0 +1,23 @@
+import os, socket, sys, time, json
+pane = sys.argv[1].removeprefix("%")
+d = os.path.join(os.environ["XDG_RUNTIME_DIR"], "codex-watch")
+os.makedirs(d, mode=0o700, exist_ok=True)
+path = os.path.join(d, f"pane-{pane}.sock")
+if os.path.exists(path):
+    sys.exit(f"socket {path} already exists; refusing to disturb it")
+s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+s.bind(path)
+s.settimeout(0.5)
+start = time.monotonic()
+end = start + float(sys.argv[2])
+try:
+    while time.monotonic() < end:
+        try:
+            raw = s.recv(65536)
+        except socket.timeout:
+            continue
+        print(f"t+{time.monotonic() - start:5.1f}s  {json.loads(raw)}", flush=True)
+finally:
+    s.close()
+    os.unlink(path)
+print("listener closed", flush=True)

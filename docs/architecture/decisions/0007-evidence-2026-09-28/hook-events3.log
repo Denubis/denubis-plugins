@@ -1,0 +1,3 @@
+t+  5.4s  {'correlation_key': None, 'key': None, 'kind': 'busy', 'scoped': False}
+t+  7.2s  {'correlation_key': '8796af63a1225f5d4c344d8f023f47179ebd9116427d8889844253e75bb6a81b', 'key': '5f6311d739911a84bc308447bc64eb9f11252d9b7ddf881ceb9fc686bf72426b', 'kind': 'done', 'scoped': True}
+listener closed

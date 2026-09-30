@@ -1,0 +1,6 @@
+#!/bin/sh
+# Temporary diagnostic, 2026-09-28: records that a SessionEnd hook fired. Logs identities only.
+jq -c --arg pane "${TMUX_PANE:-none}" --arg at "$(date +%H:%M:%S.%N | cut -c1-12)" \
+  '{at: $at, pane: $pane, event: .hook_event_name, session: .session_id, reason: (.reason // null), has_transcript: (.transcript_path != null)}' \
+  >> /tmp/diag-status-0157/session-end.log 2>/dev/null
+exit 0

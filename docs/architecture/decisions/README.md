@@ -8,6 +8,8 @@ and consequences section. One ADR per decision.
 ## Decisions
 
 - [0006 — Astra and Fable require explicit model and effort](0006-astra-fable-require-explicit-model-and-effort.md)
+- [0007 — The Codex supervisor reads session files; hooks cannot confirm a clear](0007-supervisor-reads-codex-session-files.md),
+  with frozen evidence in [`0007-evidence-2026-09-28/`](0007-evidence-2026-09-28/)
 
 ## Status lifecycle
 
