@@ -1,5 +1,10 @@
 # Changelog
 
+## [denubis-external-agents] 0.21.1
+
+**Fixed:**
+- The supervisor script's comments claimed it must parse on Python 3.9; its real floor is 3.12 (`StrEnum`, nested-quote f-strings), which is what `uv run --no-project` must resolve for the hook relay. The comments now say so, and `tests/test_codex_supervisor_python_floor.py` parses and imports the script under a real 3.12 interpreter, skipping with the reason stated when none is installed.
+
 ## [denubis-external-agents] 0.21.0
 
 **Changed:**

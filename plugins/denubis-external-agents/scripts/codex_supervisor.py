@@ -919,7 +919,7 @@ def deserialize_observation(raw: bytes) -> Observation | None:  # noqa: PLR0911
 
     PLR0911 is suppressed rather than satisfied: three of the seven returns exist only
     because the excepts below must stay as separate clauses to keep this file parseable
-    on Python 3.9. The branching is a portability artefact, not complexity.
+    on Python 3.12, its floor. The branching is a portability artefact, not complexity.
     """
     try:
         payload = json.loads(raw)
@@ -928,12 +928,14 @@ def deserialize_observation(raw: bytes) -> Observation | None:  # noqa: PLR0911
         correlation_key = payload["correlation_key"]
         scoped = payload["scoped"]
     # Do not recombine into a tuple. --hook makes this file a hook entry point, run
-    # through whatever `python3` the consuming machine resolves, so it must parse on
-    # 3.9+; the PEP 758 form is 3.14-only and dies with a SyntaxError before any logic
-    # runs. A parenthesised tuple does not hold either, because `ruff format` rewrites
-    # `except (A, B):` back to the 3.14 form under target-version = py314. Separate
-    # clauses are the only stable portable spelling. json.JSONDecodeError is absent
-    # because it subclasses ValueError.
+    # through whatever Python `uv run --no-project` resolves on the consuming machine,
+    # so it must load on the file's floor, 3.12 (`StrEnum` needs 3.11 and the
+    # nested-quote f-strings need 3.12; `tests/test_codex_supervisor_python_floor.py`
+    # holds the line). The PEP 758 form is 3.14-only and dies with a SyntaxError before
+    # any logic runs. A parenthesised tuple does not hold either, because `ruff format`
+    # rewrites `except (A, B):` back to the 3.14 form under target-version = py314.
+    # Separate clauses are the only stable portable spelling. json.JSONDecodeError is
+    # absent because it subclasses ValueError.
     except KeyError:
         return None
     except TypeError:
