@@ -25,9 +25,11 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import itertools
 import json
 import shlex
 import sys
+import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +38,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
     from types import ModuleType
     from typing import Any
 
@@ -63,6 +66,87 @@ def _spawn_workdir(tmp_path: Path) -> Path:
     workdir = tmp_path / "postgres-schema-53"
     workdir.mkdir()
     return workdir
+
+
+LIVE_CATALOGUE = ("codex", "debug", "models")
+BUNDLED_CATALOGUE = ("codex", "debug", "models", "--bundled")
+
+# The shape `codex debug models` printed on codex-cli 0.159.2 on 2026-09-30, cut to
+# one model and the field `--spawn` rewrites. Spawn reads the catalogue before it opens
+# the pane, so every fixture that reaches `split-window` has to answer that command.
+SPAWN_CATALOGUE = json.dumps(
+    {
+        "models": [
+            {
+                "slug": "gpt-6-sol",
+                "experimental_supported_tools": ["send_user_message_async", "clock"],
+            }
+        ]
+    }
+)
+
+
+@pytest.fixture
+def spawn_runtime(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Keep the catalogue `--spawn` writes out of the operator's runtime directory."""
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(runtime))
+    return runtime
+
+
+def _config_overrides(command: str) -> dict[str, object]:
+    """Read a spawn command's `-c key=value` words the way Codex says it reads them.
+
+    `codex --help` on codex-cli 0.159.2: "The `value` portion is parsed as TOML. If it
+    fails to parse as TOML, the raw string is used as a literal."
+    """
+    overrides: dict[str, object] = {}
+    for flag, word in itertools.pairwise(shlex.split(command)):
+        if flag != "-c":
+            continue
+        key, _, raw = word.partition("=")
+        try:
+            overrides[key] = tomllib.loads(f"value = {raw}")["value"]
+        except tomllib.TOMLDecodeError:
+            overrides[key] = raw
+    return overrides
+
+
+def _spawn_command(calls: list[tuple[str, ...]]) -> str:
+    return next(argv[-1] for argv in calls if argv[:2] == ("tmux", "split-window"))
+
+
+def _pinned_catalogue(calls: list[tuple[str, ...]]) -> Path:
+    """The model catalogue file the spawned Codex was told to load."""
+    command = _spawn_command(calls)
+    pinned = _config_overrides(command).get("model_catalog_json")
+    assert isinstance(pinned, str), f"spawn pinned no model catalogue: {command!r}"
+    return Path(pinned)
+
+
+def _spawn_runner(
+    watch: ModuleType,
+    calls: list[tuple[str, ...]],
+    catalogues: Mapping[tuple[str, ...], str | None],
+) -> Callable[[tuple[str, ...]], str]:
+    """Answer the commands `--spawn --cwd` runs; a `None` catalogue fails its command.
+
+    A failing catalogue command raises what `run_command` raises for a non-zero exit,
+    with the command's own words as the reason, so a test can tell which one failed.
+    """
+
+    def fake_run(argv: tuple[str, ...]) -> str:
+        calls.append(argv)
+        if argv[:3] == LIVE_CATALOGUE:
+            reply = catalogues.get(argv)
+            if reply is None:
+                raise watch.MonitorError(f"{' '.join(argv)} broke for this test")
+            return reply
+        if argv[:2] == ("tmux", "split-window"):
+            return "%10\n"
+        return ""
+
+    return fake_run
 
 
 @pytest.fixture(scope="module")
@@ -420,6 +504,7 @@ def test_spawn_starts_codex_in_an_explicit_cwd(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     """`--cwd` is what lets a supervisor whose own pane is unusable still spawn.
 
@@ -436,6 +521,8 @@ def test_spawn_starts_codex_in_an_explicit_cwd(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         if argv[:2] == ("tmux", "split-window"):
             return "%10\n"
         return ""
@@ -444,7 +531,7 @@ def test_spawn_starts_codex_in_an_explicit_cwd(
     monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
     monkeypatch.setattr(watch, "run_command", fake_run)
 
-    assert watch.spawn_pane(cwd=str(workdir)) == "%10"
+    assert watch.spawn_pane(cwd=str(workdir)).splitlines()[0] == "%10"
 
     assert all(call[-1] != "#{pane_current_path}" for call in calls), (
         f"an explicit --cwd still read the pane's own path: {calls}"
@@ -487,6 +574,7 @@ def test_spawn_hands_tmux_an_absolute_cwd(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     """A relative `--cwd` means this process's cwd, not the tmux server's.
 
@@ -503,6 +591,8 @@ def test_spawn_hands_tmux_an_absolute_cwd(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         return "%10\n"
 
     monkeypatch.setenv("TMUX_PANE", "%4")
@@ -522,6 +612,7 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     calls: list[tuple[str, ...]] = []
     workdir = _spawn_workdir(tmp_path)
@@ -531,6 +622,8 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         if argv[-1] == "#{pane_current_path}":
             return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
@@ -541,11 +634,13 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
     monkeypatch.setattr(watch, "joined_pane", no_joined_pane)
     monkeypatch.setattr(watch, "run_command", fake_run)
 
-    pane_id = watch.spawn_pane()
+    report = watch.spawn_pane()
 
-    assert pane_id == "%10"
+    (pinned,) = spawn_runtime.rglob("*.json")
+    assert report.splitlines()[0] == "%10"
     assert calls == [
         ("tmux", "display-message", "-p", "-t", "%4", "#{pane_current_path}"),
+        LIVE_CATALOGUE,
         (
             "tmux",
             "split-window",
@@ -559,7 +654,8 @@ def test_spawn_execs_codex_and_sets_default_pane_label(
             "#{pane_id}",
             (
                 "exec codex -c check_for_update_on_startup=false "
-                "-s workspace-write -a on-request --model gpt-6-sol "
+                "-s workspace-write -a on-request "
+                f"-c 'model_catalog_json=\"{pinned}\"' --model gpt-6-sol "
                 "-c 'model_reasoning_effort=\"xhigh\"'"
             ),
         ),
@@ -579,6 +675,7 @@ def test_spawn_contains_codex_rather_than_asking_per_command(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     """Containment is the sandbox, not a dialog for every command.
 
@@ -596,6 +693,8 @@ def test_spawn_contains_codex_rather_than_asking_per_command(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         if argv[-1] == "#{pane_current_path}":
             return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
@@ -621,6 +720,7 @@ def test_spawn_sets_explicit_pane_label(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     calls: list[tuple[str, ...]] = []
     workdir = _spawn_workdir(tmp_path)
@@ -630,6 +730,8 @@ def test_spawn_sets_explicit_pane_label(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         if argv[-1] == "#{pane_current_path}":
             return f"{workdir}\n"
         if argv[:2] == ("tmux", "split-window"):
@@ -657,6 +759,7 @@ def test_spawn_model_arguments_are_literal_shell_words(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    spawn_runtime: Path,
 ) -> None:
     calls: list[tuple[str, ...]] = []
 
@@ -665,6 +768,8 @@ def test_spawn_model_arguments_are_literal_shell_words(
 
     def fake_run(argv: tuple[str, ...]) -> str:
         calls.append(argv)
+        if argv == LIVE_CATALOGUE:
+            return SPAWN_CATALOGUE
         return "%10" if argv[:2] == ("tmux", "split-window") else ""
 
     monkeypatch.setenv("TMUX_PANE", "%4")
@@ -725,6 +830,260 @@ def test_model_options_require_spawn(
         watch.parse_args(["--clear", option, "high"])
     assert error.value.code == 2
     assert "require --spawn" in capsys.readouterr().err
+
+
+def _no_joined_pane_for(watch: ModuleType) -> Callable[[], str]:
+    def no_joined_pane() -> str:
+        raise watch.NoCodexPaneError("no Codex pane")
+
+    return no_joined_pane
+
+
+def test_spawn_pins_a_catalogue_without_the_question_tools(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    spawn_runtime: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A spawned Codex is never offered the async question tool at all.
+
+    Brian, 2026-09-30: "if we can force the question widget off, that would be
+    amazing", then "uh, fix it if it's fixed?". Codex registers the handler behind the
+    queued-question widget only when the model's catalogue entry lists
+    `request_user_input_async` or `send_user_message_async` in
+    `experimental_supported_tools` (`codex-rs/core/src/tools/spec_plan.rs` on `main`),
+    and `model_catalog_json` replaces the catalogue Codex loads. So the pane gets a
+    copy with exactly those two names gone. Everything else is carried through as it
+    was: `clock`, the different `send_message_to_user_async`, instruction text that
+    merely mentions a tool, an empty list, an entry with no list, and the model and
+    effort the operator asked for.
+    """
+    live = {
+        "models": [
+            {
+                "slug": "gpt-6-sol",
+                "context_window": 272000,
+                "base_instructions": "Ask in plain text, not send_user_message_async.",
+                "experimental_supported_tools": ["send_user_message_async", "clock"],
+            },
+            {
+                "slug": "gpt-6-luna",
+                "experimental_supported_tools": [
+                    "request_user_input_async",
+                    "send_message_to_user_async",
+                    "clock",
+                ],
+            },
+            {"slug": "gpt-5.5", "experimental_supported_tools": []},
+            {"slug": "codex-auto-review"},
+        ]
+    }
+    expected = {
+        "models": [
+            {
+                "slug": "gpt-6-sol",
+                "context_window": 272000,
+                "base_instructions": "Ask in plain text, not send_user_message_async.",
+                "experimental_supported_tools": ["clock"],
+            },
+            {
+                "slug": "gpt-6-luna",
+                "experimental_supported_tools": ["send_message_to_user_async", "clock"],
+            },
+            {"slug": "gpt-5.5", "experimental_supported_tools": []},
+            {"slug": "codex-auto-review"},
+        ]
+    }
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", _no_joined_pane_for(watch))
+    monkeypatch.setattr(
+        watch,
+        "run_command",
+        _spawn_runner(watch, calls, {LIVE_CATALOGUE: json.dumps(live)}),
+    )
+
+    status = watch.main(
+        [
+            "--spawn",
+            "--cwd",
+            str(workdir),
+            "--model",
+            "gpt-6-luna",
+            "--reasoning-effort",
+            "low",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert status == 0
+    pinned = _pinned_catalogue(calls)
+    assert json.loads(pinned.read_text(encoding="utf-8")) == expected
+    assert pinned.is_relative_to(spawn_runtime), (
+        f"the catalogue belongs in the runtime directory, not {pinned}"
+    )
+    assert out.splitlines()[0] == "%10", f"the pane id is no longer first: {out!r}"
+    assert str(pinned) in out, f"--spawn did not say where the catalogue is: {out!r}"
+    assert "codex debug models" in out, f"--spawn did not name its source: {out!r}"
+    assert "--bundled" not in out, f"the live catalogue was read: {out!r}"
+    command = _spawn_command(calls)
+    words = shlex.split(command)
+    assert words[words.index("--model") + 1] == "gpt-6-luna"
+    assert _config_overrides(command)["model_reasoning_effort"] == "low"
+    assert BUNDLED_CATALOGUE not in calls, "the bundled catalogue was read needlessly"
+
+
+@pytest.mark.usefixtures("spawn_runtime")
+@pytest.mark.parametrize(
+    "live_reply",
+    [
+        pytest.param(None, id="command fails"),
+        pytest.param("Error: could not read models cache\n", id="not JSON"),
+        pytest.param(json.dumps([{"slug": "gpt-6-sol"}]), id="no models list"),
+        pytest.param(
+            json.dumps(
+                {
+                    "models": [
+                        {
+                            "slug": "gpt-6-sol",
+                            "experimental_supported_tools": "send_user_message_async",
+                        }
+                    ]
+                }
+            ),
+            id="tool list of an unknown shape",
+        ),
+    ],
+)
+def test_spawn_falls_back_to_the_bundled_catalogue_and_says_so(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    live_reply: str | None,
+) -> None:
+    """A live catalogue that cannot be read, or cannot be trusted to be stripped,
+    gives way to the one the binary ships, still stripped, and the output says so.
+
+    A tool list in a shape the supervisor does not recognise could still advertise the
+    question tool after a strip that found nothing to remove, so it counts as a
+    failure of that source rather than a catalogue to pin.
+    """
+    bundled = {
+        "models": [
+            {
+                "slug": "gpt-6-sol",
+                "base_instructions": "bundled",
+                "experimental_supported_tools": ["send_user_message_async", "clock"],
+            }
+        ]
+    }
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", _no_joined_pane_for(watch))
+    monkeypatch.setattr(
+        watch,
+        "run_command",
+        _spawn_runner(
+            watch,
+            calls,
+            {LIVE_CATALOGUE: live_reply, BUNDLED_CATALOGUE: json.dumps(bundled)},
+        ),
+    )
+
+    status = watch.main(["--spawn", "--cwd", str(workdir)])
+
+    out = capsys.readouterr().out
+    assert status == 0
+    assert json.loads(_pinned_catalogue(calls).read_text(encoding="utf-8")) == {
+        "models": [
+            {
+                "slug": "gpt-6-sol",
+                "base_instructions": "bundled",
+                "experimental_supported_tools": ["clock"],
+            }
+        ]
+    }
+    assert "--bundled" in out, f"--spawn did not say it used the bundled one: {out!r}"
+    if live_reply is None:
+        assert "codex debug models broke" in out, (
+            f"--spawn did not say why the live one failed: {out!r}"
+        )
+
+
+def test_spawn_refuses_when_no_catalogue_can_be_stripped(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    spawn_runtime: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Without a catalogue to strip, Codex would start with the widget; so no Codex."""
+    calls: list[tuple[str, ...]] = []
+    workdir = _spawn_workdir(tmp_path)
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", _no_joined_pane_for(watch))
+    monkeypatch.setattr(watch, "run_command", _spawn_runner(watch, calls, {}))
+
+    status = watch.main(["--spawn", "--cwd", str(workdir)])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert all(call[:2] != ("tmux", "split-window") for call in calls), (
+        "codex was spawned without prevention"
+    )
+    assert "codex debug models broke" in captured.err, captured.err
+    assert "codex debug models --bundled broke" in captured.err, captured.err
+    assert captured.out == ""
+    assert list(spawn_runtime.rglob("*.json")) == []
+
+
+@pytest.mark.parametrize("same_catalogue", [True, False], ids=["same", "refreshed"])
+def test_a_second_spawn_leaves_the_first_panes_catalogue_alone(
+    watch: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    spawn_runtime: Path,
+    same_catalogue: bool,
+) -> None:
+    """The first pane is still running on its file when the second pane is spawned."""
+    first = {"models": [{"slug": "gpt-6-sol", "experimental_supported_tools": []}]}
+    second = (
+        first
+        if same_catalogue
+        else {"models": [{"slug": "gpt-6.1-sol", "experimental_supported_tools": []}]}
+    )
+    workdir = _spawn_workdir(tmp_path)
+    monkeypatch.setenv("TMUX_PANE", "%4")
+    monkeypatch.setattr(watch, "joined_pane", _no_joined_pane_for(watch))
+
+    first_calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        watch,
+        "run_command",
+        _spawn_runner(watch, first_calls, {LIVE_CATALOGUE: json.dumps(first)}),
+    )
+    assert watch.main(["--spawn", "--cwd", str(workdir)]) == 0
+    first_pinned = _pinned_catalogue(first_calls)
+    first_inode = first_pinned.stat().st_ino
+    first_bytes = first_pinned.read_bytes()
+
+    second_calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        watch,
+        "run_command",
+        _spawn_runner(watch, second_calls, {LIVE_CATALOGUE: json.dumps(second)}),
+    )
+    assert watch.main(["--spawn", "--cwd", str(workdir)]) == 0
+
+    assert first_pinned.stat().st_ino == first_inode, "the first file was replaced"
+    assert first_pinned.read_bytes() == first_bytes, "the first file was rewritten"
+    assert json.loads(first_pinned.read_text(encoding="utf-8")) == first
+    second_pinned = _pinned_catalogue(second_calls)
+    assert json.loads(second_pinned.read_text(encoding="utf-8")) == second
 
 
 def test_send_refuses_non_ready_pane_before_loading_text(

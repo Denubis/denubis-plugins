@@ -70,6 +70,21 @@ CODEX_SPAWN_COMMAND = (
     # every probe in a verification pass, which is the loop this pairing removes.
     "exec codex -c check_for_update_on_startup=false -s workspace-write -a on-request"
 )
+# Codex registers the async question handler behind its queued-question widget only
+# when the model's catalogue entry lists one of these in `experimental_supported_tools`
+# (`codex-rs/core/src/tools/spec_plan.rs` on `main`, read 2026-09-30). `--spawn` hands
+# Codex a catalogue without them, because Brian, 2026-09-30: "if we can force the
+# question widget off, that would be amazing". `send_message_to_user_async` is a
+# different tool (a feature listed as under development) and is left alone, as is
+# everything else in the entry.
+QUESTION_TOOLS = frozenset({"request_user_input_async", "send_user_message_async"})
+# The refreshed catalogue first, so model metadata stays current, then the one the
+# binary ships. Neither prevents anything as printed: on codex-cli 0.159.2 both list
+# `send_user_message_async` for every gpt-6 model (2026-09-30).
+CATALOGUE_SOURCES = (
+    ("codex", "debug", "models"),
+    ("codex", "debug", "models", "--bundled"),
+)
 CODEX_LABEL_OPTION = "@codex_label"
 # Where the process table is read from, to find the files a pane's Codex holds open.
 PROC_ROOT = Path("/proc")
@@ -1348,6 +1363,111 @@ def _spawn_effort(model: str, requested: str | None) -> str:
     return requested if requested is not None else DEFAULT_REASONING_EFFORT
 
 
+def without_question_tools(catalogue: object) -> tuple[dict[str, object], int, int]:
+    """Remove the async question tools from every model in a Codex catalogue.
+
+    Returns the catalogue, how many models lost a tool, and how many models there are.
+    Only `experimental_supported_tools` changes, and only by losing the names in
+    `QUESTION_TOOLS`; key order and every other value are carried through. A shape
+    this does not recognise is refused rather than passed on, because a strip that
+    finds nothing to remove in an unfamiliar layout would pin a catalogue that still
+    advertises the tool.
+    """
+    if not isinstance(catalogue, dict):
+        raise MonitorError("its catalogue is not a JSON object")
+    models = catalogue.get("models")
+    if not isinstance(models, list):
+        raise MonitorError("its catalogue has no list of models")
+    stripped: list[object] = []
+    changed = 0
+    for model in models:
+        if not isinstance(model, dict):
+            raise MonitorError("its catalogue holds a model that is not a JSON object")
+        if "experimental_supported_tools" not in model:
+            stripped.append(model)
+            continue
+        tools = model["experimental_supported_tools"]
+        if not isinstance(tools, list) or not all(
+            isinstance(tool, str) for tool in tools
+        ):
+            raise MonitorError(
+                f"model {model.get('slug')!r} lists its tools in an unrecognised shape"
+            )
+        kept = [tool for tool in tools if tool not in QUESTION_TOOLS]
+        if len(kept) != len(tools):
+            changed += 1
+        stripped.append({**model, "experimental_supported_tools": kept})
+    return {**catalogue, "models": stripped}, changed, len(models)
+
+
+def _read_catalogue(source: Command) -> tuple[dict[str, object], int, int]:
+    raw = run_command(source)
+    try:
+        parsed = json.loads(raw)
+    except ValueError as error:
+        raise MonitorError(f"it printed something other than JSON ({error})") from error
+    return without_question_tools(parsed)
+
+
+def _write_catalogue(catalogue: dict[str, object], runtime_dir: Path | None) -> Path:
+    """Write the catalogue under a name taken from its content, never over another.
+
+    A running Codex may read its file again after start-up, so a file one pane was
+    started on must not change under it when the next pane is spawned. Naming by
+    content means a second spawn on the same catalogue finds the same bytes already
+    there and writes nothing, and a refreshed catalogue lands beside the old one.
+    """
+    data = (json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n").encode()
+    directory = runtime_directory(runtime_dir)
+    path = directory / f"model-catalog-{hashlib.sha256(data).hexdigest()[:16]}.json"
+    try:
+        if path.is_file() and path.read_bytes() == data:
+            return path
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        descriptor, staged_name = tempfile.mkstemp(
+            dir=directory, prefix=".model-catalog-"
+        )
+        staged = Path(staged_name)
+        try:
+            with os.fdopen(descriptor, "wb") as staged_file:
+                staged_file.write(data)
+            staged.replace(path)
+        finally:
+            staged.unlink(missing_ok=True)
+    except OSError as error:
+        raise MonitorError(f"could not write the model catalogue: {error}") from error
+    return path
+
+
+def pin_catalogue(runtime_dir: Path | None = None) -> tuple[Path, str]:
+    """Write a Codex model catalogue that cannot register the question tool.
+
+    Returns the file and a line saying where it came from. The refreshed catalogue is
+    preferred so model metadata stays current; the bundled one is the fallback, and
+    the line says why it was needed. With neither there is nothing to strip, and a
+    Codex started without the file would draw the widget, so this refuses instead.
+    """
+    failures: list[str] = []
+    for source in CATALOGUE_SOURCES:
+        command = " ".join(source)
+        try:
+            catalogue, changed, total = _read_catalogue(source)
+        except MonitorError as error:
+            failures.append(f"{command}: {error}")
+            continue
+        path = _write_catalogue(catalogue, runtime_dir)
+        fallback = f", because {'; '.join(failures)}" if failures else ""
+        removed = " and ".join(sorted(QUESTION_TOOLS))
+        return path, (
+            f"model catalogue: {command}{fallback}; {removed} removed from "
+            f"{changed} of {total} models; pinned at {path}"
+        )
+    raise MonitorError(
+        "no model catalogue to strip the question tools from, so codex would start "
+        f"able to raise its queued-question widget; {'; '.join(failures)}"
+    )
+
+
 def spawn_pane(
     label: str | None = None,
     cwd: str | None = None,
@@ -1355,7 +1475,11 @@ def spawn_pane(
     model: str = DEFAULT_MODEL,
     reasoning_effort: str | None = None,
 ) -> str:
-    """Open a Codex pane beside this one, refusing when one already runs."""
+    """Open a Codex pane beside this one, refusing when one already runs.
+
+    The pane starts on a pinned catalogue without the async question tools, and the
+    result is its pane ID followed by the line saying which catalogue that was.
+    """
     reasoning_effort = _spawn_effort(model, reasoning_effort)
     pane = _caller_pane()
     try:
@@ -1365,8 +1489,11 @@ def spawn_pane(
     if existing:
         raise MonitorError(f"Codex already runs at {existing}; close it first")
     workdir = _spawn_directory(pane, cwd)
+    catalogue, catalogue_report = pin_catalogue()
     model_options = shlex.join(
         (
+            "-c",
+            f"model_catalog_json={json.dumps(str(catalogue))}",
             "--model",
             model,
             "-c",
@@ -1400,7 +1527,7 @@ def spawn_pane(
             pane_label,
         )
     )
-    return pane_id
+    return f"{pane_id}\n{catalogue_report}"
 
 
 def pane_status(pane_id: str) -> str:
@@ -2682,7 +2809,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--resolve", action="store_true", help="print the joined Codex pane ID"
     )
     action.add_argument(
-        "--spawn", action="store_true", help="open a Codex pane beside this one"
+        "--spawn",
+        action="store_true",
+        help=(
+            "open a Codex pane beside this one, started on a copy of codex's model "
+            "catalogue without its async question tools, so no queued-question "
+            "widget; refused if no catalogue can be read"
+        ),
     )
     parser.add_argument(
         "--model",

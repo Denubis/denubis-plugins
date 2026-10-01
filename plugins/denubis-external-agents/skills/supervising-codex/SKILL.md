@@ -97,7 +97,7 @@ The verbs, read from the parser rather than from memory:
 |---|---|
 | *(none)* | run the watch loop, emitting only actionable events |
 | `--resolve` | print the joined Codex pane ID |
-| `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one; defaults to `gpt-6-sol` at `xhigh` |
+| `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one, without the queued-question tool; defaults to `gpt-6-sol` at `xhigh` |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
 | `--clear` | start codex on a fresh session, confirmed by its process taking a new session lock |
@@ -321,8 +321,9 @@ uses it the TUI draws a collapsed widget above the composer and holds the pane t
     alt + , to answer
 ```
 
-**Two verbs answer it, in two calls** (Brian, 2026-09-19: "make it be able to alt , and
-just type in answers"):
+A pane started by `--spawn` is not given the tool at all (see below), so the widget
+belongs to panes it did not start. **Two verbs answer it there, in two calls** (Brian,
+2026-09-19: "make it be able to alt , and just type in answers"):
 
 ```sh
 codex_supervisor.py --question          # press alt+, and print what the widget shows
@@ -361,31 +362,51 @@ rules exist to prevent. That is why both the standing rules and `--send`'s ping 
 Codex to ask in plain text instead: a plain-text question leaves the pane `Ready`, so
 the supervisor can carry the human's ruling straight back with `--message`.
 
-**No feature flag switches it off, and the instruction above is a mitigation rather
-than prevention** — it asks the model not to reach for a tool it still has. `codex
-features list` on the installed 0.154.0 offers only `default_mode_request_user_input`,
-which is the *blocking* variant and is already false. The async tool is registered
-whenever the model advertises `request_user_input_async` or `send_user_message_async` in
-its catalog entry's `experimental_supported_tools` and the thread is not a sub-agent
-(`codex-rs/core/src/tools/spec_plan.rs`, read on `main` 2026-09-19; **not verified
-against the 0.154.0 tag**).
+**No feature flag switches it off, so the instruction above is only a mitigation** — it
+asks the model not to reach for a tool it still has. `codex features list` on 0.154.0
+offered only `default_mode_request_user_input`, the *blocking* variant, already false.
+The async tool is registered whenever the model advertises `request_user_input_async` or
+`send_user_message_async` in its catalogue entry's `experimental_supported_tools` and the
+thread is not a sub-agent (`codex-rs/core/src/tools/spec_plan.rs`, read on `main`;
+**not verified against a release tag**). Prevention therefore lives in the catalogue.
 
-**Which catalog is in play is the whole of it.** Measured on the installed 0.154.0,
-2026-09-19:
+**`--spawn` starts Codex on a catalogue without those two names** (Brian, 2026-09-30:
+"if we can force the question widget off, that would be amazing", then "uh, fix it if
+it's fixed?"). At every spawn it reads `codex debug models`, the catalogue Codex
+refreshes from the server, removes `request_user_input_async` and
+`send_user_message_async` from each model's `experimental_supported_tools`, and changes
+nothing else: `clock` stays, and so does the model list and every other field. It writes
+the result into its runtime directory (`$XDG_RUNTIME_DIR/codex-watch/`, else
+`/tmp/codex-watch-<uid>/`) under a name taken from the content, hands Codex
+`-c model_catalog_json=<that file>`, and prints the file and its source under the pane
+ID:
 
-```sh
-codex debug models --bundled   # gpt-5.6-sol: experimental_supported_tools = []
-codex debug models             # gpt-5.6-sol: ["send_user_message_async", "clock"]
+```
+%151
+model catalogue: codex debug models; request_user_input_async and send_user_message_async removed from 4 of 10 models; pinned at /run/user/1000/codex-watch/model-catalog-b5584c4bdd33af10.json
 ```
 
-The binary ships a catalog that does not advertise the tool for this model; the catalog
-Codex refreshes from the server does. `model_catalog_json`, documented as "Optional path
-to a JSON model catalog loaded on startup", replaces the catalog for that process, so a
-pinned catalog without that advertisement would mean the tool is never registered —
-prevention rather than a request. That is **not** wired into `--spawn`: pinning a catalog
-also freezes model metadata, and which catalog a session runs on is the operator's
-decision, not the tool's. Until it is ruled on, the widget can appear and the paragraphs
-above are what to do when it does.
+If the refreshed catalogue cannot be read, or lists tools in a shape the supervisor does
+not recognise, `--spawn` falls back to `codex debug models --bundled` and says why on
+that line. If neither can be read it refuses to spawn, because a Codex started without
+the file would have the tool. Pinning the bundled catalogue as shipped would not help:
+on codex-cli 0.159.2 both catalogues advertise `send_user_message_async` for every gpt-6
+model (observed 2026-09-30), where on 0.154.0 the bundled one advertised nothing for
+`gpt-5.6-sol`. A file is never rewritten under a running pane: the same catalogue reuses
+its file, and a refreshed one gets a new name. Nothing deletes them; the runtime
+directory is cleared at logout or reboot.
+
+**Observed on codex-cli 0.159.2, 2026-09-30,** with `gpt-6-sol` at `low` in `/tmp`, one
+prompt to each of two scratch panes asking Codex to use `request_user_input_async` or
+reply "No such tool.". The pane `--spawn` started replied "No such tool.", made no tool
+call, and drew no widget in 45 one-second captures. A control pane started the same way
+but without the pinned catalogue called `request_user_input_async`, drew the widget, and
+held its title at `[ ! ] Action Required`. That is one model and one prompt per pane;
+other models, a pane after `/clear`, and a resumed session are unverified.
+
+The widget can still appear in any pane `--spawn` did not start: a Codex started by
+hand, a pane spawned before this change, or a `codex resume`. The verbs above are how to
+answer it there.
 
 When a queued question appears, tell the human. Do not wait it out: if it expires, Codex
 proceeds on its own judgement and the fact that it had a question is gone from everything
@@ -585,9 +606,10 @@ is stored as the pane-local tmux user option `@codex_label`; inspect it with
 status there and the monitor's status reading depends on that status line.
 
 The spawn command is `exec codex -c check_for_update_on_startup=false -s workspace-write
--a on-request`. tmux gives that command to the configured login shell, which resolves
-`codex` through `PATH`, and `exec` then replaces the shell instead of leaving it as the
-pane process. This is load-bearing: the monitor accepts a pane only when
+-a on-request`, followed by the pinned catalogue (see the queued-question widget above)
+and the model and effort options. tmux gives that command to the configured login
+shell, which resolves `codex` through `PATH`, and `exec` then replaces the shell instead
+of leaving it as the pane process. This is load-bearing: the monitor accepts a pane only when
 `pane_current_command=codex`, so a shell left running as the pane process makes the new
 pane undiscoverable. The `-c` override uses Codex's documented configuration key to
 suppress the startup update check; the official

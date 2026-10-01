@@ -1,5 +1,11 @@
 # Changelog
 
+## [denubis-external-agents] 0.21.0
+
+**Changed:**
+- `--spawn` starts Codex on a copy of its model catalogue with `request_user_input_async` and `send_user_message_async` removed, so a spawned pane cannot raise the queued-question widget. The catalogue is read from `codex debug models` at each spawn, with `--bundled` as the fallback; with neither readable the spawn is refused. The pane ID is followed by a line naming the catalogue source and file.
+- `--question` / `--answer` remain for panes `--spawn` did not start.
+
 ## [denubis-external-agents] 0.20.0
 
 **Changed:**
