@@ -64,9 +64,12 @@ the loop works, and neither is optional (Brian, 2026-07-28):
 - **An open-questions ticket file**, `.notes/project_open-questions.md` in the main
   checkout. Codex's questions, and the supervisor's, are appended there as tickets rather
   than left in a pane to scroll past. A ticket closes only when the human answers it;
-  compaction, `/clear`, scroll, or elapsed time never does. Create it, without asking, the
-  first time a question arises; `denubis-project-notes:recording-project-notes` owns the
-  format.
+  compaction, `/clear`, scroll, or elapsed time never does. The file holds *open*
+  questions only: an answered ticket is moved into a decision record with the human's
+  words and removed from the file, and a ticket nobody needs any more is removed
+  (Brian, 2026-09-28 and 2026-10-08). Status notes, progress, and "state of the fix"
+  prose never go there. Create it, without asking, the first time a question arises;
+  `denubis-project-notes:recording-project-notes` owns the format.
 
 If the prompt directory is missing, say so and stop rather than improvising a substitute:
 a prompt directory that is tracked leaks working drafts into history. `.notes/` is durable
@@ -650,12 +653,31 @@ No other field. In particular:
   dead monitor is indistinguishable from a pane with nothing to say.
 - **Where the host has no `persistent` field and requires `timeout_ms`**, as Claude
   Code's Monitor tool does — it rejects the call without one and caps it at thirty
-  minutes (observed 2026-09-19) — set it to that cap and **re-arm on every expiry
-  notice**. The rule is unchanged and is simply paid for in re-arms; what is forbidden
-  is a short timeout chosen to bound the watch. An expiry that arrives having emitted
-  nothing is a reason to check the pane with `--tail` before re-arming, not evidence
-  that nothing happened, because expiry and silence look identical from outside. Say in
-  the reply that the monitor was re-armed, so a gap the human can see is a gap you named.
+  minutes (observed 2026-09-19) — set it to that cap and re-arm on an expiry notice
+  **only while Codex is working**. What is forbidden is a short timeout chosen to bound
+  the watch. An expiry that arrives having emitted nothing is a reason to check the pane
+  with `--tail` before re-arming, not evidence that nothing happened, because expiry
+  and silence look identical from outside. **Say nothing about the re-arm.** The reply
+  to an expiry notice while Codex works is empty or one line about Codex's progress;
+  "monitor re-armed" is not a fact the human needs, and six of them in a row were the
+  screen Brian came back to on 2026-10-08.
+
+**An idle pane gets no monitor.** When Codex is parked on something only the human can
+supply — a ruling, an answer to a ticket, a choice the supervisor has put to them — stop
+the monitor (or let it expire and do not re-arm) and end the turn with the question,
+once. Nothing on the pane can change until the answer arrives, and the answer arrives in
+the supervisor's own conversation, so a watch over the pane adds nothing but a wake-up
+every thirty minutes in which the supervisor finds itself with nothing to say and says
+it anyway. The question is not restated, the wait is not counted, and "still waiting on
+your rulings" is never written: the human can see what they have not answered. When the
+answer comes, `--tail` the pane, deliver the answer, and arm the monitor again. A crash
+during the unwatched wait is found by that `--tail`; Brian accepted that (2026-10-08).
+
+**The dispatching supervisor must not block itself on a permission prompt.** Every
+repeat the monitor ever produced was waiting behind a permission prompt on the human's
+side (Brian, 2026-10-08), where no amount of repeating helps. If a verb the supervisor
+needs is going to prompt, the prompt is the thing to raise with the human, not something
+to wait out.
 - **No `2>&1`.** The tool puts events on stdout and diagnostics on stderr deliberately.
   Merging them turns every diagnostic into a notification.
 - **No `| grep`, `| tail`, `while` loop, or filter of any kind.** The monitor already
@@ -687,30 +709,18 @@ Each line includes the joined Codex pane ID. Run `codex_supervisor.py --tail` to
 the joined pane's non-blank tail before acting; it resolves the pane itself rather than
 taking an ID.
 
-**Anything still pending is raised again on a backoff**, at two minutes, then five, then
-every ten, with the repeat saying how long the pane has been waiting. The monitor used to
-announce once and go quiet, which meant a line missed was a line gone; a pane sat blocked
-for 57 minutes that way on 2026-07-27. A `CRASH` is not repeated, because it is terminal
-and nothing can be done to the pane in response.
+**Each pending thing is announced once and not again.** From 2026-07-28 to 2026-10-08
+the monitor raised a pending prompt again on a backoff (two minutes, five, then ten,
+stopping after an hour with `no further reminders`), after a pane sat blocked for 57
+minutes behind a line the supervisor had missed. Brian withdrew the repeats on
+2026-10-08: every one he saw was queued behind a permission prompt on his own side,
+where a repeat cannot help, and a screen of `still waiting 17m` lines was what he came
+back to. A prompt that returns after a busy flicker is the same prompt and is not
+announced twice; a genuinely new prompt, question, or completion is.
 
-**After an hour unanswered it stops**, and the last line says `no further reminders` so
-the quiet that follows reads as a decision rather than a dead monitor (Brian,
-2026-08-04). The repeats exist to survive a line you missed, not to outlast a supervisor
-that cannot answer, and a supervisor blocked on its own permission prompt is exactly the
-case where the drum kept queueing: fifteen hours of ten-minute repeats delivered ninety
-lines at once, all of them saying what the newest already said. The hour is spent per
-waiting thing, so a genuinely new prompt gets the full ladder.
-
-`DONE` is raised again like anything else, because a finished pane is waiting on a
-decision rather than reporting an all-clear. Its line asks whether to compact, clear, or
-quit, which is the choice the numbered-prompt loop expects at exactly that moment.
-
-The reminder lapses as soon as Codex is busy, since a spinner means nothing is waiting on
-you, and the clock is restored when the prompt is still there on the next poll. Until
-2026-08-04 it was not: one busy frame disarmed a live approval permanently, and only
-`classify_snapshot` matching approval text ahead of busy kept that from silencing panes.
-That ordering is the guard that regressed in `fa54c31`, so the schedule no longer rests
-on it alone.
+`DONE` is a decision point rather than an all-clear. Its one line asks whether to
+compact, clear, or quit, which is the choice the numbered-prompt loop expects at exactly
+that moment. Act on it, or take it to the human and stop the monitor while they decide.
 
 Lifecycle hooks wake the monitor immediately for activity, permission requests, and turn
 stops. They are installed **globally**, once per machine, rather than per project:
@@ -867,7 +877,8 @@ in frozen snapshots are load-bearing; never edit them.
 | Starting a codex session | `codex_supervisor.py --spawn --label <name>` |
 | Your pane's directory is gone or wrong | `codex_supervisor.py --spawn --cwd <dir>` |
 | Checking weekly headroom | `codex_supervisor.py --quota` |
-| Watching it | `codex_supervisor.py` under Monitor, `persistent: true` (or max `timeout_ms`, re-armed), nothing else added |
+| Watching it | `codex_supervisor.py` under Monitor, `persistent: true` (or max `timeout_ms`, re-armed silently while Codex works), nothing else added |
+| Codex is parked on the human | stop the monitor, ask once, say nothing more until the answer |
 | Checking what a pane holds | `codex_supervisor.py --tail` |
 | Dispatching a prompt | `codex_supervisor.py --send codex-prompts/NN-<task>.md` |
 | Between prompts | `codex_supervisor.py --clear` |
@@ -906,7 +917,11 @@ in frozen snapshots are load-bearing; never edit them.
   hand-crafted monitor. The plugin ships one; arm it bare and `persistent: true`, or at
   the host's maximum `timeout_ms` where that field is mandatory, re-armed on expiry.
 - "The monitor expired quietly, so Codex has nothing to say." Those two look identical
-  from outside. Re-arm, and `--tail` the pane before you believe the quiet.
+  from outside. `--tail` the pane before you believe the quiet, and re-arm only if
+  Codex is working.
+- "Monitor re-armed; still waiting on your two rulings." That is a nag, not a status.
+  While the pane waits on the human there is no monitor, the question was asked once,
+  and the reply to any wake-up is empty.
 - "Context is at 22%, but this prompt is small." The floor is not a suggestion about
   prompt size. Compact, or clear and restate, or get the ruling.
 - "It said DONE, so that one is finished." DONE is a decision point, not an all-clear.

@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-external-agents] 0.22.0
+
+**Changed:**
+- The monitor announces each pending approval, question, or completion once and never repeats it. The reminder ladder (two minutes, five, ten, stopping after an hour with `no further reminders`) and its `still waiting Nm` count are removed (Brian, 2026-10-08; ADR 0009). `tests/test_codex_supervisor_announce_once.py` drives the new `poll_step` across an hour of identical screens and expects one line; the ladder's tests are deleted.
+- `supervising-codex`: an idle pane gets no monitor. When Codex is parked on something only the human can supply, the supervisor asks once, stops the monitor, and writes nothing further until the answer arrives. Re-arming on the host's thirty-minute expiry continues only while Codex works, and is never mentioned in the reply.
+- `supervising-codex`: the open-questions file holds open questions only; answered tickets move into a decision record (ADR 0008).
+
+## [denubis-project-notes] 0.3.0
+
+**Changed:**
+- `recording-project-notes`: an answered ticket is moved into a decision record (question, human's words verbatim, resolver) and removed from `.notes/project_open-questions.md`; tickets nobody needs any more are removed; status and progress never go in the file. The file's frontmatter description changes to match. Brian, 2026-09-28 and 2026-10-08; ADR 0008 amends ADR 0005.
+
 ## [denubis-external-agents] 0.21.1
 
 **Fixed:**

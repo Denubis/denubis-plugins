@@ -69,17 +69,27 @@ frontmatter below, if it does not exist; no approval is needed for that.
 ```yaml
 ---
 name: open-questions
-description: Durable queue of questions awaiting a human answer, with each answer beside its question
+description: Queue of questions still awaiting a human answer; answered tickets leave for the decision register
 type: project
 ---
 ```
 
 Each ticket carries the question, why it blocks, the evidence, and who raised it. A ticket
-closes only when the human answers it; write the answer beside the question verbatim, with
-the question it answered. Compaction, `/clear`, scroll, elapsed time, or repetition never
-closes a ticket. An answered ticket stays in the file as the record.
+closes only when the human answers it. Compaction, `/clear`, scroll, elapsed time, or
+repetition never closes a ticket.
 
-Anything the human rules is also a decision record. The default register is
+**The file holds open questions only.** When the human answers, write the ruling into a
+decision record with the question it answered and the human's words verbatim, with a
+resolver to the original message, then remove the ticket from the file. A ticket that no
+longer matters (the work it blocked is finished or abandoned, or it was an agent's
+one-off that nobody will act on) is removed without a record. Progress notes, status
+summaries, and evidence that no open question needs do not belong in the file at all.
+Brian, 2026-09-28: "*human* ADRs are moved. AI chatter that is no longer relevant is
+removed"; 2026-10-08: the file "is for *open* questions, not *answered* questions".
+Until then an answered ticket stayed in the file, and the file became a second decision
+register that nobody could read.
+
+Anything the human rules is a decision record. The default register is
 `<main-repository-root>/.notes/decisions/`, with an index at
 `.notes/decisions/README.md`; a project that already keeps its register elsewhere, such
 as `docs/architecture/decisions/`, keeps it there. Follow that register's format and

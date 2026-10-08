@@ -10,6 +10,10 @@ and consequences section. One ADR per decision.
 - [0006 — Astra and Fable require explicit model and effort](0006-astra-fable-require-explicit-model-and-effort.md)
 - [0007 — The Codex supervisor reads session files; hooks cannot confirm a clear](0007-supervisor-reads-codex-session-files.md),
   with frozen evidence in [`0007-evidence-2026-09-28/`](0007-evidence-2026-09-28/)
+- [0008 — The open-questions file holds open questions only](0008-open-questions-hold-open-questions-only.md)
+  (amends 0005)
+- [0009 — The Codex monitor announces once, and an idle pane gets no monitor](0009-monitor-announces-once-and-idle-panes-are-unwatched.md)
+- [0010 — A spawned Codex has no queued-question widget, and `--spawn` takes `--cwd`](0010-spawned-codex-has-no-question-widget-and-takes-cwd.md)
 
 ## Status lifecycle
 

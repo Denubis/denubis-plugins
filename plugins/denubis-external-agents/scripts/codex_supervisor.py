@@ -20,7 +20,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
@@ -34,17 +34,13 @@ MAX_HOOK_BYTES = 1_048_576
 MAX_DATAGRAM_BYTES = 4096
 TMUX_PANE_FORMAT = "#{pane_id}\t#{pane_current_command}\t#{pane_pid}"
 PROMPT_MARKER = "\N{SINGLE RIGHT-POINTING ANGLE QUOTATION MARK}"
-# A pending action is raised again after two minutes, then five, then every ten.
-# Announcing once was deliberate, because a stationary screen is re-observed every poll
-# and an ungated repeat trains the reader to ignore it. A clock is the repair; removing
-# the guard is not. Operator ruling 2026-07-28, after a pane sat blocked for 57 minutes.
-REMINDER_BACKOFF_SECONDS = (120.0, 300.0, 600.0)
-# ...and stops at the hour (Brian, 2026-08-04). The supervisor reading these lines can
-# be blocked on a permission prompt in its own pane, where the ten-minute drum queues a
-# repeat per ten minutes the human is away, so fifteen hours produced ninety lines
-# carrying one fact between them. The last line says it is the last, because a monitor
-# that simply stops printing reads exactly like one that has died.
-REMINDER_GIVE_UP_SECONDS = 3600.0
+# A pending action is announced once. Between 2026-07-28 and 2026-10-08 it was raised
+# again on a backoff (two minutes, five, then ten, stopping at the hour), after a pane
+# sat blocked for 57 minutes behind a line the supervisor had missed. Brian withdrew
+# that on 2026-10-08: every repeat he saw was caused by a permission prompt on his own
+# side, where a repeat cannot help, and the repeats were the screen he came back to.
+# A stationary screen is re-observed every poll, so the dedup in `advance` is what
+# keeps "once" meaning once.
 SUBMIT_ATTEMPTS = 3
 SUBMIT_POLLS = 4
 SUBMIT_POLL_SECONDS = 1.0
@@ -146,22 +142,6 @@ class Observation:
     detail: str | None = None
     correlation_key: str | None = None
     scoped: bool = False
-    # Set only on a re-raise, so a reminder can say how long the pane has been waiting.
-    # Never transported: serialize_observation whitelists four fields and not this one.
-    waited_seconds: float | None = None
-    # Set only on the raise that gives up, so the quiet after it reads as a decision
-    # rather than a failure. Not transported either, for the same reason.
-    final: bool = False
-
-
-@dataclass(frozen=True)
-class Reminder:
-    """A pending action and when to raise it again."""
-
-    action: Observation
-    armed_at: float
-    due_at: float
-    step: int = 0
 
 
 @dataclass(frozen=True)
@@ -172,11 +152,6 @@ class MonitorState:
     emitted_keys: frozenset[str] = frozenset()
     last_correlation_key: str | None = None
     last_action_scoped: bool = False
-    reminder: Reminder | None = None
-    # The correlation key of a prompt whose hour ran out. Without it a busy frame
-    # refunds the hour, because the returning screen looks like any other pending thing
-    # that has lost its clock, and _ensure_reminder would start the ladder again.
-    abandoned_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -668,16 +643,9 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
                 emitted_keys=state.emitted_keys,
                 last_correlation_key=state.last_correlation_key,
                 last_action_scoped=state.last_action_scoped,
-                # Busy means Codex is mid-turn, so nothing waits on the human and a
-                # pending reminder would nag about a prompt already answered.
-                #
-                # This does not re-arm by itself, and a comment here claimed it did
-                # until 2026-08-04. A returning approval carries the correlation key
-                # already recorded, so it takes the unchanged branch below, which
-                # neither emits nor arms. _ensure_reminder is what restores the clock,
-                # and it is all that stands between a spinner frame and a silent pane.
-                reminder=None,
-                abandoned_key=state.abandoned_key,
+                # Busy means Codex is mid-turn. The correlation key is kept, so a
+                # prompt that returns after one spinner frame takes the unchanged
+                # branch below and is not announced a second time.
             ),
             None,
         )
@@ -707,8 +675,6 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
             emitted_keys=emitted_keys,
             last_correlation_key=correlation_key,
             last_action_scoped=True,
-            reminder=state.reminder,
-            abandoned_key=state.abandoned_key,
         )
         return Transition(next_state, None if matched_snapshot else observation)
 
@@ -719,8 +685,6 @@ def advance(state: MonitorState, observation: Observation) -> Transition:
         emitted_keys=state.emitted_keys,
         last_correlation_key=correlation_key,
         last_action_scoped=False,
-        reminder=state.reminder,
-        abandoned_key=state.abandoned_key,
     )
     return Transition(next_state, observation)
 
@@ -1059,56 +1023,6 @@ class HookReceiver:
             self._lock_file = None
 
 
-def arm_reminder(
-    state: MonitorState,
-    action: Observation,
-    now: float,
-) -> MonitorState:
-    """Schedule an emitted action to be raised again, unless it is terminal."""
-    if action.kind in {ObservationKind.CRASH, ObservationKind.BUSY}:
-        return replace(state, reminder=None)
-    return replace(
-        state,
-        reminder=Reminder(
-            action=action,
-            armed_at=now,
-            due_at=now + REMINDER_BACKOFF_SECONDS[0],
-        ),
-    )
-
-
-def due_reminder(
-    state: MonitorState,
-    now: float,
-) -> tuple[MonitorState, Observation | None]:
-    """Raise the pending action again once its interval has elapsed."""
-    reminder = state.reminder
-    if reminder is None or now < reminder.due_at:
-        return state, None
-    waited = now - reminder.armed_at
-    if waited >= REMINDER_GIVE_UP_SECONDS:
-        # Naming what was abandoned is what makes the give-up stick. Disarming alone is
-        # not enough, because a busy frame followed by the same screen returning reaches
-        # _ensure_reminder as a pending prompt that has lost its clock, which is exactly
-        # the case that must get one back.
-        raised = replace(reminder.action, waited_seconds=waited, final=True)
-        abandoned = replace(
-            state,
-            reminder=None,
-            abandoned_key=_correlation_of(reminder.action),
-        )
-        return abandoned, raised
-    step = min(reminder.step + 1, len(REMINDER_BACKOFF_SECONDS) - 1)
-    rearmed = Reminder(
-        action=reminder.action,
-        armed_at=reminder.armed_at,
-        due_at=now + REMINDER_BACKOFF_SECONDS[step],
-        step=step,
-    )
-    raised = replace(reminder.action, waited_seconds=now - reminder.armed_at)
-    return replace(state, reminder=rearmed), raised
-
-
 def _humanise_wait(seconds: float) -> str:
     minutes = int(seconds // 60)
     if minutes < 60:
@@ -1130,46 +1044,46 @@ def _emit(pane_id: str, action: Observation) -> None:
         # A finished pane is not an all-clear. It is the moment to decide what happens
         # to its context, and the moment the numbered-prompt loop expects a clear.
         parts.append("compact, clear, or quit?")
-    if action.waited_seconds is not None:
-        parts.append(f"still waiting {_humanise_wait(action.waited_seconds)}")
-    if action.final:
-        parts.append("no further reminders")
     detail = f": {' | '.join(parts)}" if parts else ""
     print(f"codex {pane_id} — {labels[action.kind]}{detail}", flush=True)
-
-
-def _ensure_reminder(
-    state: MonitorState,
-    observation: Observation,
-    now: float,
-) -> MonitorState:
-    """Give the announced prompt its clock back when a busy frame took it away."""
-    if state.reminder is not None:
-        return state
-    correlation_key = _correlation_of(observation)
-    # Only the thing most recently announced. Anything else either was never introduced,
-    # so a "still waiting" line about it would be the first the reader heard of it, or
-    # has had its hour and been let go.
-    if correlation_key != state.last_correlation_key:
-        return state
-    if correlation_key == state.abandoned_key:
-        return state
-    return arm_reminder(state, observation, now)
 
 
 def _apply_observation(
     state: MonitorState,
     observation: Observation,
     pane_id: str,
-    now: float,
 ) -> tuple[MonitorState, bool]:
     transition = advance(state, observation)
     if transition.action is None:
-        return _ensure_reminder(transition.state, observation, now), False
+        return transition.state, False
     _emit(pane_id, transition.action)
-    if transition.action.kind is ObservationKind.CRASH:
-        return transition.state, True
-    return arm_reminder(transition.state, transition.action, now), False
+    return transition.state, transition.action.kind is ObservationKind.CRASH
+
+
+def poll_step(
+    state: MonitorState,
+    snapshot: Observation | None,
+    hook_observation: Observation | None,
+    pane_id: str,
+    now: float,
+) -> tuple[MonitorState, bool]:
+    """Apply one poll's pane snapshot and hook event; announce each new thing once.
+
+    `now` is accepted so the loop's clock stays visible at this boundary; nothing here
+    is scheduled by it, which is the point. There is no reminder step between the two
+    observations: a pending prompt is announced when it first appears and not again
+    (Brian, 2026-10-08).
+    """
+    del now
+    if snapshot is not None:
+        state, crashed = _apply_observation(state, snapshot, pane_id)
+        if crashed:
+            return state, True
+    if hook_observation is not None:
+        state, crashed = _apply_observation(state, hook_observation, pane_id)
+        if crashed:
+            return state, True
+    return state, False
 
 
 def _try_discover(caller_pane: str) -> PaneRef | None:
@@ -1212,32 +1126,20 @@ def run_monitor(
                     _emit(target.pane_id, topology.crash)
                     return 1
 
-                if snapshot is not None:
-                    state, crashed = _apply_observation(
-                        state,
-                        snapshot,
-                        target.pane_id,
-                        time.monotonic(),
-                    )
-                    if crashed:
-                        return 1
-
-                # Raise anything still pending before blocking on the next event, so a
-                # quiet pane reports itself rather than reading as "nothing wrong".
-                state, reminder = due_reminder(state, time.monotonic())
-                if reminder is not None:
-                    _emit(target.pane_id, reminder)
+                # The snapshot is announced before blocking on the next hook event, so
+                # a pane that changed is reported now rather than one poll later.
+                state, crashed = poll_step(
+                    state, snapshot, None, target.pane_id, time.monotonic()
+                )
+                if crashed:
+                    return 1
 
                 hook_observation = receiver.receive(poll_seconds)
-                if hook_observation is not None:
-                    state, crashed = _apply_observation(
-                        state,
-                        hook_observation,
-                        target.pane_id,
-                        time.monotonic(),
-                    )
-                    if crashed:
-                        return 1
+                state, crashed = poll_step(
+                    state, None, hook_observation, target.pane_id, time.monotonic()
+                )
+                if crashed:
+                    return 1
     except (MonitorError, OSError) as error:
         print(f"codex monitor: {error}", file=sys.stderr)
         return 2
