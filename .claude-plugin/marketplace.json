@@ -53,10 +53,10 @@
       "license": "CC-BY-SA-4.0"
     },
     {
-      "name": "denubis-extending-claude",
-      "description": "Knowledge skills for extending Claude Code: creating plugins, agents, skills, maintaining CLAUDE.md, and syncing with upstream",
-      "version": "1.10.2",
-      "source": "./plugins/denubis-extending-claude",
+      "name": "denubis-extending-agents",
+      "description": "Authoring and maintaining agent extensions for Claude Code and Codex: plugins, agents, skills, directives, CLAUDE.md and AGENTS.md files, marketplaces, and upstream sync",
+      "version": "2.0.0",
+      "source": "./plugins/denubis-extending-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

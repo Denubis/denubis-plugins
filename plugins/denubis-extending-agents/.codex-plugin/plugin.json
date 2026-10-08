@@ -1,7 +1,7 @@
 {
-  "name": "denubis-extending-claude",
-  "version": "1.10.2",
-  "description": "Create and maintain Claude Code plugins, agents, skills, directives, and project context.",
+  "name": "denubis-extending-agents",
+  "version": "2.0.0",
+  "description": "Authoring and maintaining agent extensions for Claude Code and Codex: plugins, agents, skills, directives, CLAUDE.md and AGENTS.md files, marketplaces, and upstream sync",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "url": "https://github.com/denubis"

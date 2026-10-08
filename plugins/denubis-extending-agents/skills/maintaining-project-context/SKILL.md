@@ -6,7 +6,7 @@ user-invocable: false
 
 # Maintaining Project Context
 
-**REQUIRED SUB-SKILL:** Use denubis-extending-claude:writing-claude-md-files for all context file creation and updates.
+**REQUIRED SUB-SKILL:** Use denubis-extending-agents:writing-claude-md-files for all context file creation and updates.
 
 ## Core Principle
 

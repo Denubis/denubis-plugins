@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-extending-agents] 2.0.0
+
+Renamed from `denubis-extending-claude`. Claude Code 2.1.293 warns that a plugin name containing "claude" reads as one of Anthropic's own, and the repository's strict validation gate turned that warning into a refusal of every commit; Brian also wanted the name to cover Codex and other agent hosts (2026-10-08). Skill names are unchanged, so routes become `denubis-extending-agents:<skill>`.
+
+**Changed:**
+- Plugin directory, both manifests, both marketplace entries, the repository's CLAUDE.md and README, the `foa4008439` deployment candidate, `scripts/rename-upstream.sh`, and every in-skill self-reference now use the new name.
+- Description generalised to agent extensions for Claude Code and Codex.
+
+**Migration:** `claude plugin uninstall denubis-extending-claude@denubis-plugins` then `claude plugin install denubis-extending-agents@denubis-plugins`; update any CLAUDE.md or AGENTS.md route that names the old plugin.
+
 ## [denubis-external-agents] 0.22.0
 
 **Changed:**

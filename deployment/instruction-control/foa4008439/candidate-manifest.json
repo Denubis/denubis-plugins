@@ -251,14 +251,14 @@
       "path": "CLAUDE.md",
       "live_path": "/home/brian/people/Brian/brian-ed3d-plugins/CLAUDE.md",
       "bytes": 3308,
-      "sha256": "e211b06279c8a519f5dc67e3a7bf5205603488704385bd85a4975200fe19504b",
+      "sha256": "789ef0fad33bdf3a13a5108b9987a498960e7584ee380c8a1bbc0b30db84be54",
       "authority_actions": ["global_instruction_control", "project_uv_execution"]
     },
     "settings": {
       "path": "deployment/instruction-control/foa4008439/settings.json",
       "live_path": "/home/brian/.claude/settings.json",
       "bytes": 6432,
-      "sha256": "b29aec688241f90c3df535e486b61e5030495a6fbb7beb9b386b7ea25af049c1",
+      "sha256": "03a9f3354c1773b4dfe2194dfd833c04d28cf103d2d60ce8824ec0c43c8bea96",
       "authority_actions": ["global_instruction_control", "retire_claude_sync"]
     }
   },
@@ -285,9 +285,9 @@
         "authority_actions": ["global_instruction_control", "model_dispatch_floor"]
       },
       {
-        "name": "denubis-extending-claude",
+        "name": "denubis-extending-agents",
         "version": "1.10.1",
-        "source": "plugins/denubis-extending-claude",
+        "source": "plugins/denubis-extending-agents",
         "tree_sha256": "1c3a43129e030824947f908aeca2b0d178a312ad0a95766aa734d2eb69b7f1f9",
         "authority_actions": ["global_instruction_control", "model_dispatch_floor", "fable_cost_gate", "advisor_selection", "test_evidence_boundary"]
       },

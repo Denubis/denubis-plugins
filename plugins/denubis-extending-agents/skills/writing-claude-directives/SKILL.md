@@ -132,7 +132,7 @@ A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agen
 
 ## Rubric Callback
 
-Before writing a new directive — or editing one in a way that changes its scope, triggers, audience, or failure consequences — check whether the underlying agent-task-or-skill passes the `denubis-extending-claude:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
+Before writing a new directive — or editing one in a way that changes its scope, triggers, audience, or failure consequences — check whether the underlying agent-task-or-skill passes the `denubis-extending-agents:epistemic-humility` rubric. The rubric screens Scope (Jones's three conditions), Observability (form-gate + tautology-screen + named-falsifier), Process (Schön's four questions), and Failure-pattern (four named patterns from AbsenceJudgement); full citations for Jones, Schön, and AbsenceJudgement are in that skill's `absencejudgement-citations.md`. If the artefact under review fails any screen, the right next step is usually to revise the scope, not to write stronger directives — directive-writing is a protective belt around a scope decision, not a substitute for it.
 
 ## Structure Patterns
 
@@ -270,7 +270,7 @@ Per-model behavioural specifics (effort levels, steerability, instruction-follow
 
 ## Testing Directives
 
-Use `denubis-extending-claude:testing-skills-with-subagents` to separate executable
+Use `denubis-extending-agents:testing-skills-with-subagents` to separate executable
 checks from prose review. Verify metadata, references, helper behavior, and real runtime
 boundaries mechanically. Put non-mechanical expectations in a falsifiable rubric. A model
 following a directive in one prompt is an observation about that invocation, not a

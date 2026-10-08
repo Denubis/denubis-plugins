@@ -28,7 +28,7 @@ a named situation. Use another owner when the responsibility is different:
 | Current decision and consequences | ADR or decision record |
 | Historical argument | Git or an explicit archive |
 
-Apply `denubis-extending-claude:epistemic-humility` when the proposed skill changes scope,
+Apply `denubis-extending-agents:epistemic-humility` when the proposed skill changes scope,
 claims a new capability, or automates judgment. A narrower procedure is usually better
 than a broad skill defended by more instructions.
 
@@ -72,9 +72,9 @@ or runtime cannot guarantee. Add platform metadata only when the platform consum
 4. **Write the smallest complete procedure.** Put one current path through the task in the
    body. Remove incident dialogue, self-critique, and rebuttals to earlier versions.
 5. **Phrase for the target surface.** Use
-   `denubis-extending-claude:writing-claude-directives` for metadata and directive details.
+   `denubis-extending-agents:writing-claude-directives` for metadata and directive details.
 6. **Define honest checks.** Use
-   `denubis-extending-claude:testing-skills-with-subagents` to separate executable checks
+   `denubis-extending-agents:testing-skills-with-subagents` to separate executable checks
    from a falsifiable review rubric.
 7. **Verify references and mechanics.** Run the repository's actual parsers, reference
    checks, helper tests, and plugin validation where applicable.

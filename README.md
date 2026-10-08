@@ -37,7 +37,7 @@ metadata are adapters; they do not copy the procedures.
 | `denubis-00-getting-started` | Package-install safety policy and onboarding |
 | `denubis-basic-agents` | Provider-native delegation by functional role |
 | `denubis-research-agents` | Codebase, internet, combined, remote-code, and academic research routing |
-| `denubis-extending-claude` | Claude plugin, agent, skill, directive, and project-context maintenance from any host |
+| `denubis-extending-agents` | Claude plugin, agent, skill, directive, and project-context maintenance from any host |
 | `denubis-academic` | Academic revision, manuscript review, and Zotero-backed source work |
 | `denubis-git-commit` | Intentional local commits at authorized boundaries |
 | `denubis-crash-recovery` | Claude session-state triage callable from any host |
@@ -67,7 +67,7 @@ codex plugin add denubis-00-getting-started@denubis-plugins
 codex plugin add denubis-plan-and-execute@denubis-plugins
 codex plugin add denubis-basic-agents@denubis-plugins
 codex plugin add denubis-research-agents@denubis-plugins
-codex plugin add denubis-extending-claude@denubis-plugins
+codex plugin add denubis-extending-agents@denubis-plugins
 codex plugin add denubis-academic@denubis-plugins
 codex plugin add denubis-git-commit@denubis-plugins
 codex plugin add denubis-crash-recovery@denubis-plugins

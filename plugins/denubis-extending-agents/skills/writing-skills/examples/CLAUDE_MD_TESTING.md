@@ -13,7 +13,7 @@ adaptation: light-touch — denubis voice tweaks and one cross-reference annotat
 > layouts, and documentation variants are upstream material. They illustrate prompt
 > comparison, but their model responses are observations rather than acceptance gates.
 > Current verification guidance lives in
-> `denubis-extending-claude:testing-skills-with-subagents`.
+> `denubis-extending-agents:testing-skills-with-subagents`.
 
 Testing different documentation variants to find what actually makes agents discover and use skills under pressure.
 

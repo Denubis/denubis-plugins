@@ -216,7 +216,7 @@ model: opus
 Detailed instructions and system prompt for this agent.
 ```
 
-For complete guidance on agent creation — description writing for auto-delegation, tool selection, prompt structure, and testing — see the `denubis-extending-claude:creating-an-agent` skill.
+For complete guidance on agent creation — description writing for auto-delegation, tool selection, prompt structure, and testing — see the `denubis-extending-agents:creating-an-agent` skill.
 
 ## Creating Skills
 

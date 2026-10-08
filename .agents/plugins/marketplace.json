@@ -29,8 +29,8 @@
       "category": "Productivity"
     },
     {
-      "name": "denubis-extending-claude",
-      "source": {"source": "local", "path": "./plugins/denubis-extending-claude"},
+      "name": "denubis-extending-agents",
+      "source": {"source": "local", "path": "./plugins/denubis-extending-agents"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
       "category": "Developer Tools"
     },

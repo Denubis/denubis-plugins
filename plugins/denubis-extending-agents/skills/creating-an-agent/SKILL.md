@@ -6,7 +6,7 @@ user-invocable: false
 
 # Creating an Agent
 
-**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure. This skill focuses on agent-specific patterns.
+**REQUIRED BACKGROUND:** Read denubis-extending-agents:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure. This skill focuses on agent-specific patterns.
 
 ## What is an Agent?
 

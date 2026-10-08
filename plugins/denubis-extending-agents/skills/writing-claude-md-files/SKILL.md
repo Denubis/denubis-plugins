@@ -7,7 +7,7 @@ last-reviewed: 2026-04-22
 
 # Writing CLAUDE.md Files
 
-**REQUIRED BACKGROUND:** Read denubis-extending-claude:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure.
+**REQUIRED BACKGROUND:** Read denubis-extending-agents:writing-claude-directives for foundational guidance on token efficiency, compliance techniques, and directive structure.
 
 **Review cadence:** This skill itself should be re-checked against current Claude Code guidance on CLAUDE.md structure quarterly. When reviewing, update the `last-reviewed` date in the frontmatter even if no content changes — that is the signal that someone actually checked.
 

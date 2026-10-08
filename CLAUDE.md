@@ -46,7 +46,7 @@ Claude Code plugins for design, implementation, and development workflows.
 - Testing commands: `.ed3d/testing-guidance.md` when present, otherwise `pyproject.toml`
   and `scripts/pre-commit`.
 - Task-invocation syntax and directive structure:
-  `denubis-extending-claude:writing-claude-directives`.
+  `denubis-extending-agents:writing-claude-directives`.
 - Repository search flags, scope, and negative-result handling:
   `denubis-plan-and-execute:using-code-search`.
 - Reviews of instruction, skill, hook, evidence, or deployment-control changes:
