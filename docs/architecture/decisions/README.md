@@ -14,6 +14,17 @@ and consequences section. One ADR per decision.
   (amends 0005)
 - [0009 — The Codex monitor announces once, and an idle pane gets no monitor](0009-monitor-announces-once-and-idle-panes-are-unwatched.md)
 - [0010 — A spawned Codex has no queued-question widget, and `--spawn` takes `--cwd`](0010-spawned-codex-has-no-question-widget-and-takes-cwd.md)
+- [0011 — Same-family sessions use their native infrastructure; the messaging system is cross-provider](0011-same-family-sessions-use-native-infrastructure.md)
+- [0012 — Approvals are answerable from the side-monitor surface and from the pane; first answer wins](0012-approvals-answerable-from-the-surface-and-the-pane.md)
+- [0013 — A driving supervisor answers only what its own task narrowly needs; anything with other implications pauses and escalates](0013-a-driving-supervisor-answers-only-what-its-task-narrowly-needs.md)
+- [0014 — One supervisor may drive many supervisees, and all of them sit in the supervisor's own tmux window](0014-one-supervisor-many-supervisees-all-in-its-own-tmux-window.md)
+- [0015 — Unacknowledged mail climbs an escalation ladder ending in an interrupt and Brian; a sender may withdraw a mooted message, leaving a tombstone](0015-unacknowledged-mail-climbs-an-escalation-ladder-and-withdrawals-leave-tombstones.md)
+- [0016 — The escalation ladder's clocks run only while the supervisee is idle and unblocked; a block is listed, not nudged](0016-ladder-clocks-run-only-while-the-supervisee-is-unblocked.md)
+- [0017 — Escalation ladder timing defaults, accepted as revisable](0017-ladder-timing-defaults.md)
+- [0018 — Every session gets a ping that it has mail through its vendor's own channel, and pulls the body from the record; Claude-to-Claude mail goes through the record too](0018-every-session-gets-a-ping-through-its-own-channel-and-pulls-mail-from-the-record.md)
+  (qualifies 0011)
+- [0019 — Identity defaults: sub-agents send as their parent, a Codex pane keeps its address across clear by a hook binding, and a model-run whoami acknowledges identity](0019-identity-defaults-subagents-send-as-parent-codex-pane-binds-by-hook-whoami-acknowledges.md)
+- [0020 — The human surface runs outside the main byobu session, is reachable from anywhere over SSH or Tailscale, is launched from a terminal on this machine, and is whatever is durable and simple](0020-the-human-surface-runs-outside-byobu-reachable-over-ssh-durable-simple-tailscale-only.md)
 
 ## Status lifecycle
 
