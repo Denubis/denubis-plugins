@@ -1,5 +1,19 @@
 # Changelog
 
+## [denubis-hook-branch-bg] 0.3.0
+
+Brian reported that every repo looked brown or purple (2026-10-09). The cause was the mapping: all colours sat at HLS lightness 0.12, where hue barely registers, and an Opus audit found only three of the hashed repo colours mutually distinguishable (`docs/handover-branch-bg-colour.md`, `docs/branch-bg-colour-eval.py`). Trying a brighter field showed the real constraint: a repo colour reads well as a highlight on black and badly as the field under white text.
+
+**Changed:**
+- Every tmux pane now carries a title strip of up to four coloured blocks, `[person][repo][branch][session]`, drawn by tmux itself from the pane's current path and title (`hooks/branch-strip.sh` behind a global `pane-border-format`; `pane-border-status top`). Person is the directory under a `people/` segment; session is Claude's `✳ <name>` or the task field of Codex's title; shell panes show only what they have. The strip therefore stays right across `cd`, outlives any agent session, and covers Codex and plain shells.
+- Block colours come from one baked table of 40 colours chosen by Oklab farthest-point search so that black or white label text reads on every one at 4.5:1 (`--text-flip`); the label text flips accordingly. Person, repo and branch names are assigned colours through a registry at `$XDG_STATE_HOME/branch-bg/registry.json` (override `BRANCH_BG_REGISTRY`): lowest free slot first, starting at a different point of the table per kind, least recently seen slot reused when full. The same branch name is the same colour in every repo, and `main`/`master` are pinned bright red (`#ff0000`, black text) outside the registry (Brian, 2026-10-09: "usually it's not a good idea to work there"). Session names are hashed, stepping past any block already on that strip. An unusable registry falls back to hashing.
+- The field behind text is a near-black shade of the repo colour (else the person's, else the pane's place under home): set as a pane option (`set-option -p window-style`), never through `select-pane`, which also moves focus and did so in the first live run; the tmux pane background via the strip script, and the terminal window via OSC 11 from the SessionStart hook. The hook also installs the strip into the running tmux server once (only when `pane-border-format` does not already name the script). Python 3.9 import compatibility is kept.
+- `branch-strip.sh` caches each pane's answer for 20 s (`BRANCH_BG_STRIP_TTL`) under `$XDG_RUNTIME_DIR/branch-bg-<uid>/` so tmux's per-second refresh runs Python only on a miss.
+
+**Tests:** `tests/test_branch_bg.py` covers the palette's legibility contract, person and session parsing from real pane titles, block order and omission, field shading, tmux `#` escaping, stable and distinct assignment, same-branch-same-colour, least-recently-seen reuse, hash fallback, registry layout, and the hook's one-time strip installation.
+
+**Not verified:** no perceptual test beyond Brian's live look; `seen` ordering under concurrent starts relies on `flock`; the strip's cost on servers with many visible panes was timed only on this machine.
+
 ## [denubis-extending-agents] 2.0.0
 
 Renamed from `denubis-extending-claude`. Claude Code 2.1.293 warns that a plugin name containing "claude" reads as one of Anthropic's own, and the repository's strict validation gate turned that warning into a refusal of every commit; Brian also wanted the name to cover Codex and other agent hosts (2026-10-08). Skill names are unchanged, so routes become `denubis-extending-agents:<skill>`.
