@@ -100,7 +100,8 @@ The verbs, read from the parser rather than from memory:
 |---|---|
 | *(none)* | run the watch loop, emitting only actionable events |
 | `--resolve` | print the joined Codex pane ID |
-| `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one, without the queued-question tool; defaults to `gpt-6-sol` at `xhigh` |
+| `--spawn [--label NAME] [--cwd PATH] [--model MODEL] [--reasoning-effort EFFORT]` | open a Codex pane beside this one, without the queued-question tool; defaults to the catalogue's lowest-priority listed `-sol` slug (fallback `gpt-6-sol`) at `xhigh`, and says which it chose |
+| `--default-model` | print the slug `--spawn` would default to, read from the same catalogue, with the reason on stderr; the peer-review runner substitutes this |
 | `--send PROMPT_FILE` | send the standard ping for one prompt file |
 | `--message TEXT` | send one literal message (`-` reads stdin) |
 | `--clear` | start codex on a fresh session, confirmed by its process taking a new session lock |

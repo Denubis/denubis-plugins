@@ -21,8 +21,16 @@ setup() {
     export CODEX_WORK_TRACK="$TEST_DIR/codex-workdirs"
     local stub_bin="$TEST_DIR/bin"
     mkdir -p "$stub_bin"
+    # CODEX_CATALOGUE, when set, is what `codex debug models` prints; unset, the
+    # command fails the way a codex with no readable catalogue does.
+    export CODEX_CATALOGUE=""
     cat > "$stub_bin/codex" <<'STUB'
 #!/usr/bin/env bash
+if [ "${1:-}" = debug ] && [ "${2:-}" = models ]; then
+    [ -n "$CODEX_CATALOGUE" ] || { echo "no catalogue" >&2; exit 1; }
+    cat "$CODEX_CATALOGUE"
+    exit 0
+fi
 printf '%s\n' "$@" > "$CODEX_ARGS_FILE"
 cat > "$CODEX_STDIN_FILE"
 out="" work="" prev=""
@@ -358,13 +366,41 @@ make_repo() {
 
 # ── Explicit model routing ──
 
-@test "review defaults to sol xhigh despite astra in user config" {
+@test "review defaults to the catalogue's lowest-priority listed sol model at xhigh" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    printf 'model = "gpt-6-astra"\n' > "$CODEX_HOME/config.toml"
+    export CODEX_CATALOGUE="$TEST_DIR/catalogue.json"
+    cat > "$CODEX_CATALOGUE" <<'JSON'
+{"models": [
+  {"slug": "gpt-6-astra", "priority": 0, "visibility": "list"},
+  {"slug": "gpt-6.1-sol", "priority": 1, "visibility": "list"},
+  {"slug": "gpt-6-sol", "priority": 3, "visibility": "list"},
+  {"slug": "gpt-7-sol", "priority": 0, "visibility": "hide"}
+]}
+JSON
+    run bash "$SCRIPT" docs/target.md
+    [ "$status" -eq 0 ]
+    grep -qx -- "gpt-6.1-sol" "$CODEX_ARGS_FILE"
+    grep -Fqx -- 'model_reasoning_effort="xhigh"' "$CODEX_ARGS_FILE"
+    [ "$(field model)" = "gpt-6.1-sol" ]
+}
+
+@test "review falls back to sol xhigh when codex lists no catalogue" {
     make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
     printf 'model = "gpt-6-astra"\n' > "$CODEX_HOME/config.toml"
     run bash "$SCRIPT" docs/target.md
     [ "$status" -eq 0 ]
     grep -qx -- "gpt-6-sol" "$CODEX_ARGS_FILE"
     grep -Fqx -- 'model_reasoning_effort="xhigh"' "$CODEX_ARGS_FILE"
+    [ "$(field model)" = "gpt-6-sol" ]
+}
+
+@test "an explicit model skips the catalogue entirely" {
+    make_repo "$TEST_DIR/repo"; cd "$TEST_DIR/repo"
+    export CODEX_CATALOGUE="$TEST_DIR/catalogue.json"
+    printf '{"models": [{"slug": "gpt-6.1-sol", "priority": 1, "visibility": "list"}]}\n' > "$CODEX_CATALOGUE"
+    run bash "$SCRIPT" docs/target.md --model gpt-6-sol
+    [ "$status" -eq 0 ]
     [ "$(field model)" = "gpt-6-sol" ]
 }
 

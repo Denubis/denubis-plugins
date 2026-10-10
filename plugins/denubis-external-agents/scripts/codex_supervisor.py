@@ -57,7 +57,14 @@ CONTEXT_FLOOR_PERCENT = 30
 # Typed into the composer as keystrokes, never pasted. Codex reads a pasted or narrated
 # instruction as a task, so it reads files to answer it and the meter goes down.
 SLASH_COMMANDS = ("/clear", "/compact", "/status")
-DEFAULT_MODEL = "gpt-6-sol"
+# The default model is the listed `-sol` slug with the lowest `priority` in the
+# catalogue `--spawn` reads anyway, so a new Sol release is picked up without an edit
+# here (Brian, 2026-10-10: "how do we generalise this without needing to revise this
+# each release but also without having multi-discovery steps?"). `priority` ordering
+# is observed on codex-cli 0.160.1, not documented; the constant is the fallback when
+# no listed `-sol` slug carries one, and the output says which was used.
+DEFAULT_MODEL_FAMILY = "-sol"
+FALLBACK_MODEL = "gpt-6-sol"
 DEFAULT_REASONING_EFFORT = "xhigh"
 CODEX_SPAWN_COMMAND = (
     # Containment is the sandbox rather than a dialog per command: `workspace-write`
@@ -1257,14 +1264,66 @@ def _spawn_directory(pane: str, requested: str | None) -> Path:
     return candidate.resolve()
 
 
-def _spawn_effort(model: str, requested: str | None) -> str:
-    if requested is None and any(
-        name in model.casefold() for name in ("astra", "fable")
+def _spawn_effort(model: str | None, requested: str | None) -> str:
+    # A model of None is the catalogue default, which is always a `-sol` slug or the
+    # fallback constant, so the Astra/Fable gate cannot apply to it.
+    if (
+        requested is None
+        and model is not None
+        and any(name in model.casefold() for name in ("astra", "fable"))
     ):
         raise MonitorError(
             "Astra/Fable require an explicit effort from the human request"
         )
     return requested if requested is not None else DEFAULT_REASONING_EFFORT
+
+
+def default_model(catalogue: Mapping[str, object]) -> str | None:
+    """The listed `DEFAULT_MODEL_FAMILY` slug with the lowest `priority`, or None.
+
+    A model counts only when its `visibility` is `list` and its `priority` is a
+    number, so a hidden preview or an entry the rule cannot order never becomes the
+    default. Ties keep catalogue order. None means the caller falls back; the rule
+    never guesses.
+    """
+    models = catalogue.get("models")
+    if not isinstance(models, list):
+        return None
+    best: tuple[float, str] | None = None
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        slug, priority = model.get("slug"), model.get("priority")
+        if (
+            not isinstance(slug, str)
+            or DEFAULT_MODEL_FAMILY not in slug
+            or model.get("visibility") != "list"
+            or isinstance(priority, bool)
+            or not isinstance(priority, int | float)
+        ):
+            continue
+        if best is None or priority < best[0]:
+            best = (priority, slug)
+    return best[1] if best is not None else None
+
+
+def resolve_default_model(catalogue: Mapping[str, object] | None) -> tuple[str, str]:
+    """The model to use when none was asked for, and one line saying why."""
+    chosen = default_model(catalogue) if catalogue is not None else None
+    if chosen is not None:
+        return chosen, (
+            f"default model: {chosen}, the listed {DEFAULT_MODEL_FAMILY} slug with "
+            "the lowest priority in the catalogue"
+        )
+    reason = (
+        "no catalogue could be read"
+        if catalogue is None
+        else f"the catalogue lists no {DEFAULT_MODEL_FAMILY} slug with a priority"
+    )
+    return (
+        FALLBACK_MODEL,
+        f"default model: {FALLBACK_MODEL}, the fallback, because {reason}",
+    )
 
 
 def without_question_tools(catalogue: object) -> tuple[dict[str, object], int, int]:
@@ -1343,10 +1402,14 @@ def _write_catalogue(catalogue: dict[str, object], runtime_dir: Path | None) -> 
     return path
 
 
-def pin_catalogue(runtime_dir: Path | None = None) -> tuple[Path, str]:
+def pin_catalogue(
+    runtime_dir: Path | None = None,
+) -> tuple[Path, str, dict[str, object]]:
     """Write a Codex model catalogue that cannot register the question tool.
 
-    Returns the file and a line saying where it came from. The refreshed catalogue is
+    Returns the file, a line saying where it came from, and the stripped catalogue
+    itself, so the default model can be read from the same catalogue in the same
+    read rather than a second discovery step. The refreshed catalogue is
     preferred so model metadata stays current; the bundled one is the fallback, and
     the line says why it was needed. With neither there is nothing to strip, and a
     Codex started without the file would draw the widget, so this refuses instead.
@@ -1362,9 +1425,13 @@ def pin_catalogue(runtime_dir: Path | None = None) -> tuple[Path, str]:
         path = _write_catalogue(catalogue, runtime_dir)
         fallback = f", because {'; '.join(failures)}" if failures else ""
         removed = " and ".join(sorted(QUESTION_TOOLS))
-        return path, (
-            f"model catalogue: {command}{fallback}; {removed} removed from "
-            f"{changed} of {total} models; pinned at {path}"
+        return (
+            path,
+            (
+                f"model catalogue: {command}{fallback}; {removed} removed from "
+                f"{changed} of {total} models; pinned at {path}"
+            ),
+            catalogue,
         )
     raise MonitorError(
         "no model catalogue to strip the question tools from, so codex would start "
@@ -1372,17 +1439,40 @@ def pin_catalogue(runtime_dir: Path | None = None) -> tuple[Path, str]:
     )
 
 
+def report_default_model() -> str:
+    """Print the model a spawn or review would default to, and say why on stderr.
+
+    Stdout is exactly the slug so a shell runner can substitute it. Nothing here
+    starts a Codex, so an unreadable catalogue is a fallback rather than a refusal.
+    """
+    catalogue: dict[str, object] | None = None
+    failures: list[str] = []
+    for source in CATALOGUE_SOURCES:
+        try:
+            catalogue, _, _ = _read_catalogue(source)
+        except MonitorError as error:
+            failures.append(f"{' '.join(source)}: {error}")
+            continue
+        break
+    model, reason = resolve_default_model(catalogue)
+    if failures:
+        reason = f"{reason} ({'; '.join(failures)})"
+    print(f"codex monitor: {reason}", file=sys.stderr)
+    return model
+
+
 def spawn_pane(
     label: str | None = None,
     cwd: str | None = None,
     *,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
     reasoning_effort: str | None = None,
 ) -> str:
     """Open a Codex pane beside this one, refusing when one already runs.
 
     The pane starts on a pinned catalogue without the async question tools, and the
-    result is its pane ID followed by the line saying which catalogue that was.
+    result is its pane ID followed by the line saying which catalogue that was and,
+    when no model was asked for, the line saying which default was read from it.
     """
     reasoning_effort = _spawn_effort(model, reasoning_effort)
     pane = _caller_pane()
@@ -1393,7 +1483,10 @@ def spawn_pane(
     if existing:
         raise MonitorError(f"Codex already runs at {existing}; close it first")
     workdir = _spawn_directory(pane, cwd)
-    catalogue, catalogue_report = pin_catalogue()
+    catalogue, catalogue_report, models = pin_catalogue()
+    if model is None:
+        model, model_report = resolve_default_model(models)
+        catalogue_report = f"{catalogue_report}\n{model_report}"
     model_options = shlex.join(
         (
             "-c",
@@ -2689,15 +2782,22 @@ def run_verb(args: argparse.Namespace) -> int | None:
         print(approve_pending())
     elif (widget := _widget_verb(args)) is not None:
         print(widget)
-    elif args.clear:
-        print(run_slash_command("/clear"))
-    elif args.compact:
-        print(run_slash_command("/compact"))
-    elif args.quota:
-        print(report_quota())
+    elif (report := _report_verb(args)) is not None:
+        print(report)
     else:
         return None
     return 0
+
+
+def _report_verb(args: argparse.Namespace) -> str | None:
+    """Run whichever argument-free verb was asked for, or report that none was."""
+    verbs: tuple[tuple[bool, Callable[[], str]], ...] = (
+        (args.clear, lambda: run_slash_command("/clear")),
+        (args.compact, lambda: run_slash_command("/compact")),
+        (args.quota, report_quota),
+        (args.default_model, report_default_model),
+    )
+    return next((verb() for asked, verb in verbs if asked), None)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -2721,10 +2821,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "widget; refused if no catalogue can be read"
         ),
     )
+    action.add_argument(
+        "--default-model",
+        action="store_true",
+        help=(
+            "print the model --spawn would use without --model: the listed "
+            f"{DEFAULT_MODEL_FAMILY} slug with the lowest priority in codex's "
+            f"catalogue, else {FALLBACK_MODEL}; the reason goes to stderr"
+        ),
+    )
     parser.add_argument(
         "--model",
         metavar="MODEL",
-        help=f"model for --spawn (default: {DEFAULT_MODEL})",
+        help=(
+            "model for --spawn (default: the catalogue's lowest-priority listed "
+            f"{DEFAULT_MODEL_FAMILY} slug, else {FALLBACK_MODEL}; see --default-model)"
+        ),
     )
     parser.add_argument(
         "--reasoning-effort",
@@ -2812,7 +2924,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--model and --reasoning-effort require --spawn")
     if args.model is not None and not args.model.strip():
         parser.error("--model must not be empty")
-    args.model = args.model if args.model is not None else DEFAULT_MODEL
+    # A model of None stays None: --spawn reads the default from the catalogue it
+    # pins, so the choice is made once, from the same read.
     try:
         args.reasoning_effort = _spawn_effort(args.model, args.reasoning_effort)
     except MonitorError as error:

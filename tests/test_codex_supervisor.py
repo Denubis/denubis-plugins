@@ -787,13 +787,13 @@ def test_label_cwd_and_model_options_reach_spawn(
     watch: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    received: list[tuple[str | None, str | None, str, str]] = []
+    received: list[tuple[str | None, str | None, str | None, str]] = []
 
     def fake_spawn(
         label: str | None = None,
         cwd: str | None = None,
         *,
-        model: str,
+        model: str | None,
         reasoning_effort: str,
     ) -> str:
         received.append((label, cwd, model, reasoning_effort))
@@ -817,9 +817,11 @@ def test_label_cwd_and_model_options_reach_spawn(
     assert watch.run_verb(args) == 0
     assert received == [("lesson-schema", "/srv/lesson-schema", "gpt-6-astra", "high")]
 
+    # A bare --spawn passes no model: spawn_pane reads the default from the catalogue
+    # it pins (tests/test_codex_supervisor_default_model.py owns that rule).
     bare = watch.parse_args(["--spawn"])
     assert watch.run_verb(bare) == 0
-    assert received[-1] == (None, None, "gpt-6-sol", "xhigh")
+    assert received[-1] == (None, None, None, "xhigh")
 
 
 @pytest.mark.parametrize("option", ["--model", "--reasoning-effort"])

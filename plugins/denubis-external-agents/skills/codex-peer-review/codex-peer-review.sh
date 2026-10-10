@@ -38,7 +38,12 @@ focus=""
 focus_set=0
 includes=()
 include_confirmed=0
-MODEL="gpt-6-sol"
+# Empty until the options are read: an explicit --model wins, otherwise the
+# supervisor reads the default from codex's own catalogue (the listed -sol slug
+# with the lowest priority, else its pinned fallback), so a new Sol release
+# needs no edit here and costs no extra discovery step.
+MODEL=""
+SUPERVISOR="$SCRIPT_DIR/../../scripts/codex_supervisor.py"
 effort=""
 # Unrecognised arguments are fatal. A tolerant parser that took the first bare
 # token as the focus note and dropped the rest turned `--includ evidence.md`
@@ -87,6 +92,13 @@ done
 [ -f "$PROMPT_FILE" ] || { echo "prompt not found: $PROMPT_FILE" >&2; exit 1; }
 
 target_abs="$(cd "$(dirname "$target")" && pwd)/$(basename "$target")"
+
+if [ -z "$MODEL" ]; then
+  [ -f "$SUPERVISOR" ] || { echo "supervisor not found: $SUPERVISOR" >&2; exit 1; }
+  MODEL="$(uv run --no-project --no-config python "$SUPERVISOR" --default-model)" \
+    || { echo "could not resolve the default model" >&2; exit 1; }
+  [ -n "$MODEL" ] || { echo "the supervisor printed no default model" >&2; exit 1; }
+fi
 
 # Never inherit a restricted model or effort from host configuration.
 case "${MODEL,,}" in

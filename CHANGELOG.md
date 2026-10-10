@@ -1,5 +1,18 @@
 # Changelog
 
+## [denubis-external-agents] 0.23.0
+
+Brian, 2026-10-10, on finding the runners pinned to `gpt-6-sol` while `gpt-6.1-sol` had shipped: "how do we generalise this without needing to revise this each release but also without having multi-discovery steps?", then "great" to the rule below.
+
+**Changed:**
+- The default Codex model is no longer a pinned slug. `--spawn` without `--model` takes the listed `-sol` slug with the lowest `priority` from the catalogue it already reads and strips, so a new Sol release is picked up with no edit and no second discovery step; the spawn report says which slug was chosen and why. `gpt-6-sol` remains as the fallback when no listed `-sol` slug carries a priority, and the report says `fallback` when it was used. Effort stays `xhigh`; an explicit `--model` still wins, and the Astra/Fable gate (ADR 0006) is unchanged.
+- New verb `codex_supervisor.py --default-model` prints that slug alone on stdout with the reason on stderr. `codex-peer-review.sh` substitutes it when `--model` is absent, so both runners share one rule; the runner refuses rather than guessing if the supervisor cannot be found or prints nothing.
+- `pin_catalogue` now also returns the stripped catalogue, so the default is read from the same bytes that were pinned.
+
+**Observed, not documented:** on codex-cli 0.160.1 `codex debug models` lists `gpt-6.1-sol` at priority 1, `gpt-6-astra` at 2, `gpt-6-sol` at 3, hidden entries sharing priorities with listed ones. Nothing guarantees `priority` tracks release order, and the `-sol` family name is OpenAI's; if either changes the fallback and its `fallback` line are what the operator sees. The supervisor's widget-stripping evidence (ADR 0010) was measured on `gpt-6-sol` only; `gpt-6.1-sol` is unverified there.
+
+**Tests:** `tests/test_codex_supervisor_default_model.py` (the rule, every no-candidate case, spawn and verb wiring, fallback reporting); `tests/test_codex_peer_review.bats` gains a catalogue-answering stub and cases for the catalogue default, the fallback, and an explicit model skipping the catalogue. `test_label_cwd_and_model_options_reach_spawn` now expects a bare `--spawn` to pass no model through.
+
 ## [denubis-hook-branch-bg] 0.3.0
 
 Brian reported that every repo looked brown or purple (2026-10-09). The cause was the mapping: all colours sat at HLS lightness 0.12, where hue barely registers, and an Opus audit found only three of the hashed repo colours mutually distinguishable (`docs/handover-branch-bg-colour.md`, `docs/branch-bg-colour-eval.py`). Trying a brighter field showed the real constraint: a repo colour reads well as a highlight on black and badly as the field under white text.

@@ -34,6 +34,7 @@ and consequences section. One ADR per decision.
 - [0025 — Identity follows the pane: anything with its own pane is itself; a paneless sub-agent is not a messaging participant, and an attempt is an anomaly](0025-identity-follows-the-pane-and-paneless-sub-agents-do-not-message.md)
   (amends 0019, withdrawing clause (a); closes M14)
 - [0026 — The record lives in its own database, `agent_record`, with owner, app, and reader roles; `local_mail` is left untouched](0026-the-record-lives-in-its-own-database-agent-record-with-three-roles.md)
+- [0027 — The default Codex model is whatever the latest Sol-class release is, at xhigh, read from the catalogue rather than pinned](0027-the-default-codex-model-is-the-latest-sol-class-release-at-xhigh.md)
 
 ## Status lifecycle
 
