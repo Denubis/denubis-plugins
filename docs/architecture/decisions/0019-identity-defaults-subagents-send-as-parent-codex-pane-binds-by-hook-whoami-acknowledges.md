@@ -1,6 +1,6 @@
 # ADR 0019 — Identity defaults: sub-agents send as their parent, a Codex pane keeps its address across clear by a hook binding, and a model-run whoami acknowledges identity
 
-**Status:** Accepted (2026-10-09). Qualifies property 12 of the 2026-08-09 design.
+**Status:** Accepted (2026-10-09). Qualifies property 12 of the 2026-08-09 design. Clause (a) withdrawn by ADR 0025 (2026-10-10): identity follows the pane and paneless sub-agents do not message; clauses (b) and (c) stand.
 
 ## Authority evidence
 

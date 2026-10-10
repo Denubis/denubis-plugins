@@ -25,6 +25,15 @@ and consequences section. One ADR per decision.
   (qualifies 0011)
 - [0019 — Identity defaults: sub-agents send as their parent, a Codex pane keeps its address across clear by a hook binding, and a model-run whoami acknowledges identity](0019-identity-defaults-subagents-send-as-parent-codex-pane-binds-by-hook-whoami-acknowledges.md)
 - [0020 — The human surface runs outside the main byobu session, is reachable from anywhere over SSH or Tailscale, is launched from a terminal on this machine, and is whatever is durable and simple](0020-the-human-surface-runs-outside-byobu-reachable-over-ssh-durable-simple-tailscale-only.md)
+- [0021 — The ladder runs whenever the supervisee is unblocked, busy or idle; an agent that keeps working past two nudges is interrupted; a blocked supervisor is Brian's item](0021-ladder-runs-while-unblocked-busy-or-idle-and-a-blocked-supervisor-is-brians-item.md)
+  (amends 0016)
+- [0022 — A supervisor's mandate carries expiry and a directory root as hard stops, no decision count; the screen-reading `--approve` keypress is soft-retired pending the hooks](0022-mandate-rails-are-expiry-and-directory-only-and-the-blind-approve-is-soft-retired.md)
+- [0023 — A cited agent-to-agent message resolves by transcript locator, like every other citation; the record may prune a cited thread](0023-a-cited-agent-message-resolves-by-transcript-locator-and-the-record-may-prune-it.md)
+  (supersedes property 10 of the 2026-08-09 design for the Postgres record)
+- [0024 — Agents on this box act with Brian's authority; the record's decision table is not a security boundary against them, and no Postgres authentication change is made](0024-agents-run-with-brians-authority-and-the-decision-table-is-not-a-security-boundary.md)
+- [0025 — Identity follows the pane: anything with its own pane is itself; a paneless sub-agent is not a messaging participant, and an attempt is an anomaly](0025-identity-follows-the-pane-and-paneless-sub-agents-do-not-message.md)
+  (amends 0019, withdrawing clause (a); closes M14)
+- [0026 — The record lives in its own database, `agent_record`, with owner, app, and reader roles; `local_mail` is left untouched](0026-the-record-lives-in-its-own-database-agent-record-with-three-roles.md)
 
 ## Status lifecycle
 

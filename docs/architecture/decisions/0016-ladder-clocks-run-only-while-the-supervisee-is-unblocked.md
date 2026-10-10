@@ -2,7 +2,8 @@
 
 **Status:** Accepted (2026-10-09). Qualifies ADR 0015 and reaffirms property 6 of the
 2026-08-09 design and ADR 0009's finding that every repeated reminder had been waiting
-behind a permission prompt.
+behind a permission prompt. Amended the same day by ADR 0021: the clocks run while the
+supervisee is unblocked, whether idle or working, not only while idle.
 
 ## Authority evidence
 

@@ -40,9 +40,13 @@ PermissionRequest hooks in `~/.codex/hooks.json`. agy has no PermissionRequest e
   can be answered there. The answer is returned through the vendor's held hook as its
   typed allow or deny. The surface never types into a pane.
 - The same approval remains answerable at the pane. Whichever answer arrives first
-  settles it; the other place must then retire its copy (for Claude, a PostToolUse or
-  PermissionDenied event retires the pending row; the mechanism is function 6's to build
-  and test).
+  settles it; the other place must then retire its copy. The mechanism is function 6's
+  to build and test. The dispatcher's first wording named PermissionDenied as a Claude
+  retirement signal; verification 06 and the synthesis (2026-10-09) corrected that from
+  the Claude hooks documentation, which says PermissionDenied fires only in auto mode
+  and not on a manual deny. PostToolUse covers a pane-answered allow; a pane-answered
+  deny is learnt only at turn end (Stop or UserPromptSubmit) unless a live test finds
+  an earlier signal. The ruling is unaffected.
 - An intake hook may wrap the approver's existing Codex and agy entries and add a Claude
   PermissionRequest registration (proposal 06 Q4, answered by this ruling's "one place").
 - agy approvals are shown only; they cannot be answered from the surface until agy
