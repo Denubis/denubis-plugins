@@ -28,10 +28,16 @@ Exact raw-record resolver:
 awk 'NR==72 || NR==91 || NR==568' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d8536e45-ac36-41df-a1f9-8b31a931af99.jsonl
 ```
 
-The last message's "default medium" for Astra/Fable is not recorded here as a ruling:
-it conflicts with ADR 0006 ("If the human names the model but omits effort, ask for
-the missing level before launch") and is an open ticket in
-`.notes/project_open-questions.md` until Brian resolves the conflict.
+The last message's "default medium" for Astra/Fable is not a ruling. Asked whether it
+replaced ADR 0006's rule that a named Astra or Fable without an effort is asked for,
+not defaulted, Brian answered at line 678, record
+`f8f9a942-31b4-4ef1-a143-9c9f811509dd` (2026-10-10T05:36:38Z): "no, that's fine, it's a
+useful doublecheck". ADR 0006 stands unchanged; the runners keep refusing a named
+Astra or Fable with no effort.
+
+```sh
+awk 'NR==678' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d8536e45-ac36-41df-a1f9-8b31a931af99.jsonl
+```
 
 ## Context
 
