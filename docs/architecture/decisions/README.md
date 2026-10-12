@@ -37,6 +37,7 @@ and consequences section. One ADR per decision.
 - [0027 — The default Codex model is whatever the latest Sol-class release is, at xhigh, read from the catalogue rather than pinned](0027-the-default-codex-model-is-the-latest-sol-class-release-at-xhigh.md)
 - [0028 — A pane session's "You should know" offer is mail from that pane to its supervising session; kept, not suppressed, with the sending pane identified](0028-a-pane-sessions-you-should-know-offer-is-mail-to-its-supervisor.md)
   (applies 0018 and 0025)
+- [0028 — Zotero writes go through Zotero 10's stock local API, delete means trash, and zotero-api-plus is kept only for what stock cannot do](0028-zotero-writes-use-the-stock-local-api-and-delete-means-trash.md)
 
 ## Status lifecycle
 
