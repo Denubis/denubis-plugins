@@ -214,6 +214,59 @@ Repeat `--set FIELD=VALUE`, `--clear FIELD`, `--author 'Last, First'`, or
 `--creator TYPE='Last, First'` as required. Creator flags replace the creator
 list; do not omit creators that should remain. Read the item back after success.
 
+## Create an item
+
+```bash
+uv run "$BIB/create_item.py" --type book --set title="<title>" --set date=2026 \
+  --author "Last, First" --creator editor="Last, First" \
+  --collection "<collection name or key>" --library "<library>"
+```
+
+Create class: the preview prints the full JSON body (`itemType`, fields,
+`creators`, `collections`), the resolved library (name and libraryID), the
+resolved collection key, and the apply command carrying `--expect-collection
+KEY` (when a collection is named) and `--expect-library ID`. After
+confirmation run that command. Apply re-resolves both names and stops with
+`target changed` if a key differs, POSTs one item, reads it back, and verifies
+the fields, the creator list and the collection; it prints the new key and the
+citekey, or `citekey: not yet assigned` while Better BibTeX has not yet set
+one (not a verification failure). The field grammar is `update_item.py`'s;
+`--author` and `--creator` give the complete creator list in order.
+
+## Create, rename, trash, or restore a collection
+
+```bash
+uv run "$BIB/collection.py" --create "<name>" [--parent "<name or key>"]
+uv run "$BIB/collection.py" --rename <key> "<new name>"
+uv run "$BIB/collection.py" --trash <key>
+uv run "$BIB/collection.py" --restore <key> [--descendants K1,K2,...]
+```
+
+`--create` is the create class: the preview prints the body and the resolved
+parent and library, and apply carries `--expect-library ID` and, when a
+parent is named, `--expect-parent KEY`. The other three are the modify class
+with `--expect-version N`.
+
+Trash semantics, read in the installed Zotero 10.0.6 source on 2026-10-12:
+Zotero trashes a collection's descendants with it, restores non-recursively,
+and its collection listings and `numCollections` exclude the trash; only a
+direct key read returns a trashed collection. So:
+
+- `--trash` lists the live descendant collections and the member item count
+  in the preview; apply PATCHes `deleted` on the parent, verifies the parent
+  and every listed descendant by direct key read, and ends with the exact
+  restore command, `--restore KEY --descendants K1,K2,...`. Keep that line: it
+  is the record of what went into the trash.
+- `--restore` with `--descendants` clears `deleted` on the parent and then on
+  each listed descendant, shallowest first, each protected by its own read
+  version, and verifies every one by read-back together with the parent's
+  item count. Without `--descendants` it restores the parent only and prints
+  `descendants unknown: Zotero's collection listings exclude the trash; pass
+  --descendants from the trash output or restore them in Zotero`; it never
+  claims to have restored what it could not see.
+
+Member items are not trashed with their collection and keep their membership.
+
 ## Annotate a cited passage
 
 Requires the `zotero-api-plus` annotation endpoints. An annotation is a Zotero

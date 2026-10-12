@@ -497,6 +497,24 @@ def get_item_children(library: dict, key: str, *, timeout: float = 30.0) -> list
     return body if isinstance(body, list) else []
 
 
+def get_subcollections(library: dict, key: str, *, timeout: float = 30.0) -> list[dict]:
+    """`/collections/<key>/collections`: the LIVE direct children only.
+
+    The installed local API builds this listing without `includeTrashed`
+    (server_localAPI.js:993-995, read 2026-10-12), so a trashed child never
+    appears here; only a direct key read returns it. Callers that need
+    trashed descendants must already know their keys.
+    """
+    url = f"{_object_url(library, 'collections', key)}/collections"
+    reply = _http_request("GET", url, params={"format": "json"}, timeout=timeout)
+    if not 200 <= reply.status_code < 300:
+        raise LibraryQueryError(
+            f"GET collections/{key}/collections: HTTP {reply.status_code}"
+        )
+    body = reply.json()
+    return body if isinstance(body, list) else []
+
+
 def classify_write_reply(
     status: int, version_header: str | None, body: str, *, library_name: str
 ) -> WriteResult:

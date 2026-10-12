@@ -3,13 +3,6 @@
 Plan: `plan.md` in this directory. Each outcome is done when its verification block
 passes and its evidence is in `worklog.md`.
 
-## Outcome D: item creation and collection CRUD
-- [ ] Red: `create_item.py` W2 cases; `collection.py` verbs (descendant listing at trash time with a stub that excludes trashed children, trash output prints the `--restore … --descendants` command, restore order with `--descendants`, `descendants unknown` without it, parser rejects two verbs, no DELETE in any request log)
-- [ ] Green: `create_item.py`
-- [ ] Green: `collection.py --create/--rename/--trash/--restore`
-- [ ] Docs: `zotero-writes.md`, `SKILL.md` rows, `troubleshooting.md` `target changed`; regex update
-- [ ] Verification block D; checkpoint commit
-
 ## Outcome E: auto-export registration
 - [ ] Red: `register_export.py` cases (`bbt_collection_path` numeric absolute form reaches the RPC stub, preview no RPC, `--expect-version` rejected, missing flag usage error, accepted/not accepted by returned key, E2a, E2b, no-mtime-change, content satisfied/not)
 - [ ] Green: `register_export.py` (injected clock)

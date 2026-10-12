@@ -54,21 +54,48 @@ def _state_name(flag: str) -> str:
     return flag.removeprefix("--expect-")
 
 
-def add_gate_arguments(parser: argparse.ArgumentParser, cls: OperationClass) -> None:
-    """Add `--apply` and the class's expected-state flags to a parser."""
+def add_gate_arguments(
+    parser: argparse.ArgumentParser, *classes: OperationClass
+) -> None:
+    """Add `--apply` and the expected-state flags of the given classes.
+
+    A helper with verbs of more than one class (collection.py) passes them
+    all and rejects the foreign ones per verb with foreign_expectations.
+    """
     parser.add_argument(
         "--apply",
         action="store_true",
         help="perform the previewed write. Without it nothing is written.",
     )
-    for flag in EXPECTATIONS[cls]:
-        kwargs: dict = {"help": _HELP[flag]}
-        if flag == "--expect-version":
-            kwargs["type"] = int
-            kwargs["metavar"] = "N"
-        else:
-            kwargs["metavar"] = "KEY" if flag != "--expect-library" else "ID"
-        parser.add_argument(flag, **kwargs)
+    seen: list[str] = []
+    for cls in classes:
+        for flag in EXPECTATIONS[cls]:
+            if flag in seen:
+                continue
+            seen.append(flag)
+            kwargs: dict = {"help": _HELP[flag]}
+            if flag == "--expect-version":
+                kwargs["type"] = int
+                kwargs["metavar"] = "N"
+            else:
+                kwargs["metavar"] = "KEY" if flag != "--expect-library" else "ID"
+            parser.add_argument(flag, **kwargs)
+
+
+def foreign_expectations(args: argparse.Namespace, cls: OperationClass) -> list[str]:
+    """Expected-state flags that were passed but belong to another class.
+
+    A create or register verb never takes `--expect-version` (there is no
+    prior version to protect); a modify verb never takes the create keys.
+    """
+    own = set(EXPECTATIONS[cls])
+    return [
+        flag
+        for other, flags in EXPECTATIONS.items()
+        if other != cls
+        for flag in flags
+        if flag not in own and getattr(args, _dest(flag), None) is not None
+    ]
 
 
 def missing_expectations(

@@ -169,6 +169,9 @@ change user-owned state and require the procedure's preview and confirmation:
 | Repair metadata | `update_item.py` without `--apply` | Show diff and receive approval, then `--apply` |
 | File an item into or out of a collection (modify class) | `item_collections.py --key K --add/--remove C` | Preview shows title, version, collections before and after; approval, then the printed `--apply --expect-version N` |
 | Trash or restore an item or attachment (modify class) | `trash_item.py --key K [--restore]` | Preview shows type, title, parent, file, relations, child count, `deleted` (named through the parent when the parent is trashed), version; approval, then the printed `--apply --expect-version N`; `--restore` on a child of a trashed parent writes nothing and prints the parent's restore command |
+| Create an item (create class) | `create_item.py --type T --set F=V … [--collection C]` | Preview shows the full JSON body, the resolved library and collection keys; approval, then the printed `--apply --expect-collection KEY --expect-library ID` |
+| Create a collection (create class) | `collection.py --create NAME [--parent P]` | Preview shows the body, parent and library; approval, then the printed `--apply --expect-library ID [--expect-parent KEY]` |
+| Rename, trash, or restore a collection (modify class) | `collection.py --rename/--trash/--restore KEY` | Preview shows name, version, descendants and item count; approval, then the printed `--apply --expect-version N`; keep the `--restore … --descendants` line a trash prints |
 | Add PDF annotation | `annotate.py --dry-run` | Explicit instruction to annotate; then omit `--dry-run` |
 | Create zettelkasten/project notes | Draft path and content | Follow project rules and obtain any required confirmation |
 | Create config or zettelkasten layout | Explain exact paths | User creates them or explicitly authorises creation |

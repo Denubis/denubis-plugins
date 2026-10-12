@@ -75,6 +75,21 @@ def test_register_class_has_only_expect_collection():
             _parser("register").parse_args(rejected)
 
 
+def test_a_parser_may_carry_two_classes_and_reject_the_foreign_flags():
+    """collection.py has create and modify verbs on one parser; the verb's
+    class decides which expected-state flags are legal."""
+    parser = argparse.ArgumentParser(prog="collection.py", exit_on_error=False)
+    gate.add_gate_arguments(parser, "create", "modify")
+    args = parser.parse_args(["--apply", "--expect-version", "3"])
+    assert gate.foreign_expectations(args, "modify") == []
+    assert gate.foreign_expectations(args, "create") == ["--expect-version"]
+    args = parser.parse_args(["--expect-library", "1", "--expect-parent", "P"])
+    assert gate.foreign_expectations(args, "modify") == [
+        "--expect-parent",
+        "--expect-library",
+    ]
+
+
 def test_preview_is_the_default():
     args = _parser("modify").parse_args([])
     assert args.apply is False

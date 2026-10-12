@@ -279,3 +279,68 @@ Evidence:
 - Not yet exercised live: a real PATCH (the 204/`Last-Modified-Version` contract and
   the 412 collision are read from the installed source, not observed); UAT L2/L3 are
   the first live writes.
+
+Checkpoint: `cdd585e` (Outcome C).
+
+## 2026-10-12 — Outcome D: item creation and collection create, rename, trash, restore
+
+Changed surfaces:
+
+- `write_gate.py`: `add_gate_arguments(parser, *classes)` (one `--apply`, the union of
+  the classes' flags) and `foreign_expectations(args, cls)` so `collection.py`, which
+  carries create and modify verbs on one parser, rejects the other class's flags per
+  verb (W2 for `--create`).
+- `zotero_local_api.py`: `get_subcollections(library, key)` over
+  `/collections/<key>/collections` (live children only, as the installed API lists).
+- `collection.py`: verbs `--create NAME [--parent P]` (create class: body `{"name",
+  "parentCollection": KEY|false}`, apply needs `--expect-library` and, when a parent is
+  named, `--expect-parent`; re-resolves, `target changed`, POST through
+  `create_objects`, read-back verifies name and parent), `--rename KEY NAME`, `--trash
+  KEY` (preview lists live descendants recursively and `meta.numItems`; apply PATCHes
+  `deleted: true`, verifies the parent and every listed descendant by direct key read,
+  prints `--restore KEY --descendants K1,K2`), `--restore KEY [--descendants …]`
+  (reads the parent and each listed descendant by key, PATCHes the parent then each
+  descendant shallowest first by walking `parentCollection`, each with its own read
+  version; verifies every read-back and that `numItems` is unchanged; without
+  `--descendants` prints the exact `descendants unknown: …` sentence and PATCHes the
+  parent only). Two verbs on one call is a parser error. Pure `order_by_depth`.
+- New `create_item.py` (`--type T --set F=V … --author … --creator TYPE=… [--collection
+  C] [--library L]`): create class; `build_item_body`, `verification_problems`,
+  `created_key` are pure; preview prints the JSON body, library (name, libraryID),
+  collection key, apply command with `--expect-collection` (when named) and
+  `--expect-library`; apply re-resolves, `target changed`, POSTs one body, reads back,
+  verifies fields, creators, and collection; prints key and citekey or `citekey: not
+  yet assigned`. `--expect-version` is not a flag of its parser.
+- Docs: `zotero-writes.md` ("Create an item", "Create, rename, trash, or restore a
+  collection" with the trash semantics and the evidence), `SKILL.md` three
+  write-boundary rows; `tests/test_bibliography_skill.py` regex gains `create_item`.
+- Tests: `tests/test_bibliography_create_item.py` (new, 12: payload/keys/apply
+  command, parser rejects `--expect-version`, usage error without the keys, library-only
+  when no collection, W3, `target changed` with no POST, happy POST + read-back with the
+  exact body, citekey absence, wrong collection on read-back → not verified, a `failed`
+  entry → not accepted, no DELETE); `tests/test_bibliography_collection.py` (+18: two
+  verbs rejected, foreign flags rejected per class, W3, create preview/required
+  flags/target changed/read-back, rename preview and PATCH body, trash preview with
+  descendants and item count, trash apply verifies each descendant and prints the
+  restore command, descendant still live → not verified, version moved, restore with
+  descendants in depth order with per-key versions, restore without descendants PATCHes
+  one and prints the sentence, listing cannot reveal trashed descendants, restore
+  preview reads each listed descendant); `tests/test_bibliography_write_gate.py` (+1).
+  Every write-verb case asserts no DELETE reached the seam.
+
+Evidence:
+
+- Red: 14 collection-verb failures and the missing `create_item.py`; then the three
+  suites pass; `uv run pytest tests/test_bibliography_*.py tests/test_skill_*.py
+  tests/test_academic_literature_helpers.py -q` → 1073 passed (see the rerun after the
+  lint fixes below).
+- Live, read-only: `create_item.py --type book --set "title=Scratch book for 0.19 UAT"
+  --set date=2026 --author "Scratch, Author" --collection "Sage SRM Guide"` → payload
+  with `collections: ["UJPGKR74"]`, `library: My Library (libraryID 1)`, apply command
+  ending `--apply --expect-collection UJPGKR74 --expect-library 1`, no request to the
+  seam, exit 0. `collection.py --trash UJPGKR74` → `items: 31` (`meta.numItems`,
+  which excludes the 4 trashed members the listing marks), `descendants: 0`, `version:
+  295`, exit 0, nothing written. `collection.py --create "Scratch 0.19" --parent "Sage
+  SRM Guide"` → body `{"name": "Scratch 0.19", "parentCollection": "UJPGKR74"}`, apply
+  command with `--expect-parent UJPGKR74 --expect-library 1`, exit 0.
+- Not yet exercised live: any POST or collection PATCH (UAT L4, L5).
