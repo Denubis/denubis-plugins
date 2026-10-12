@@ -1,5 +1,16 @@
 # Changelog
 
+## [denubis-external-agents] 0.24.0
+
+Brian, 2026-10-12, on finding that Claude Code's builtin "You should know" side agent shows its offers inside advisor panes where nobody reads them: "I don't actually mind those alerts, we just need to see them", then "it's mail to supervisor", then "it's fine if we have some sort of hook that bubbles that up right now, but ultimately I do think I want this you should know offer to be part of mail proper ... No point in building a mail thing that isn't part of the larger mail infra" (ADR 0028).
+
+**Added:**
+- `hooks/supervisee-offers.py`, on PostToolUse (the marketplace gate in `tests/test_instruction_delivery.py` rules UserPromptSubmit out, so an idle lead sees offers at its next tool call). In a session that leads an agent team, it reads the team's `~/.claude/teams/<team>/config.json` for its tmux-backed members, finds each teammate's session id from the transcript Claude Code wrote for it (the first records carry `teamName` and `agentName`; the spawn passes no session id and the config records none), reads the builtin plugin's own store (`~/.claude/plugins/store/cc-plugin-you-should-know_builtin-*.json`) for those sessions, and hands any unforwarded `offer` or `explained` view to the lead as additional context naming the teammate, its pane, session id, model and cwd. Forwarded offers are remembered in the `@ysk_forwarded` option on the lead's tmux pane, so each arrives once and nothing new is written to disk. A session that leads no team exits silently; a lead with teammates and a missing or unreadable store is told so rather than left quiet. This is the interim carrier until the messaging record (ADR 0026) exists; the record then becomes the sink and the detection does not change.
+
+**Observed, not documented:** the store layout, the team config, the teammate spawn flags and the plugin's behaviour were read from the 2.1.296 binary and this machine's files. The plugin skips in-process Agent-tool sub-agents (`agentId`) but treats a teammate's pane session as a main session, checks every sixth tool step, and clears an offer after two further prompts. Whether the store is rewritten atomically is unverified; the hook tolerates a torn read by reporting the store unreadable on that call and reading again on the next. The transcript scan reads the first 32 KB of transcripts in the teammate's project directory modified since it joined.
+
+**Tests:** `tests/test_supervisee_offers.py` (lead lookup, tmux-member selection, the project-directory slug, transcript matching, attribution, dedupe, explained views, ignored view kinds, rendering, bounded forwarded set, and end-to-end through a fake HOME and a fake `tmux` on PATH: silent for a non-lead, forward once then stay quiet, a sibling teammate's offer not misattributed, missing and unreadable store reported, store override honoured). The hook passes `tests/test_hook_portability.py` (Python 3.9 import). A live offer reaching a lead is UAT, not automated.
+
 ## [denubis-external-agents] 0.23.0
 
 Brian, 2026-10-10, on finding the runners pinned to `gpt-6-sol` while `gpt-6.1-sol` had shipped: "how do we generalise this without needing to revise this each release but also without having multi-discovery steps?", then "great" to the rule below.

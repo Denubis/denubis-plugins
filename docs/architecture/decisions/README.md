@@ -35,6 +35,8 @@ and consequences section. One ADR per decision.
   (amends 0019, withdrawing clause (a); closes M14)
 - [0026 — The record lives in its own database, `agent_record`, with owner, app, and reader roles; `local_mail` is left untouched](0026-the-record-lives-in-its-own-database-agent-record-with-three-roles.md)
 - [0027 — The default Codex model is whatever the latest Sol-class release is, at xhigh, read from the catalogue rather than pinned](0027-the-default-codex-model-is-the-latest-sol-class-release-at-xhigh.md)
+- [0028 — A pane session's "You should know" offer is mail from that pane to its supervising session; kept, not suppressed, with the sending pane identified](0028-a-pane-sessions-you-should-know-offer-is-mail-to-its-supervisor.md)
+  (applies 0018 and 0025)
 
 ## Status lifecycle
 

@@ -92,6 +92,19 @@ A section **without** that marker comment is treated as yours and left alone. A 
 is why the marker exists: without it, a config written before a grant was added could
 never receive that grant. That defect was live between 2026-08-06 and 2026-08-08.
 
+## Supervisee "You should know" offers reach the supervisor
+
+Claude Code's builtin "You should know" side agent shows its offers above the prompt of
+whichever session produced them, including agent-team teammate panes nobody is reading.
+Under ADR 0028 such an offer is mail from the teammate to its team lead. The hook
+`hooks/supervisee-offers.py` (PostToolUse) runs in every session but acts only when the
+session leads a team: it reads the team's config under `~/.claude/teams/` for its
+tmux-backed members, finds each teammate's session id from the transcript Claude Code
+wrote for it, reads the plugin's own store for those sessions, and adds any new offer to
+the lead's context naming the teammate, pane, session id, model and cwd. Forwarded
+offers are remembered in `@ysk_forwarded` on the lead's pane. This is the interim
+carrier until the messaging record exists; it writes nothing of its own.
+
 ## Tests
 
 ```sh
