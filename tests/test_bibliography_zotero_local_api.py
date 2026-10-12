@@ -24,6 +24,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 _MODULE = (
     Path(__file__).resolve().parent.parent
     / "plugins"
@@ -397,6 +399,224 @@ def test_get_collection_items_raises_library_query_error(monkeypatch):
         assert "connection refused" in str(error)
     else:
         raise AssertionError("expected LibraryQueryError")
+
+
+# --- stock write primitive (0.19, Contract 2) ---------------------------------
+#
+# Zotero 10's local API writes: PATCH /items/<key> and /collections/<key> with
+# If-Unmodified-Since-Version (204 + Last-Modified-Version on success, 412 on a
+# mismatch), POST /items and /collections (≤ 50 bodies, {successful, unchanged,
+# failed}). Read in the installed server_localAPI.js on 2026-10-12. Every
+# request goes through the `_http_request` seam, stubbed here.
+
+
+class _Reply:
+    def __init__(self, status, *, headers=None, text="", body=None):
+        self.status_code = status
+        self.headers = headers or {}
+        self.text = text
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+class _Seam:
+    """Records every request and answers from a queue per (method, url)."""
+
+    def __init__(self):
+        self.calls: list[dict] = []
+        self.answers: dict[tuple[str, str], list[_Reply]] = {}
+
+    def answer(self, method, url, reply):
+        self.answers.setdefault((method, url), []).append(reply)
+
+    def __call__(
+        self, method, url, *, headers=None, json=None, params=None, timeout=30.0
+    ):
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": dict(headers or {}),
+                "json": json,
+                "params": dict(params or {}),
+            }
+        )
+        queue = self.answers.get((method, url))
+        if not queue:
+            raise AssertionError(f"unexpected request {method} {url}")
+        return queue.pop(0)
+
+
+_USER = {"type": "user", "libraryID": 1, "name": "My Library"}
+_ITEM_URL = "http://localhost:23119/api/users/0/items/ABCD1234"
+_CREDS = {"Zotero-Server-ID": "g6bzZS56RsjG", "Zotero-API-Key": "k1"}
+
+
+def _auth(monkeypatch, *, server="g6bzZS56RsjG"):
+    forgotten = []
+    monkeypatch.setattr(zla.zotero_auth, "server_id", lambda **_k: server)
+    monkeypatch.setattr(
+        zla.zotero_auth, "credentials", lambda **_k: dict(_CREDS) if server else {}
+    )
+    monkeypatch.setattr(zla.zotero_auth, "forget_key", forgotten.append)
+    return forgotten
+
+
+def test_require_stock_writes_refuses_without_a_server_id(monkeypatch):
+    _auth(monkeypatch, server=None)
+    seam = _Seam()
+    monkeypatch.setattr(zla, "_http_request", seam)
+    with pytest.raises(zla.StockWriteUnavailable, match="stock writes need Zotero 10"):
+        zla.require_stock_writes()
+    assert seam.calls == []
+
+
+def test_require_stock_writes_passes_on_zotero_10(monkeypatch):
+    _auth(monkeypatch)
+    zla.require_stock_writes()
+
+
+def test_read_object_gets_the_envelope_with_the_trash(monkeypatch):
+    seam = _Seam()
+    envelope = {"key": "ABCD1234", "version": 429, "data": {"deleted": True}}
+    seam.answer("GET", _ITEM_URL, _Reply(200, body=envelope))
+    monkeypatch.setattr(zla, "_http_request", seam)
+    assert zla.read_object(_USER, "items", "ABCD1234") == envelope
+    call = seam.calls[0]
+    assert call["params"] == {"format": "json", "includeTrashed": 1}
+    assert call["headers"] == {}
+
+
+def test_read_object_raises_on_a_non_2xx(monkeypatch):
+    seam = _Seam()
+    seam.answer("GET", _ITEM_URL, _Reply(404, text="Not found"))
+    monkeypatch.setattr(zla, "_http_request", seam)
+    with pytest.raises(zla.LibraryQueryError, match="404"):
+        zla.read_object(_USER, "items", "ABCD1234")
+
+
+def test_write_object_sends_credentials_and_the_version_header(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer(
+        "PATCH", _ITEM_URL, _Reply(204, headers={"Last-Modified-Version": "430"})
+    )
+    monkeypatch.setattr(zla, "_http_request", seam)
+
+    result = zla.write_object(_USER, "items", "ABCD1234", {"deleted": True}, 429)
+
+    assert result.status == "accepted"
+    assert result.version == 430
+    call = seam.calls[0]
+    assert call["method"] == "PATCH"
+    assert call["json"] == {"deleted": True}
+    assert call["headers"] == {**_CREDS, "If-Unmodified-Since-Version": "429"}
+    assert len(seam.calls) == 1
+
+
+def test_write_object_412_is_a_conflict_with_the_current_object(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer("PATCH", _ITEM_URL, _Reply(412, text="Precondition Failed"))
+    current = {"key": "ABCD1234", "version": 431, "data": {}}
+    seam.answer("GET", _ITEM_URL, _Reply(200, body=current))
+    monkeypatch.setattr(zla, "_http_request", seam)
+
+    result = zla.write_object(_USER, "items", "ABCD1234", {"deleted": True}, 429)
+
+    assert result.status == "conflict"
+    assert result.current == current
+    # One PATCH, never retried; the only other request is the read-back.
+    assert [c["method"] for c in seam.calls] == ["PATCH", "GET"]
+
+
+def test_write_object_412_naming_the_server_id_is_refused(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer("PATCH", _ITEM_URL, _Reply(412, text="Zotero-Server-ID does not match"))
+    monkeypatch.setattr(zla, "_http_request", seam)
+
+    result = zla.write_object(_USER, "items", "ABCD1234", {"deleted": True}, 429)
+
+    assert result.status == "refused"
+    assert "server id" in result.body.lower()
+    assert len(seam.calls) == 1
+
+
+def test_write_object_401_forgets_the_key_and_retries_once(monkeypatch):
+    forgotten = _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer("PATCH", _ITEM_URL, _Reply(401, text="Invalid or expired API key"))
+    seam.answer("PATCH", _ITEM_URL, _Reply(401, text="Invalid or expired API key"))
+    monkeypatch.setattr(zla, "_http_request", seam)
+
+    result = zla.write_object(_USER, "items", "ABCD1234", {"deleted": True}, 429)
+
+    assert result.status == "refused"
+    assert forgotten == ["g6bzZS56RsjG"]
+    assert [c["method"] for c in seam.calls] == ["PATCH", "PATCH"]
+
+
+def test_write_object_403_is_refused_naming_the_library(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer("PATCH", _ITEM_URL, _Reply(403, text="Forbidden"))
+    monkeypatch.setattr(zla, "_http_request", seam)
+    result = zla.write_object(_USER, "items", "ABCD1234", {"deleted": True}, 429)
+    assert result.status == "refused"
+    assert "My Library" in result.body
+
+
+def test_write_object_400_is_failed_with_the_body(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer("PATCH", _ITEM_URL, _Reply(400, text="ZoteroMissingObjectError"))
+    monkeypatch.setattr(zla, "_http_request", seam)
+    result = zla.write_object(_USER, "items", "ABCD1234", {"collections": ["X"]}, 429)
+    assert result.status == "failed"
+    assert "ZoteroMissingObjectError" in result.body
+
+
+def test_create_objects_posts_the_bodies_and_returns_zoteros_report(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    report = {"successful": {"0": {"key": "NEW00001"}}, "unchanged": {}, "failed": {}}
+    seam.answer(
+        "POST", "http://localhost:23119/api/users/0/items", _Reply(200, body=report)
+    )
+    monkeypatch.setattr(zla, "_http_request", seam)
+
+    out = zla.create_objects(_USER, "items", [{"itemType": "book", "title": "T"}])
+
+    assert out == report
+    call = seam.calls[0]
+    assert call["method"] == "POST"
+    assert call["json"] == [{"itemType": "book", "title": "T"}]
+    assert call["headers"] == _CREDS
+
+
+def test_create_objects_refuses_more_than_fifty_bodies(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    monkeypatch.setattr(zla, "_http_request", seam)
+    with pytest.raises(ValueError, match="50"):
+        zla.create_objects(_USER, "items", [{}] * 51)
+    assert seam.calls == []
+
+
+def test_create_objects_raises_on_a_non_200(monkeypatch):
+    _auth(monkeypatch)
+    seam = _Seam()
+    seam.answer(
+        "POST",
+        "http://localhost:23119/api/users/0/items",
+        _Reply(403, text="Forbidden"),
+    )
+    monkeypatch.setattr(zla, "_http_request", seam)
+    with pytest.raises(zla.LibraryQueryError, match="403"):
+        zla.create_objects(_USER, "items", [{}])
 
 
 def _collection_listing():

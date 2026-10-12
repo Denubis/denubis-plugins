@@ -69,7 +69,7 @@ def test_bibliography_commands_are_independent_of_callers_working_directory() ->
     bare_script = re.compile(
         r"(?:uv run(?: --[^\n]+)*|python)\s+"
         r"(?:resolve|ingest|render|blockquote|fetch|copy_item|update_item|annotate"
-        r"|collection)\.py\b"
+        r"|collection|item_collections|trash_item)\.py\b"
     )
     url = re.compile(r"https?://\S+")
     violations = {

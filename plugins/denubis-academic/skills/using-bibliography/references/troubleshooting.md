@@ -65,6 +65,18 @@ The stored key lives in
 `~/.config/denubis-academic-research/zotero-local-api-keys.json` (mode `0600`).
 Deleting it only forces one more prompt. Zotero 7-9 never reach this path.
 
+## Stock-API write helpers
+
+| Symptom | Meaning | Next step |
+|---|---|---|
+| `stock writes need Zotero 10` | `GET /api/` sent no `Zotero-Server-ID`; this Zotero has no local-API write routes | Upgrade Zotero, or use the zotero-api-plus helpers that exist for Zotero 7-9; nothing was sent |
+| `changed since preview: version is N, expected M` | The object changed between the preview and `--apply` | Re-run the preview and copy its new apply command; nothing was written |
+| `target changed: collection is K, expected X` | A name resolved to a different key than the preview showed | Re-run the preview; nothing was written |
+| `not accepted: conflict: … Zotero now holds version N` | Zotero answered 412 to `If-Unmodified-Since-Version` in the window after the re-read | Inspect the printed current object, re-run the preview; the helper never retries a conflict |
+| `not accepted: refused: HTTP 403 …` | The library is not editable by this Zotero user | Check the group's permissions in Zotero |
+| `accepted; not verified: <reason>` | Zotero took the request but the read-back did not show the change | Check the object in Zotero before repeating; the change may have landed |
+| `--apply requires --expect-version` (usage error, exit 2) | The apply command was retyped without the expected-state flag | Copy the apply command the preview printed |
+
 ## Render failures
 
 | Symptom | Correct response |

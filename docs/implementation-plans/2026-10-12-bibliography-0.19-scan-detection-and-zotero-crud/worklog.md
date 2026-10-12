@@ -205,3 +205,77 @@ Evidence:
   4TU2XD9B, D7IV2YRB marked), exit 0; `update_item.py --list "Sage SRM Guide"` → `35
   top-level items`, exit 0. The design's L1 count of 26 predates additions to the
   collection; UAT compares against Zotero's pane.
+
+Checkpoint: `8ad11d0` (Outcome B).
+
+## 2026-10-12 — Outcome C: write primitive, membership, item trash and restore
+
+Changed surfaces:
+
+- `zotero_local_api.py`: `StockWriteUnavailable`, `WriteResult`, `require_stock_writes`
+  (`zotero_auth.server_id()` is None → raises, no request), `_http_request` seam
+  (`httpx.request`), `read_object` (GET with `includeTrashed=1` by default,
+  `LibraryQueryError` on non-2xx), `get_item_children`, pure `classify_write_reply`,
+  `write_object` (PATCH with `credentials()` + `If-Unmodified-Since-Version`; 204 →
+  `accepted` with `Last-Modified-Version`; 412 naming `Zotero-Server-ID` → `refused`;
+  other 412 → `conflict` with a fresh `read_object`, never retried; 401 → `forget_key`
+  and one retry; 403 → `refused` naming the library; 428 → `refused`; else `failed`),
+  `create_objects` (POST ≤ 50 bodies, 401 retried once, non-200 raises). The module
+  now imports `zotero_auth` (sys.path insert, as resolve.py does).
+- New `write_gate.py`. The plan sketched `check_gate(args, cls, *, previewed)`; the
+  implemented split is `add_gate_arguments(parser, cls)`, `missing_expectations(args,
+  required)` (the caller names what its run needs, so a create without a parent does
+  not need `--expect-parent`), `expected_from_args`, `state_refusal(expected, current)`
+  (`changed since preview: version is N, expected M` / `target changed: <name> is K,
+  expected X`), `format_apply_command(argv, expected)` (repeats the invocation minus
+  stale gate flags, shell-quoted), and `report(accepted=, verified=, reason=)`.
+- New `item_collections.py` (`--key K [--library L] (--add C | --remove C)`): modify
+  class; preview GET-only with title, citekey, library, version, collections before and
+  after with names, and the apply command; `No change` when the target is already
+  present or absent; apply re-reads, refuses `changed since preview`, PATCHes the merged
+  array, reads back, verifies presence or absence of the target key.
+- New `trash_item.py` (`--key K [--library L] [--restore]`): modify class; preview
+  shows type, title, citekey, library, parent key and title, file name and size from
+  `~/Zotero/storage/<key>/<filename>` when present (`STORAGE_ROOT`, an observation),
+  `owl:sameAs` relations, child count with "they follow it into the trash", `deleted`,
+  version, apply command; `No change` when already in the requested state; apply
+  PATCHes `{"deleted": bool}` and verifies by read-back with the trash included.
+- Both helpers call `require_stock_writes()` first (preview included), then
+  `probe_api_plus()`, and handle `zotero_auth.AuthorizationError` like `update_item.py`.
+- Docs: `zotero-writes.md` ("Stock writes: preview, protect, report", the two helper
+  sections, no `DELETE`), `SKILL.md` (precondition 5 widened, new precondition 7 for
+  Zotero 10, two write-boundary rows, the GET-only preview and no-`DELETE` paragraph,
+  completion evidence names `accepted`/`verified`), `troubleshooting.md` ("Stock-API
+  write helpers" table). `tests/test_bibliography_skill.py` regex gains
+  `item_collections|trash_item`.
+- Tests: `tests/test_bibliography_zotero_local_api.py` (13 primitive cases over the
+  seam), `tests/test_bibliography_write_gate.py` (new, 16), `tests/test_bibliography_item_collections.py`
+  (new, 12: W4 preview GET-only and apply-without-flag usage error, W3 refusal before
+  any request, W1 version moved and 412 conflict with no success word, happy add and
+  remove with the exact PATCH body and headers, R1 read-back unchanged, no DELETE),
+  `tests/test_bibliography_trash_item.py` (new, 11: same shape plus parent child count,
+  trash and restore bodies, read-back with `includeTrashed`).
+
+Evidence:
+
+- Red: 13 primitive failures, then the helper suites failed on missing modules; after
+  implementation `uv run pytest tests/test_bibliography_*.py -q` → 421 passed; with
+  `tests/test_skill_*.py tests/test_academic_literature_helpers.py` → 1043 passed.
+  `SKILL.md` is 199 lines (limit 500).
+- `uvx ruff check` on the eight touched files: clean (a RUF100, an S105 on a loop
+  variable named `token`, a PLR0911 and a PLR0915 were fixed by restructuring;
+  `item_collections.main` was split into `print_preview` and `apply_change`).
+  `uvx ruff format --check plugins/denubis-academic` clean; under `tests/` the
+  formatter still flags 13 pre-existing files this work does not own
+  (`test_bibliography_copy.py` among them).
+- Live, read-only (no `--apply`): `item_collections.py --key 2B9HPL4W --add "Sage SRM
+  Guide"` → `No change: the item is already in UJPGKR74`, exit 0; `--remove` → preview
+  with `version: 487`, `after: (none)`, apply command ending `--apply --expect-version
+  487`, exit 0. `trash_item.py --key 2B9HPL4W` → `relation: owl:sameAs
+  http://zotero.org/groups/6556525/items/UTHVA3TP`, `children: 1 (they follow it into
+  the trash)`, `deleted: false`, `version: 487`; `trash_item.py --key D7IV2YRB
+  --restore` → `children: 2`, `deleted: true`, `version: 429`, apply command with
+  `--restore --apply --expect-version 429`. No write was sent (L2, L3 are UAT).
+- Not yet exercised live: a real PATCH (the 204/`Last-Modified-Version` contract and
+  the 412 collision are read from the installed source, not observed); UAT L2/L3 are
+  the first live writes.

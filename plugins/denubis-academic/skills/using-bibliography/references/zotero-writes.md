@@ -41,6 +41,83 @@ the user's and is never written. `DENUBIS_ZOTERO_KEY_STORE` overrides the path.
 The prompt appears at the first *writing* command, which for `update_item.py`
 and `copy_item.py` is the preview — both send a `POST` that changes nothing.
 Say so before running one, so an unexpected Zotero modal is not a surprise.
+The stock-API helpers below preview with `GET` only; their prompt appears at
+`--apply`.
+
+## Stock writes: preview, protect, report (0.19)
+
+`item_collections.py`, `trash_item.py`, `create_item.py`, and the write verbs
+of `collection.py` write through Zotero 10's own local API (ADR 0028). They
+refuse before any request on a Zotero without a `Zotero-Server-ID` header
+(`stock writes need Zotero 10`), resolve library and collection names through
+zotero-api-plus `/api/plus/libraries`, and share one gate:
+
+- **Preview** is the default and sends only `GET`s. It prints the object as
+  read, its `version`, the resulting state, and the exact apply command.
+- **Apply** is `--apply` plus the expected-state flag of the operation class.
+  The *modify* class (membership, trash, restore, rename) carries
+  `--expect-version N`: apply re-reads the object and stops with `changed
+  since preview` if its version differs, then writes with
+  `If-Unmodified-Since-Version: N`, so a concurrent edit in the window after
+  the read is a `conflict` (Zotero's 412) that prints Zotero's current object
+  and is never retried. The *create* and *register* classes carry
+  `--expect-collection KEY`, `--expect-parent KEY`, `--expect-library ID` and
+  stop with `target changed` if a re-resolved key differs. There is no
+  universal `--expect-version`.
+- **Report**: the final line is `accepted; verified`, `accepted; not
+  verified: <reason>`, or `not accepted: <reason>`. `accepted` means Zotero
+  took the request (204 with `Last-Modified-Version`, or a `successful` entry
+  from a `POST`); `verified` means the helper read the object back and saw
+  the change. Only `accepted; verified` exits 0.
+
+No helper sends `DELETE`, which erases permanently: delete means trash
+(`PATCH {"deleted": true}`), and emptying the trash stays a human action in
+Zotero.
+
+Copy the apply command the preview printed rather than retyping it. Before
+running it, state the object, the change, and the version to the user and
+obtain confirmation.
+
+## File an existing item into a collection
+
+```bash
+uv run "$BIB/item_collections.py" --key <item-key> --add "<collection name or key>"
+uv run "$BIB/item_collections.py" --key <item-key> --remove "<collection name or key>"
+```
+
+The preview shows the item's title, library, version, and its `collections`
+before and after, with names. After confirmation run the printed command:
+
+```bash
+uv run "$BIB/item_collections.py" --key <item-key> --add "<collection>" \
+  --apply --expect-version <N>
+```
+
+Apply PATCHes the merged `collections` array and verifies by reading the item
+back. This files one existing record; `copy_item.py` copies between libraries
+with attachment top-up and must not be used to file an item.
+
+## Trash or restore an item or attachment
+
+```bash
+uv run "$BIB/trash_item.py" --key <item-or-attachment-key>
+uv run "$BIB/trash_item.py" --key <item-or-attachment-key> --restore
+```
+
+The preview shows the type, title, parent (for an attachment or note), the
+file name and size, `owl:sameAs` relations, the child count (children follow a
+parent into the trash), the current `deleted` flag, and the version. After
+confirmation run the printed command with `--apply --expect-version <N>`.
+Apply PATCHes `deleted` and verifies by reading the object back with the trash
+included.
+
+A child (attachment or note) is in the trash whenever its parent is, whatever
+its own `deleted` flag says; that is Zotero's own `isInTrash()`, and the stock
+API reports only the child's flag. The helper reads the parent, shows the
+state on the `deleted:` line (`false (in the trash through parent KEY)`), and
+`--restore` on such a child writes nothing: it prints the parent's restore
+command and ends `not accepted: in the trash through parent KEY`. Restore the
+parent first; a child whose own flag is set needs its own restore afterwards.
 
 ## List a collection (read-only)
 

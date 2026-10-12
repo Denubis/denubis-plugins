@@ -59,8 +59,12 @@ Before any bibliography operation:
    metadata. Rendering dependencies are acquired from the script metadata;
    never override the configured package or model caches.
 5. Treat `zotero-api-plus` as an optional, capability-probed extension. Pure
-   resolution and rendering do not require it; Zotero writes and forced BBT
-   refreshes do.
+   resolution and rendering do not require it; every write helper (for library
+   and collection name resolution, even when the write itself goes to stock
+   Zotero), the collection listing, and forced BBT refreshes do.
+7. Stock-API writes (`item_collections.py`, `trash_item.py`, `create_item.py`,
+   `collection.py` write verbs) need Zotero 10: each refuses before any request
+   on a Zotero without a `Zotero-Server-ID` header.
 6. On Zotero 10, every local-API write needs a one-time authorisation. The
    first writing command on a machine makes Zotero show an Allow / Always
    Allow / Deny prompt: tell the user to choose **Always Allow**, or every
@@ -163,6 +167,8 @@ change user-owned state and require the procedure's preview and confirmation:
 | Fetch missing paper | `fetch.py` without `--fetch` | Explicit confirmation, then `--fetch` |
 | Copy item/library attachment | `copy_item.py` without `--copy` | Explicit confirmation, then `--copy` |
 | Repair metadata | `update_item.py` without `--apply` | Show diff and receive approval, then `--apply` |
+| File an item into or out of a collection (modify class) | `item_collections.py --key K --add/--remove C` | Preview shows title, version, collections before and after; approval, then the printed `--apply --expect-version N` |
+| Trash or restore an item or attachment (modify class) | `trash_item.py --key K [--restore]` | Preview shows type, title, parent, file, relations, child count, `deleted` (named through the parent when the parent is trashed), version; approval, then the printed `--apply --expect-version N`; `--restore` on a child of a trashed parent writes nothing and prints the parent's restore command |
 | Add PDF annotation | `annotate.py --dry-run` | Explicit instruction to annotate; then omit `--dry-run` |
 | Create zettelkasten/project notes | Draft path and content | Follow project rules and obtain any required confirmation |
 | Create config or zettelkasten layout | Explain exact paths | User creates them or explicitly authorises creation |
@@ -170,10 +176,13 @@ change user-owned state and require the procedure's preview and confirmation:
 Never treat a request to ingest, read, or cite papers as consent to add items to
 Zotero. Never hand-edit a BBT-generated bibliography.
 
-On Zotero 10 the previews are themselves credentialed `POST`s — `update_item.py`
-computes its diff server-side, and `copy_item.py` probes the endpoint — so the
-authorisation prompt appears at the preview, before anything is written. The
-preview still writes nothing; the write gate in the table above is unchanged.
+On Zotero 10 the `update_item.py` and `copy_item.py` previews are themselves
+credentialed `POST`s — one computes its diff server-side, the other probes the
+endpoint — so the authorisation prompt appears at the preview, before anything
+is written. The stock-API helpers preview with `GET` only and prompt at
+`--apply`. Every preview writes nothing; the write gate in the table above is
+unchanged. No helper sends `DELETE`: delete means trash, restore is the
+reverse, and emptying the trash stays a human action in Zotero.
 
 ## Completion evidence
 
@@ -185,7 +194,10 @@ Report only evidence appropriate to the operation:
 - quote: its state (`located`, `verified`, `contradicted`, or `unverified`), the
   physical page, and for `verified` or `contradicted` the source check that was
   made;
-- Zotero write: approved preview, endpoint result, and post-write read-back;
+- Zotero write: the approved preview, then `accepted` and `verified` reported
+  separately as the helper's final line, naming the read-back (or, for an
+  export, the completion and content observations); `accepted; not verified`
+  is not success;
 - bib refresh: the registered auto-export ran and the exact citekey parsed from
   the resulting well-formed bibliography;
 - install/migration: current marketplace entry, installed plugin name/version, and

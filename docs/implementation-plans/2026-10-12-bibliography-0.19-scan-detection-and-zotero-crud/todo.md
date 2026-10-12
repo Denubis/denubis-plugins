@@ -3,17 +3,6 @@
 Plan: `plan.md` in this directory. Each outcome is done when its verification block
 passes and its evidence is in `worklog.md`.
 
-## Outcome C: write primitive, membership, item trash/restore
-- [ ] Red: primitive over the stubbed seam (headers, version header, 204, 412 conflict, 412 server-ID body, 401 retry, `require_stock_writes`)
-- [ ] Red: `write_gate.py` flag sets per class, refusals, report lines and exit codes
-- [ ] Red: `item_collections.py` and `trash_item.py` cases W1, W3, W4, R1
-- [ ] Green: `zotero_local_api.py` primitive (`read_object`, `write_object`, `create_objects`, `_http_request` seam, `StockWriteUnavailable`)
-- [ ] Green: `write_gate.py`
-- [ ] Green: `item_collections.py`
-- [ ] Green: `trash_item.py`
-- [ ] Docs: `zotero-writes.md`, `SKILL.md` rows and Zotero 10 precondition, `troubleshooting.md` rows; regex update
-- [ ] Verification block C; checkpoint commit
-
 ## Outcome D: item creation and collection CRUD
 - [ ] Red: `create_item.py` W2 cases; `collection.py` verbs (descendant listing at trash time with a stub that excludes trashed children, trash output prints the `--restore … --descendants` command, restore order with `--descendants`, `descendants unknown` without it, parser rejects two verbs, no DELETE in any request log)
 - [ ] Green: `create_item.py`

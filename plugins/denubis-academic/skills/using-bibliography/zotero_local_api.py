@@ -50,12 +50,21 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# The write primitive carries zotero_auth's credentials; its pure core stays
+# importable without httpx, like the rest of this module.
+import zotero_auth
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 LOCAL_API_BASE = "http://localhost:23119/api"
+
+# Zotero's writeMultipleObjects accepts at most this many objects per POST.
+_CREATE_BATCH_LIMIT = 50
 
 # Zotero's item read API caps a page at 100.
 _PAGE = 100
@@ -376,3 +385,220 @@ def search_doi_field(doi: str) -> list[str]:
     found = search_doi_items(doi)
     warn_unsearched_libraries(found)
     return doi_citekeys(found.items, doi)
+
+
+# --- Stock write primitive (Zotero 10, ADR 0028) -------------------------------
+#
+# Zotero 10's local API writes items and collections behind the server-ID and
+# API-key gate zotero_auth already satisfies. Read in the installed 10.0.6
+# server_localAPI.js (2026-10-12): PATCH /items/<key> and /collections/<key>
+# merge the body over the object's JSON, require If-Unmodified-Since-Version,
+# answer 412 on a mismatch and 204 with Last-Modified-Version on success; POST
+# /items and /collections take up to 50 objects and return {successful,
+# unchanged, failed}. DELETE erases permanently and is never sent (delete
+# means trash: PATCH {"deleted": true}).
+#
+# Stock 412 collides with zotero_auth's server-ID-mismatch 412, so this
+# primitive sends its own request rather than going through zotero_auth.post:
+# a 412 whose body names the server ID is `refused`; any other 412 is a
+# `conflict`, reported with Zotero's current object and never retried.
+
+ObjectKind = Literal["items", "collections"]
+WriteStatus = Literal["accepted", "conflict", "refused", "failed"]
+
+
+class StockWriteUnavailable(RuntimeError):
+    """This Zotero has no server ID, so it has no stock write routes (7-9)."""
+
+
+@dataclass(frozen=True)
+class WriteResult:
+    """What Zotero said to one PATCH.
+
+    accepted: 204; `version` is Last-Modified-Version.
+    conflict: 412 on If-Unmodified-Since-Version; `current` is the object as
+      Zotero now holds it. Never retried.
+    refused: a credential or permission answer (401 after one retry, 403,
+      412 naming the server ID, 428).
+    failed: anything else, with Zotero's body.
+    """
+
+    status: WriteStatus
+    version: int | None
+    body: str
+    current: dict | None = None
+
+
+def require_stock_writes() -> None:
+    """Refuse, before any request, on a Zotero without a server ID."""
+    if not zotero_auth.server_id():
+        raise StockWriteUnavailable(
+            "stock writes need Zotero 10: this Zotero sends no Zotero-Server-ID "
+            "header, so it has no local-API write routes."
+        )
+
+
+def _http_request(
+    method: str,
+    url: str,
+    *,
+    headers: dict | None = None,
+    json=None,
+    params: dict | None = None,
+    timeout: float = 30.0,
+):
+    """The one httpx seam every read and write of this primitive goes through."""
+    import httpx  # noqa: PLC0415
+
+    return httpx.request(
+        method, url, headers=headers, json=json, params=params, timeout=timeout
+    )
+
+
+def _object_url(library: dict, kind: ObjectKind, key: str | None = None) -> str:
+    url = f"{LOCAL_API_BASE}{library_base(library)}/{kind}"
+    return f"{url}/{key}" if key else url
+
+
+def read_object(
+    library: dict,
+    kind: ObjectKind,
+    key: str,
+    *,
+    include_trashed: bool = True,
+    timeout: float = 30.0,
+) -> dict:
+    """GET one item or collection envelope; trashed objects included by default.
+
+    Raises LibraryQueryError on a non-2xx status.
+    """
+    params: dict = {"format": "json"}
+    if include_trashed:
+        params["includeTrashed"] = 1
+    reply = _http_request(
+        "GET", _object_url(library, kind, key), params=params, timeout=timeout
+    )
+    if not 200 <= reply.status_code < 300:
+        raise LibraryQueryError(
+            f"GET {kind}/{key}: HTTP {reply.status_code}: {reply.text.strip()[:200]}"
+        )
+    return reply.json()
+
+
+def get_item_children(library: dict, key: str, *, timeout: float = 30.0) -> list[dict]:
+    """`/items/<key>/children` with the trash included; [] when it has none."""
+    url = f"{_object_url(library, 'items', key)}/children"
+    reply = _http_request(
+        "GET", url, params={"format": "json", "includeTrashed": 1}, timeout=timeout
+    )
+    if not 200 <= reply.status_code < 300:
+        raise LibraryQueryError(f"GET items/{key}/children: HTTP {reply.status_code}")
+    body = reply.json()
+    return body if isinstance(body, list) else []
+
+
+def classify_write_reply(
+    status: int, version_header: str | None, body: str, *, library_name: str
+) -> WriteResult:
+    """Map one PATCH reply to a WriteResult (pure; `current` is filled by the
+    shell on a conflict)."""
+    text = (body or "").strip()
+    if status == 204:
+        version = None
+        if version_header and version_header.strip().isdigit():
+            version = int(version_header.strip())
+        return WriteResult("accepted", version, text)
+    if status == 412 and "zotero-server-id" not in text.lower():
+        return WriteResult("conflict", None, text)
+    refusals = {
+        412: f"server id: {text}",
+        401: f"HTTP 401: {text}",
+        403: f"HTTP 403: {library_name!r} is not editable by this Zotero user ({text})",
+        428: f"HTTP 428: {text}",
+    }
+    if status in refusals:
+        return WriteResult("refused", None, refusals[status])
+    return WriteResult("failed", None, f"HTTP {status}: {text}")
+
+
+def write_object(
+    library: dict,
+    kind: ObjectKind,
+    key: str,
+    body: dict,
+    expected_version: int,
+    *,
+    timeout: float = 30.0,
+) -> WriteResult:
+    """PATCH one item or collection, protected by `expected_version`.
+
+    Carries zotero_auth's credentials and If-Unmodified-Since-Version. A 401
+    discards the stored key and retries once (as zotero_auth.post does); a 412
+    is classified by classify_write_reply and a conflict is returned with the
+    object Zotero now holds. Nothing is retried after that.
+    """
+    url = _object_url(library, kind, key)
+
+    def send() -> WriteResult:
+        headers = {
+            **zotero_auth.credentials(),
+            "If-Unmodified-Since-Version": str(expected_version),
+        }
+        reply = _http_request("PATCH", url, headers=headers, json=body, timeout=timeout)
+        return classify_write_reply(
+            reply.status_code,
+            reply.headers.get("Last-Modified-Version"),
+            reply.text,
+            library_name=library.get("name", "?"),
+        ), reply.status_code
+
+    result, status = send()
+    if status == 401:
+        stale = zotero_auth.server_id()
+        if stale:
+            zotero_auth.forget_key(stale)
+        result, _status = send()
+    if result.status == "conflict":
+        try:
+            current = read_object(library, kind, key, timeout=timeout)
+        except LibraryQueryError as error:
+            current = {"error": str(error)}
+        result = WriteResult("conflict", None, result.body, current)
+    return result
+
+
+def create_objects(
+    library: dict, kind: ObjectKind, bodies: list[dict], *, timeout: float = 30.0
+) -> dict:
+    """POST up to 50 new items or collections; return Zotero's
+    `{successful, unchanged, failed}` report.
+
+    A 401 discards the stored key and retries once. Any other non-200 raises
+    LibraryQueryError with the status and body: nothing about a refused POST
+    is a partial success.
+    """
+    if len(bodies) > _CREATE_BATCH_LIMIT:
+        raise ValueError(
+            f"Zotero accepts at most {_CREATE_BATCH_LIMIT} objects per POST, "
+            f"got {len(bodies)}"
+        )
+    url = _object_url(library, kind)
+    reply = _http_request(
+        "POST", url, headers=zotero_auth.credentials(), json=bodies, timeout=timeout
+    )
+    if reply.status_code == 401:
+        stale = zotero_auth.server_id()
+        if stale:
+            zotero_auth.forget_key(stale)
+        reply = _http_request(
+            "POST",
+            url,
+            headers=zotero_auth.credentials(),
+            json=bodies,
+            timeout=timeout,
+        )
+    if reply.status_code != 200:
+        raise LibraryQueryError(
+            f"POST {kind}: HTTP {reply.status_code}: {reply.text.strip()[:300]}"
+        )
+    return reply.json()
