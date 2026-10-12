@@ -60,7 +60,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # the credentials. Better BibTeX's own JSON-RPC endpoint is served outside that
 # base class and stays a bare POST. Zotero 7-9 are unaffected either way.
 import zotero_auth
-from renderer import render_metadata_is_current
+from renderer import extraction_label, render_metadata_is_current, suggests_forced_ocr
 from zotero_local_api import LibrarySearch, search_doi_items, search_items
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
@@ -752,7 +752,9 @@ def check_rendered(info: dict, papers_dir: Path, *, force: bool = False) -> dict
     return {**info, "rendered": rendered, "out_dir": out_dir}
 
 
-def _render_cmd(pdf: Path, out_dir: Path, *, allow_mocr: bool = False) -> list[str]:
+def _render_cmd(
+    pdf: Path, out_dir: Path, *, allow_mocr: bool = False, force_ocr: bool = False
+) -> list[str]:
     """Build the uv command that renders via render.py.
 
     render.py has NO PEP 723 header — it requires its render deps passed on the
@@ -776,10 +778,14 @@ def _render_cmd(pdf: Path, out_dir: Path, *, allow_mocr: bool = False) -> list[s
     ]
     if allow_mocr:
         cmd.append("--allow-mocr")
+    if force_ocr:
+        cmd.append("--force-ocr")
     return cmd
 
 
-def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False) -> str:
+def render_via_subprocess(
+    pdf: Path, out_dir: Path, *, allow_mocr: bool = False, force_ocr: bool = False
+) -> str:
     """Render a PDF by delegating to render.py as a subprocess.
 
     Keeps resolve.py's PEP 723 header httpx-only — heavy render deps (pymupdf4llm,
@@ -788,7 +794,7 @@ def render_via_subprocess(pdf: Path, out_dir: Path, *, allow_mocr: bool = False)
     Returns one of: 'rendered' | 'needs-mocr' | 'failed'.
     Exit codes from render.py: 0 = success, 3 = NeedsMocr, 1 = hard failure.
     """
-    cmd = _render_cmd(pdf, out_dir, allow_mocr=allow_mocr)
+    cmd = _render_cmd(pdf, out_dir, allow_mocr=allow_mocr, force_ocr=force_ocr)
     proc = subprocess.run(cmd, check=False)  # returncode inspected below
     if proc.returncode == 0:
         return "rendered"
@@ -996,6 +1002,29 @@ def print_no_match(
         )
 
 
+def read_render_record(out_dir: Path | None) -> dict | None:
+    """The render's meta.json as a dict, or None when absent or unreadable."""
+    if out_dir is None:
+        return None
+    try:
+        record = json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def render_state_detail(meta: dict | None) -> str:
+    """The parenthesised extraction summary after `rendered`: the extraction
+    label and the first limitation, from the record on disk."""
+    if not meta or not meta.get("extraction"):
+        return ""
+    detail = extraction_label(meta)
+    limitations = meta.get("limitations") or []
+    if limitations:
+        detail += f"; {limitations[0]}"
+    return f" ({detail})"
+
+
 def print_match(info: dict, state: str) -> None:
     """Print a truthful per-match block to stdout."""
     p = info["paper"]
@@ -1023,10 +1052,19 @@ def print_match(info: dict, state: str) -> None:
         )
     else:
         print("  attachment: (no PDF or HTML snapshot)", flush=True)
-    print(f"  state:      {state}", flush=True)
+    meta = read_render_record(info.get("out_dir")) if state == "rendered" else None
+    print(f"  state:      {state}{render_state_detail(meta)}", flush=True)
     # Only advertise a render dir when a render actually exists there.
     if state == "rendered" and info.get("out_dir"):
         print(f"  render dir: {info['out_dir']}", flush=True)
+    if meta and suggests_forced_ocr(meta):
+        # Advice, not a verdict: the reader checks the source page either way.
+        print(
+            "  advice:     the text layer looks like third-party OCR; "
+            "re-run with --force-ocr to read the page images instead "
+            "(exact quotations need a source-page check in either case).",
+            flush=True,
+        )
 
 
 def report_near_matches(
@@ -1141,6 +1179,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "Escalate to dots.mocr (GPU) if the render cascade cannot produce a "
             "usable render. Passed through to render.py. Requires [mocr] in "
             "config.toml."
+        ),
+    )
+    parser.add_argument(
+        "--force-ocr",
+        action="store_true",
+        help=(
+            "Re-render through OCR even when the embedded text layer passes the "
+            "quality gate: skips the text-layer tiers (with --allow-mocr, goes "
+            "straight to dots.mocr). Implies --force. For a scan whose text "
+            "layer is itself third-party OCR."
         ),
     )
     parser.add_argument(
@@ -1291,7 +1339,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     render_errors = 0
     for paper in papers:
         info = enrich_paper(paper, library_map)
-        info = check_rendered(info, papers_dir, force=args.force)
+        # --force-ocr bypasses the cache too: a scan whose embedded layer
+        # passed the gate has a CURRENT render and would never be re-rendered.
+        info = check_rendered(info, papers_dir, force=args.force or args.force_ocr)
 
         state = classify_state(
             found=True,
@@ -1311,7 +1361,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             assert pdf is not None and out_dir is not None  # noqa: S101
             print(f"\n  [rendering {paper.citekey} via render.py ...]", flush=True)
             render_result = render_via_subprocess(
-                pdf, out_dir, allow_mocr=args.allow_mocr
+                pdf, out_dir, allow_mocr=args.allow_mocr, force_ocr=args.force_ocr
             )
             if render_result == "rendered":
                 state = "rendered"

@@ -10,6 +10,7 @@ talks to Zotero is verified live, not exercised here.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -207,6 +208,173 @@ def test_render_cmd_passes_heavy_deps_to_render_py():
 def test_render_cmd_appends_allow_mocr():
     cmd = resolve._render_cmd(Path("/tmp/x.pdf"), Path("/tmp/out"), allow_mocr=True)
     assert cmd[-1] == "--allow-mocr"
+
+
+def test_render_cmd_appends_force_ocr():
+    cmd = resolve._render_cmd(Path("/tmp/x.pdf"), Path("/tmp/out"), force_ocr=True)
+    assert "--force-ocr" in cmd
+    assert "--allow-mocr" not in cmd
+
+
+# --- state line: extraction record and the forced-OCR advisory (0.19) --------
+#
+# The state line reports what meta.json says about extraction and its first
+# limitation. The advisory is advice to re-render through OCR, never a verdict
+# on whether the text may be quoted.
+
+
+def _rendered_info(tmp_path, meta):
+    out = tmp_path / "papers" / "k2020"
+    out.mkdir(parents=True)
+    (out / "meta.json").write_text(json.dumps(meta))
+    (out / "full.md").write_text("text")
+    return {
+        "paper": _paper("k2020"),
+        "collections": [],
+        "pdf_path": Path("/x.pdf"),
+        "pdf_exists": True,
+        "pdf_status": "present",
+        "rendered": True,
+        "out_dir": out,
+    }
+
+
+def test_print_match_shows_extraction_and_first_limitation(tmp_path, capsys):
+    info = _rendered_info(
+        tmp_path,
+        {
+            "render_version": 3,
+            "renderer": "pymupdf4llm",
+            "ocr": False,
+            "extraction": "text-layer",
+            "forced": False,
+            "limitations": [
+                "311 of 311 pages carry a page-sized image; the text layer is likely "
+                "third-party OCR (producer: Adobe Acrobat 9.55 Paper Capture Plug-in)",
+                "7 pages have no extractable text",
+            ],
+        },
+    )
+    resolve.print_match(info, "rendered")
+    out = capsys.readouterr().out
+    assert (
+        "state:      rendered (text-layer; 311 of 311 pages carry a page-sized image"
+        in out
+    )
+    assert "--force-ocr" in out
+    assert "7 pages have no extractable text" not in out  # first limitation only
+
+
+def test_print_match_without_limitations_gives_no_advice(tmp_path, capsys):
+    info = _rendered_info(
+        tmp_path,
+        {
+            "render_version": 3,
+            "renderer": "pymupdf4llm",
+            "ocr": False,
+            "extraction": "text-layer",
+            "forced": False,
+            "limitations": [],
+        },
+    )
+    resolve.print_match(info, "rendered")
+    out = capsys.readouterr().out
+    assert "state:      rendered (text-layer)" in out
+    assert "--force-ocr" not in out
+
+
+def test_print_match_after_forced_ocr_reports_ocr_and_no_advice(tmp_path, capsys):
+    info = _rendered_info(
+        tmp_path,
+        {
+            "render_version": 3,
+            "renderer": "docling",
+            "ocr": True,
+            "extraction": "ocr",
+            "forced": True,
+            "limitations": ["311 of 311 pages carry a page-sized image; x"],
+        },
+    )
+    resolve.print_match(info, "rendered")
+    out = capsys.readouterr().out
+    assert "state:      rendered (ocr, forced; 311 of 311 pages" in out
+    assert "--force-ocr" not in out
+
+
+# --- main(): --force-ocr bypasses a current cache ---------------------------
+#
+# A scan whose embedded text layer passed the quality gate has a CURRENT
+# render, so without the bypass `--force-ocr` would never reach render.py.
+
+
+def _run_main(monkeypatch, tmp_path, argv, *, cache_current):
+    papers_root = tmp_path / "zk"
+    (papers_root / "papers").mkdir(parents=True)
+    out = papers_root / "papers" / _KUDINA_CITEKEY
+    if cache_current:
+        out.mkdir()
+        (out / "full.md").write_text("cached")
+        (out / "meta.json").write_text(
+            json.dumps({"render_version": 3, "renderer": "pymupdf4llm"})
+        )
+    monkeypatch.setattr(
+        resolve, "load_config", lambda: {"zettelkasten_root": papers_root}
+    )
+    monkeypatch.setattr(resolve, "probe_zotero", lambda: None)
+    monkeypatch.setattr(resolve, "build_library_map", lambda: {"My Library": 1})
+    monkeypatch.setattr(
+        resolve,
+        "search_items",
+        lambda _q, **_k: resolve.LibrarySearch(
+            items=(_kudina_local_item("My Library"),), failed_libraries=()
+        ),
+    )
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    def fake_rpc(method, params, *_a, **_k):
+        if method == "item.collections":
+            return {}
+        if method == "item.attachments":
+            return [{"path": str(pdf)}]
+        raise AssertionError(method)
+
+    monkeypatch.setattr(resolve, "rpc", fake_rpc)
+    renders: list[dict] = []
+
+    def fake_render(pdf_path, out_dir, *, allow_mocr=False, force_ocr=False):
+        renders.append({"allow_mocr": allow_mocr, "force_ocr": force_ocr})
+        out_dir.mkdir(exist_ok=True)
+        (out_dir / "full.md").write_text("fresh")
+        (out_dir / "meta.json").write_text(
+            json.dumps({"render_version": 3, "extraction": "ocr", "forced": True})
+        )
+        return "rendered"
+
+    monkeypatch.setattr(resolve, "render_via_subprocess", fake_render)
+    monkeypatch.setattr(sys, "argv", ["resolve.py", *argv])
+    code = resolve.main()
+    return code, renders
+
+
+def test_force_ocr_re_renders_a_current_cache(monkeypatch, tmp_path):
+    code, renders = _run_main(
+        monkeypatch,
+        tmp_path,
+        ["--citekey", _KUDINA_CITEKEY, "--force-ocr"],
+        cache_current=True,
+    )
+    assert code == 0
+    assert renders == [{"allow_mocr": False, "force_ocr": True}]
+
+
+def test_current_cache_is_not_re_rendered_without_a_force_flag(monkeypatch, tmp_path):
+    """Positive control for the bypass: the cache still short-circuits."""
+    code, renders = _run_main(
+        monkeypatch, tmp_path, ["--citekey", _KUDINA_CITEKEY], cache_current=True
+    )
+    assert code == 0
+    assert renders == []
 
 
 # --- paper_from_local_item: the one Paper producer ---------------------------

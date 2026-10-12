@@ -123,20 +123,34 @@ boundary; metadata landing pages and abstracts may be inspected without import.
 Reference managed sources in evidence records rather than creating another PDF
 or full-text extraction corpus. This boundary also applies to delegated reviewers.
 
-`meta.json` decides what a quotation claim can mean:
+### Quoting rule (Contract 1)
 
-- With `"ocr": false`, rendered page Markdown is the controlled reading text.
-  Copy exact quotations from the matching `pages/NNN.md` and retain its physical
-  page number.
-- With `"ocr": true`, rendered Markdown is a locator, not authoritative exact
-  wording. It may support a paraphrase or a candidate quotation, but the exact
-  quotation must be visually checked against the source PDF before it is called
-  verified.
-- `blockquote.py` proves that a string occurs in rendered Markdown. It does not
-  independently prove an OCR transcription against the PDF.
+Rendered Markdown, for every renderer and every source type, is a reading text
+and a locator. It is never exact-quotation authority on its own, whatever
+`meta.json` records. A quotation carries one of four states:
 
-Never fabricate wording after `NO MATCH`. Mark it unverified and surface the
-gap.
+- `located`: the wording was found in the render (`blockquote.py` proves this
+  and labels its hits so);
+- `verified`: the wording was checked against the source document itself, at
+  the physical page the render names: the PDF page image, or the HTML snapshot
+  or original attachment for non-PDF sources, and it matched;
+- `contradicted`: the wording was found in the render, but the source page,
+  inspected the same way, reads differently. The render's wording is never
+  quoted; quote the source page's wording as a new `verified` candidate, or
+  quote nothing;
+- `unverified`: none of these, including every `NO MATCH`.
+
+Every exact quotation is checked against the source before it is called
+`verified`. `blockquote.py` locates; it does not verify. Never fabricate wording
+after `NO MATCH`; mark it `unverified` and surface the gap.
+
+`meta.json` describes extraction, not safety: `extraction` is `text-layer`,
+`ocr`, or `converted`; `forced` says `--force-ocr` chose the tier; `limitations`
+lists what the renderer could cheaply observe (page-sized images and the
+producer, pages without text, replacement characters). The resolver's state line
+shows the extraction and the first limitation and may advise `--force-ocr` for a
+scan whose text layer is itself OCR. That advice changes which render you read;
+it does not change the verification duty above.
 
 ## Write boundary
 
@@ -165,9 +179,11 @@ preview still writes nothing; the write gate in the table above is unchanged.
 Report only evidence appropriate to the operation:
 
 - resolution: exact returned citekey, library, attachment state, and exit code;
-- render: non-empty `full.md`, `pages/`, and `meta.json`, including renderer and
-  OCR flag;
-- quote: page-keyed text match plus PDF visual verification when OCR was used;
+- render: non-empty `full.md`, `pages/`, and `meta.json`, including renderer,
+  extraction, and limitations;
+- quote: its state (`located`, `verified`, `contradicted`, or `unverified`), the
+  physical page, and for `verified` or `contradicted` the source check that was
+  made;
 - Zotero write: approved preview, endpoint result, and post-write read-back;
 - bib refresh: the registered auto-export ran and the exact citekey parsed from
   the resulting well-formed bibliography;

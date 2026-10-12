@@ -73,6 +73,9 @@ Deleting it only forces one more prompt. Zotero 7-9 never reach this path.
 | Non-PDF/non-HTML attachment fails | Verify `pandoc` is installed and on `PATH` |
 | First OCR run downloads large dependencies/models | Use configured caches; never redirect package or model cache locations |
 | Claimed render but no paper text | Positively check non-empty `full.md`, `meta.json`, and `pages/` |
+| `advice: … re-run with --force-ocr` | The text layer sits under page-sized images on most pages (likely third-party OCR). Decide whether to re-render through OCR; either render still needs the source-page check for quotations |
+| A paper rendered before 0.19 re-renders on next use | Expected: records below `render_version` 3 lack the extraction record |
+| `limitation: source could not be described: …` | `describe_pdf` failed (PyMuPDF missing or an unreadable file); the render stands, the limitations list is incomplete |
 
 Docling is deliberately pinned to EasyOCR by `renderer.py`; bypassing that code
 can select a different engine and unexpected model host. The normal cascade is
@@ -85,8 +88,9 @@ for a substring in page Markdown. `NO MATCH` can mean extraction drift, a table
 boundary, a paraphrase mistaken for a quotation, or genuinely absent wording.
 Try a shorter exact substring and inspect the matching page; never invent text.
 
-For `meta.json` with `ocr: true`, a Markdown match is still only a locator. The
-exact quote is unverified until visually checked against the physical PDF page.
+A Markdown match is `located`, whatever `meta.json` records about extraction.
+The quotation is `verified` only after the physical source page has been
+inspected; `NO MATCH` leaves it `unverified`.
 
 ## Platform notes
 
@@ -106,5 +110,5 @@ exact quote is unverified until visually checked against the physical PDF page.
 
 The skill does not automatically build the central zettelkasten bibliography,
 generate permanent notes without an explicit request, bypass publisher/EZProxy
-SSL, or verify OCR quotations without visual source inspection. State the limit
+SSL, or verify a quotation without inspecting the source page. State the limit
 instead of improvising another toolchain.

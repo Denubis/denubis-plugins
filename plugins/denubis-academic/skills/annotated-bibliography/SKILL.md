@@ -17,8 +17,9 @@ if the task first needs new sources. Do not silently expand the source set.
 ## Prepare once
 
 Resolve each source through the bibliography front door, then inspect its
-`meta.json`, physical page files and extraction limitations. Re-render legacy
-PyMuPDF/Docling caches before relying on their OCR flags or page assignments.
+`meta.json` (`extraction`, `forced`, `limitations`), and physical page files.
+A cache below render version 3 re-renders on its next resolve; do not rely on
+an older record's page assignments.
 Give each source its own working entry and record the source hash. Do not copy
 PDF text into a tracked project corpus or start another extraction pipeline.
 
@@ -51,19 +52,25 @@ worker is not a completed entry.
    return changed interpretations to review. Preserve unresolved disagreements
    and stop when resolving them requires new evidence or an author decision.
 
-For OCR, inspect the matching physical PDF page before calling exact wording
-verified. Record which span/page was inspected, by whom, and any discrepancy.
-Uninspected spans remain candidates even after a successful text check. Printed
-page labels require separate verification; never treat the physical file number
-as the printed citation page by default.
+Quotation states follow using-bibliography's quoting rule (Contract 1): a text
+check makes a quotation `located`; it is `verified` only after the matching
+physical page (the PDF page image, or the snapshot or attachment for non-PDF
+sources) has been inspected and matched, whatever `meta.json` says about
+extraction; `contradicted` when that inspection shows the page reads
+differently, in which case the render's wording is never quoted; otherwise it
+is `unverified`. Record which span/page was inspected, by whom,
+and any discrepancy. Uninspected spans remain candidates even after a
+successful text check. Printed page labels require separate verification;
+never treat the physical file number as the printed citation page by default.
 
 ## Deliver
 
 Write entries to the project's chosen literature-note location, following
 using-bibliography's note conventions (`ai-generated: true`, human `verified-by`
 unset until actually verified). Keep the working entry and review dispositions
-available for audit. Report source coverage, text-check count, OCR visual-check
-state, interpretation-review state and any unresolved points separately. Link
+available for audit. Report source coverage, text-check count, the quotation
+state of every exact span (`located`, `verified`, `contradicted`, `unverified`),
+interpretation-review state and any unresolved points separately. Link
 the source and use only the resolver's exact citekey. Do not write to Zotero or
 the central permanent-note collection without the corresponding authorisation.
 

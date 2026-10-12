@@ -92,11 +92,14 @@ def test_docling_isolates_pages_before_paragraph_merge_and_keeps_furniture(monke
         ),
     )
     calls = []
+    ocr_options = []
     texts = {1: "A paragraph ending on page 296.", 2: "Its continuation on page 297."}
 
     class Converter:
         def __init__(self, **kwargs):
-            pass
+            ocr_options.append(
+                kwargs["format_options"]["pdf"]["pipeline_options"]["ocr_options"]
+            )
 
         def convert(self, path, *, page_range):
             calls.append(page_range)
@@ -122,6 +125,7 @@ def test_docling_isolates_pages_before_paragraph_merge_and_keeps_furniture(monke
         ),
         "docling.datamodel.pipeline_options": SimpleNamespace(
             EasyOcrOptions=lambda **kw: kw,
+            OcrMode=SimpleNamespace(FULL_PAGE="full_page"),
             PdfPipelineOptions=lambda **kw: kw,
         ),
         "docling.document_converter": SimpleNamespace(
@@ -138,22 +142,36 @@ def test_docling_isolates_pages_before_paragraph_merge_and_keeps_furniture(monke
     pages = renderer._render_with_docling(Path("paper.pdf"), ocr=False)
     assert calls == [(1, 1), (2, 2)]
     assert pages == [texts[1] + "\n296", texts[2] + "\n297"]
+    # The ordinary OCR tier keeps Docling's default mode, which OCRs bitmap
+    # regions and keeps programmatic text cells. The forced tier OCRs the whole
+    # page so an embedded (third-party OCR) layer is replaced, not merged.
+    assert ocr_options[0] == {"lang": ["en"]}
+    renderer._render_with_docling(Path("paper.pdf"), ocr=True, full_page_ocr=True)
+    assert ocr_options[1] == {"lang": ["en"], "mode": "full_page"}
 
 
-@pytest.mark.parametrize("backend", ["pymupdf4llm", "docling"])
-def test_legacy_pdf_render_is_not_current(backend):
+# Every renderer that has ever written a meta.json. A pre-0.19 record of ANY of
+# them lacks the extraction record, so the version test exempts none of them.
+_EVERY_RENDERER = ["pymupdf4llm", "docling", "mocr", "html.parser", "pandoc"]
+
+
+@pytest.mark.parametrize("backend", _EVERY_RENDERER)
+def test_pre_019_render_is_stale_for_every_renderer(backend):
     assert not renderer.render_metadata_is_current({"renderer": backend, "ocr": False})
-    assert renderer.render_metadata_is_current(
-        {
-            "renderer": backend,
-            "render_version": renderer.RENDER_VERSION,
-        }
+    assert not renderer.render_metadata_is_current(
+        {"renderer": backend, "ocr": True, "render_version": 2}
     )
-    assert renderer.render_metadata_is_current({"renderer": "mocr", "ocr": True})
+    assert renderer.render_metadata_is_current(
+        {"renderer": backend, "render_version": renderer.RENDER_VERSION}
+    )
 
 
-@pytest.mark.parametrize("backend", ["pymupdf4llm", "docling"])
-def test_both_cache_readers_reject_legacy_pdf_metadata(tmp_path, monkeypatch, backend):
+def test_render_version_is_three():
+    assert renderer.RENDER_VERSION == 3
+
+
+@pytest.mark.parametrize("backend", _EVERY_RENDERER)
+def test_both_cache_readers_reject_pre_019_metadata(tmp_path, monkeypatch, backend):
     monkeypatch.syspath_prepend(str(_RENDERER.parent))
     import ingest
     import resolve
@@ -164,7 +182,8 @@ def test_both_cache_readers_reject_legacy_pdf_metadata(tmp_path, monkeypatch, ba
     (out / "full.md").write_text("Cached paper")
     meta = {
         "renderer": backend,
-        "ocr": False,
+        "ocr": backend == "mocr",
+        "render_version": 2,
         "sha256_prefix": hashlib.sha256(pdf.read_bytes()).hexdigest()[:16],
     }
     (out / "meta.json").write_text(json.dumps(meta))
@@ -186,6 +205,248 @@ def test_explicit_ocr_fallback_is_labelled(tmp_path, monkeypatch):
     meta = renderer.render_pdf_with_fallback(_fake_pdf(tmp_path), tmp_path / "out")
     assert meta["renderer"] == "docling"
     assert meta["ocr"] is True
+    assert meta["extraction"] == "ocr"
+    assert meta["forced"] is False
+
+
+# --- extraction record (0.19, Contract 1) ------------------------------------
+# meta.json describes how the text was extracted and what the renderer could
+# cheaply observe about the source. It never says the text is safe to quote.
+
+
+def _stub_describe(monkeypatch, description):
+    monkeypatch.setattr(renderer, "describe_pdf", lambda pdf: description)
+
+
+def test_write_outputs_records_extraction_forced_and_limitations(tmp_path):
+    out = tmp_path / "out"
+    meta = renderer._write_outputs(
+        ["Page one text. " * 10],
+        _fake_pdf(tmp_path),
+        out,
+        "pymupdf4llm",
+        False,
+        [],
+        extraction="text-layer",
+        forced=False,
+        limitations=["7 pages have no extractable text"],
+    )
+    on_disk = json.loads((out / "meta.json").read_text())
+    for record in (meta, on_disk):
+        assert record["extraction"] == "text-layer"
+        assert record["forced"] is False
+        assert record["limitations"] == ["7 pages have no extractable text"]
+        assert record["render_version"] == 3
+        # Existing readers keep their keys.
+        assert record["renderer"] == "pymupdf4llm"
+        assert record["ocr"] is False
+
+
+def test_unforced_text_layer_render_records_text_layer(tmp_path, monkeypatch):
+    _stub_describe(monkeypatch, None)
+    monkeypatch.setattr(
+        renderer, "_render_with_pymupdf4llm", lambda pdf: ["Clean text. " * 10]
+    )
+    meta = renderer.render_pdf_with_fallback(
+        _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None
+    )
+    assert meta["extraction"] == "text-layer"
+    assert meta["forced"] is False
+    assert meta["limitations"] == []
+
+
+def test_forced_ocr_skips_the_non_ocr_tiers(tmp_path, monkeypatch):
+    _stub_describe(monkeypatch, None)
+    called: list[str] = []
+
+    def pymupdf(pdf):
+        called.append("pymupdf4llm")
+        return ["Embedded layer. " * 10]
+
+    def docling(pdf, ocr, *, full_page_ocr=False):
+        called.append(f"docling ocr={ocr} full_page={full_page_ocr}")
+        return ["OCR read text. " * 10]
+
+    monkeypatch.setattr(renderer, "_render_with_pymupdf4llm", pymupdf)
+    monkeypatch.setattr(renderer, "_render_with_docling", docling)
+    meta = renderer.render_pdf_with_fallback(
+        _fake_pdf(tmp_path), tmp_path / "out", progress=lambda *_: None, force_ocr=True
+    )
+    assert called == ["docling ocr=True full_page=True"]
+    assert meta["renderer"] == "docling"
+    assert meta["ocr"] is True
+    assert meta["extraction"] == "ocr"
+    assert meta["forced"] is True
+    assert (tmp_path / "out" / "pages" / "001.md").read_text().startswith("OCR read")
+
+
+def test_forced_ocr_with_mocr_goes_straight_to_mocr(tmp_path, monkeypatch):
+    _stub_describe(monkeypatch, None)
+    called: list[str] = []
+    monkeypatch.setattr(
+        renderer,
+        "_render_with_pymupdf4llm",
+        lambda pdf: called.append("pymupdf4llm") or ["x" * 500],
+    )
+    monkeypatch.setattr(
+        renderer,
+        "_render_with_docling",
+        lambda pdf, ocr: called.append(f"docling ocr={ocr}") or ["x" * 500],
+    )
+
+    class FakeSession:
+        def render(self, pdf):
+            called.append("mocr")
+            return (["Mocr page text. " * 10], "/tmp/x_nohf.md")
+
+    meta = renderer.render_pdf_with_fallback(
+        _fake_pdf(tmp_path),
+        tmp_path / "out",
+        progress=lambda *_: None,
+        force_ocr=True,
+        allow_mocr=True,
+        mocr_session=FakeSession(),
+    )
+    assert called == ["mocr"]
+    assert meta["renderer"] == "mocr"
+    assert meta["extraction"] == "ocr"
+    assert meta["forced"] is True
+
+
+def test_forced_ocr_without_allow_mocr_still_raises_needs_mocr(tmp_path, monkeypatch):
+    _stub_describe(monkeypatch, None)
+    monkeypatch.setattr(renderer, "_render_with_pymupdf4llm", lambda pdf: ["x" * 500])
+    monkeypatch.setattr(renderer, "_render_with_docling", lambda pdf, ocr: [""] * 5)
+    with pytest.raises(renderer.NeedsMocr):
+        renderer.render_pdf_with_fallback(
+            _fake_pdf(tmp_path),
+            tmp_path / "out",
+            progress=lambda *_: None,
+            force_ocr=True,
+        )
+
+
+def test_limitations_for_the_paper_capture_scan():
+    # Borgmann 2006 (Q1): every page is a page-sized image under an Acrobat
+    # Paper Capture producer; the text layer is that plug-in's OCR.
+    description = {
+        "page_count": 311,
+        "producer": "Adobe Acrobat 9.55 Paper Capture Plug-in",
+        "full_page_image_pages": 311,
+        "no_text_pages": 7,
+    }
+    out = renderer.limitations_for(description, ["ok"] * 311)
+    assert out[0] == (
+        "311 of 311 pages carry a page-sized image; the text layer is likely "
+        "third-party OCR (producer: Adobe Acrobat 9.55 Paper Capture Plug-in)"
+    )
+    assert "7 pages have no extractable text" in out
+    assert renderer.suggests_forced_ocr(
+        {"extraction": "text-layer", "limitations": out}
+    )
+    # Once the text came from OCR the suggestion no longer applies.
+    assert not renderer.suggests_forced_ocr({"extraction": "ocr", "limitations": out})
+
+
+def test_limitations_for_a_clean_word_pdf_has_no_page_image_sentence():
+    # Borgmann 1987 (Q2): 16 pages, no page-sized images, text on every page.
+    description = {
+        "page_count": 16,
+        "producer": "Adobe PDF Library 19.12.68",
+        "full_page_image_pages": 0,
+        "no_text_pages": 0,
+    }
+    out = renderer.limitations_for(description, ["ok"] * 16)
+    assert out == []
+    assert not renderer.suggests_forced_ocr(
+        {"extraction": "text-layer", "limitations": out}
+    )
+
+
+def test_limitations_for_a_minority_of_page_images_does_not_infer_ocr():
+    # One full-page figure in a born-digital paper is reported, not diagnosed.
+    description = {
+        "page_count": 20,
+        "producer": "LaTeX with hyperref",
+        "full_page_image_pages": 1,
+        "no_text_pages": 0,
+    }
+    out = renderer.limitations_for(description, ["ok"] * 20)
+    assert out == ["1 of 20 pages carry a page-sized image"]
+    assert not renderer.suggests_forced_ocr(
+        {"extraction": "text-layer", "limitations": out}
+    )
+
+
+def test_limitations_for_counts_replacement_character_pages():
+    out = renderer.limitations_for(None, ["fine", "bad �", "also ��"])
+    assert out == ["replacement characters on 2 pages"]
+
+
+def test_limitations_for_reports_an_unreadable_description():
+    out = renderer.limitations_for({"error": "not a PDF"}, ["fine"])
+    assert out == ["source could not be described: not a PDF"]
+
+
+def test_describe_pdf_counts_page_sized_images_and_textless_pages(monkeypatch):
+    class Page:
+        def __init__(self, bbox, text):
+            self.rect = SimpleNamespace(width=432.0, height=648.0)
+            self._bbox = bbox
+            self._text = text
+
+        def get_image_info(self):
+            return [{"bbox": self._bbox}] if self._bbox else []
+
+        def get_text(self, kind):
+            assert kind == "text"
+            return self._text
+
+    pages = [
+        Page((0.0, 0.0, 432.0, 648.0), "ocr layer"),  # full-page image + text
+        Page((10.0, 10.0, 100.0, 100.0), "a figure"),  # small image
+        Page(None, "   "),  # no image, no text
+    ]
+
+    class Doc:
+        def __init__(self):
+            self.metadata = {"producer": "Adobe Acrobat 9.55 Paper Capture Plug-in"}
+
+        def __iter__(self):
+            return iter(pages)
+
+        def __len__(self):
+            return len(pages)
+
+    monkeypatch.setitem(
+        sys.modules, "pymupdf", SimpleNamespace(open=lambda _: nullcontext(Doc()))
+    )
+    assert renderer.describe_pdf(Path("x.pdf")) == {
+        "page_count": 3,
+        "producer": "Adobe Acrobat 9.55 Paper Capture Plug-in",
+        "full_page_image_pages": 1,
+        "no_text_pages": 1,
+    }
+
+
+def test_snapshot_and_pandoc_records_say_converted(tmp_path, monkeypatch):
+    snapshot = tmp_path / "page.html"
+    snapshot.write_text("<html><body><p>Snapshot body text.</p></body></html>")
+    meta = renderer.render_snapshot(snapshot, tmp_path / "html-out")
+    assert meta["extraction"] == "converted"
+    assert meta["forced"] is False
+    assert meta["limitations"] == []
+
+    docx = tmp_path / "paper.docx"
+    docx.write_bytes(b"fake")
+    monkeypatch.setattr(
+        renderer.subprocess,
+        "run",
+        lambda *_a, **_k: SimpleNamespace(stdout="Converted body text.\n"),
+    )
+    meta = renderer.render_attachment(docx, tmp_path / "docx-out")
+    assert meta["renderer"] == "pandoc"
+    assert meta["extraction"] == "converted"
 
 
 MARKER = "**==> picture [480 x 720] intentionally omitted <==**"

@@ -56,14 +56,117 @@ _PYMUPDF_PICTURE_MARKER_RE = re.compile(
 )
 
 Progress = Callable[[str], None]
-RENDER_VERSION = 2
+# 3 (0.19): meta.json gained the extraction record (`extraction`, `forced`,
+# `limitations`). Every earlier record, whichever renderer wrote it, lacks it.
+RENDER_VERSION = 3
+
+# A page image covering at least this share of the page rectangle is counted
+# as page-sized: the shape of a scan, where the text layer (if any) was laid
+# over the picture by an OCR step rather than set by the document's author.
+_PAGE_IMAGE_COVERAGE = 0.9
+# Above this share of page-sized images the record says the text layer is
+# likely third-party OCR; below it the count is reported without that reading.
+_SCAN_MAJORITY = 0.5
+_THIRD_PARTY_OCR = "the text layer is likely third-party OCR"
 
 
 def render_metadata_is_current(meta: dict) -> bool:
-    """Old PDF renders may hide OCR or merge text across physical pages."""
-    return (
-        meta.get("renderer") not in {"pymupdf4llm", "docling"}
-        or meta.get("render_version") == RENDER_VERSION
+    """A record is current only at the current render version, for every
+    renderer. Pre-0.19 records carry no extraction record; older PDF renders
+    may also hide OCR or merge text across physical pages."""
+    return meta.get("render_version") == RENDER_VERSION
+
+
+def describe_pdf(pdf: Path) -> dict:
+    """What a reader should know about the source before trusting its text.
+
+    Cheap observations only: the producer string, how many pages carry a
+    page-sized image (the shape of a scan) and how many have no extractable
+    text. These describe extraction; they never decide whether text may be
+    quoted (design 2026-10-12, D3).
+    """
+    import pymupdf
+
+    full_page_images = 0
+    no_text = 0
+    with pymupdf.open(pdf) as doc:
+        producer = (doc.metadata or {}).get("producer") or ""
+        page_count = len(doc)
+        for page in doc:
+            rect = page.rect
+            page_area = rect.width * rect.height
+            if page_area and any(
+                _bbox_area(info.get("bbox")) >= _PAGE_IMAGE_COVERAGE * page_area
+                for info in page.get_image_info()
+            ):
+                full_page_images += 1
+            if not page.get_text("text").strip():
+                no_text += 1
+    return {
+        "page_count": page_count,
+        "producer": producer,
+        "full_page_image_pages": full_page_images,
+        "no_text_pages": no_text,
+    }
+
+
+def _bbox_area(bbox) -> float:
+    if not bbox or len(bbox) != 4:
+        return 0.0
+    x0, y0, x1, y1 = bbox
+    return max(0.0, x1 - x0) * max(0.0, y1 - y0)
+
+
+def _describe_pdf_safely(pdf: Path) -> dict:
+    """describe_pdf, with a failure recorded rather than raised: a render that
+    succeeded is not thrown away because the description step could not run."""
+    try:
+        return describe_pdf(pdf)
+    except Exception as error:
+        # Any failure (pymupdf missing, unreadable file) becomes the record.
+        return {"error": str(error) or type(error).__name__}
+
+
+def limitations_for(description: dict | None, pages: list[str]) -> list[str]:
+    """Advisory sentences for meta.json's `limitations`, from describe_pdf's
+    output and the rendered pages. Pure; order is stable."""
+    out: list[str] = []
+    if description and "error" in description:
+        out.append(f"source could not be described: {description['error']}")
+    elif description:
+        total = description.get("page_count") or 0
+        imaged = description.get("full_page_image_pages") or 0
+        if total and imaged:
+            sentence = f"{imaged} of {total} pages carry a page-sized image"
+            if imaged / total > _SCAN_MAJORITY:
+                producer = description.get("producer") or "unknown"
+                sentence += f"; {_THIRD_PARTY_OCR} (producer: {producer})"
+            out.append(sentence)
+        textless = description.get("no_text_pages") or 0
+        if textless:
+            noun = "page has" if textless == 1 else "pages have"
+            out.append(f"{textless} {noun} no extractable text")
+    fffd_pages = sum(1 for page in pages if "�" in page)
+    if fffd_pages:
+        noun = "page" if fffd_pages == 1 else "pages"
+        out.append(f"replacement characters on {fffd_pages} {noun}")
+    return out
+
+
+def extraction_label(meta: dict) -> str:
+    """`text-layer`, `ocr`, `ocr, forced` or `converted`, for status lines."""
+    label = meta.get("extraction") or "unknown"
+    if meta.get("forced"):
+        label += ", forced"
+    return label
+
+
+def suggests_forced_ocr(meta: dict) -> bool:
+    """True when the record reads an embedded text layer off what looks like a
+    scan: the one case where `--force-ocr` may read the page better. Advice
+    only; the reader's duty to check the source page is unchanged either way."""
+    return meta.get("extraction") == "text-layer" and any(
+        _THIRD_PARTY_OCR in limitation for limitation in meta.get("limitations") or []
     )
 
 
@@ -123,7 +226,17 @@ def render_snapshot(snapshot: Path, out_dir: Path) -> dict:
     )
     if not text:
         raise RuntimeError(f"snapshot contains no readable text: {snapshot}")
-    return _write_outputs([text], snapshot, out_dir, "html.parser", False, [])
+    return _write_outputs(
+        [text],
+        snapshot,
+        out_dir,
+        "html.parser",
+        False,
+        [],
+        extraction="converted",
+        forced=False,
+        limitations=[],
+    )
 
 
 def render_attachment(source: Path, out_dir: Path, **pdf_options) -> dict:
@@ -147,7 +260,17 @@ def render_attachment(source: Path, out_dir: Path, **pdf_options) -> dict:
         ) from error
     if not result.stdout.strip():
         raise RuntimeError(f"pandoc produced no readable text for {source}")
-    return _write_outputs([result.stdout.strip()], source, out_dir, "pandoc", False, [])
+    return _write_outputs(
+        [result.stdout.strip()],
+        source,
+        out_dir,
+        "pandoc",
+        False,
+        [],
+        extraction="converted",
+        forced=False,
+        limitations=[],
+    )
 
 
 def _strip_structural_markers(page_text: str) -> str:
@@ -177,7 +300,9 @@ def _render_with_pymupdf4llm(pdf: Path) -> list[str]:
     return [page["text"] for page in pages]
 
 
-def _render_with_docling(pdf: Path, ocr: bool) -> list[str]:
+def _render_with_docling(
+    pdf: Path, ocr: bool, *, full_page_ocr: bool = False
+) -> list[str]:
     import pymupdf
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import EasyOcrOptions, PdfPipelineOptions
@@ -187,10 +312,19 @@ def _render_with_docling(pdf: Path, ocr: bool) -> list[str]:
     # Pin EasyOCR explicitly: recent docling builds default to RapidOCR, which
     # downloads models from modelscope.cn at first use - unreliable from
     # outside China. EasyOCR ships its own English models via PyPI.
+    ocr_kwargs: dict = {"lang": ["en"]}
+    if full_page_ocr:
+        # Docling's default OCR mode reads bitmap regions and KEEPS the PDF's
+        # own text cells, so a scan's embedded OCR layer would be merged back
+        # in. FULL_PAGE OCRs the page image and replaces that layer, which is
+        # what --force-ocr is for. Verified on docling 2.130.0, 2026-10-12.
+        from docling.datamodel.pipeline_options import OcrMode
+
+        ocr_kwargs["mode"] = OcrMode.FULL_PAGE
     opts = PdfPipelineOptions(
         do_ocr=ocr,
         do_table_structure=True,
-        ocr_options=EasyOcrOptions(lang=["en"]),
+        ocr_options=EasyOcrOptions(**ocr_kwargs),
     )
     conv = DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
@@ -295,8 +429,18 @@ def _write_outputs(
     renderer: str,
     ocr: bool,
     attempts: list[dict],
+    *,
+    extraction: str,
+    forced: bool,
+    limitations: list[str],
     extra_meta: dict | None = None,
 ) -> dict:
+    """Write pages/, full.md and meta.json.
+
+    `extraction` is "text-layer", "ocr" or "converted"; `forced` says whether
+    --force-ocr chose the tier; `limitations` is limitations_for's output.
+    `renderer` and `ocr` stay as they were for existing readers.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     pages_dir = out_dir / "pages"
     pages_dir.mkdir(exist_ok=True)
@@ -313,6 +457,9 @@ def _write_outputs(
         "sha256_prefix": hashlib.sha256(source.read_bytes()).hexdigest()[:16],
         "renderer": renderer,
         "ocr": ocr,
+        "extraction": extraction,
+        "forced": forced,
+        "limitations": list(limitations),
     }
     if source.suffix.lower() == ".pdf":
         meta["source_pdf"] = str(source)  # compatibility with existing renders
@@ -510,21 +657,39 @@ def render_pdf_with_fallback(
     *,
     allow_mocr: bool = False,
     mocr_session=None,
+    force_ocr: bool = False,
 ) -> dict:
     """Render a PDF to per-page markdown, escalating renderers on failure.
 
     Writes pages/NNN.md, full.md, and meta.json under out_dir. Returns the
     meta dict.
 
+    force_ocr starts the cascade at the OCR tier, so an embedded text layer is
+    never read even when it would pass the quality gate (a scan whose OCR layer
+    is the one being doubted). With allow_mocr and a live session it goes
+    straight to dots.mocr.
+
     On total cascade failure: if allow_mocr and a live mocr_session is supplied,
     escalate to dots.mocr (whose output is itself quality-checked); otherwise
     raise NeedsMocr. Raises RuntimeError if mocr is attempted and also fails.
     """
+    description = _describe_pdf_safely(pdf)
     cascade: list[tuple[str, bool, Callable[[], list[str]]]] = [
         ("pymupdf4llm", False, lambda: _render_with_pymupdf4llm(pdf)),
         ("docling", False, lambda: _render_with_docling(pdf, ocr=False)),
         ("docling", True, lambda: _render_with_docling(pdf, ocr=True)),
     ]
+    if force_ocr:
+        progress("  forced OCR: skipping the text-layer tiers")
+        cascade = [
+            (
+                "docling",
+                True,
+                lambda: _render_with_docling(pdf, ocr=True, full_page_ocr=True),
+            )
+        ]
+        if allow_mocr and mocr_session is not None:
+            cascade = []
 
     attempts: list[dict] = []
     for renderer, ocr, run in cascade:
@@ -564,7 +729,17 @@ def render_pdf_with_fallback(
                 f"    {label} OK: {qa['total_pages']} pages, "
                 f"{qa['empty_pages']} near-empty, {qa['fffd_count']} U+FFFD"
             )
-            return _write_outputs(pages, pdf, out_dir, renderer, ocr, attempts)
+            return _write_outputs(
+                pages,
+                pdf,
+                out_dir,
+                renderer,
+                ocr,
+                attempts,
+                extraction="ocr" if ocr else "text-layer",
+                forced=force_ocr,
+                limitations=limitations_for(description, pages),
+            )
         progress(f"    {label} quality failed: {'; '.join(qa['reasons'])}; escalating")
 
     if allow_mocr and mocr_session is not None:
@@ -581,7 +756,16 @@ def render_pdf_with_fallback(
             )
             extra = {"source_md": source_md} if source_md else None
             return _write_outputs(
-                pages, pdf, out_dir, "mocr", True, attempts, extra_meta=extra
+                pages,
+                pdf,
+                out_dir,
+                "mocr",
+                True,
+                attempts,
+                extraction="ocr",
+                forced=force_ocr,
+                limitations=limitations_for(description, pages),
+                extra_meta=extra,
             )
         raise RuntimeError(
             f"mocr also failed for {pdf.name}: {'; '.join(qa['reasons'])}"

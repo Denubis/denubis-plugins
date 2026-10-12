@@ -37,6 +37,12 @@ verified-by: null
 
 ## Verified quotes
 
+> exact wording [physical p. N] — verified: source page inspected by <who>
+
+## Located quotes (not yet verified)
+
+> exact wording as rendered [physical p. N] — located: render match only
+
 ## Questions, critique, and connections
 
 ## Linked permanent notes
@@ -54,9 +60,12 @@ uv run "$BIB/blockquote.py" \
   "<citekey>" "<verbatim substring>"
 ```
 
-For a clean text-layer render, retain the emitted physical page and exact text.
-For `meta.json` with `ocr: true`, label the output as a candidate and visually
-check it against the source PDF before placing it under “Verified quotes.”
+A hit is `located`: retain the emitted physical page and exact text under
+“Located quotes”. Move a quotation under “Verified quotes” only after the
+matching source page (the PDF page image, or the snapshot or attachment for a
+non-PDF source) has been inspected and the wording matched, whatever
+`meta.json` records about extraction. A `NO MATCH` quotation is `unverified`
+and does not enter the note as a quotation.
 
 ## Permanent notes
 

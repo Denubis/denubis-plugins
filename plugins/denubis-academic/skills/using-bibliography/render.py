@@ -3,17 +3,21 @@
 Outputs into <out_dir>:
   full.md             Combined document with `<!-- page:N -->` boundary markers.
   pages/NNN.md        One file per 1-based page (zero-padded to 3 digits).
-  meta.json           page_count, source_pdf, sha256_prefix, renderer, ocr.
+  meta.json           page_count, source_pdf, sha256_prefix, renderer, ocr,
+                      extraction, forced, limitations.
 
 Tries pymupdf4llm first, then escalates to docling (no OCR), then docling+OCR
 if earlier passes produce empty/garbled output. If even docling+OCR drops too
 many pages (>30% near-empty), the render is refused: pass --allow-mocr to
 escalate to dots.mocr (GPU OCR), which the cascade starts and stops itself.
+--force-ocr skips the text-layer tiers and starts at docling+OCR (or, with
+--allow-mocr, at dots.mocr), for a scan whose embedded OCR layer is doubted.
 See renderer.py for thresholds.
 
 Usage:
     python render.py <pdf_path> <out_dir>
     python render.py <pdf_path> <out_dir> --allow-mocr
+    python render.py <pdf_path> <out_dir> --force-ocr [--allow-mocr]
 
 Requires pymupdf4llm (AGPL-3). docling (Apache-2.0) loads only when the fallback
 fires; dots.mocr (configured via [mocr] in config.toml) only with --allow-mocr.
@@ -25,7 +29,7 @@ import tomllib
 from contextlib import nullcontext
 from pathlib import Path
 
-from renderer import NeedsMocr, mocr_server, render_attachment
+from renderer import NeedsMocr, extraction_label, mocr_server, render_attachment
 
 CONFIG_PATH = Path.home() / ".config" / "denubis-academic-research" / "config.toml"
 
@@ -59,6 +63,13 @@ def main() -> int:
         help="Escalate to dots.mocr (GPU) if the cascade can't produce a usable "
         "render. Requires [mocr] in config.toml.",
     )
+    parser.add_argument(
+        "--force-ocr",
+        action="store_true",
+        help="Skip the text-layer tiers and start at docling+OCR (with "
+        "--allow-mocr, go straight to dots.mocr). For a scan whose embedded "
+        "text layer is itself OCR.",
+    )
     args = parser.parse_args()
 
     pdf = Path(args.pdf)
@@ -86,7 +97,11 @@ def main() -> int:
     try:
         with ctx as session:
             meta = render_attachment(
-                pdf, out, allow_mocr=args.allow_mocr, mocr_session=session
+                pdf,
+                out,
+                allow_mocr=args.allow_mocr,
+                mocr_session=session,
+                force_ocr=args.force_ocr,
             )
     except NeedsMocr as e:
         print(f"NEEDS MOCR: {e}", file=sys.stderr)
@@ -96,7 +111,12 @@ def main() -> int:
         return 1
 
     label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
-    print(f"Rendered {meta['page_count']} pages from {pdf.name} via {label}")
+    print(
+        f"Rendered {meta['page_count']} pages from {pdf.name} via {label} "
+        f"({extraction_label(meta)})"
+    )
+    for limitation in meta.get("limitations") or []:
+        print(f"  limitation: {limitation}")
     print(f"  Combined: {out / 'full.md'}")
     print(f"  Per-page: {out / 'pages'}/")
     print(f"  Metadata: {out / 'meta.json'}")

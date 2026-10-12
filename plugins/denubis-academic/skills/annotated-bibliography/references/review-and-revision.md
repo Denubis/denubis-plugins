@@ -20,6 +20,6 @@ check into a certificate that the entry is valid.
 For revision, reopen each disputed source passage. Record applied, adapted or
 declined corrections with evidence. Do not mechanically accept all reviewer
 suggestions. Preserve unchanged exact spans; any new span runs through the
-checker and, for OCR, visual verification again. Summary/positioning edits need
+checker and the source-page check again. Summary/positioning edits need
 interpretation review even when no quotation changed. An unresolved disagreement
 stays visible in the final note.

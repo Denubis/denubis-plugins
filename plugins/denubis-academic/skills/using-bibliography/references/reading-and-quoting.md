@@ -16,11 +16,17 @@ For each paper:
 1. Resolve by the exact citekey wherever possible.
 2. Accept only `rendered`; put `no-pdf`, `pdf-unknown`, render failures, and
    `needs-ocr-escalation` on a visible “could not prepare” list.
-3. Prove `full.md` is non-empty and read `meta.json`.
-4. Label the reader input `clean text layer` when `ocr` is false, or `OCR
-   locator—exact quotes require source-PDF verification` when it is true.
+3. Prove `full.md` is non-empty and read `meta.json`: `extraction`
+   (`text-layer`, `ocr`, `converted`), `forced`, and `limitations`.
+4. Build the render note from the record: the extraction label and every
+   limitation, verbatim. The note describes how the text was extracted; it never
+   says the text may be quoted without a source check.
 5. Dispatch one reader with the deterministic `full.md` path and the paper's
    bounded brief.
+
+If the resolver advised `--force-ocr` (a text layer that looks like third-party
+OCR under page-sized images), decide before dispatch whether to re-render; the
+reader's duty is the same either way.
 
 The citekey is the handle for the render directory, Pandoc citation, literature
 note, and reader result. Never construct it from author/title/year.
@@ -49,11 +55,15 @@ marker. Do not resolve, fetch, re-render, or search for another copy.
 </method>
 
 <source_fidelity>
-If the render note says clean text layer, copy quotations verbatim from the
-matching page Markdown. If it says OCR locator, use the Markdown to locate and
-summarise the passage, but label every verbatim candidate “needs visual PDF
-verification”; do not claim its exact wording is verified. The orchestrator or
-human owns that visual check against the source PDF.
+The rendered Markdown is a reading text and a locator, whatever the render note
+says about extraction. Copy each candidate quotation verbatim from the matching
+page Markdown and label it `located`. Call a quotation `verified` only if you
+have opened the source page yourself (the PDF page image at that physical page,
+or the snapshot or attachment for a non-PDF source) and the wording matches;
+otherwise the orchestrator or human performs that check. If you opened the
+page and the wording differs, the quotation is `contradicted`: say what the
+page reads, and do not quote the render's wording. A passage you could not
+find in the render is `unverified`. Never repair wording to make it match.
 </source_fidelity>
 
 <output>
@@ -67,18 +77,19 @@ human owns that visual check against the source PDF.
 
 [@{{CITEKEY}}, p. N]
 
-Verification: clean-render match | needs visual PDF verification
+Verification: located | verified (source page N inspected by <who>) | contradicted (source page N inspected by <who>; it reads "...") | unverified
 
 ### Gaps and caveats
 - what the brief requested but the paper did not establish
-- extraction defects or uncertainties
+- extraction defects or uncertainties, including the render note's limitations
 </output>
 ```
 
 Readers normally receive only rendered Markdown, which keeps PDF extraction and
 the rest of the corpus out of their context. That restriction must not be used
-to overclaim OCR fidelity: the reader returns a candidate and the orchestrator
-performs or requests the source-PDF check.
+to overclaim fidelity: a reader without the source returns `located` candidates
+and the orchestrator performs or requests the source check for each one it will
+call `verified`.
 
 ## Locate a quotation in rendered pages
 
@@ -90,14 +101,17 @@ uv run "$BIB/blockquote.py" \
   "<citekey>" "<verbatim substring>"
 ```
 
-Exit `0` emits every matching page-keyed blockquote. Exit `2` prints `NO MATCH`.
-Try a shorter faithful substring and account for whitespace or Unicode hyphen
+Exit `0` emits every matching page-keyed blockquote, each ending with
+`Verification: located (render match; check the source page before calling it
+verified)`. Exit `2` prints `NO MATCH` and `Verification: unverified`. Try a
+shorter faithful substring and account for whitespace or Unicode hyphen
 normalisation; never repair a mismatch by inventing source wording.
 
-The helper checks rendered Markdown only. For `ocr: true`, append a
-“needs visual PDF verification” marker until the matching physical page has
-been inspected. If visual inspection cannot establish the exact wording, quote
-nothing; paraphrase with an explicit caveat instead.
+The helper checks rendered Markdown only: a hit locates the passage. For every
+quotation that will be called `verified`, open the matching physical page of
+the source (the PDF page image, or the snapshot or attachment for a non-PDF
+source) and compare the wording. If that inspection cannot establish the exact
+wording, quote nothing; paraphrase with an explicit caveat instead.
 
 ## Verification record
 
@@ -106,8 +120,9 @@ For each quotation retain:
 - exact Zotero citekey;
 - physical attachment page;
 - exact page-Markdown match;
-- `meta.json` renderer and OCR flag;
-- when OCR is true, who visually checked the PDF and whether wording matched.
+- `meta.json` renderer, `extraction`, `forced`, and `limitations`;
+- its state: `located`, `verified` or `contradicted` (who checked the source
+  page, and for `contradicted` what it reads), or `unverified`.
 
 Page markers describe physical file pages, not the page number printed on the
 paper. Use the physical page for bundled annotation tools; adapt citation style

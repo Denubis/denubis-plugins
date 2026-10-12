@@ -14,7 +14,8 @@ unverified and raise placement separately.
 Load using-bibliography and follow its current resolver and render procedure. Never invent
 a citekey, hand-extract an attachment, or fetch, re-render, OCR, annotate, or write to
 Zotero outside that procedure's authority. Positively verify the rendered source and read
-its metadata. OCR text is a locator until checked against the PDF for exact quotation.
+its metadata. Rendered text is a locator, whatever its extraction record says, until
+checked against the source page for exact quotation (using-bibliography, Contract 1).
 
 An absent source, uncertain identity, missing attachment, or unreliable render is
 UNVERIFIED. It has not failed to support the claim because it has not been checked.

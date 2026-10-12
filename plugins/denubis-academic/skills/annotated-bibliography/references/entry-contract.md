@@ -42,11 +42,13 @@ source hashes fail. Matching is case-sensitive and literal: the helper does not
 normalise punctuation, hyphens, case or whitespace. Copy a shorter exact span
 when extraction line breaks interrupt a longer quotation.
 
-The JSON report exposes `matched`/`total`, failures, and
-`visual_verification_required`. For OCR this flag remains true even if a human
-has separately checked the PDF: the helper cannot attest that action. Keep the
-visual verification record beside the entry. An input note claiming verification
-cannot change the helper's result.
+The JSON report exposes `matched`/`total`, failures, `quotation_state`
+(always `located`: a text match locates a span), `source_verification_required`
+(always true), and the render's `extraction`, `forced`, and `limitations`. The
+flag stays true even if a human has separately checked the source page: the
+helper cannot attest that action. Keep the source verification record beside
+the entry. An input note claiming verification cannot change the helper's
+result.
 
 The readable note should show source identity, coverage, summary, positioning,
 each paraphrase with its short evidence span and locator, caveats, and review

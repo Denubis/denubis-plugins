@@ -201,9 +201,12 @@ def test_annotation_cli_checks_source_page_and_ocr(tmp_path):
     (paper / "pages/002.md").write_text("A different page.\n")
     meta = {
         "renderer": "docling",
-        "render_version": 2,
+        "render_version": 3,
         "page_count": 2,
         "ocr": True,
+        "extraction": "ocr",
+        "forced": False,
+        "limitations": ["12 pages have no extractable text"],
         "sha256_prefix": "0123456789abcdef",
     }
     entry = {
@@ -241,7 +244,11 @@ def test_annotation_cli_checks_source_page_and_ocr(tmp_path):
 
     code, result = run()
     assert code == 0 and result["matched"] == 1
-    assert result["visual_verification_required"] is True
+    # A text match locates; the source-page check is always still owed.
+    assert result["quotation_state"] == "located"
+    assert result["source_verification_required"] is True
+    assert result["extraction"] == "ocr"
+    assert result["limitations"] == ["12 pages have no extractable text"]
     assert result["interpretation_review"] == "not assessed by this tool"
     for page, quote in [
         (2, "The precise quotation."),
@@ -255,13 +262,18 @@ def test_annotation_cli_checks_source_page_and_ocr(tmp_path):
     entry["points"][0].update(physical_page=1, quote="The precise quotation.")
     for field, value in [
         ("sha256_prefix", "fedcba9876543210"),
-        ("render_version", 1),
+        ("render_version", 2),
         ("ocr", None),
+        ("extraction", None),
         ("page_count", 0),
     ]:
         old = meta[field]
         meta[field] = value
         assert run()[0] == 1
         meta[field] = old
+    # A clean text layer does not waive the source check (Contract 1).
     meta["ocr"] = False
-    assert run()[1]["visual_verification_required"] is False
+    meta["extraction"] = "text-layer"
+    result = run()[1]
+    assert result["quotation_state"] == "located"
+    assert result["source_verification_required"] is True

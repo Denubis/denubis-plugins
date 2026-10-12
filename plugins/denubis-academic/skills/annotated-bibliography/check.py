@@ -36,6 +36,8 @@ def check(entry, paper_dir):  # noqa: PLR0912 -- linear record validation
         )
     if type(meta.get("ocr")) is not bool:
         raise ValueError("Render has no trustworthy OCR flag")
+    if not isinstance(meta.get("extraction"), str) or not meta["extraction"]:
+        raise ValueError("Render has no extraction record; re-render first")
     if not isinstance(meta.get("renderer"), str) or not meta["renderer"]:
         raise ValueError("Render has no renderer identity")
     page_count = meta.get("page_count")
@@ -80,7 +82,15 @@ def check(entry, paper_dir):  # noqa: PLR0912 -- linear record validation
         "matched": len(points) - len(failures),
         "total": len(points),
         "failures": failures,
-        "visual_verification_required": meta["ocr"],
+        # A text match LOCATES a span in the render. Whatever the extraction
+        # record says, a span is `verified` only after the source page has been
+        # inspected, which this tool cannot attest (using-bibliography,
+        # Contract 1).
+        "quotation_state": "located",
+        "source_verification_required": True,
+        "extraction": meta["extraction"],
+        "forced": bool(meta.get("forced")),
+        "limitations": list(meta.get("limitations") or []),
         "interpretation_review": "not assessed by this tool",
     }
 

@@ -37,7 +37,11 @@ no exact citekey was accepted; nothing was rendered.
 
 The states are:
 
-- `rendered`: current render exists;
+- `rendered`: current render exists; the line continues with the extraction
+  label and the first limitation from `meta.json`, for example
+  `rendered (text-layer; 311 of 311 pages carry a page-sized image; …)`, and an
+  `advice:` line names `--force-ocr` when the text layer looks like third-party
+  OCR;
 - `ready-to-render`: attachment exists and rendering was suppressed;
 - `no-pdf`: item is resolved but has no renderable attachment;
 - `pdf-unknown`: lookup could not prove attachment state;
@@ -62,8 +66,9 @@ uv run "$BIB/ingest.py" - < dois.txt
 ```
 
 `ingest.py` is idempotent and uses a source hash to skip current renders.
-`--force` re-renders. A missing Zotero item is reported, not fetched. Use the
-write-gated procedure in `zotero-writes.md` if the user wants to add it.
+`--force` re-renders; `--force-ocr` re-renders through the OCR tier (below). A
+missing Zotero item is reported, not fetched. Use the write-gated procedure in
+`zotero-writes.md` if the user wants to add it.
 
 ## Render cascade
 
@@ -103,13 +108,45 @@ repo = "~/path/to/dots.mocr"
 # startup_timeout = 300
 ```
 
+### Forced OCR
+
+A scan with an embedded OCR layer (a Paper Capture PDF, for instance) passes
+tier 1 and is recorded `extraction: text-layer`; the cascade never reaches OCR
+on its own. `--force-ocr` on `resolve.py`, `ingest.py`, and `render.py` skips
+the text-layer tiers and starts at Docling with EasyOCR; with `--allow-mocr` it
+goes straight to `dots.mocr`. It also bypasses the render cache, because such a
+scan has a current render. The record then says `extraction: ocr, forced:
+true`. The resolver advises it when the limitations show page-sized images on
+most pages under a text layer; the advice is about which render to read, not
+about whether a quotation is verified.
+
+```bash
+uv run "$BIB/resolve.py" --citekey <key> --force-ocr
+uv run "$BIB/resolve.py" --citekey <key> --force-ocr --allow-mocr
+```
+
 ## Output contract
 
 Every successful render directory contains:
 
 - `full.md`: combined text with `<!-- page:N -->` markers;
 - `pages/NNN.md`: one file per physical attachment page;
-- `meta.json`: source path/hash, renderer, page count, OCR flag, and warnings.
+- `meta.json`: the extraction record.
+
+`meta.json` carries `render_version` (3 since 0.19), `page_count`,
+`sha256_prefix`, the source path, `renderer`, `ocr`, and:
+
+- `extraction`: `text-layer` (the PDF's own layer was read), `ocr` (an OCR tier
+  produced the text), or `converted` (HTML snapshot or Pandoc);
+- `forced`: `true` when `--force-ocr` chose the tier;
+- `limitations`: advisory observations such as `311 of 311 pages carry a
+  page-sized image; the text layer is likely third-party OCR (producer: …)`,
+  `7 pages have no extractable text`, or `replacement characters on 3 pages`.
+  Nothing grants or withholds quotation authority on their basis.
+
+Every record written before 0.19 (any `render_version` below 3, for every
+renderer) is stale: the next resolve or ingest re-renders it and writes the
+record above.
 
 Verify positive files, not just a success message:
 
@@ -119,8 +156,9 @@ test -s "<zettelkasten-root>/papers/<citekey>/meta.json"
 test -d "<zettelkasten-root>/papers/<citekey>/pages"
 ```
 
-Read `meta.json` before quoting. `ocr: true` changes rendered text from exact
-quotation authority to a locator requiring visual PDF verification.
+Read `meta.json` before quoting. It describes how the text was extracted; the
+quoting rule in `SKILL.md` (every exact quotation checked against the source
+page before it is `verified`) applies whatever it says.
 
 ## Dependencies
 

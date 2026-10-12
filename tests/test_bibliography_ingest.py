@@ -135,6 +135,60 @@ def test_find_by_doi_warns_when_a_library_was_unsearchable(monkeypatch, capsys):
     assert "inconclusive" in capsys.readouterr().err
 
 
+# --- main(): --force-ocr bypasses a current cache ---------------------------
+
+
+def _run_main(monkeypatch, tmp_path, argv):
+    zk = tmp_path / "zk"
+    out = zk / "papers" / _CITEKEY
+    out.mkdir(parents=True)
+    (out / "full.md").write_text("cached")
+    (out / "meta.json").write_text("{}")
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF")
+    monkeypatch.setattr(ingest, "load_config", lambda: {"zettelkasten_root": zk})
+    monkeypatch.setattr(ingest, "probe_zotero", lambda: None)
+    monkeypatch.setattr(ingest, "rpc", lambda method, params, *_a, **_k: [])
+    monkeypatch.setattr(
+        ingest,
+        "find_by_doi",
+        lambda _doi: _envelope("YLIDC5RW", _CITEKEY, "2026-ailoc-stage1"),
+    )
+    monkeypatch.setattr(ingest, "resolve_pdf", lambda _item, _map: pdf)
+    monkeypatch.setattr(ingest, "current_render_matches", lambda _o, _p: True)
+    renders: list[dict] = []
+
+    def fake_render(
+        pdf_path, out_dir, *, allow_mocr=False, mocr_session=None, force_ocr=False
+    ):
+        renders.append({"allow_mocr": allow_mocr, "force_ocr": force_ocr})
+        return {
+            "page_count": 1,
+            "renderer": "docling",
+            "ocr": True,
+            "extraction": "ocr",
+            "forced": force_ocr,
+        }
+
+    monkeypatch.setattr(ingest, "render_pdf", fake_render)
+    monkeypatch.setattr(sys, "argv", ["ingest.py", *argv])
+    return ingest.main(), renders
+
+
+def test_force_ocr_re_renders_a_current_cache(monkeypatch, tmp_path, capsys):
+    code, renders = _run_main(monkeypatch, tmp_path, [_DOI, "--force-ocr"])
+    assert code == 0
+    assert renders == [{"allow_mocr": False, "force_ocr": True}]
+    assert "(ocr, forced)" in capsys.readouterr().out
+
+
+def test_current_cache_is_skipped_without_a_force_flag(monkeypatch, tmp_path):
+    """Positive control: the cache check still short-circuits."""
+    code, renders = _run_main(monkeypatch, tmp_path, [_DOI])
+    assert code == 0
+    assert renders == []
+
+
 def test_resolve_pdf_exports_the_envelope_copy_by_library_name(monkeypatch):
     # The export still goes through BBT (it carries the attachment path), keyed
     # by the citekey and the BBT library id that user.groups maps the

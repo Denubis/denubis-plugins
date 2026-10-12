@@ -14,7 +14,8 @@ Per the using-bibliography SKILL.md and ~/zettelkasten/AGENTS.md:
   - Reads only from Zotero. Never fetches papers from the internet.
   - Skips items missing a PDF attachment with a warning, not a fabrication.
   - Renders deterministically — re-running on the same PDF produces the same
-    output. Use --force to re-render even if the cached render is current.
+    output. Use --force to re-render even if the cached render is current;
+    --force-ocr also re-renders, starting the cascade at the OCR tier.
 """
 
 # /// script
@@ -37,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bbt import parse_attachment_paths
 from renderer import (
     NeedsMocr,
+    extraction_label,
     mocr_server,
     render_attachment,
     render_metadata_is_current,
@@ -170,7 +172,12 @@ def current_render_matches(out_dir: Path, pdf: Path) -> bool:
 
 
 def render_pdf(
-    pdf: Path, out_dir: Path, *, allow_mocr: bool = False, mocr_session=None
+    pdf: Path,
+    out_dir: Path,
+    *,
+    allow_mocr: bool = False,
+    mocr_session=None,
+    force_ocr: bool = False,
 ) -> dict:
     """Render an attachment; PDFs escalate through OCR, snapshots use HTML text.
 
@@ -179,7 +186,11 @@ def render_pdf(
     fails (including mocr).
     """
     return render_attachment(
-        pdf, out_dir, allow_mocr=allow_mocr, mocr_session=mocr_session
+        pdf,
+        out_dir,
+        allow_mocr=allow_mocr,
+        mocr_session=mocr_session,
+        force_ocr=force_ocr,
     )
 
 
@@ -199,6 +210,13 @@ def main() -> int:
         help="Permit GPU escalation to dots.mocr when the cascade cannot produce "
         "a usable render. Starts the vLLM server once and stops it after. "
         "Requires a [mocr] section in config.toml.",
+    )
+    parser.add_argument(
+        "--force-ocr",
+        action="store_true",
+        help="Re-render through OCR even if the embedded text layer passes the "
+        "quality gate: skips the text-layer tiers (with --allow-mocr, goes "
+        "straight to dots.mocr). Implies --force.",
     )
     args = parser.parse_args()
 
@@ -266,7 +284,11 @@ def main() -> int:
                     failures += 1
                     continue
                 out = papers_dir / citekey
-                if not args.force and current_render_matches(out, pdf):
+                # --force-ocr bypasses the cache too: a scan whose text layer
+                # passed the gate has a CURRENT render and would never reach
+                # the OCR tier otherwise.
+                force = args.force or args.force_ocr
+                if not force and current_render_matches(out, pdf):
                     print(
                         "  cache current — skipped (use --force to re-render)",
                         flush=True,
@@ -274,13 +296,20 @@ def main() -> int:
                     skipped += 1
                     continue
                 meta = render_pdf(
-                    pdf, out, allow_mocr=args.allow_mocr, mocr_session=mocr_session
+                    pdf,
+                    out,
+                    allow_mocr=args.allow_mocr,
+                    mocr_session=mocr_session,
+                    force_ocr=args.force_ocr,
                 )
                 label = meta["renderer"] + (" +OCR" if meta.get("ocr") else "")
                 print(
-                    f"  rendered {meta['page_count']} pages via {label} → {out}",
+                    f"  rendered {meta['page_count']} pages via {label} "
+                    f"({extraction_label(meta)}) → {out}",
                     flush=True,
                 )
+                for limitation in meta.get("limitations") or []:
+                    print(f"  limitation: {limitation}", flush=True)
                 successes += 1
             except NeedsMocr as e:
                 print(f"  NEEDS MOCR: {e}", flush=True)
