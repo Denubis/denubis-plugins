@@ -1,4 +1,7 @@
 .worktrees/
+# Claude Code's own worktree location (--worktree, EnterWorktree); the repo's
+# convention is .worktrees/, but a session that lands here must not dirty main.
+.claude/worktrees/
 .claude/settings.local.json
 .serena/
 .venv
