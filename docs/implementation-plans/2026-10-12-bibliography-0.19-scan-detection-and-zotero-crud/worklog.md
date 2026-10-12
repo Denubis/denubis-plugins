@@ -344,3 +344,56 @@ Evidence:
   SRM Guide"` → body `{"name": "Scratch 0.19", "parentCollection": "UJPGKR74"}`, apply
   command with `--expect-parent UJPGKR74 --expect-library 1`, exit 0.
 - Not yet exercised live: any POST or collection PATCH (UAT L4, L5).
+
+Checkpoint: `e82e407` (Outcome D).
+
+## 2026-10-12 — Outcome E: auto-export registration
+
+Changed surfaces:
+
+- New `register_export.py` (`--collection "<lib>/<path>" --path FILE.bib [--translator]
+  [--replace]`, register class with `--expect-collection`). Declares Python ≥ 3.14 (it
+  imports `resolve.py`, which the formatter writes with PEP 758 clauses) and
+  `bibtexparser` for `check_bib`. Pure: `parse_collection_spec`,
+  `resolve_collection_path` (segment under its parent; a missing segment is an error,
+  so BBT is never allowed to create a collection), `bbt_collection_path` →
+  `/<libraryID>/<names>`, `describe_file` (size, mtime, sha256 prefix),
+  `collection_citekey` (first live parent with a citekey). Shell: `observe_completion`
+  (`post_run_autoexport` → `classify_autoexport_response`; `observed` only when
+  `triggered` and the file mtime advances past the trigger within 30 s, polling with
+  injected `now`/`sleep`) and `check_content` (`check_bib` on the file). Apply calls
+  `rpc("autoexport.add", [bbt_path, translator, path, {}, replace])`; `accepted` only
+  when the returned `key` equals the expected key, any other result or RPC error
+  printed verbatim as `not accepted`. Final line `accepted; completion <state>;
+  content <state>; verified|not verified`, exit 0 only when verified; the previewed
+  size and hash are printed beside the new ones as an observation.
+- Docs: `zotero-writes.md` ("Register a Better BibTeX auto-export"),
+  `notes-and-bibliographies.md` (bootstrap steps 1–4 may use the helper; manual route
+  kept), `SKILL.md` write-boundary row, `troubleshooting.md` four rows;
+  `tests/test_bibliography_skill.py` regex gains `register_export`.
+- Tests: `tests/test_bibliography_register_export.py` (new, 21): numeric path, spec
+  parsing, path resolution (missing segment, same-named sibling under another parent),
+  preview without RPC and with file facts, missing file, `--expect-version` rejected,
+  usage error without `--expect-collection`, W3, `target changed` without RPC, the RPC
+  receives `/1/Sage SRM Guide/Readings` and never the `My Library/...` form, replace and
+  translator forwarded, another key → not accepted verbatim, BBT error → not accepted
+  verbatim, E2a (no zotero-api-plus → `completion not observed`, content still checked,
+  exit 1), E2b (identical bytes with a later mtime → observed), no mtime change → not
+  observed after a 30 s injected wait, trigger refused with its kind, content not
+  satisfied on an absent citekey and on a missing file.
+
+Evidence:
+
+- The first run of the suite had 20 passing and one false negative caused by the test
+  clock (it started at 1000, so a real file mtime was always "after the trigger"); the
+  fixture now starts at real time and back-dates the file. After that the suite passes;
+  `uv run pytest tests/test_bibliography_*.py tests/test_skill_*.py
+  tests/test_academic_literature_helpers.py -q` → 1094 passed. `uvx ruff check` on
+  the helper and tests clean (`main` split into `apply_registration` for the statement
+  count); `uvx ruff format --check plugins/denubis-academic` clean. `SKILL.md` is 203
+  lines.
+- Not exercised live: `autoexport.add` itself and the trigger-then-mtime observation
+  (E1, E3 are UAT on a scratch collection with zotero-api-plus present). The empty-params
+  probe of `autoexport.add` answered `-32602 required argument collection missing,
+  translator missing, path missing`, which is the verbatim error shape the helper
+  prints.

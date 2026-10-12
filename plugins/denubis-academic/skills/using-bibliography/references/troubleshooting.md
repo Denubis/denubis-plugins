@@ -76,6 +76,11 @@ Deleting it only forces one more prompt. Zotero 7-9 never reach this path.
 | `not accepted: refused: HTTP 403 …` | The library is not editable by this Zotero user | Check the group's permissions in Zotero |
 | `accepted; not verified: <reason>` | Zotero took the request but the read-back did not show the change | Check the object in Zotero before repeating; the change may have landed |
 | `--apply requires --expect-version` (usage error, exit 2) | The apply command was retyped without the expected-state flag | Copy the apply command the preview printed |
+| `accepted; completion not observed: no zotero-api-plus` | BBT registered the export but the forced run could not be triggered | Install zotero-api-plus ≥ 0.4.0, or add an item to the collection and watch the file; the registration stands |
+| `accepted; completion not observed: no modification seen within 30 s` | The trigger fired but the file did not change in time | Check BBT's automatic-export preferences for the path and its error column; re-run `resolve.py --bib` later |
+| `accepted; completion not observed …; content not satisfied: no file`, while BBT's automatic-export list shows the export as done with no error | Zotero is sandboxed (Flatpak `org.zotero.Zotero` has a private `/tmp`) and wrote the file where the host cannot see it | Register again with a path the sandbox shares, normally under the home directory, and delete the unreachable registration in Zotero; observed with Zotero 10.0.6 Flatpak on 2026-10-12 |
+| `content not satisfied: <citekey> absent` or `malformed block(s)` | The file does not yet hold a listed citekey, or is mid-write | Wait for the export, then re-check with `resolve.py --citekey <key> --bib <path>` |
+| `not accepted: autoexport.add error: … already registered …` | The path belongs to another collection or translator | Confirm the intent, then re-run with `--replace` |
 
 ## Render failures
 

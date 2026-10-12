@@ -267,6 +267,45 @@ direct key read returns a trashed collection. So:
 
 Member items are not trashed with their collection and keep their membership.
 
+## Register a Better BibTeX auto-export
+
+```bash
+uv run "$BIB/register_export.py" --collection "<library>/<collection>[/<sub>]" \
+  --path /absolute/project/references.bib [--translator "Better BibLaTeX"]
+```
+
+Register class. The preview resolves the collection path segment by segment
+(a missing segment is an error; the helper never lets BBT create one) and
+prints the key, translator, absolute path, whether a file exists there with
+its size, mtime and sha256, `registration state: unknown` with BBT's
+`autoexport.add` semantics, and the apply command carrying
+`--expect-collection KEY`. After confirmation run that command (add
+`--replace` only when the user wants a path that belongs to another
+collection or translator re-pointed).
+
+Apply re-resolves and refuses `target changed`, then calls `autoexport.add`
+with the numeric absolute path `/<libraryID>/<names>`. BBT registers an
+enabled "Keep updated" collection export, reschedules an existing one at the
+same path and translator with its settings untouched, and errors when the
+path is registered elsewhere unless `--replace`; it cannot register a
+library-level export and has no list or remove counterpart. A registration is
+therefore a standing side effect: removing it is manual, in Zotero under
+Settings > Better BibTeX > Automatic export, and the preview says so before
+approval. The report separates three observations:
+
+- `accepted`: BBT returned the expected collection key (anything else is
+  printed verbatim);
+- `completion observed` only when zotero-api-plus triggered the export and the
+  file's modification time advanced within 30 s; otherwise `not observed` with
+  the reason (`no zotero-api-plus`, `trigger refused: <kind>`, `no modification
+  seen within 30 s`). zotero-api-plus never reports export success;
+- `content satisfied` only when the file parses as a bibliography and holds a
+  citekey from the collection listing.
+
+`verified` is printed only when both observations are positive; the previewed
+size and hash are shown beside the new ones as an observation, never as the
+verdict (a repeat export can write identical bytes).
+
 ## Annotate a cited passage
 
 Requires the `zotero-api-plus` annotation endpoints. An annotation is a Zotero

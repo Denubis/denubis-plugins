@@ -96,6 +96,13 @@ The supported Better BibTeX setup is:
 7. With user approval, create the project's `notes/literature/` and any local
    structure directory its instructions require.
 
+Steps 1 to 4 may instead be done with the write-gated helper in
+[Zotero writes](zotero-writes.md#register-a-better-bibtex-auto-export):
+`register_export.py` previews the resolved collection and path, registers the
+"Keep updated" export behind `--apply --expect-collection KEY`, and reports
+`accepted`, `completion`, and `content` separately. Steps 5 and 6 remain BBT
+preferences the user sets; the manual route stays supported.
+
 Read the bibliography path from project configuration or document metadata.
 Never guess that it is `references.bib` merely because that name is common.
 

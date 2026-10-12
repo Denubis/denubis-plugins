@@ -172,6 +172,7 @@ change user-owned state and require the procedure's preview and confirmation:
 | Create an item (create class) | `create_item.py --type T --set F=V … [--collection C]` | Preview shows the full JSON body, the resolved library and collection keys; approval, then the printed `--apply --expect-collection KEY --expect-library ID` |
 | Create a collection (create class) | `collection.py --create NAME [--parent P]` | Preview shows the body, parent and library; approval, then the printed `--apply --expect-library ID [--expect-parent KEY]` |
 | Rename, trash, or restore a collection (modify class) | `collection.py --rename/--trash/--restore KEY` | Preview shows name, version, descendants and item count; approval, then the printed `--apply --expect-version N`; keep the `--restore … --descendants` line a trash prints |
+| Register a BBT auto-export (register class) | `register_export.py --collection "<lib>/<path>" --path FILE.bib` | Preview shows the resolved key, translator, path, existing file facts, `registration state: unknown`, and that removal is manual (Settings > Better BibTeX > Automatic export); approval, then the printed `--apply --expect-collection KEY` |
 | Add PDF annotation | `annotate.py --dry-run` | Explicit instruction to annotate; then omit `--dry-run` |
 | Create zettelkasten/project notes | Draft path and content | Follow project rules and obtain any required confirmation |
 | Create config or zettelkasten layout | Explain exact paths | User creates them or explicitly authorises creation |

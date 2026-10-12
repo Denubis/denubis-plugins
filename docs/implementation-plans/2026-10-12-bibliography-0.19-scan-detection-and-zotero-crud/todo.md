@@ -3,12 +3,6 @@
 Plan: `plan.md` in this directory. Each outcome is done when its verification block
 passes and its evidence is in `worklog.md`.
 
-## Outcome E: auto-export registration
-- [ ] Red: `register_export.py` cases (`bbt_collection_path` numeric absolute form reaches the RPC stub, preview no RPC, `--expect-version` rejected, missing flag usage error, accepted/not accepted by returned key, E2a, E2b, no-mtime-change, content satisfied/not)
-- [ ] Green: `register_export.py` (injected clock)
-- [ ] Docs: `zotero-writes.md`, `notes-and-bibliographies.md`, `SKILL.md` row, `troubleshooting.md` rows; regex update
-- [ ] Verification block E; checkpoint commit
-
 ## Outcome F: release 0.19.0
 - [ ] Final `SKILL.md` pass (preconditions, front door, write-boundary table, completion evidence; ≤ 500 lines)
 - [ ] Bounded inspection: every documented flag and preview line exists in the helper (`--help` plus format strings), recorded per helper
