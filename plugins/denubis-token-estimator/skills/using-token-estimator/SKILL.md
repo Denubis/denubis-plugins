@@ -37,11 +37,15 @@ They define `[start, end)` and cannot be combined with `--month`.
 
 - `main_tok` is model output owned by human-steered root threads.
 - `sub_tok` is model output owned by spawned subagents after replay removal.
-- `human_words` counts retained human user turns after named machine-wrapper
-  exclusions.
+- `own_words` (`human_words` in CSV) counts the human's own authorship in retained
+  user turns after the structural and named machine exclusions.
+- `pasted` (`pasted_words` in CSV) counts text the human submitted but did not write:
+  `pasted_content` wrapper bodies and forwarded side-agent notes. Report it, do not
+  add it to authorship.
 
 The subagent percentage describes only the model-output split. Do not combine it with
-the human-word total.
+either word column. For sessions older than Claude Code's paste wrapper, state that
+own words are an upper bound: earlier pastes were recorded as plain text.
 
 ## Counting rules
 
@@ -58,14 +62,19 @@ baseline; if they start fresh or reset, retain them unchanged. Root and replay-a
 child totals are additive.
 
 Claude human turns come from main transcripts, deduplicate by UUID at their earliest
-timestamp, and exclude `toolUseResult`, `isMeta`, and named wrapper tags. Codex human
-turns come from root-thread `response_item` user messages and exclude named injected
-markers. Do not text-deduplicate Codex turns: repeated `yes` or `continue` messages are
-distinct human sends.
+timestamp, and exclude records flagged `toolUseResult`, `isMeta`, `isSidechain`, or
+`isCompactSummary`, then blocks matching a named machine marker: a wrapper tag, the
+`Another Claude session sent a message:` relay line, or the bare
+`[Request interrupted by user]` boilerplate. Codex human turns come from root-thread
+`response_item` user messages and exclude named injected markers. Do not
+text-deduplicate Codex turns: repeated `yes` or `continue` messages are distinct human
+sends.
 
 Machine filtering is a named allow-list in `scripts/verify.py`, never a rule such as
 "drop anything starting with `<` or `#`". Human prompts may contain markup, Markdown
-headings, terminal output, or pasted agent text.
+headings, terminal output, or pasted agent text. When a figure looks wrong, histogram
+the first line of retained blocks and inspect the verifier's largest-block list before
+adding a marker; a new marker needs live-log evidence of its exact form.
 
 ## Exact windows and disclosure scope
 

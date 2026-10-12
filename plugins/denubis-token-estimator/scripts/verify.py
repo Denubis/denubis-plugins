@@ -32,6 +32,7 @@ from pathlib import Path
 
 CLAUDE_ROOT = Path.home() / ".claude" / "projects"
 CODEX_ROOT = Path.home() / ".codex" / "sessions"
+LARGEST_KEEP = 10  # retained original-word blocks listed for hand-checking
 
 
 # People-roots are NOT hardcoded. They come from ~/.token-estimator (TOML) as a
@@ -72,6 +73,81 @@ MACHINE_TAGS = {
     "user-prompt-submit-hook",
 }
 _LEAD_TAG = re.compile(r"^\s*<([a-zA-Z][\w-]*)")
+
+# Named machine lines that are not tags (node 3). Claude Code prints this line, alone,
+# before the <teammate-message> wrapper when another session delivers mail; the human
+# wrote none of it. The key must be the whole first line: a human sentence that begins
+# the same way but carries its message on the same line is kept. Observed 2026-10-12
+# in 1,677 main-thread user records, every one followed by a <teammate-message> tag.
+CLAUDE_MACHINE_LINES = {
+    "Another Claude session sent a message:": "another-claude-session",
+}
+# Whole-block boilerplate Claude Code writes when the human presses Escape. Matched
+# against the stripped block, so an interrupt followed by human words is kept. Observed
+# 2026-10-12: 4,188 blocks, every one exactly one of these two strings.
+CLAUDE_MACHINE_BLOCKS = {
+    "[Request interrupted by user]",
+    "[Request interrupted by user for tool use]",
+}
+# Structural flags on a user record that mark it as injected rather than typed.
+# `isCompactSummary` is the automatic continuation summary written after compaction
+# (observed 2026-10-12 on 512 records, each paired with `isVisibleInTranscriptOnly`).
+CLAUDE_MACHINE_RECORD_FLAGS = ("isSidechain", "isMeta", "isCompactSummary")
+
+# Claude Code wraps a large paste as <pasted_content id="…">…</pasted_content id="…">
+# (the closing tag repeats the attribute). Words inside are pasted material; words
+# outside are the human's own authorship. An unclosed wrapper runs to the end of text.
+_PASTED = re.compile(
+    r"<pasted_content\b[^>]*>(.*?)(?:</pasted_content\b[^>]*>|\Z)", re.DOTALL
+)
+# Claude Code's builtin "You should know" side agent pre-fills the prompt with this
+# header and a Markdown blockquote of its note; the human submits it, often with their
+# own words after the quote. The quoted note is forwarded agent text, counted as pasted.
+# Observed 2026-10-12 on 30 records (prompt source typed or queued, origin human).
+_SIDE_AGENT_NOTE = re.compile(
+    r"^[ \t]*Here is a note offered by a side agent:[ \t]*\n\s*((?:^>.*\n?)+)",
+    re.MULTILINE,
+)
+
+
+def claude_user_excluded(record):
+    """Return the structural reason a main-thread user record is not a human turn."""
+    if "toolUseResult" in record:
+        return "toolUseResult"
+    for flag in CLAUDE_MACHINE_RECORD_FLAGS:
+        if record.get(flag) is True:
+            return flag
+    return None
+
+
+def claude_machine_marker(text):
+    """Return the named machine marker a Claude user text block matches, else None."""
+    tag = lead_tag(text)
+    if tag in MACHINE_TAGS:
+        return tag
+    stripped = text.strip()
+    if stripped in CLAUDE_MACHINE_BLOCKS:
+        return stripped
+    first_line = stripped.split("\n", 1)[0].strip()
+    return CLAUDE_MACHINE_LINES.get(first_line)
+
+
+def split_pasted(text):
+    """Split a human text block into (original, pasted).
+
+    Pasted text is the paste wrapper's body and the blockquote of a forwarded
+    side-agent note; everything else is the human's own authorship.
+    """
+    pasted = []
+
+    def take(match):
+        pasted.append(match.group(1))
+        return " "
+
+    original = _PASTED.sub(take, text)
+    original = _SIDE_AGENT_NOTE.sub(take, original)
+    return original, " ".join(pasted)
+
 
 # Codex root-thread user-input machine markers (node 4), derived by signature-inspecting
 # the live stream. Same allow-list discipline as node 3: machine is a NAMED set, not
@@ -162,6 +238,13 @@ def lead_tag(text):
     return m.group(1).lower() if m else None
 
 
+def _display_path(fp):
+    try:
+        return str(fp.relative_to(CLAUDE_ROOT))
+    except ValueError:
+        return str(fp)
+
+
 # ---------------------------------------------------------------- Claude pass
 def claude_pass():
     """One pass: node 1 (tokens/origin), node 5 (cwd/id), node 3 (human words)."""
@@ -174,8 +257,14 @@ def claude_pass():
     # node3
     blocks = 0
     words = 0
+    pasted_words = 0
+    pasted_blocks = 0
     seen_uuid = set()
     wrap_hist = collections.Counter()
+    record_drop_hist = collections.Counter()
+    # Largest retained original-word blocks: pastes made before the paste wrapper
+    # existed are indistinguishable from typing, so these are the hand-check list.
+    largest = []
 
     for fp in claude_files():
         is_subfile = "/subagents/" in str(fp)
@@ -214,16 +303,14 @@ def claude_pass():
                             cwd_atmax[mid] = cwd
                         out_max[mid] = max(out_max[mid], out)
                     elif t == "user" and not is_subfile:
-                        if r.get("isSidechain") is True:
-                            continue
-                        if "toolUseResult" in r:
-                            continue
-                        if r.get("isMeta") is True:
-                            continue
                         uid = r.get("uuid")
                         if uid in seen_uuid:
                             continue
                         seen_uuid.add(uid)
+                        dropped = claude_user_excluded(r)
+                        if dropped:
+                            record_drop_hist[dropped] += 1
+                            continue
                         msg = r.get("message") or {}
                         content = msg.get("content")
                         texts = []
@@ -238,12 +325,29 @@ def claude_pass():
                         for tx in texts:
                             if not tx or not tx.strip():
                                 continue
-                            tag = lead_tag(tx)
-                            if tag in MACHINE_TAGS:
-                                wrap_hist[tag] += 1
+                            marker = claude_machine_marker(tx)
+                            if marker:
+                                wrap_hist[marker] += 1
                                 continue
+                            original, pasted = split_pasted(tx)
                             blocks += 1
-                            words += len(tx.split())
+                            own = len(original.split())
+                            words += own
+                            if pasted.strip():
+                                pasted_blocks += 1
+                                pasted_words += len(pasted.split())
+                            if own:
+                                largest.append(
+                                    (
+                                        own,
+                                        " ".join(original.split()[:8]),
+                                        _display_path(fp),
+                                        uid,
+                                    )
+                                )
+                                if len(largest) > LARGEST_KEEP * 4:
+                                    largest.sort(reverse=True)
+                                    del largest[LARGEST_KEEP:]
         except OSError:
             continue
 
@@ -267,7 +371,14 @@ def claude_pass():
         "cross_partition": cross_part,
         "node3_blocks": blocks,
         "node3_words": words,
+        "node3_pasted_blocks": pasted_blocks,
+        "node3_pasted_words": pasted_words,
+        "node3_largest": [
+            {"words": n, "lead": lead, "file": file, "uuid": uid}
+            for n, lead, file, uid in sorted(largest, reverse=True)[:LARGEST_KEEP]
+        ],
         "wrap_hist": dict(wrap_hist),
+        "record_drop_hist": dict(record_drop_hist),
         "cross_person": cross_person,
         "cross_person_project": cross_pp,
     }
@@ -625,8 +736,17 @@ def main():
     print("\nNODE 3 — Claude human words")
     print(base("human blocks", c["node3_blocks"], BASELINE["node3_human_blocks"]))
     print(
-        f"        human words={c['node3_words']:,}   wrappers dropped: {c['wrap_hist']}"
+        f"        original words={c['node3_words']:,}   pasted words="
+        f"{c['node3_pasted_words']:,} in {c['node3_pasted_blocks']:,} blocks"
     )
+    print(f"        machine blocks dropped: {c['wrap_hist']}")
+    print(f"        injected records dropped: {c['record_drop_hist']}")
+    print(
+        "        largest retained original blocks (hand-check: pastes older than the"
+        " paste wrapper look like typing):"
+    )
+    for row in c["node3_largest"]:
+        print(f"          {row['words']:>7,}  {row['lead'][:48]!r:52} {row['file']}")
 
     print(
         "\nNODE 4 — Codex human words "

@@ -78,12 +78,30 @@ child totals are additive only after replay removal.
 - Read main-thread user records only.
 - Deduplicate by user `uuid`, retaining the earliest timestamp so filesystem
   traversal order cannot move a turn across a time boundary.
-- Drop `toolUseResult` and `isMeta` records.
-- Count text blocks unless their leading tag is in the named machine-wrapper
-  allow-list in `scripts/verify.py`.
+- Drop records whose structure marks them as injected: `toolUseResult`, `isMeta`,
+  `isSidechain`, and `isCompactSummary` (the automatic continuation summary written
+  after compaction; observed 2026-10-12, paired with `isVisibleInTranscriptOnly`).
+- Drop text blocks that match a named machine marker in `scripts/verify.py`: a
+  leading wrapper tag from the allow-list, the relay line `Another Claude session
+  sent a message:` standing alone as the first line (observed 2026-10-12, always
+  followed by a `teammate-message` wrapper), or a block that is exactly the Escape
+  boilerplate `[Request interrupted by user]` or `[Request interrupted by user for
+  tool use]`.
+- Split each retained block into original and pasted words. Pasted words are the body
+  of a `pasted_content` wrapper (its closing tag repeats the `id` attribute; an unclosed
+  wrapper runs to the end of the block) and the blockquote of a forwarded side-agent
+  note introduced by the line `Here is a note offered by a side agent:`. Everything
+  else is the human's own authorship.
 
 The exclusion is deliberately not "starts with `<`". Human prompts can contain
-HTML, XML, or pasted agent output.
+HTML, XML, or pasted agent output. Every exclusion is a named structural flag or a
+named marker; the verifier reports a histogram of each so an auditor can see what was
+removed.
+
+The paste wrapper is recent. Pastes made before Claude Code added it were recorded as
+plain text and cannot be told from typing, so for sessions predating the wrapper the
+original-word figure is an upper bound. The verifier lists the largest retained
+original blocks as the hand-check list.
 
 ### Codex
 
@@ -93,7 +111,9 @@ HTML, XML, or pasted agent output.
   environment, skill, subagent-notification, abort, and `AGENTS.md` payloads.
 - Do not text-deduplicate. Repeated short human messages are distinct sends.
 
-Pasted content remains human input by the owner's explicit policy.
+Pasted content remains human input by the owner's explicit policy. Claude reports it
+in a separate pasted-word column; Codex has no paste marker, so its pasted column is
+always zero and its word figure is original and pasted together.
 
 ## Exact windows
 
@@ -152,6 +172,12 @@ an empty defect list is bounded by a positive inventory.
   explicit continuation rule before they could be counted safely.
 - The structural estimator does not decide which project activity is topically in
   scope for a particular disclosure.
+- Claude pastes older than the `pasted_content` wrapper, and every Codex paste, are
+  counted as original words. The original-word figure is therefore an upper bound on
+  authorship for those sessions.
+- The injected-record and machine-marker sets were derived by signature-inspecting the
+  live corpus on 2026-10-12. A future Claude Code release may add a new injected form;
+  the verifier's largest-block list and marker histograms are where it would show.
 
 ## Implementation ownership
 

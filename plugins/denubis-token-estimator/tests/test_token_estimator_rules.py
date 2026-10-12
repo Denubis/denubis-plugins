@@ -63,6 +63,130 @@ class TestClaudeWrappers:
         assert V.lead_tag("just some prose") is None
 
 
+# ------------------------------------------- claude_machine_marker (node 3)
+class TestClaudeMachineMarker:
+    """Named markers beyond leading tags: the cross-session relay line that Claude Code
+    prints before a <teammate-message> wrapper, and the interrupt boilerplate it writes
+    when the human presses Escape. Neither is human-authored text."""
+
+    def test_wrapper_tag_is_a_marker(self):
+        marker = V.claude_machine_marker("<system-reminder>x</system-reminder>")
+        assert marker is not None
+
+    def test_cross_session_relay_is_a_marker(self):
+        text = (
+            "Another Claude session sent a message:\n"
+            '<teammate-message teammate_id="reader" color="cyan">\n'
+            "Note written; quotes verified.\n</teammate-message>"
+        )
+        assert V.claude_machine_marker(text) is not None
+
+    def test_cross_session_sentence_typed_by_a_human_is_kept(self):
+        # The relay line stands alone; a human sentence that happens to begin the same
+        # way, with the message on the same line, is not the machine form.
+        assert (
+            V.claude_machine_marker(
+                "Another Claude session sent a message: can you check it arrived?"
+            )
+            is None
+        )
+
+    def test_interrupt_boilerplate_is_a_marker(self):
+        assert V.claude_machine_marker("[Request interrupted by user]") is not None
+        assert (
+            V.claude_machine_marker("  [Request interrupted by user for tool use]\n")
+            is not None
+        )
+
+    def test_interrupt_followed_by_human_text_is_kept(self):
+        assert (
+            V.claude_machine_marker("[Request interrupted by user] no, do it this way")
+            is None
+        )
+
+    def test_human_markup_heading_and_prose_are_kept(self):
+        assert V.claude_machine_marker("<p>genuine pasted html</p>") is None
+        assert V.claude_machine_marker("# Claude, please do X") is None
+        assert V.claude_machine_marker("just some prose") is None
+
+
+# ------------------------------------------ claude_user_excluded (node 3)
+class TestClaudeUserRecordExclusion:
+    """Record-level drops are structural flags on the user record, not text rules."""
+
+    def test_compaction_summary_record_is_excluded(self):
+        rec = {
+            "type": "user",
+            "isCompactSummary": True,
+            "message": {"content": "This session is being continued from a previous"},
+        }
+        assert V.claude_user_excluded(rec) is not None
+
+    def test_existing_structural_drops_still_apply(self):
+        assert V.claude_user_excluded({"type": "user", "isSidechain": True}) is not None
+        assert V.claude_user_excluded({"type": "user", "toolUseResult": {}}) is not None
+        assert V.claude_user_excluded({"type": "user", "isMeta": True}) is not None
+
+    def test_plain_human_record_is_kept(self):
+        rec = {"type": "user", "uuid": "u1", "message": {"content": "hello"}}
+        assert V.claude_user_excluded(rec) is None
+
+
+# ------------------------------------------------------ split_pasted (node 3)
+class TestSplitPasted:
+    """Claude Code wraps a large paste in <pasted_content id="…">…</pasted_content
+    id="…">. Words inside the wrapper are pasted material; words outside it are the
+    human's own authorship. Both are counted, separately."""
+
+    def test_no_wrapper_is_all_original(self):
+        assert V.split_pasted("just my own words") == ("just my own words", "")
+
+    def test_wrapper_mid_text_with_attributed_closing_tag(self):
+        text = (
+            'fix this\n\n<pasted_content id="863a">\nalpha beta gamma delta\n'
+            '</pasted_content id="863a">\n\nplease'
+        )
+        original, pasted = V.split_pasted(text)
+        assert original.split() == ["fix", "this", "please"]
+        assert pasted.split() == ["alpha", "beta", "gamma", "delta"]
+
+    def test_wrapper_at_start(self):
+        original, pasted = V.split_pasted(
+            '<pasted_content id="1">one two</pasted_content id="1"> ok'
+        )
+        assert original.split() == ["ok"]
+        assert pasted.split() == ["one", "two"]
+
+    def test_unclosed_wrapper_runs_to_end(self):
+        original, pasted = V.split_pasted('see: <pasted_content id="7"> one two three')
+        assert original.split() == ["see:"]
+        assert pasted.split() == ["one", "two", "three"]
+
+    def test_forwarded_side_agent_note_is_pasted_and_own_words_kept(self):
+        text = (
+            "Here is a note offered by a side agent:\n\n"
+            "> Heads up · Older pastes still count.\n>\n"
+            "> **Older pastes**\n> * one point\n\n"
+            "arrgh"
+        )
+        original, pasted = V.split_pasted(text)
+        assert original.split() == ["arrgh"]
+        assert "Heads" in pasted and "point" in pasted
+
+    def test_blockquote_without_the_note_header_is_own_words(self):
+        original, pasted = V.split_pasted("> quoting myself\n> here")
+        assert original.split() == [">", "quoting", "myself", ">", "here"]
+        assert pasted == ""
+
+    def test_two_wrappers(self):
+        original, pasted = V.split_pasted(
+            'a <pasted_content id="1">x</pasted_content id="1"> b '
+            '<pasted_content id="2">y z</pasted_content id="2"> c'
+        )
+        assert original.split() == ["a", "b", "c"]
+        assert pasted.split() == ["x", "y", "z"]
+
+
 # --------------------------------------------------- codex_machine_marker (node 4)
 class TestCodexMarkers:
     def test_named_machine_markers_excluded(self):

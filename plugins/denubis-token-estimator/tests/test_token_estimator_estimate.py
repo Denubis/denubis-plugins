@@ -53,7 +53,77 @@ def test_collect_claude_leaf_grain(tmp_path, monkeypatch):
     monkeypatch.setattr(V, "CLAUDE_ROOT", root)
     leaves = collections.defaultdict(E._blank)
     E.collect_claude(leaves, _attr_r)
-    assert leaves[("claude", "Alice", "ProjX", "2026-06")] == [300, 0, 3]
+    assert leaves[("claude", "Alice", "ProjX", "2026-06")] == [300, 0, 3, 0]
+
+
+def test_collect_claude_separates_injected_text_and_pasted_words(tmp_path, monkeypatch):
+    root = tmp_path / "projects"
+    common = {"cwd": "/r/Alice/ProjX", "timestamp": "2026-06-15T10:00:01Z"}
+    _write_jsonl(
+        root / "proj" / "main.jsonl",
+        [
+            {  # compaction summary: not a human turn
+                "type": "user",
+                "uuid": "c1",
+                "isCompactSummary": True,
+                "message": {
+                    "content": "This session is being continued from a previous one"
+                },
+                **common,
+            },
+            {  # relay from another Claude session: not a human turn
+                "type": "user",
+                "uuid": "x1",
+                "message": {
+                    "content": "Another Claude session sent a message:\n"
+                    '<teammate-message teammate_id="a">\nreport body here\n'
+                    "</teammate-message>"
+                },
+                **common,
+            },
+            {  # Escape boilerplate: not a human turn
+                "type": "user",
+                "uuid": "i1",
+                "message": {"content": "[Request interrupted by user for tool use]"},
+                **common,
+            },
+            {  # human turn with a paste: 3 original words, 4 pasted words
+                "type": "user",
+                "uuid": "h1",
+                "message": {
+                    "content": 'fix this\n<pasted_content id="1">\nalpha beta gamma '
+                    'delta\n</pasted_content id="1">\nplease'
+                },
+                **common,
+            },
+        ],
+    )
+    monkeypatch.setattr(V, "CLAUDE_ROOT", root)
+    leaves = collections.defaultdict(E._blank)
+    E.collect_claude(leaves, _attr_r)
+    assert leaves[("claude", "Alice", "ProjX", "2026-06")] == [0, 0, 3, 4]
+
+
+def test_csv_leaf_grain_carries_pasted_words_column(tmp_path):
+    import csv
+
+    leaves = {("claude", "A", "P", "2026-06"): [20, 3, 4, 6]}
+    out = tmp_path / "out.csv"
+    E.write_csv(leaves, out)
+    with out.open(newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows == [
+        {
+            "source": "claude",
+            "person": "A",
+            "project": "P",
+            "month": "2026-06",
+            "main_tok": "20",
+            "sub_tok": "3",
+            "human_words": "4",
+            "pasted_words": "6",
+        }
+    ]
 
 
 def test_collect_claude_equal_max_attribution_is_traversal_order_independent(
@@ -96,8 +166,8 @@ def test_collect_claude_equal_max_attribution_is_traversal_order_independent(
     leaves = collections.defaultdict(E._blank)
     E.collect_claude(leaves, _attr_r)
 
-    assert leaves[("claude", "Alice", "ProjX", "2026-06")] == [300, 0, 0]
-    assert leaves[("claude", "Bob", "ProjY", "2026-06")] == [0, 0, 0]
+    assert leaves[("claude", "Alice", "ProjX", "2026-06")] == [300, 0, 0, 0]
+    assert leaves[("claude", "Bob", "ProjY", "2026-06")] == [0, 0, 0, 0]
 
 
 def test_collect_claude_window_uses_message_origin_not_replay_time(
@@ -179,7 +249,7 @@ def test_collect_claude_window_uses_message_origin_not_replay_time(
 
     # "inside" is counted once at its main-thread origin, using its global MAX.
     # "before" is excluded even though a replay lands inside the window.
-    assert leaves[("claude", "Alice", "ProjX", "(window)")] == [300, 0, 3]
+    assert leaves[("claude", "Alice", "ProjX", "(window)")] == [300, 0, 3, 0]
 
 
 def test_collect_claude_window_user_dedup_is_traversal_order_independent(
@@ -221,7 +291,7 @@ def test_collect_claude_window_user_dedup_is_traversal_order_independent(
         end=V.parse_timestamp("2026-08-12T00:00:00Z"),
     )
 
-    assert leaves[("claude", "Alice", "ProjX", "(window)")] == [0, 0, 3]
+    assert leaves[("claude", "Alice", "ProjX", "(window)")] == [0, 0, 3, 0]
 
 
 def test_collect_codex_leaf_grain(tmp_path, monkeypatch):
@@ -254,7 +324,7 @@ def test_collect_codex_leaf_grain(tmp_path, monkeypatch):
     leaves = collections.defaultdict(E._blank)
     E.collect_codex(leaves, _attr_r)
     # month comes from the rollout filename; main-thread tokens land in slot 0.
-    assert leaves[("codex", "Alice", "ProjX", "2026-06")] == [800, 0, 3]
+    assert leaves[("codex", "Alice", "ProjX", "2026-06")] == [800, 0, 3, 0]
 
 
 def test_collect_codex_uses_child_owned_counter_after_replay(tmp_path, monkeypatch):
@@ -333,7 +403,7 @@ def test_collect_codex_uses_child_owned_counter_after_replay(tmp_path, monkeypat
     leaves = collections.defaultdict(E._blank)
     E.collect_codex(leaves, _attr_r)
 
-    assert leaves[("codex", "Alice", "ProjX", "2026-08")] == [5_000, 1_500, 0]
+    assert leaves[("codex", "Alice", "ProjX", "2026-08")] == [5_000, 1_500, 0, 0]
 
 
 def test_collect_codex_window_uses_owned_counter_delta(tmp_path, monkeypatch):
@@ -404,28 +474,28 @@ def test_collect_codex_window_uses_owned_counter_delta(tmp_path, monkeypatch):
     )
 
     # Inclusive start, exclusive end: 900 - 100; the 1,200 event is excluded.
-    assert leaves[("codex", "Alice", "ProjX", "(window)")] == [800, 0, 3]
+    assert leaves[("codex", "Alice", "ProjX", "(window)")] == [800, 0, 3, 0]
 
 
 def test_rollup_collapses_to_person_project():
     leaves = {
-        ("claude", "A", "P", "2026-05"): [10, 1, 2],
-        ("claude", "A", "P", "2026-06"): [20, 3, 4],
-        ("codex", "A", "P", "2026-06"): [5, 0, 1],
+        ("claude", "A", "P", "2026-05"): [10, 1, 2, 5],
+        ("claude", "A", "P", "2026-06"): [20, 3, 4, 6],
+        ("codex", "A", "P", "2026-06"): [5, 0, 1, 0],
     }
     agg = E.rollup(leaves)
-    assert agg[("A", "P")] == [35, 4, 7]
+    assert agg[("A", "P")] == [35, 4, 7, 11]
 
 
 def test_rollup_keeps_month_when_asked():
     leaves = {
-        ("claude", "A", "P", "2026-05"): [10, 1, 2],
-        ("claude", "A", "P", "2026-06"): [20, 3, 4],
-        ("codex", "A", "P", "2026-06"): [5, 0, 1],
+        ("claude", "A", "P", "2026-05"): [10, 1, 2, 5],
+        ("claude", "A", "P", "2026-06"): [20, 3, 4, 6],
+        ("codex", "A", "P", "2026-06"): [5, 0, 1, 0],
     }
     aggm = E.rollup(leaves, keep_month=True)
-    assert aggm[("A", "P", "2026-06")] == [25, 3, 5]
-    assert aggm[("A", "P", "2026-05")] == [10, 1, 2]
+    assert aggm[("A", "P", "2026-06")] == [25, 3, 5, 6]
+    assert aggm[("A", "P", "2026-05")] == [10, 1, 2, 5]
 
 
 def test_share():

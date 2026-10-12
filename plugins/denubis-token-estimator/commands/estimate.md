@@ -30,10 +30,15 @@ with `--month`. `--csv <file>` also writes the tidy
 `using-token-estimator` skill):
 - **output tokens**, origin-deduplicated, split into **main** (human-steered main
   thread) and **sub** (autonomous subagent fan-out);
-- **human input words**, with machine wrappers stripped and pasted human content kept.
+- **human input words**, with injected records (compaction summaries, cross-session
+  relays, Escape boilerplate, wrapper tags) removed, split into **own_words** (the
+  human's authorship) and **pasted** (paste-wrapper bodies and forwarded side-agent
+  notes).
 
-Present the table as-is; call out the subagent share and the human-word total. The grand
-total equals the sum of the monthly rows by construction. If a figure looks surprising,
+Present the table as-is; call out the subagent share and both word columns. Say that
+own words are an upper bound for sessions older than Claude Code's paste wrapper, since
+earlier pastes are indistinguishable from typing. The grand total equals the sum of the
+monthly rows by construction. If a figure looks surprising,
 re-derive the headline numbers from the live logs with
 `uv run --no-project python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify.py"`.
 

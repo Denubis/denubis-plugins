@@ -5,13 +5,19 @@ disclosure section of a paper. Two real measures, never proxies:
 
 - **output tokens** — origin-deduplicated, split into **main** (human-steered main thread)
   and **sub** (autonomous subagent fan-out);
-- **human input words** — user turns with machine wrappers stripped, pasted human content
-  kept.
+- **human input words** — user turns with injected records and machine markers removed,
+  split into **own** words (the human's authorship) and **pasted** words (paste-wrapper
+  bodies and forwarded side-agent notes, counted but kept apart).
 
 Reported per project, rolled up from the directory, optionally by month or by an
 exact timezone-aware interval.
 
-> **Status: WIP (0.2.0).** Fixture tests and the live verifier exercise the implemented
+Injected text that is not counted as human: compaction continuation summaries, relays
+from other Claude sessions, Escape boilerplate, and the named wrapper tags. Pastes
+made before Claude Code added its paste wrapper look like typing, so the own-word
+figure is an upper bound for older sessions; the verifier lists the largest blocks.
+
+> **Status: WIP (0.3.0).** Fixture tests and the live verifier exercise the implemented
 > methodology, but the independent audit in `docs/AUDIT-BRIEF.md` remains pending.
 > Treat publication numbers as corrected-pending-audit.
 

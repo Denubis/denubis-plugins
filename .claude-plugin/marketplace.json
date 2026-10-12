@@ -186,8 +186,8 @@
     },
     {
       "name": "denubis-token-estimator",
-      "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens are origin-deduplicated and split between root threads and subagent fan-out; human-authored input words exclude named machine wrappers. Report per project, by month or exact time window. WIP \u2014 independent audit pending.",
-      "version": "0.2.1",
+      "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens are origin-deduplicated and split between root threads and subagent fan-out; human input words exclude injected records and named machine markers and are split into own authorship and pasted text. Report per project, by month or exact time window. WIP \u2014 independent audit pending.",
+      "version": "0.3.0",
       "source": "./plugins/denubis-token-estimator",
       "author": {
         "name": "Brian Ballsun-Stanton",

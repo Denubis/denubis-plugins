@@ -108,6 +108,35 @@ def claude_corpus(tmp_path, monkeypatch):
                 "cwd": "/r/Alice/ProjX",
                 "message": {"content": [{"type": "text", "text": "meta"}]},
             },
+            {  # automatic continuation summary after compaction -> record dropped
+                "type": "user",
+                "uuid": "u6",
+                "isCompactSummary": True,
+                "isVisibleInTranscriptOnly": True,
+                "cwd": "/r/Alice/ProjX",
+                "message": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "This session is being continued from a previous "
+                            "conversation that ran out of context. Summary: lots",
+                        }
+                    ]
+                },
+            },
+            _user(  # relay from another Claude session -> machine block
+                "Another Claude session sent a message:\n"
+                '<teammate-message teammate_id="reader" color="cyan">\n'
+                "Note written and verified against the source.\n"
+                "</teammate-message>",
+                "u7",
+            ),
+            _user("[Request interrupted by user]", "u8"),  # Escape boilerplate
+            _user(  # original words around a paste: 3 own, 4 pasted
+                'fix this\n\n<pasted_content id="863a">\nalpha beta gamma delta\n'
+                '</pasted_content id="863a">\n\nplease',
+                "u9",
+            ),
         ],
     )
     _write_jsonl(
@@ -132,9 +161,16 @@ def test_claude_origin_dedup_and_words():
     assert c["main_tok"] == 1049  # A(max 999) + B(50); A NOT double-counted by file
     assert c["sub_tok"] == 900  # C only; A is main despite the subagent replay
     assert c["cross_partition"] == 1  # A appears in both a main and a sub file
-    assert c["node3_blocks"] == 2  # "Hello..." + "<p>..."; subfile user text excluded
-    assert c["node3_words"] == 6
-    assert c["wrap_hist"] == {"system-reminder": 1}
+    # "Hello..." + "<p>..." + "fix this ... please"; subfile user text excluded
+    assert c["node3_blocks"] == 3
+    assert c["node3_words"] == 9  # 3 + 3 + 3 own words; pasted words are not here
+    assert c["node3_pasted_words"] == 4
+    # Every dropped block and record is named, so an auditor can see what was removed.
+    assert sum(c["wrap_hist"].values()) == 3  # system-reminder, relay, interrupt
+    assert c["wrap_hist"]["system-reminder"] == 1
+    assert c["record_drop_hist"]["isCompactSummary"] == 1
+    assert sum(c["record_drop_hist"].values()) == 3  # + toolUseResult + isMeta
+    assert c["node3_largest"][0]["words"] == 3  # hand-check list is populated
     assert c["cross_person"] == 0
     assert c["cross_person_project"] == 0
 

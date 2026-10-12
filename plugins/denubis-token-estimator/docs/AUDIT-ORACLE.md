@@ -26,6 +26,15 @@ should expect the actor to test, not instructions the actor should imitate.
 - Machine-text filtering is a named-marker classification, not a leading-character
   rule. Human markup, Markdown headings, and pasted content may legitimately begin with
   syntax that resembles a wrapper.
+- A leading-tag rule alone is insufficient. Compaction continuation summaries are
+  user records flagged `isCompactSummary`; cross-session relays begin with a prose line
+  before their `teammate-message` wrapper; Escape boilerplate is a bare bracketed line.
+  An actor who histograms only leading tags will miss all three and overstate human
+  words by an order of magnitude on a corpus with team sessions.
+- Original and pasted words are different quantities. Pasted text inside a
+  `pasted_content` wrapper or a forwarded side-agent blockquote is reported, not
+  dropped, and not mixed with authorship. Pastes older than the wrapper cannot be
+  separated; an actor should say so rather than claim the original figure is exact.
 
 ## Evidence quality
 

@@ -41,9 +41,15 @@ def make_attr(roots):
 _CODEX_MONTH = re.compile(r"rollout-(\d{4}-\d{2})")
 
 
-# leaf key = (source, person, project, month) -> [main_tok, sub_tok, words]
+# leaf key = (source, person, project, month)
+#   -> [main_tok, sub_tok, human_words, pasted_words]
+# human_words are the human's own authorship; pasted_words are text the human
+# submitted but did not write (paste wrapper bodies, forwarded side-agent notes).
+SLOTS = 4
+
+
 def _blank():
-    return [0, 0, 0]
+    return [0] * SLOTS
 
 
 def _remember_claude_user(human_by_uuid, record):
@@ -80,13 +86,17 @@ def _add_claude_human_words(leaves, attr, human_by_uuid, start, end):
         month = (
             "(window)" if start is not None else (timestamp or "")[:7] or "(no-date)"
         )
-        words = sum(
-            len(text.split())
-            for text in blocks
-            if text and text.strip() and V.lead_tag(text) not in V.MACHINE_TAGS
-        )
-        if words:
-            leaves[("claude", person, project, month)][2] += words
+        words = pasted_words = 0
+        for text in blocks:
+            if not text or not text.strip() or V.claude_machine_marker(text):
+                continue
+            original, pasted = V.split_pasted(text)
+            words += len(original.split())
+            pasted_words += len(pasted.split())
+        if words or pasted_words:
+            leaf = leaves[("claude", person, project, month)]
+            leaf[2] += words
+            leaf[3] += pasted_words
 
 
 def collect_claude(leaves, attr, *, start=None, end=None):
@@ -139,11 +149,7 @@ def collect_claude(leaves, attr, *, start=None, end=None):
                         cwd_atmax[mid] = r.get("cwd")
                         month_atmax[mid] = (r.get("timestamp") or "")[:7] or "(no-date)"
                 elif t == "user" and not is_sub:
-                    if (
-                        r.get("isSidechain") is True
-                        or "toolUseResult" in r
-                        or r.get("isMeta") is True
-                    ):
+                    if V.claude_user_excluded(r):
                         continue
                     _remember_claude_user(human_by_uuid, r)
     _add_claude_human_words(leaves, attr, human_by_uuid, start, end)
@@ -183,7 +189,7 @@ def rollup(leaves, keep_month=False):
     agg = collections.defaultdict(_blank)
     for (_src, person, project, month), v in leaves.items():
         k = (person, project) + ((month,) if keep_month else ())
-        for i in range(3):
+        for i in range(SLOTS):
             agg[k][i] += v[i]
     return agg
 
@@ -200,29 +206,34 @@ def print_project(leaves, person, project, by_month):
     rows = rollup(leaves, keep_month=True)
     months = sorted(m for (pe, pr, m) in rows if pe == person and pr == project)
     tot = _blank()
+    width = 82
     print(
-        f"\n{'=' * 72}\n{person} / {project}"
-        f"{'  (by month)' if by_month else ''}\n{'=' * 72}"
+        f"\n{'=' * width}\n{person} / {project}"
+        f"{'  (by month)' if by_month else ''}\n{'=' * width}"
     )
-    print(f"{'month':<12}{'main_tok':>14}{'sub_tok':>12}{'sub%':>6}{'words':>12}")
-    print("-" * 72)
+    print(
+        f"{'month':<12}{'main_tok':>14}{'sub_tok':>12}{'sub%':>6}"
+        f"{'own_words':>12}{'pasted':>10}"
+    )
+    print("-" * width)
     for m in months:
         v = rows[(person, project, m)]
-        for i in range(3):
+        for i in range(SLOTS):
             tot[i] += v[i]
         if by_month:
             print(
                 f"{m:<12}{fmt(v[0]):>14}{fmt(v[1]):>12}"
-                f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>12}"
+                f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>12}{fmt(v[3]):>10}"
             )
-    print("-" * 72)
+    print("-" * width)
     print(
         f"{'TOTAL':<12}{fmt(tot[0]):>14}{fmt(tot[1]):>12}"
-        f"{share(tot[0], tot[1]):>5.0f}%{fmt(tot[2]):>12}"
+        f"{share(tot[0], tot[1]):>5.0f}%{fmt(tot[2]):>12}{fmt(tot[3]):>10}"
     )
     print(
         f"\n  output tokens: {fmt(tot[0] + tot[1])} "
-        f"({share(tot[0], tot[1]):.0f}% subagent)   human words: {fmt(tot[2])}"
+        f"({share(tot[0], tot[1]):.0f}% subagent)   "
+        f"human words: {fmt(tot[2])} own + {fmt(tot[3])} pasted"
     )
 
 
@@ -231,30 +242,35 @@ def print_person(leaves, person, by_month):
     projects = sorted({pr for (pe, pr, m) in rows if pe == person})
     gt = _blank()
     print(f"\n{'=' * 72}\n{person} — all projects\n{'=' * 72}")
+    print(
+        f"{'project':<40}{'main_tok':>13}{'sub_tok':>11}{'sub%':>6}"
+        f"{'own_words':>11}{'pasted':>9}"
+    )
     for project in projects:
         months = sorted(m for (pe, pr, m) in rows if pe == person and pr == project)
         pt = _blank()
         for m in months:
             v = rows[(person, project, m)]
-            for i in range(3):
+            for i in range(SLOTS):
                 pt[i] += v[i]
         print(
             f"\n{project:<40}{fmt(pt[0]):>13}{fmt(pt[1]):>11}"
-            f"{share(pt[0], pt[1]):>5.0f}%{fmt(pt[2]):>11}"
+            f"{share(pt[0], pt[1]):>5.0f}%{fmt(pt[2]):>11}{fmt(pt[3]):>9}"
         )
         if by_month:
             for m in months:
                 v = rows[(person, project, m)]
                 print(
                     f"   {m:<37}{fmt(v[0]):>13}{fmt(v[1]):>11}"
-                    f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>11}"
+                    f"{share(v[0], v[1]):>5.0f}%{fmt(v[2]):>11}{fmt(v[3]):>9}"
                 )
-        for i in range(3):
+        for i in range(SLOTS):
             gt[i] += pt[i]
     print(f"\n{'=' * 72}")
     print(
         f"{person} TOTAL: {fmt(gt[0] + gt[1])} output tokens "
-        f"({share(gt[0], gt[1]):.0f}% subagent), {fmt(gt[2])} human words"
+        f"({share(gt[0], gt[1]):.0f}% subagent), "
+        f"{fmt(gt[2])} own human words + {fmt(gt[3])} pasted"
     )
 
 
@@ -270,10 +286,11 @@ def write_csv(leaves, path):
                 "main_tok",
                 "sub_tok",
                 "human_words",
+                "pasted_words",
             ]
         )
         for (src, person, project, month), v in sorted(leaves.items()):
-            w.writerow([src, person, project, month, v[0], v[1], v[2]])
+            w.writerow([src, person, project, month, *v[:SLOTS]])
     print(f"[csv] wrote {path}", file=sys.stderr)
 
 
@@ -345,8 +362,11 @@ def main(argv=None):
     elif args.all:
         agg = rollup(leaves)
         for person, project in sorted(agg):
-            m, s, w = agg[(person, project)]
-            print(f"{person:<16}{project:<36}{fmt(m + s):>14} tok  {fmt(w):>10} words")
+            m, s, w, p = agg[(person, project)]
+            print(
+                f"{person:<16}{project:<36}{fmt(m + s):>14} tok  "
+                f"{fmt(w):>10} own words  {fmt(p):>9} pasted"
+            )
     else:
         d = str(Path(args.dir or ".").resolve())
         person, project, _ = attr(d)

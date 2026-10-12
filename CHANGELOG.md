@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-token-estimator] 0.3.0
+
+Brian, 2026-10-12, relaying a prior session's finding: "The largest-input check found automatic continuation summaries and messages from other Claude sessions being counted as human input. I was wrong to describe the whole 112,571-word total as human-submitted text. ... I'll separate those from actual user turns and keep pasted material distinct from original authorship."
+
+**Fixed:**
+- Claude human words no longer include three injected forms that a leading-tag rule cannot see. Compaction continuation summaries are user records flagged `isCompactSummary` and are dropped structurally. Relays from another Claude session begin with the prose line `Another Claude session sent a message:` before their `teammate-message` wrapper; that line, standing alone as the first line, is a named marker. The Escape boilerplate `[Request interrupted by user]` and `[Request interrupted by user for tool use]` is a named whole-block marker. A human sentence that merely begins the same way, or an interrupt followed by human words, is kept. Signature inspection of the live corpus on 2026-10-12 found 512 summaries (1.14 million words), 1,680 relay blocks (1.48 million words) and 4,188 interrupt blocks counted as human; for this repository's project the human-word figure falls from 334,667 to 150,249 own plus 5,913 pasted.
+
+**Added:**
+- Human words are now two columns: `own_words` (`human_words` in CSV) for the human's authorship and `pasted` (`pasted_words`) for text the human submitted but did not write. Pasted text is the body of Claude Code's `pasted_content` wrapper (the closing tag repeats its `id`; an unclosed wrapper runs to the end of the block) and the blockquote of a forwarded "You should know" side-agent note. Codex has no paste marker, so its pasted column is zero. The leaf grain, CSV, project, person and `--all` reports carry both.
+- `verify.py` reports a histogram of dropped records by structural flag, a histogram of dropped blocks by named marker, the pasted-word total, and the ten largest retained original blocks with their lead words and transcript file. The last is the hand-check list: pastes made before the wrapper existed were recorded as plain text and look like typing, so own words are an upper bound for older sessions. On the live corpus the four largest are a 65,891-word HTML page body, a 31,314-word bug log, a 25,032-word blog post and a 21,069-word web-page dump.
+
+**Observed, not documented:** the `isCompactSummary` and `isVisibleInTranscriptOnly` flags, the relay line, the interrupt strings, the paste wrapper's attributed closing tag, and the side-agent note header were all read from this machine's Claude Code 2.1.x transcripts; no Claude Code documentation was found for any of them. The side-agent note arrives with prompt source `typed` or `queued` and origin `human`, because the human submits the pre-filled prompt; that is why it is treated as pasted rather than dropped.
+
+**Tests:** `tests/test_token_estimator_rules.py` (each marker and its human look-alike, each structural flag, the paste split with mid-block, leading, unclosed and double wrappers, the side-agent note with human words after it, and a plain blockquote kept as own words); `tests/test_token_estimator_passes.py` and `tests/test_token_estimator_estimate.py` fixtures gain all four injected forms and assert the own/pasted split through the leaf grain and the CSV header.
+
 ## [denubis-external-agents] 0.24.0
 
 Brian, 2026-10-12, on finding that Claude Code's builtin "You should know" side agent shows its offers inside advisor panes where nobody reads them: "I don't actually mind those alerts, we just need to see them", then "it's mail to supervisor", then "it's fine if we have some sort of hook that bubbles that up right now, but ultimately I do think I want this you should know offer to be part of mail proper ... No point in building a mail thing that isn't part of the larger mail infra" (ADR 0028).

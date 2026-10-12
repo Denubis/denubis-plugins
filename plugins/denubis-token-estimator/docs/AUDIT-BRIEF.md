@@ -80,11 +80,20 @@ Choose at least one interval that cuts through active Claude and Codex sessions.
 
 - For Claude main user records, histogram leading tags by count and word volume. Inspect
   frequent unlisted tags and samples of listed tags. Test UUID replay ordering.
+- Histogram the first line of every retained Claude block, not only its leading tag. An
+  injected message can begin with prose before its wrapper, and boilerplate can be a
+  bare bracketed line. Inspect the largest retained blocks and say which are human.
+- Histogram the structural keys on Claude user records. Decide for each flag the
+  estimator drops whether a human turn could carry it, and for each flag it keeps
+  whether an injected record could carry it.
 - For Codex root user messages, histogram leading markers by count and word volume.
   Inspect both retained and excluded samples.
 - Check whether any human turn exists only in an ignored record channel.
 - Report pasted-content volume separately; it is intentionally retained, but its size
-  must remain visible.
+  must remain visible. Test the original/pasted split: a paste wrapper mid-block, an
+  unclosed wrapper, a forwarded side-agent note with human words after it, and plain
+  text that merely resembles either. State how much retained original text predates
+  the paste wrapper and so cannot be classified.
 
 ### 6. Reconcile attribution and totals
 
