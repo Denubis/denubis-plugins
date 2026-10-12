@@ -268,7 +268,7 @@ def probe_api_plus() -> None:
     """Confirm zotero-api-plus answers at all; exit with the install hint if not.
 
     Shared by every helper that resolves library and collection names through
-    `/api/plus/libraries` (ruling of 2026-10-12, ADR 0028), including the ones
+    `/api/plus/libraries` (ruling of 2026-10-12, ADR 0029), including the ones
     whose writes then go to the stock API.
     """
     import httpx

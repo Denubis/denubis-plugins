@@ -2,7 +2,7 @@
 
 **Design:** `docs/design-plans/2026-10-12-bibliography-0.19-scan-detection-and-zotero-crud.md`
 (status: current design; accepted 2026-10-12, "great, lock it in").
-**ADR:** `docs/architecture/decisions/0028-zotero-writes-use-the-stock-local-api-and-delete-means-trash.md`
+**ADR:** `docs/architecture/decisions/0029-zotero-writes-use-the-stock-local-api-and-delete-means-trash.md`
 (untracked in this worktree together with the design and the README index line; the first
 checkpoint commit carries all three).
 **Working root:** `/home/brian/people/Brian/brian-ed3d-plugins/.claude/worktrees/bibliography-0.19-design`
@@ -79,7 +79,7 @@ Observed 2026-10-12 in this worktree unless stated.
    writes go to stock. Each helper probes `/api/plus` first and stops with the same
    message `copy_item.probe_copy_item` uses when the extension is absent. `SKILL.md`
    precondition 5 says so. Stock `/groups` and `/collections` are not used for names.
-   Recorded in ADR 0028's consequences.
+   Recorded in ADR 0029's consequences.
 2. **412 handling.** The stock conflict status collides with `zotero_auth`'s server-ID
    mismatch status. The write primitive sends its own request with `credentials()`
    headers, never retries a 412, and reports it as `conflict` carrying Zotero's current
@@ -561,7 +561,7 @@ new helpers and boundary, version surfaces agree at 0.19.0, and the full gates p
   `.claude-plugin/marketplace.json` entry, and a new `## [denubis-academic] 0.19.0`
   entry at the top of `CHANGELOG.md` in the repository's existing voice (what changed,
   tests, what is not verified).
-- Confirm: `docs/architecture/decisions/README.md` index line for 0028 is present
+- Confirm: `docs/architecture/decisions/README.md` index line for 0029 is present
   (already edited, uncommitted).
 - First real consumer: a fresh session invoking `/denubis-academic:using-bibliography`
   from the installed plugin.
@@ -629,7 +629,7 @@ Zotero's authorisation modal (choose Always Allow).
 
 - Work stays on `worktree-bibliography-0.19-design` in this worktree. Invocation of the
   execution skill authorises private checkpoint commits here; the first checkpoint
-  includes the design, ADR 0028, and the README index line already present uncommitted.
+  includes the design, ADR 0029, and the README index line already present uncommitted.
 - No push, publication, or history rewrite during execution.
 - After accepted UAT: fold checkpoints into one commit per outcome (or fewer if the human
   prefers), preserving the accepted tree, then rerun the Outcome F gates and

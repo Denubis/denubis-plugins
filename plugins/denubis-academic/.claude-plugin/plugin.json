@@ -1,7 +1,7 @@
 {
   "name": "denubis-academic",
   "description": "Scholarly workflow for Claude Code: academic writing, manuscript review, literature scouting, annotated bibliographies, and Zotero-managed sources rendered to page-keyed Markdown.",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "author": {
     "name": "Brian Ballsun-Stanton",
     "github": "denubis"

@@ -9,7 +9,7 @@ Usage (preview, writes nothing):
 Usage (apply, exactly the command the preview printed):
     ... --apply --expect-collection KEY --expect-library ID
 
-Create class (design 2026-10-12, ADR 0028): a new object has no prior
+Create class (design 2026-10-12, ADR 0029): a new object has no prior
 version, so the preview prints the full JSON body, the resolved library
 (name and libraryID) and collection key, and the apply command carrying
 `--expect-collection KEY` (when a collection is named) and

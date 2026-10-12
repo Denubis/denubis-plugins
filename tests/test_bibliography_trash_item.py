@@ -1,7 +1,7 @@
 """Tests for using-bibliography/trash_item.py (0.19).
 
 Trashes or restores one item or attachment by PATCHing `deleted` through the
-stock local API; never `DELETE` (ADR 0028). Modify class: preview reads only
+stock local API; never `DELETE` (ADR 0029). Modify class: preview reads only
 and prints version N with what the trash will take with it; apply requires
 `--expect-version N`, re-reads, refuses `changed since preview`, PATCHes with
 `If-Unmodified-Since-Version`, reads back with the trash included and reports

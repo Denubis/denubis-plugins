@@ -8,7 +8,7 @@ Usage (preview, writes nothing):
 Usage (apply, exactly the command the preview printed):
     uv run trash_item.py --key ATTACH01 --apply --expect-version 12
 
-Delete means trash (ADR 0028): the helper PATCHes `{"deleted": true}` through
+Delete means trash (ADR 0029): the helper PATCHes `{"deleted": true}` through
 Zotero 10's stock local API and never sends `DELETE`, which erases the object
 and its storage permanently. Emptying the trash stays a human action in
 Zotero. Trashing a parent takes its children with it in Zotero's own

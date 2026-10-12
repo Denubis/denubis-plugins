@@ -387,7 +387,7 @@ def search_doi_field(doi: str) -> list[str]:
     return doi_citekeys(found.items, doi)
 
 
-# --- Stock write primitive (Zotero 10, ADR 0028) -------------------------------
+# --- Stock write primitive (Zotero 10, ADR 0029) -------------------------------
 #
 # Zotero 10's local API writes items and collections behind the server-ID and
 # API-key gate zotero_auth already satisfies. Read in the installed 10.0.6

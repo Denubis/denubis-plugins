@@ -358,11 +358,11 @@ change.
 **D1. Writes go through Zotero 10's stock local API; zotero-api-plus is kept only for
 what stock cannot do.** Evidence: the installed `server_localAPI.js`; the extension has
 no such endpoints. Consequence: Zotero 10 only for the new helpers. Recorded as ADR
-0028.
+0029.
 
 **D2. Delete means trash for every object that has one; the skill never erases.**
 Evidence: `_eraseData` in `item.js` and `collection.js`; both `fromJSON` accept
-`deleted`. Part of ADR 0028.
+`deleted`. Part of ADR 0029.
 
 **D3. The renderer is not an authority on quotation safety.** Alternative: a page
 classifier that grants authority to pages judged native. Rejected because image
@@ -427,7 +427,7 @@ coverage is a release checklist item, not a test.
 4. **Create and collection CRUD** (`create_item.py`, the write half of
    `collection.py`, criteria W2, L4, L5). Depends on phase 3.
 5. **Auto-export** (`register_export.py`, criteria E1 to E3). Depends on phase 2.
-6. **Release** (skill text, criterion F1, documentation checklist, ADR 0028 index
+6. **Release** (skill text, criterion F1, documentation checklist, ADR 0029 index
    entry). Depends on all phases.
 
 ## Verification and human judgment

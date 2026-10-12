@@ -10,7 +10,7 @@ Usage (apply, exactly the command the preview printed):
         --apply --expect-version 429
 
 This is the way to file an item that already exists: one record, its
-`collections` array PATCHed through Zotero 10's stock local API (ADR 0028).
+`collections` array PATCHed through Zotero 10's stock local API (ADR 0029).
 `copy_item.py` is for copying between libraries and tops up attachments; it
 duplicated a record when used for filing (the Sage SRM Guide defects of
 2026-10-10).

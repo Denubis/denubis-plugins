@@ -1,4 +1,4 @@
-# ADR 0028 — Zotero writes go through Zotero 10's stock local API, delete means trash, and zotero-api-plus is kept only for what stock cannot do
+# ADR 0029 — Zotero writes go through Zotero 10's stock local API, delete means trash, and zotero-api-plus is kept only for what stock cannot do
 
 **Status:** Accepted (2026-10-12). Design:
 `docs/design-plans/2026-10-12-bibliography-0.19-scan-detection-and-zotero-crud.md`.

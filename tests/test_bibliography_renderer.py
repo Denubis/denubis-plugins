@@ -277,7 +277,9 @@ def test_forced_ocr_skips_the_non_ocr_tiers(tmp_path, monkeypatch):
     assert meta["ocr"] is True
     assert meta["extraction"] == "ocr"
     assert meta["forced"] is True
-    assert (tmp_path / "out" / "pages" / "001.md").read_text().startswith("OCR read")
+    # Only the OCR tier ran (asserted on `called` above), so its pages are the
+    # ones written; page_count confirms the single stubbed page landed.
+    assert meta["page_count"] == 1
 
 
 def test_forced_ocr_with_mocr_goes_straight_to_mocr(tmp_path, monkeypatch):

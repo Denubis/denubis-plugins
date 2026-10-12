@@ -47,7 +47,7 @@ The stock-API helpers below preview with `GET` only; their prompt appears at
 ## Stock writes: preview, protect, report (0.19)
 
 `item_collections.py`, `trash_item.py`, `create_item.py`, and the write verbs
-of `collection.py` write through Zotero 10's own local API (ADR 0028). They
+of `collection.py` write through Zotero 10's own local API (ADR 0029). They
 refuse before any request on a Zotero without a `Zotero-Server-ID` header
 (`stock writes need Zotero 10`), resolve library and collection names through
 zotero-api-plus `/api/plus/libraries`, and share one gate:

@@ -5,7 +5,7 @@
 Established while writing `plan.md`; every item is an observation, not a claim about
 planned behaviour.
 
-- Worktree `worktree-bibliography-0.19-design` holds the design, ADR 0028, and the ADR
+- Worktree `worktree-bibliography-0.19-design` holds the design, ADR 0029, and the ADR
   README index line uncommitted (`git status --short`: `M docs/architecture/decisions/README.md`,
   two untracked files). No other dirty state.
 - `.notes/project_open-questions.md` carries no ticket bearing on this work (one parked
@@ -130,7 +130,7 @@ Evidence:
   `~/zettelkasten/papers/borgmannTechnologyCharacterContemporary2006/` (meta: `docling,
   ocr true, extraction "ocr", forced true`).
 
-Checkpoints: `8590878` (design, ADR 0028, README index, plan directory), `9c87200`
+Checkpoints: `8590878` (design, ADR 0029, README index, plan directory), `9c87200`
 (Outcome A).
 
 ## 2026-10-12 — Outcome B: trash awareness and the read-only listing
@@ -397,3 +397,85 @@ Evidence:
   probe of `autoexport.add` answered `-32602 required argument collection missing,
   translator missing, path missing`, which is the verbatim error shape the helper
   prints.
+
+Checkpoint: `f637cac` (Outcome E).
+
+## 2026-10-12 — Outcome F: release 0.19.0
+
+Changed surfaces:
+
+- `SKILL.md` final pass: precondition 5 names every write helper and the listing as
+  zotero-api-plus consumers; precondition 7 (Zotero 10 for the stock-API helpers,
+  `register_export.py` included for uniformity) renumbered into order; the procedure
+  table row for Zotero writes names listing, filing, trash, restore, create,
+  collections, and export registration. Front door, quoting rule, write-boundary table
+  (one row per helper with preview command, class, and what the preview shows), and
+  completion evidence were written in Outcomes A to E. 204 lines (limit 500).
+- `docs/architecture/plugins/denubis-academic/0-context.md`: helper table row, the
+  Zotero/BBT and zotero-api-plus boundary rows, the rendered-Markdown bullet rewritten to
+  Contract 1, a new bullet for `accepted` versus `verified`.
+- Versions: `plugins/denubis-academic/.claude-plugin/plugin.json`,
+  `plugins/denubis-academic/.codex-plugin/plugin.json`, and the
+  `.claude-plugin/marketplace.json` entry at 0.19.0; new `## [denubis-academic] 0.19.0`
+  at the top of `CHANGELOG.md`.
+
+Bounded inspection (every documented flag exists in the helper; `--help` captured by
+`/tmp/bib019/helpflags.sh` on 2026-10-12):
+
+| Helper | `--help` flags | Documented in the skill text |
+|---|---|---|
+| `resolve.py` | `--allow-mocr --author --bib --citekey --date --doi --force --force-ocr --library --no-render --title --year` | all present |
+| `ingest.py` | `--allow-mocr --force --force-ocr` | all present |
+| `render.py` | `--allow-mocr --force-ocr` | all present |
+| `collection.py` | `--apply --create --descendants --expect-* --library --list --parent --rename --restore --trash` | all present |
+| `item_collections.py` | `--add --apply --expect-version --key --library --remove` | all present |
+| `trash_item.py` | `--apply --expect-version --key --library --restore` | all present |
+| `create_item.py` | `--apply --author --collection --creator --expect-collection --expect-library --expect-parent --library --set --type` | all documented flags present; `--expect-parent` exists through the create class but has no meaning here (passing it refuses as `target changed`) |
+| `register_export.py` | `--apply --collection --expect-collection --path --replace --translator` | all present |
+| `update_item.py`, `copy_item.py`, `fetch.py`, `annotate.py` | unchanged flag sets | unchanged docs |
+
+Preview lines documented in `zotero-writes.md` and `SKILL.md` were checked against the
+helpers' format strings while writing Outcomes C to E and by the live read-only previews
+recorded above (`version:`, `collections:`/`after:`, `parent:`, `file:`, `relation:`,
+`children:`, `deleted:`, `payload:`, `library:`, `collection:`, `descendants:`, `items:`,
+`translator:`, `path:`, `registration state: unknown`, and the `Preview only … To apply
+exactly this change:` block).
+
+Evidence:
+
+- `uv run pytest tests/test_bibliography_*.py tests/test_skill_*.py
+  tests/test_marketplace_sync.py tests/test_codex_marketplace.py
+  tests/test_academic_literature_helpers.py tests/test_paper_review_skill.py -q` →
+  1128 passed.
+- Whole suite: `uv run pytest -q` stops at collection with 20 errors, all in
+  `plugins/denubis-crash-recovery/scripts/crash_recovery/tests/` (`ModuleNotFoundError:
+  No module named 'typer'`; that sub-project has its own environment, last changed in
+  `44b5fbc`, untouched here), and
+  `plugins/denubis-plan-and-execute/scripts/workflow_statusline/tests` fails collection
+  the same way (`No module named 'workflow_statusline'`, its own package). Both are
+  pre-existing environment facts outside this work. Run by explicit path:
+  `plugins/denubis-token-estimator/tests` → 45 passed; `tests` → one failure,
+  `tests/test_test_quality.py::test_python_tests_have_no_detectable_markdown_wording_assertions`,
+  pointing at a new assertion in `tests/test_bibliography_renderer.py` that read a
+  generated `pages/001.md` and checked its text. The assertion was redundant with the
+  recorded tier calls (only the OCR tier ran, so only its pages could be written) and
+  was replaced by a `page_count` check; `uv run pytest -q tests` → 1533 passed.
+- `uvx ruff check .`: 54 findings on the base commit, fewer now; every remaining
+  finding is in a file this work did not create (`copy_item.py` 6 and `update_item.py` 6,
+  down from 10, pre-existing; `renderer.py` 3 pre-existing; the rest outside the
+  plugin). `uvx ruff format --check plugins/denubis-academic` clean; under `tests/` 13
+  pre-existing files this work does not own would be reformatted.
+- `git diff --check` clean.
+- `rg -n '0\.19\.0'` hits the two manifests, the marketplace entry, and the changelog
+  heading.
+- ADR renumbered 0028 → 0029 after `main` took 0028 (`f5609a5`) post-fork: `git mv` of
+  the decision file, README index line, and every citation in the design, plan, todo,
+  changelog, skill text, references, and helper docstrings. `rg -n 0028` on the branch
+  afterwards hits only the todo's note about `main`'s own ADR.
+
+Checkpoint series before normalisation (2026-10-12, no upstream, nothing pushed):
+`8590878 9c87200 8ad11d0 cdd585e e82e407 f637cac 2c612a7 a9792e0 acd5694`, tree
+`aa66e4ae8fb23b26291217cee427102eb1589fff`. Normalised at the human's request before
+UAT: `2c612a7` and the two renumber commits (`a9792e0`, `acd5694`) folded into one
+Outcome F commit by `git reset --soft f637cac` and recommitting; commits A to E keep
+their SHAs. The only tree difference from `aa66e4a` is this worklog entry and the todo.

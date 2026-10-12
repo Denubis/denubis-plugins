@@ -5,7 +5,7 @@ Read-only listing (trashed rows marked):
     uv run collection.py --list "<collection name or key>" [--library "<library>"]
 
 Writes, each a preview until `--apply` is added with the flag the preview
-printed (design 2026-10-12, ADR 0028; Zotero 10 only; never `DELETE`):
+printed (design 2026-10-12, ADR 0029; Zotero 10 only; never `DELETE`):
     uv run collection.py --create NAME [--parent <name or key>]
         --apply --expect-library ID [--expect-parent KEY]        (create class)
     uv run collection.py --rename KEY NAME   --apply --expect-version N  (modify)

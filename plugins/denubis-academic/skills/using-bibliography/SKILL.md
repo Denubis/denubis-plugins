@@ -21,7 +21,7 @@ Provider-specific invocation syntax is transport, not part of the bibliography m
 | Install, upgrade, migrate a retired name, or diagnose plugin loading | [Setup and migration](references/setup-and-migration.md) |
 | Resolve, batch-ingest, render, or inspect render state | [Resolve and render](references/resolve-and-render.md) |
 | Read papers in parallel, extract quotations, or verify exact wording | [Reading and quoting](references/reading-and-quoting.md) |
-| Fetch, copy, repair, or annotate Zotero items | [Zotero writes](references/zotero-writes.md) |
+| List a collection; file, trash, restore, create, repair, copy, fetch, or annotate Zotero items; create or manage collections; register a BBT auto-export | [Zotero writes](references/zotero-writes.md) |
 | Create literature/permanent notes or refresh a project bibliography | [Notes and bibliographies](references/notes-and-bibliographies.md) |
 | Diagnose failures, platform differences, or exit codes | [Troubleshooting](references/troubleshooting.md) |
 
@@ -62,9 +62,6 @@ Before any bibliography operation:
    resolution and rendering do not require it; every write helper (for library
    and collection name resolution, even when the write itself goes to stock
    Zotero), the collection listing, and forced BBT refreshes do.
-7. Stock-API writes (`item_collections.py`, `trash_item.py`, `create_item.py`,
-   `collection.py` write verbs) need Zotero 10: each refuses before any request
-   on a Zotero without a `Zotero-Server-ID` header.
 6. On Zotero 10, every local-API write needs a one-time authorisation. The
    first writing command on a machine makes Zotero show an Allow / Always
    Allow / Deny prompt: tell the user to choose **Always Allow**, or every
@@ -73,6 +70,10 @@ Before any bibliography operation:
    `0600`), which they own; `config.toml` is never written. Zotero 7-9 have no
    such gate and are unaffected. See
    [Zotero writes](references/zotero-writes.md).
+7. Stock-API writes (`item_collections.py`, `trash_item.py`, `create_item.py`,
+   `collection.py` write verbs, and `register_export.py` for uniformity) need
+   Zotero 10: each refuses before any request on a Zotero without a
+   `Zotero-Server-ID` header.
 
 ## Front door
 
