@@ -66,10 +66,18 @@ import zotero_auth
 
 # Library resolution is shared with copy_item.py rather than reimplemented: the
 # name -> libraryID mapping is the step that used to be hand-rolled and broke.
-from copy_item import ResolutionError, find_library, get_libraries, find_items
+from copy_item import ResolutionError, find_items, find_library, get_libraries
+
+# The collection listing is shared with collection.py (0.19): one paginated,
+# trash-aware walk of the stock API rather than two.
+from zotero_local_api import (
+    LibraryQueryError,
+    get_collection_items,
+    item_in_trash,
+    select_parent_items,
+)
 
 UPDATE_ITEM_ENDPOINT = "http://localhost:23119/api/plus/update-item"
-STOCK_API = "http://localhost:23119/api"
 
 # Shown in place of an empty value, so "set to nothing" is never mistaken for
 # "unchanged" when reading the diff.
@@ -164,7 +172,9 @@ def parse_update_response(status: int, body: str, content_type: str) -> dict:
         try:
             return json.loads(body)
         except json.JSONDecodeError as exc:
-            raise UpdateError(f"update-item returned unparseable JSON: {body!r}") from exc
+            raise UpdateError(
+                f"update-item returned unparseable JSON: {body!r}"
+            ) from exc
 
     if "json" in content_type:
         try:
@@ -245,9 +255,7 @@ def render_diff(response: dict) -> str:
     if collateral:
         width = _field_width(collateral)
         lines.append("")
-        lines.append(
-            "  Consequences of that type change (Zotero's, not requested):"
-        )
+        lines.append("  Consequences of that type change (Zotero's, not requested):")
         for change in collateral:
             lines.append(render_change(change, width))
 
@@ -267,7 +275,8 @@ def summarise_items(api_items: list[dict]) -> list[dict]:
 
     The stock local API returns Zotero Web API v3 shape, so the metadata sits
     under "data". Creators are counted rather than listed because the question
-    at triage time is "which of these has none".
+    at triage time is "which of these has none". A trashed item is kept and
+    flagged rather than dropped, so the triage sees what Zotero holds.
     """
     rows = []
     for entry in api_items:
@@ -280,26 +289,27 @@ def summarise_items(api_items: list[dict]) -> list[dict]:
                 "creators": len(creators),
                 "title": data.get("title", ""),
                 "publicationTitle": data.get("publicationTitle", ""),
+                "in_trash": item_in_trash(entry),
             }
         )
     return rows
 
 
 def render_item_table(rows: list[dict]) -> str:
-    """A fixed-width triage table. Zero creators is called out, not left to be
-    inferred from a 0 in a column."""
+    """A fixed-width triage table. Zero creators and the trash are called out,
+    not left to be inferred from a column."""
     if not rows:
         return "(no items)"
     type_width = max(len(r["itemType"]) for r in rows)
     lines = []
     for row in rows:
         flag = "  NO AUTHOR" if row["creators"] == 0 else ""
+        if row.get("in_trash"):
+            flag += "  IN TRASH"
         title = row["title"] or "(untitled)"
         if len(title) > 64:
             title = title[:61] + "..."
-        lines.append(
-            f"  {row['key']}  {row['itemType']:<{type_width}}  {title}{flag}"
-        )
+        lines.append(f"  {row['key']}  {row['itemType']:<{type_width}}  {title}{flag}")
     return "\n".join(lines)
 
 
@@ -322,39 +332,6 @@ def cleared_fields(response: dict) -> list[str]:
 
 
 # --- Imperative shell -------------------------------------------------------
-
-
-def get_collection_items(library: dict, collection_key: str) -> list[dict]:
-    """Top-level items of one collection, via Zotero's own read-only local API.
-
-    Paginated to the end rather than capped, so a long collection is never
-    silently truncated into a partial triage.
-    """
-    import httpx
-
-    if library.get("type") == "user":
-        base = f"{STOCK_API}/users/0"
-    else:
-        base = f"{STOCK_API}/groups/{library['groupID']}"
-    url = f"{base}/collections/{collection_key}/items/top"
-
-    items: list[dict] = []
-    start, limit = 0, 100
-    while True:
-        try:
-            reply = httpx.get(
-                url,
-                params={"format": "json", "limit": limit, "start": start},
-                timeout=30.0,
-            )
-            reply.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise UpdateError(f"cannot list collection items: {exc}") from exc
-        page = reply.json()
-        items.extend(page)
-        if len(page) < limit:
-            return items
-        start += limit
 
 
 def update_item(payload: dict) -> dict:
@@ -391,30 +368,45 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--type", dest="item_type", help="new Zotero item type")
     parser.add_argument(
-        "--set", action="append", default=[], metavar="FIELD=VALUE",
+        "--set",
+        action="append",
+        default=[],
+        metavar="FIELD=VALUE",
         help="set a field (repeatable)",
     )
     parser.add_argument(
-        "--clear", action="append", default=[], metavar="FIELD",
+        "--clear",
+        action="append",
+        default=[],
+        metavar="FIELD",
         help="clear a field (repeatable)",
     )
     parser.add_argument(
-        "--author", action="append", default=[], metavar="'Last, First'",
+        "--author",
+        action="append",
+        default=[],
+        metavar="'Last, First'",
         help="add an author, in order (repeatable); replaces the creator list",
     )
     parser.add_argument(
-        "--creator", action="append", default=[], metavar="TYPE='Last, First'",
+        "--creator",
+        action="append",
+        default=[],
+        metavar="TYPE='Last, First'",
         help="add a non-author creator (repeatable); replaces the creator list",
     )
     parser.add_argument(
-        "--apply", action="store_true",
+        "--apply",
+        action="store_true",
         help="write the change. Without this nothing is written.",
     )
     parser.add_argument("--json", action="store_true", help="print the raw response")
     return parser
 
 
-def collect_changes(args: argparse.Namespace) -> tuple[dict[str, str], list[dict] | None]:
+def collect_changes(
+    args: argparse.Namespace,
+) -> tuple[dict[str, str], list[dict] | None]:
     """Turn the CLI's change flags into the two payload channels."""
     fields: dict[str, str] = {}
     for spec in args.set:
@@ -463,10 +455,11 @@ def main() -> int:
             return 2
 
         try:
-            rows = summarise_items(get_collection_items(library, collection_key))
-        except UpdateError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            items = get_collection_items(library, collection_key, include_trashed=True)
+        except LibraryQueryError as exc:
+            print(f"Error: cannot list collection items: {exc}", file=sys.stderr)
             return 1
+        rows = summarise_items(select_parent_items(items))
 
         print(
             f"{args.list_collection} in {library.get('name')} "

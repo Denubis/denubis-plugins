@@ -23,9 +23,10 @@ For each match it reports the libraries AND collections the paper is in, whether
 a PDF is attached and on disk, and whether it has been rendered — and renders it
 when it hasn't. An optional library constraint narrows the search.
 
-Exit codes: 0 the paper resolved (rendered or ready); 1 genuinely absent or an
-error; 2 no exact citekey match but NEAR matches were surfaced — re-run with the
-real key shown (a near match is never rendered).
+Exit codes: 0 the paper resolved (rendered or ready); 1 genuinely absent, in
+Zotero's trash (`state: in trash`, found by exact citekey only), or an error; 2
+no exact citekey match but NEAR matches were surfaced — re-run with the real key
+shown (a near match is never rendered).
 
 Endpoint contracts verified live against Zotero 9.0.4 + BBT, not transcribed.
 """
@@ -61,7 +62,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # base class and stays a bare POST. Zotero 7-9 are unaffected either way.
 import zotero_auth
 from renderer import extraction_label, render_metadata_is_current, suggests_forced_ocr
-from zotero_local_api import LibrarySearch, search_doi_items, search_items
+from zotero_local_api import (
+    LibrarySearch,
+    item_in_trash,
+    search_doi_items,
+    search_items,
+)
 
 BBT_ENDPOINT = "http://localhost:23119/better-bibtex/json-rpc"
 PING_ENDPOINT = "http://localhost:23119/connector/ping"
@@ -253,6 +259,7 @@ class Paper:
     library: str  # human library name
     library_id: int | None  # the id from the API that produced this record
     collection_keys: tuple[str, ...]
+    in_trash: bool = False  # `data.deleted` on the stock envelope
 
 
 def _year_from_date(date: str | None) -> int | None:
@@ -617,6 +624,7 @@ def paper_from_local_item(item: dict) -> Paper:
         library=(item.get("library") or {}).get("name") or "",
         library_id=None,
         collection_keys=tuple(data.get("collections") or ()),
+        in_trash=item_in_trash(item),
     )
 
 
@@ -651,7 +659,9 @@ def search_by_doi(doi: str) -> tuple[list[Paper], list[str]]:
     return papers, errors
 
 
-def search_papers(tokens: list[str]) -> tuple[list[Paper], list[str]]:
+def search_papers(
+    tokens: list[str], *, include_trashed_for: set[str] | frozenset[str] = frozenset()
+) -> tuple[list[Paper], list[str]]:
     """Search every token across every library and union the results.
 
     Each token is one stock quicksearch sweep (search_items). Copies are
@@ -662,6 +672,10 @@ def search_papers(tokens: list[str]) -> tuple[list[Paper], list[str]]:
     failure must not sink the whole resolve, and the no-match message needs the
     failure to qualify an empty result as inconclusive rather than absent.
 
+    Tokens in `include_trashed_for` (the exact citekey) also search the trash,
+    so a trashed paper is reported as `in trash` rather than as absent; the
+    widening tokens keep Zotero's exclusion.
+
     A failure to list the groups still raises, per library_item_urls: searching
     an unknown subset of the corpus and calling that an answer is the failure
     this path exists to remove.
@@ -670,7 +684,7 @@ def search_papers(tokens: list[str]) -> tuple[list[Paper], list[str]]:
     papers: list[Paper] = []
     errors: list[str] = []
     for tok in tokens:
-        found = search_items(tok)
+        found = search_items(tok, include_trashed=tok in include_trashed_for)
         errors.extend(f"{tok!r} {failure}" for failure in found.failed_libraries)
         for item in found.items:
             library = (item.get("library") or {}).get("name") or ""
@@ -738,6 +752,24 @@ def enrich_paper(paper: Paper, library_map: dict[str, int]) -> dict:
         "pdf_exists": pdf_exists,
         "pdf_status": pdf_status,
         "rendered": False,  # filled in by check_rendered once we know out_dir
+        "out_dir": None,
+    }
+
+
+def trashed_info(paper: Paper) -> dict:
+    """The info dict for a copy that is in the trash: nothing is looked up.
+
+    enrich_paper's BBT calls aggregate by citekey, not by copy, so a trashed
+    copy would be shown with a live sibling's collections and attachment.
+    `pdf_status` and `collections` say `not checked` instead.
+    """
+    return {
+        "paper": paper,
+        "collections": None,
+        "pdf_path": None,
+        "pdf_exists": False,
+        "pdf_status": "not-checked",
+        "rendered": False,
         "out_dir": None,
     }
 
@@ -944,7 +976,11 @@ def ensure_citeable(
 
 
 def print_no_match(
-    tokens: list[str], *, doi: str | None, search_errors: list[str]
+    tokens: list[str],
+    *,
+    doi: str | None,
+    search_errors: list[str],
+    trash_excluded: bool = False,
 ) -> None:
     """Report a no-match honestly: a no-match here is NOT proof of absence.
 
@@ -953,11 +989,18 @@ def print_no_match(
     spelled differently, returns zero while the paper is present. State that,
     show what was searched, and point at the move that works — rather than
     asserting the paper is absent, which is the overclaim this resolver exists
-    to avoid.
+    to avoid. `trash_excluded` says the searches kept Zotero's trash exclusion
+    (author, title, DOI); the exact-citekey sweep does not, so it stays silent.
     """
     print("No matches surfaced in Zotero for this query.", flush=True)
     searched = ", ".join(repr(t) for t in tokens) or "(nothing searchable)"
     print(f"  searched: {searched}", flush=True)
+    if trash_excluded:
+        print(
+            "  trashed items are excluded from this search; resolve by the exact "
+            "citekey to see a trashed item.",
+            flush=True,
+        )
     if search_errors:
         print(
             f"  WARNING: {len(search_errors)} search call(s) errored "
@@ -1035,10 +1078,15 @@ def print_match(info: dict, state: str) -> None:
     print(f"  doi:        {p.doi or '(none)'}", flush=True)
     print(f"  library:    {p.library}", flush=True)
     cols = info["collections"]
-    print(f"  collections: {', '.join(cols) if cols else '(none)'}", flush=True)
+    if cols is None:
+        print("  collections: (not checked: item is in the trash)", flush=True)
+    else:
+        print(f"  collections: {', '.join(cols) if cols else '(none)'}", flush=True)
     pdf = info["pdf_path"]
     status = info.get("pdf_status", "none")
-    if status == "unknown":
+    if status == "not-checked":
+        print("  attachment: (not checked: item is in the trash)", flush=True)
+    elif status == "unknown":
         print(
             "  attachment: (could not check — library name unresolved "
             "or attachment lookup failed)",
@@ -1275,7 +1323,12 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             for extra in (citekey_base(args.citekey), citekey_author(args.citekey)):
                 if extra and extra not in tokens:
                     tokens.append(extra)
-        papers, token_errors = search_papers(tokens)
+        # Only the exact citekey sweep looks in the trash: a trashed paper
+        # resolved by its key is reported `in trash`, never as absent and
+        # never as live. The widening tokens keep Zotero's exclusion.
+        papers, token_errors = search_papers(
+            tokens, include_trashed_for={args.citekey} if args.citekey else frozenset()
+        )
         search_errors.extend(token_errors)
 
         # A citekey query: exact matches are render-eligible (the unchanged happy
@@ -1325,7 +1378,12 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             # Distinct from no-match (1): the paper IS here under a near key, so a
             # caller can branch on 2 to re-run with the real key printed above.
             return 2
-        print_no_match(tokens, doi=args.doi, search_errors=search_errors)
+        print_no_match(
+            tokens,
+            doi=args.doi,
+            search_errors=search_errors,
+            trash_excluded=not args.citekey,
+        )
         if args.bib:
             print(
                 "\n  cannot make citeable: the paper did not resolve in Zotero, so a\n"
@@ -1337,7 +1395,18 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
     # --- Enrich, classify, optionally render ---------------------------------
     render_errors = 0
+    trashed = 0
+    live = 0
     for paper in papers:
+        if paper.in_trash:
+            # Found by its exact key, but in Zotero's trash: report that and
+            # nothing else. BBT aggregates collections and attachments by
+            # citekey, so enriching a trashed copy would borrow a live copy's
+            # facts; they are reported as not checked instead. Never rendered.
+            print_match(trashed_info(paper), "in trash")
+            trashed += 1
+            continue
+        live += 1
         info = enrich_paper(paper, library_map)
         # --force-ocr bypasses the cache too: a scan whose embedded layer
         # passed the gate has a CURRENT render and would never be re-rendered.
@@ -1393,7 +1462,11 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     if args.bib:
         cite_failed = ensure_citeable(Path(args.bib), args.citekey) != 0
 
-    return 1 if (render_errors or cite_failed) else 0
+    # A citekey whose only copies are in the trash did not resolve to a usable
+    # paper; one live copy beside trashed ones did, and the trashed rows were
+    # reported above for the human to act on.
+    only_trashed = trashed and not live
+    return 1 if (render_errors or cite_failed or only_trashed) else 0
 
 
 if __name__ == "__main__":

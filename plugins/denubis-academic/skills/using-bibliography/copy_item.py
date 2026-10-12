@@ -264,15 +264,12 @@ def copy_succeeded(response: dict) -> bool:
 # --- Imperative shell (HTTP) ------------------------------------------------
 
 
-def probe_copy_item() -> None:
-    """Confirm the endpoint exists. An empty body yields 400 when present and
-    Zotero's generic 404 when the installed build predates it.
+def probe_api_plus() -> None:
+    """Confirm zotero-api-plus answers at all; exit with the install hint if not.
 
-    The probe is itself a POST, so on Zotero 10 it is credentialed like any
-    other write — an unauthenticated probe would answer 428 and the 400/404
-    distinction above would no longer hold. That also means the one-time
-    Zotero authorisation prompt appears here, during a command that writes
-    nothing, rather than partway through a copy.
+    Shared by every helper that resolves library and collection names through
+    `/api/plus/libraries` (ruling of 2026-10-12, ADR 0028), including the ones
+    whose writes then go to the stock API.
     """
     import httpx
 
@@ -283,6 +280,19 @@ def probe_copy_item() -> None:
             f"zotero-api-plus not reachable on {PLUS_PROBE} ({e}).\n"
             "Start Zotero with the zotero-api-plus plugin installed."
         )
+
+
+def probe_copy_item() -> None:
+    """Confirm the endpoint exists. An empty body yields 400 when present and
+    Zotero's generic 404 when the installed build predates it.
+
+    The probe is itself a POST, so on Zotero 10 it is credentialed like any
+    other write — an unauthenticated probe would answer 428 and the 400/404
+    distinction above would no longer hold. That also means the one-time
+    Zotero authorisation prompt appears here, during a command that writes
+    nothing, rather than partway through a copy.
+    """
+    probe_api_plus()
     try:
         r = zotero_auth.post(COPY_ITEM_ENDPOINT, json={}, timeout=5)
     except Exception as e:
@@ -316,9 +326,7 @@ def find_items(query: str) -> list[dict]:
     for lib in libs:
         lid = lib.get("libraryID")
         path = (
-            "users/0"
-            if lib.get("type") == "user"
-            else f"groups/{lib.get('groupID')}"
+            "users/0" if lib.get("type") == "user" else f"groups/{lib.get('groupID')}"
         )
         try:
             r = httpx.get(

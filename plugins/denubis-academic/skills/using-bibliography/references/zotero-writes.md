@@ -42,6 +42,23 @@ The prompt appears at the first *writing* command, which for `update_item.py`
 and `copy_item.py` is the preview — both send a `POST` that changes nothing.
 Say so before running one, so an unexpected Zotero modal is not a surprise.
 
+## List a collection (read-only)
+
+Requires `zotero-api-plus` for name resolution only; the listing itself is the
+stock local API with the trash included.
+
+```bash
+uv run "$BIB/collection.py" --list "<collection name or key>" --library "<library>"
+```
+
+`--library` defaults to My Library. An ambiguous name errors with every
+candidate key and its parent key; pass the key instead. Each row is
+`key  citekey  title  [in trash]  attachments: n (names)`, and the last line is
+the total with the trashed count. This is the way to check what a collection
+holds before filing into it, and it writes nothing. `update_item.py --list`
+prints the same membership as a triage table (type, title, `NO AUTHOR`,
+`IN TRASH`).
+
 ## Fetch a genuinely missing paper
 
 Requires `zotero-api-plus` 0.3.0+.

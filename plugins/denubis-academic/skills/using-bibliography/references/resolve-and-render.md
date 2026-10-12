@@ -43,6 +43,13 @@ The states are:
   `advice:` line names `--force-ocr` when the text layer looks like third-party
   OCR;
 - `ready-to-render`: attachment exists and rendering was suppressed;
+- `in trash`: the exact citekey resolved to an item in Zotero's trash; that
+  copy's collections and attachment are reported as not checked (Better BibTeX
+  aggregates them by citekey) and it is never rendered. The resolver exits `1`
+  when every copy is in the trash; a live copy beside trashed ones resolves
+  normally with the trashed rows shown. Only the exact-citekey search looks in
+  the trash: `--author`, `--title`, and `--doi` keep Zotero's exclusion and say
+  so in their no-match message;
 - `no-pdf`: item is resolved but has no renderable attachment;
 - `pdf-unknown`: lookup could not prove attachment state;
 - `needs-ocr-escalation`: ordinary rendering failed quality checks.

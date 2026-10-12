@@ -235,9 +235,10 @@ def _stub_sweep(monkeypatch, pages):
     """
     monkeypatch.setattr(zla, "library_item_urls", lambda **_k: list(pages))
 
-    def fake_fetch(url, query, *, qmode, timeout=30.0):
+    def fake_fetch(url, query, *, qmode, include_trashed=False, timeout=30.0):
         assert query == "Giner-Sorolla"
         assert qmode == "titleCreatorYear"
+        assert include_trashed is False
         page = pages[url]
         if isinstance(page, Exception):
             raise page
@@ -280,3 +281,203 @@ def test_search_items_reports_a_library_that_could_not_be_searched(monkeypatch):
     assert len(found.failed_libraries) == 1
     assert "groups/14" in found.failed_libraries[0]
     assert "timeout" in found.failed_libraries[0]
+
+
+# --- trash awareness (0.19) ----------------------------------------------------
+#
+# Zotero's quicksearch excludes trashed items unless `includeTrashed=1`; a direct
+# key read returns them with `data.deleted: true`. Observed live on 2026-10-12 for
+# D7IV2YRB (the 1987 Borgmann record), which resolve.py had reported as rendered.
+
+
+class _FakeHttpx:
+    """A stand-in for httpx that records GET params and answers from a table."""
+
+    class HTTPError(Exception):
+        pass
+
+    def __init__(self, answers):
+        self.answers = answers  # url -> list of page bodies, in order
+        self.calls: list[tuple[str, dict]] = []
+
+    def get(self, url, *, params, timeout):
+        self.calls.append((url, dict(params)))
+        body = self.answers[url].pop(0)
+
+        class Reply:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return body
+
+        return Reply()
+
+
+def test_fetch_search_page_sends_include_trashed_only_when_asked(monkeypatch):
+    url = "http://localhost:23119/api/users/0/items"
+    fake = _FakeHttpx({url: [[], []]})
+    monkeypatch.setitem(sys.modules, "httpx", fake)
+
+    zla.fetch_search_page(url, "borgmann", qmode="titleCreatorYear")
+    zla.fetch_search_page(
+        url, "borgmann", qmode="titleCreatorYear", include_trashed=True
+    )
+
+    plain, trashed = (params for _url, params in fake.calls)
+    assert "includeTrashed" not in plain
+    assert trashed["includeTrashed"] == 1
+    assert trashed["q"] == "borgmann" and trashed["qmode"] == "titleCreatorYear"
+
+
+def test_search_items_forwards_include_trashed_to_every_library(monkeypatch):
+    mine = "http://localhost:23119/api/users/0/items"
+    group = "http://localhost:23119/api/groups/6624981/items"
+    monkeypatch.setattr(zla, "library_item_urls", lambda **_k: [mine, group])
+    seen = []
+
+    def fake_fetch(url, query, *, qmode, include_trashed=False, timeout=30.0):
+        seen.append((url, include_trashed))
+        return []
+
+    monkeypatch.setattr(zla, "fetch_search_page", fake_fetch)
+    zla.search_items("borgmann", include_trashed=True)
+    assert seen == [(mine, True), (group, True)]
+
+
+def test_item_in_trash_reads_data_deleted():
+    assert zla.item_in_trash({"key": "D7IV2YRB", "data": {"deleted": True}})
+    assert not zla.item_in_trash({"key": "X", "data": {"deleted": False}})
+    assert not zla.item_in_trash({"key": "X", "data": {}})
+    assert not zla.item_in_trash({"key": "X"})
+
+
+def test_library_base_for_user_and_group_libraries():
+    assert zla.library_base({"type": "user", "libraryID": 1}) == "/users/0"
+    assert (
+        zla.library_base({"type": "group", "libraryID": 7, "groupID": 6624981})
+        == "/groups/6624981"
+    )
+
+
+def test_get_collection_items_lists_children_and_trash_paginated(monkeypatch):
+    url = "http://localhost:23119/api/groups/6624981/collections/ABCD1234/items"
+    page_one = [_stock_hit(f"K{n:07d}", citekey=f"k{n}") for n in range(100)]
+    page_two = [_stock_hit("LAST0001", citekey="last")]
+    fake = _FakeHttpx({url: [page_one, page_two]})
+    monkeypatch.setitem(sys.modules, "httpx", fake)
+
+    items = zla.get_collection_items(
+        {"type": "group", "groupID": 6624981}, "ABCD1234", include_trashed=True
+    )
+
+    assert len(items) == 101
+    assert [params["start"] for _u, params in fake.calls] == [0, 100]
+    assert all(params["includeTrashed"] == 1 for _u, params in fake.calls)
+    assert all(params["limit"] == 100 for _u, params in fake.calls)
+
+
+def test_get_collection_items_without_trash_omits_the_param(monkeypatch):
+    url = "http://localhost:23119/api/users/0/collections/ABCD1234/items"
+    fake = _FakeHttpx({url: [[]]})
+    monkeypatch.setitem(sys.modules, "httpx", fake)
+    zla.get_collection_items({"type": "user"}, "ABCD1234", include_trashed=False)
+    assert "includeTrashed" not in fake.calls[0][1]
+
+
+def test_get_collection_items_raises_library_query_error(monkeypatch):
+    class Boom(_FakeHttpx):
+        def get(self, url, *, params, timeout):
+            raise self.HTTPError("connection refused")
+
+    monkeypatch.setitem(sys.modules, "httpx", Boom({}))
+    try:
+        zla.get_collection_items({"type": "user"}, "ABCD1234")
+    except zla.LibraryQueryError as error:
+        assert "connection refused" in str(error)
+    else:
+        raise AssertionError("expected LibraryQueryError")
+
+
+def _collection_listing():
+    return [
+        {
+            "key": "PARENT01",
+            "data": {
+                "key": "PARENT01",
+                "itemType": "book",
+                "title": "Technology and the character of contemporary life",
+                "citationKey": "borgmann1984",
+                "deleted": False,
+            },
+        },
+        {
+            "key": "ATTACH01",
+            "data": {
+                "key": "ATTACH01",
+                "itemType": "attachment",
+                "parentItem": "PARENT01",
+                "filename": "Borgmann - 1984.pdf",
+                "deleted": True,
+            },
+        },
+        {
+            "key": "NOTE0001",
+            "data": {"key": "NOTE0001", "itemType": "note", "parentItem": "PARENT01"},
+        },
+        {
+            "key": "PARENT02",
+            "data": {
+                "key": "PARENT02",
+                "itemType": "journalArticle",
+                "title": "Trashed paper",
+                "citationKey": "trashed2020",
+                "deleted": True,
+            },
+        },
+        {
+            "key": "ATTACH02",
+            "data": {
+                "key": "ATTACH02",
+                "itemType": "attachment",
+                "parentItem": "PARENT02",
+                "filename": "trashed.pdf",
+            },
+        },
+        {
+            "key": "LINKURL1",
+            "data": {
+                "key": "LINKURL1",
+                "itemType": "attachment",
+                "parentItem": "PARENT02",
+                "linkMode": "linked_url",
+                "title": "OSF registration",
+            },
+        },
+    ]
+
+
+def test_summarise_collection_groups_attachments_under_parents():
+    rows = zla.summarise_collection(_collection_listing())
+    assert rows == [
+        {
+            "key": "PARENT01",
+            "citekey": "borgmann1984",
+            "title": "Technology and the character of contemporary life",
+            "itemType": "book",
+            "in_trash": False,
+            "attachments": [{"filename": "Borgmann - 1984.pdf", "in_trash": True}],
+        },
+        {
+            "key": "PARENT02",
+            "citekey": "trashed2020",
+            "title": "Trashed paper",
+            "itemType": "journalArticle",
+            "in_trash": True,
+            "attachments": [
+                {"filename": "trashed.pdf", "in_trash": False},
+                # A linked URL has no filename; its title names it.
+                {"filename": "OSF registration", "in_trash": False},
+            ],
+        },
+    ]

@@ -101,6 +101,7 @@ Interpret exit status and state explicitly:
 | exit `0`; `rendered` | Exact item resolved and render is ready | Verify `full.md` and `meta.json` exist |
 | exit `0`; `ready-to-render` | Attachment exists but rendering was suppressed | Render through the resolver/cascade |
 | exit `2`; near matches | Supplied citekey was not exact | Re-run with the returned real citekey |
+| exit `1`; `in trash` | The exact citekey is in Zotero's trash | Report it as trashed; do not read or cite it as live. Only the citekey search sees the trash: author, title, and DOI searches exclude it and say so |
 | `no-pdf` | Item exists without a usable attachment | Ask the user to attach it or consider confirmed fetch |
 | `pdf-unknown` | Attachment truth could not be established | Diagnose; never report `no-pdf` |
 | `needs-ocr-escalation` | Normal cascade could not produce usable text | Ask before optional GPU OCR |

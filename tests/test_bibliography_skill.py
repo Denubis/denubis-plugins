@@ -68,7 +68,8 @@ def test_bibliography_commands_are_independent_of_callers_working_directory() ->
     repo_relative = "plugins/denubis-academic/skills/using-bibliography"
     bare_script = re.compile(
         r"(?:uv run(?: --[^\n]+)*|python)\s+"
-        r"(?:resolve|ingest|render|blockquote|fetch|copy_item|update_item|annotate)\.py\b"
+        r"(?:resolve|ingest|render|blockquote|fetch|copy_item|update_item|annotate"
+        r"|collection)\.py\b"
     )
     url = re.compile(r"https?://\S+")
     violations = {

@@ -53,9 +53,10 @@ class TestParseFieldAssignment:
 
     def test_value_may_contain_equals(self):
         # DOIs and URLs carry '=', so only the first one may split.
-        assert update_mod.parse_field_assignment(
-            "url=https://x.test/a?b=c&d=e"
-        ) == ("url", "https://x.test/a?b=c&d=e")
+        assert update_mod.parse_field_assignment("url=https://x.test/a?b=c&d=e") == (
+            "url",
+            "https://x.test/a?b=c&d=e",
+        )
 
     def test_empty_value_is_legal_and_clears(self):
         assert update_mod.parse_field_assignment("shortTitle=") == ("shortTitle", "")
@@ -313,13 +314,76 @@ class TestRenderDiff:
                         "kind": "creators",
                         "from": [],
                         "to": [
-                            {"creatorType": "author", "name": "World Health Organization"}
+                            {
+                                "creatorType": "author",
+                                "name": "World Health Organization",
+                            }
                         ],
                     }
                 ],
             }
         )
         assert "+ World Health Organization (author)" in rendered
+
+
+class TestListThroughTheSharedListing:
+    """`--list` consumes zotero_local_api.get_collection_items (0.19), asks for
+    the trash, and marks trashed rows."""
+
+    def test_list_marks_trashed_rows(self, monkeypatch, capsys):
+        library = {
+            "type": "user",
+            "libraryID": 1,
+            "name": "My Library",
+            "collections": [{"name": "Sage SRM Guide", "key": "COLL0001"}],
+        }
+        monkeypatch.setattr(update_mod, "get_libraries", lambda: [library])
+        seen = {}
+
+        def fake_listing(lib, key, *, include_trashed=True):
+            seen["args"] = (lib, key, include_trashed)
+            return [
+                {
+                    "key": "LIVE0001",
+                    "data": {
+                        "key": "LIVE0001",
+                        "itemType": "book",
+                        "title": "Live book",
+                        "creators": [{"lastName": "A"}],
+                    },
+                },
+                {
+                    "key": "GONE0001",
+                    "data": {
+                        "key": "GONE0001",
+                        "itemType": "book",
+                        "title": "Trashed book",
+                        "creators": [],
+                        "deleted": True,
+                    },
+                },
+                {
+                    "key": "CHILD001",
+                    "data": {
+                        "key": "CHILD001",
+                        "itemType": "attachment",
+                        "parentItem": "LIVE0001",
+                    },
+                },
+            ]
+
+        monkeypatch.setattr(update_mod, "get_collection_items", fake_listing)
+        monkeypatch.setattr(sys, "argv", ["update_item.py", "--list", "Sage SRM Guide"])
+        assert update_mod.main() == 0
+        out = capsys.readouterr().out
+        assert seen["args"] == (library, "COLL0001", True)
+        assert "2 top-level items" in out
+        assert "LIVE0001" in out and "GONE0001" in out
+        assert "CHILD001" not in out
+        trashed_line = next(line for line in out.splitlines() if "GONE0001" in line)
+        assert "IN TRASH" in trashed_line
+        live_line = next(line for line in out.splitlines() if "LIVE0001" in line)
+        assert "IN TRASH" not in live_line
 
 
 class TestClearedFields:
@@ -351,7 +415,10 @@ class TestClearedFields:
     def test_a_creator_change_is_not_a_field_clear(self):
         assert (
             update_mod.cleared_fields(
-                {"collateral": [], "requested": [{"kind": "creators", "from": [], "to": []}]}
+                {
+                    "collateral": [],
+                    "requested": [{"kind": "creators", "from": [], "to": []}],
+                }
             )
             == []
         )

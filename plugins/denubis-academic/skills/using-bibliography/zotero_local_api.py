@@ -32,6 +32,14 @@ Two modes are used:
 
 `/api/users/0/` is My Library ALONE. Groups are swept explicitly.
 
+Trash (0.19): Zotero's item listings and quicksearch exclude trashed items
+unless `includeTrashed=1`; a direct key read returns them, and every envelope
+carries `data.deleted` when the item is in the trash. The exact-citekey sweep
+asks for the trash so a trashed paper is reported as such instead of being
+reported as absent or, worse, as a live render; author, title, and DOI searches
+keep Zotero's exclusion and the resolver says so. Verified live on Zotero 10.0.6
+on 2026-10-12 against D7IV2YRB.
+
 Do NOT reach for `qmode=everything`. It adds PDF fulltext, so a DOI query
 returns hundreds of attachment hits with the parent below the first page.
 Reading the first few results of that set is what recorded DOI-field search as
@@ -79,6 +87,22 @@ def item_library(item: dict) -> str:
     not the BBT library id.
     """
     return (item.get("library") or {}).get("name") or ""
+
+
+def item_in_trash(item: dict) -> bool:
+    """True when a stock envelope says the item is in Zotero's trash."""
+    return bool((item.get("data") or {}).get("deleted"))
+
+
+def library_base(library: dict) -> str:
+    """The stock local API path prefix for a zotero-api-plus library record.
+
+    `/users/0` is My Library; a group is addressed by its groupID, not by the
+    libraryID that the write endpoints take (the two number spaces differ).
+    """
+    if library.get("type") == "user":
+        return "/users/0"
+    return f"/groups/{library['groupID']}"
 
 
 def select_parent_items(items: list[dict]) -> list[dict]:
@@ -144,10 +168,8 @@ def library_item_urls(timeout: float = 30.0) -> list[str]:
     ]
 
 
-def fetch_search_page(
-    url: str, query: str, *, qmode: str, timeout: float = 30.0
-) -> list[dict]:
-    """Every item matching `query` at `url` in `qmode`, following pagination.
+def _fetch_all_pages(url: str, params: dict, *, timeout: float) -> list[dict]:
+    """Follow Zotero's `start`/`limit` pagination to the end of a listing.
 
     Reading only the first page is the error this module's docstring describes,
     so pages are followed until one comes back short. A transport failure or a
@@ -161,13 +183,7 @@ def fetch_search_page(
         try:
             r = httpx.get(
                 url,
-                params={
-                    "q": query,
-                    "qmode": qmode,
-                    "limit": _PAGE,
-                    "start": start,
-                    "format": "json",
-                },
+                params={**params, "limit": _PAGE, "start": start, "format": "json"},
                 timeout=timeout,
             )
             r.raise_for_status()
@@ -178,6 +194,83 @@ def fetch_search_page(
         if len(batch) < _PAGE:
             return items
         start += _PAGE
+
+
+def fetch_search_page(
+    url: str,
+    query: str,
+    *,
+    qmode: str,
+    include_trashed: bool = False,
+    timeout: float = 30.0,
+) -> list[dict]:
+    """Every item matching `query` at `url` in `qmode`, following pagination.
+
+    `include_trashed` adds `includeTrashed=1`, which is the only way a
+    quicksearch returns a trashed item.
+    """
+    params: dict = {"q": query, "qmode": qmode}
+    if include_trashed:
+        params["includeTrashed"] = 1
+    return _fetch_all_pages(url, params, timeout=timeout)
+
+
+def get_collection_items(
+    library: dict,
+    collection_key: str,
+    *,
+    include_trashed: bool = True,
+    timeout: float = 30.0,
+) -> list[dict]:
+    """Every item of one collection, children included, via the stock API.
+
+    Lists `/collections/<key>/items` (not `/items/top`) so attachments and
+    notes arrive beside their parents and can be grouped by summarise_collection;
+    the trash is included by default so a listing can MARK trashed rows rather
+    than silently omit them. Paginated to the end. Raises LibraryQueryError.
+    """
+    url = f"{LOCAL_API_BASE}{library_base(library)}/collections/{collection_key}/items"
+    params: dict = {}
+    if include_trashed:
+        params["includeTrashed"] = 1
+    return _fetch_all_pages(url, params, timeout=timeout)
+
+
+def summarise_collection(items: list[dict]) -> list[dict]:
+    """Reduce a collection listing to one row per parent item, attachments
+    grouped beneath, with the trash state of each. Pure; listing order kept.
+
+    A child whose parent is not in the listing is dropped: it is not a member
+    of the collection in its own right.
+    """
+    rows: list[dict] = []
+    by_key: dict[str, dict] = {}
+    for item in select_parent_items(items):
+        data = item.get("data") or {}
+        row = {
+            "key": data.get("key") or item.get("key") or "",
+            "citekey": item_citekey(item),
+            "title": data.get("title") or "",
+            "itemType": data.get("itemType") or "",
+            "in_trash": item_in_trash(item),
+            "attachments": [],
+        }
+        rows.append(row)
+        by_key[row["key"]] = row
+    for item in items:
+        data = item.get("data") or {}
+        if data.get("itemType") != "attachment":
+            continue
+        parent = by_key.get(data.get("parentItem") or "")
+        if parent is None:
+            continue
+        # A linked-URL attachment has no filename; its title is the next best
+        # name. Observed live on J4CUUEHW (two such attachments), 2026-10-12.
+        name = data.get("filename") or data.get("title") or "(unnamed attachment)"
+        parent["attachments"].append(
+            {"filename": name, "in_trash": item_in_trash(item)}
+        )
+    return rows
 
 
 @dataclass(frozen=True)
@@ -201,14 +294,20 @@ class LibrarySearch:
 
 
 def _sweep(
-    query: str, *, qmode: str, keep: Callable[[list[dict]], list[dict]]
+    query: str,
+    *,
+    qmode: str,
+    keep: Callable[[list[dict]], list[dict]],
+    include_trashed: bool = False,
 ) -> LibrarySearch:
     """Run one query against every library, keeping what `keep` selects."""
     items: list[dict] = []
     failed: list[str] = []
     for url in library_item_urls():
         try:
-            page = fetch_search_page(url, query, qmode=qmode)
+            page = fetch_search_page(
+                url, query, qmode=qmode, include_trashed=include_trashed
+            )
         except LibraryQueryError as e:
             failed.append(f"{url}: {e}")
             continue
@@ -216,7 +315,9 @@ def _sweep(
     return LibrarySearch(items=tuple(items), failed_libraries=tuple(failed))
 
 
-def search_items(query: str, *, qmode: str = "titleCreatorYear") -> LibrarySearch:
+def search_items(
+    query: str, *, qmode: str = "titleCreatorYear", include_trashed: bool = False
+) -> LibrarySearch:
     """Every parent item matching `query` in `qmode`, across all libraries.
 
     This is the token search that replaced BBT `item.search`. The server ANDs
@@ -224,11 +325,14 @@ def search_items(query: str, *, qmode: str = "titleCreatorYear") -> LibrarySearc
     surname (first author or not), a title fragment or a free term all work; an
     exact object key is matched too. The caller applies its own precision
     filter to the envelopes, which carry title, creators, date, DOI, citekey,
-    collections and the library's human name.
+    collections, the library's human name, and `deleted` (item_in_trash).
+    `include_trashed` asks Zotero for trashed items too.
 
     A failure to list the groups still raises, per library_item_urls.
     """
-    return _sweep(query, qmode=qmode, keep=select_parent_items)
+    return _sweep(
+        query, qmode=qmode, keep=select_parent_items, include_trashed=include_trashed
+    )
 
 
 def search_doi_items(doi: str) -> LibrarySearch:

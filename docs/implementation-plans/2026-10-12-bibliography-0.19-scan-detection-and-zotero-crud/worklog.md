@@ -120,3 +120,88 @@ Evidence:
   140 150 154 172 176 188 192 193 201 211 220 251 256); "Jiving" on 205. The previous
   version-2 cache was copied to `/tmp/bib019/borgmann2006-previous-cache` before the
   live forced run.
+- Q3 live: `uv run resolve.py --citekey borgmannTechnologyCharacterContemporary2006
+  --force-ocr` (log `/tmp/bib019/forced2006.log`) went through the front door with a
+  current version-3-equivalent cache bypassed, ran `docling +OCR OK: 311 pages, 6
+  near-empty, 0 U+FFFD`, exit 0, and the state line now reads `rendered (ocr, forced;
+  311 of 311 pages carry a page-sized image; …)` with no advice line. In the forced
+  render "in tum" remains on 2 pages (192, 201) and "in turn" now appears on the other
+  26 former slip pages; "Jiving" on 205 is gone ("living" present). Render kept at
+  `~/zettelkasten/papers/borgmannTechnologyCharacterContemporary2006/` (meta: `docling,
+  ocr true, extraction "ocr", forced true`).
+
+Checkpoints: `8590878` (design, ADR 0028, README index, plan directory), `9c87200`
+(Outcome A).
+
+## 2026-10-12 — Outcome B: trash awareness and the read-only listing
+
+Changed surfaces:
+
+- `zotero_local_api.py`: `item_in_trash`, `library_base`, `_fetch_all_pages` (shared
+  pagination), `fetch_search_page(include_trashed=)`, `search_items(include_trashed=)`
+  through `_sweep`, `get_collection_items(library, key, *, include_trashed=True)` listing
+  `/collections/<key>/items` (children included) and raising `LibraryQueryError`,
+  `summarise_collection` (one row per parent, attachments grouped, linked-URL
+  attachments named by title).
+- `resolve.py`: `Paper.in_trash`; `paper_from_local_item` sets it;
+  `search_papers(include_trashed_for=)` and `main` pass the exact citekey only;
+  `print_no_match(trash_excluded=)` for author/title/DOI; trashed copies print
+  `state: in trash` with collections and attachment `(not checked: item is in the
+  trash)` (`trashed_info`), are never rendered, and the run exits 1 only when every
+  copy is in the trash.
+- Deviation found live: the design's T1 scenario had one (trashed) copy; Zotero now
+  holds three items with the citekey `borgmannTechnologyCharacterContemporary1987` in
+  My Library (5N8ATYMZ live, two trashed including D7IV2YRB). Two consequences: (a)
+  `enrich_paper` aggregates collections and attachments by citekey through BBT, so a
+  trashed row would have borrowed the live copy's attachment; trashed rows are no
+  longer enriched. (b) exit 1 with a live copy resolved would hide the usable paper, so
+  the exit is 1 only when no live copy resolved. Both are recorded in
+  `references/resolve-and-render.md` and tested (`test_main_exits_0_when_a_live_copy_sits_beside_trashed_ones`,
+  `test_print_match_reports_in_trash_without_borrowing_live_facts`). This is a
+  judgement call on a case the design did not cover; raised in the report.
+- `copy_item.py`: `probe_api_plus()` split out of `probe_copy_item()` (which now calls
+  it) so helpers that only resolve names through `/api/plus/libraries` share the probe.
+  `ruff format` also normalised pre-existing hunks of `copy_item.py` and `update_item.py`
+  (formatter-only).
+- `update_item.py`: `--list` consumes the shared listing with the trash included,
+  `summarise_items` carries `in_trash`, `render_item_table` prints `IN TRASH`; the
+  private `get_collection_items` and `STOCK_API` are gone; the import block is sorted.
+- New `collection.py --list <name-or-key> [--library L]`: `probe_api_plus`, name
+  resolution through `copy_item.find_library`/`find_collection`, bare 8-character key
+  accepted, ambiguous name error names candidate keys and parents, rows
+  `key  citekey  title  [in trash]  attachments: n (names)`, total line.
+- Docs: `resolve-and-render.md` (`in trash` state), `SKILL.md` front door row,
+  `zotero-writes.md` "List a collection (read-only)", `troubleshooting.md` two rows;
+  `tests/test_bibliography_skill.py` regex gains `collection`.
+- Tests: `tests/test_bibliography_zotero_local_api.py` (params with and without
+  `includeTrashed`, forwarding to every library, `item_in_trash`, `library_base`,
+  paginated listing with the param, listing error), `tests/test_bibliography_resolve.py`
+  (flag on the Paper, citekey-only trash sweep, `in trash` output, no-match exclusion
+  sentence and its positive control, `main` exit 1 for an only-trashed citekey, exit 0
+  with a live sibling, untrashed control), `tests/test_bibliography_update.py` (`--list`
+  through the shared function with `include_trashed=True`, `IN TRASH` flag),
+  `tests/test_bibliography_collection.py` (new).
+
+Evidence:
+
+- Red: 17 failed / 128 passed across the four suites plus the missing module, then
+  `uv run pytest tests/test_bibliography_*.py tests/test_skill_*.py -q` → 988 passed
+  (the linked-URL attachment case joined the existing summarise test). `uvx ruff check`
+  on the touched files:
+  only pre-existing findings in `copy_item.py`, `update_item.py`, `renderer.py`;
+  `uvx ruff format --check plugins/denubis-academic` clean.
+- A structural test asserting the private lister attribute was gone was written and
+  then removed (it tripped on the shared import and established no behaviour).
+- T1 live, citekey form: `resolve.py --citekey borgmannTechnologyCharacterContemporary1987
+  --no-render` prints three blocks, `ready-to-render` for 5N8ATYMZ and `in trash` twice
+  with `(not checked: item is in the trash)` lines, exit 0 (a live copy exists; before
+  the exit rule change it exited 1).
+- T1 live, author form: `resolve.py --author Borgmann --year 1987 --no-render` returns
+  only the live copy (`ready-to-render`, exit 0); the trashed copies are excluded, as
+  designed. The plan's expected "no match naming the exclusion" assumed no live copy;
+  that message is covered by the unit test instead.
+- Listing live (read-only): `collection.py --list "Sage SRM Guide"` → `Sage SRM Guide
+  (UJPGKR74) in My Library`, 35 rows, `35 items (4 in trash)` (K6HE8KBB, KSSPB3DH,
+  4TU2XD9B, D7IV2YRB marked), exit 0; `update_item.py --list "Sage SRM Guide"` → `35
+  top-level items`, exit 0. The design's L1 count of 26 predates additions to the
+  collection; UAT compares against Zotero's pane.

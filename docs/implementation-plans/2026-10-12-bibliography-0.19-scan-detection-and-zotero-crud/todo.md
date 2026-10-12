@@ -3,19 +3,6 @@
 Plan: `plan.md` in this directory. Each outcome is done when its verification block
 passes and its evidence is in `worklog.md`.
 
-## Outcome A: extraction record, forced OCR, quoting contract
-- [ ] Operational Q3 live: forced Borgmann 2006 run through `resolve.py --force-ocr` (started 2026-10-12, log `/tmp/bib019/forced2006.log`); on completion record which of the 28 "in tum" pages lost the slip, and keep the render
-
-## Outcome B: trash awareness and read-only listing
-- [ ] Red: `includeTrashed` param only when requested; `item_in_trash`; `summarise_collection`; `library_base`
-- [ ] Red: trashed envelope → `in_trash`, `state: in trash`, exit 1; untrashed control; author no-match names the exclusion
-- [ ] Green: `zotero_local_api.py` (`fetch_search_page`/`search_items` flag, `item_in_trash`, `library_base`, moved `get_collection_items`, `summarise_collection`)
-- [ ] Green: `resolve.py` (`Paper.in_trash`, citekey sweep, state line, no-match text)
-- [ ] Green: `collection.py --list`; `update_item.py --list` through the shared function; remove the old `get_collection_items`
-- [ ] Docs: `resolve-and-render.md`, `SKILL.md` front door, `zotero-writes.md` listing section, `troubleshooting.md`; regex in `tests/test_bibliography_skill.py`
-- [ ] Operational T1 against `D7IV2YRB` (citekey and author forms)
-- [ ] Verification block B; checkpoint commit
-
 ## Outcome C: write primitive, membership, item trash/restore
 - [ ] Red: primitive over the stubbed seam (headers, version header, 204, 412 conflict, 412 server-ID body, 401 retry, `require_stock_writes`)
 - [ ] Red: `write_gate.py` flag sets per class, refusals, report lines and exit codes

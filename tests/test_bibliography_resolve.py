@@ -307,7 +307,10 @@ def test_print_match_after_forced_ocr_reports_ocr_and_no_advice(tmp_path, capsys
 # render, so without the bypass `--force-ocr` would never reach render.py.
 
 
-def _run_main(monkeypatch, tmp_path, argv, *, cache_current):
+def _run_main(
+    monkeypatch, tmp_path, argv, *, cache_current, envelope=None, extra_envelopes=()
+):
+    envelopes = (envelope or _kudina_local_item("My Library"), *extra_envelopes)
     papers_root = tmp_path / "zk"
     (papers_root / "papers").mkdir(parents=True)
     out = papers_root / "papers" / _KUDINA_CITEKEY
@@ -325,9 +328,7 @@ def _run_main(monkeypatch, tmp_path, argv, *, cache_current):
     monkeypatch.setattr(
         resolve,
         "search_items",
-        lambda _q, **_k: resolve.LibrarySearch(
-            items=(_kudina_local_item("My Library"),), failed_libraries=()
-        ),
+        lambda _q, **_k: resolve.LibrarySearch(items=envelopes, failed_libraries=()),
     )
     pdf = tmp_path / "paper.pdf"
     pdf.write_bytes(b"%PDF")
@@ -431,6 +432,123 @@ def test_paper_from_local_item_tolerates_missing_fields():
     assert p.year is None
     assert p.library == ""
     assert p.collection_keys == ()
+    assert p.in_trash is False
+
+
+# --- trash awareness (0.19, T1) ---------------------------------------------
+#
+# D7IV2YRB (borgmannTechnologyCharacterContemporary1987) sat in Zotero's trash
+# with `data.deleted: true` and resolved as `rendered` on 2026-10-12. The
+# citekey sweep now includes the trash and reports the state; the widening
+# tokens and the author/title/DOI searches keep Zotero's exclusion and say so.
+
+
+def test_paper_from_local_item_carries_the_trash_flag():
+    trashed = {**LOCAL_ITEM, "data": {**LOCAL_ITEM["data"], "deleted": True}}
+    assert resolve.paper_from_local_item(trashed).in_trash is True
+    assert resolve.paper_from_local_item(LOCAL_ITEM).in_trash is False
+
+
+def test_search_papers_includes_the_trash_only_for_the_citekey_token(monkeypatch):
+    seen = []
+
+    def fake(query, *, qmode="titleCreatorYear", include_trashed=False):
+        seen.append((query, include_trashed))
+        return resolve.LibrarySearch(items=(), failed_libraries=())
+
+    monkeypatch.setattr(resolve, "search_items", fake)
+    resolve.search_papers(
+        [_KUDINA_CITEKEY, "kudina"], include_trashed_for={_KUDINA_CITEKEY}
+    )
+    assert seen == [(_KUDINA_CITEKEY, True), ("kudina", False)]
+
+
+def test_print_match_reports_in_trash_without_borrowing_live_facts(capsys):
+    paper = resolve.Paper(
+        citekey="k2020",
+        doi="",
+        title="t",
+        authors=(),
+        year=None,
+        library="My Library",
+        library_id=None,
+        collection_keys=(),
+        in_trash=True,
+    )
+    resolve.print_match(resolve.trashed_info(paper), "in trash")
+    out = capsys.readouterr().out
+    assert "state:      in trash" in out
+    # BBT aggregates collections and attachments by citekey, so a trashed copy
+    # must not be shown with a live sibling's facts.
+    assert "collections: (not checked: item is in the trash)" in out
+    assert "attachment: (not checked: item is in the trash)" in out
+
+
+def test_print_no_match_names_the_trash_exclusion_for_author_searches(capsys):
+    resolve.print_no_match(
+        ["Borgmann"], doi=None, search_errors=[], trash_excluded=True
+    )
+    assert "trashed items are excluded from this search" in capsys.readouterr().out
+
+
+def test_print_no_match_for_a_citekey_does_not_claim_an_exclusion(capsys):
+    """Positive control: the citekey sweep searched the trash, so no caveat."""
+    resolve.print_no_match(["k2020"], doi=None, search_errors=[], trash_excluded=False)
+    assert "trashed items are excluded" not in capsys.readouterr().out
+
+
+def test_main_exits_1_with_in_trash_for_a_trashed_citekey(
+    monkeypatch, tmp_path, capsys
+):
+    trashed = _kudina_local_item("My Library")
+    trashed["data"] = {**trashed["data"], "deleted": True}
+    code, renders = _run_main(
+        monkeypatch,
+        tmp_path,
+        ["--citekey", _KUDINA_CITEKEY, "--no-render"],
+        cache_current=False,
+        envelope=trashed,
+    )
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "state:      in trash" in out
+    assert renders == []
+
+
+def test_main_exits_0_when_a_live_copy_sits_beside_trashed_ones(
+    monkeypatch, tmp_path, capsys
+):
+    """Observed live on 2026-10-12: one live and two trashed copies of the
+    Borgmann 1987 citekey in My Library. The live copy resolves; the trashed
+    rows are reported, not counted as a failure."""
+    live = _kudina_local_item("My Library")
+    trashed = _kudina_local_item("My Library")
+    trashed["key"] = "TRASHED1"
+    trashed["data"] = {**trashed["data"], "key": "TRASHED1", "deleted": True}
+    code, _renders = _run_main(
+        monkeypatch,
+        tmp_path,
+        ["--citekey", _KUDINA_CITEKEY, "--no-render"],
+        cache_current=False,
+        envelope=live,
+        extra_envelopes=[trashed],
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "state:      in trash" in out
+    assert "state:      ready-to-render" in out
+
+
+def test_main_resolves_the_same_envelope_untrashed(monkeypatch, tmp_path, capsys):
+    """Positive control: without `deleted`, the item is ready-to-render."""
+    code, _renders = _run_main(
+        monkeypatch,
+        tmp_path,
+        ["--citekey", _KUDINA_CITEKEY, "--no-render"],
+        cache_current=False,
+    )
+    assert code == 0
+    assert "state:      ready-to-render" in capsys.readouterr().out
 
 
 def test_paper_from_local_item_skips_a_creator_with_no_name():
@@ -1111,7 +1229,7 @@ def test_doi_no_match_still_concludes_absence_when_every_search_succeeded(capsys
 def _stub_search_items(monkeypatch, by_token):
     """by_token: token -> (envelopes, failed_libraries)."""
 
-    def fake(query, *, qmode="titleCreatorYear"):
+    def fake(query, *, qmode="titleCreatorYear", include_trashed=False):
         assert qmode == "titleCreatorYear"
         items, failed = by_token[query]
         return resolve.LibrarySearch(items=tuple(items), failed_libraries=tuple(failed))
