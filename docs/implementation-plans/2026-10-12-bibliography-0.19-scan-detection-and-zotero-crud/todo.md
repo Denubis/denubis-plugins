@@ -3,9 +3,9 @@
 Plan: `plan.md` in this directory. Each outcome is done when its verification block
 passes and its evidence is in `worklog.md`.
 
-## Human UAT (after F)
-- [ ] Steps 1–8 in `plan.md` "Human UAT"; record each result in `worklog.md`
-- [ ] After acceptance: fold any UAT fixes into the outcome they serve, rerun F gates
+## Manual cleanup in Zotero
+- [ ] The reviewer's five scratch objects remain in Zotero's trash; empty when convenient.
 
 ## Integration
-- [ ] `docs/architecture/decisions/README.md` needs both new index lines merged: 0028 from `main` (`f5609a5`) and 0029 from this branch.
+- [ ] Merge `worktree-bibliography-0.19-design` into `main` (fast-forward after the rebase);
+      push and worktree cleanup need their own authority.

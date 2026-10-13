@@ -479,3 +479,246 @@ Checkpoint series before normalisation (2026-10-12, no upstream, nothing pushed)
 UAT: `2c612a7` and the two renumber commits (`a9792e0`, `acd5694`) folded into one
 Outcome F commit by `git reset --soft f637cac` and recommitting; commits A to E keep
 their SHAs. The only tree difference from `aa66e4a` is this worklog entry and the todo.
+
+## 2026-10-12 — Review fix: the restore command was not shell-quoted
+
+A reviewer running `collection.py --trash` with stubbed writes found the emitted
+`uv run collection.py --restore KEY --library My Library` line joined with plain spaces,
+so pasting it back exited 2 (`unrecognized arguments: Library`). Serves Outcome D.
+
+- `collection.py`: the restore line now uses `shlex.join`, matching
+  `write_gate.format_apply_command`, which every other emitted command already used
+  (`rg '" "\.join\('` over the helpers hits only two text-normalisation joins in
+  `annotate.py` and `renderer.py`).
+- `tests/test_bibliography_collection.py`: new
+  `test_trash_apply_restore_command_round_trips_through_the_parser` trashes with
+  `--library "My Library"`, `shlex.split`s the emitted line, and parses it with the
+  helper's own parser. Red before the fix for the reviewer's reason (`unrecognized
+  arguments: Library`); green after.
+- `uv run pytest tests/test_bibliography_collection.py tests/test_skill_*.py -q` → 644
+  passed; ruff check and format clean on both files; `git diff --check` clean.
+- Private checkpoint on top of the normalised series; folds into Outcome D
+  (`e82e407`) after UAT.
+
+## 2026-10-12 — Live UAT results and the parent-trash fix
+
+Live checks by the human's reviewer session (log `/tmp/bib019-live-check.log`, five
+scratch objects left verified in Zotero's trash, harness files removed, repository
+unchanged): passed creation (L4), membership add and remove (L2), collection rename,
+attachment trash and restore without touching parent or sibling (L3), collection-tree
+restore preserving membership (L5), and stale-version refusal. Export registration
+(E1/E3) remains untested live because the available API cannot remove a registration
+afterwards. The quoting fix (`28e8f06`) was confirmed: 1,534 tests passed there.
+
+Confirmed bug: `trash_item.py --restore` on an attachment under a trashed parent
+reported `accepted; verified` while the attachment stayed in the trash, and on a child
+whose own flag was clear said "not in the trash. Nothing to apply." Cause:
+`zotero_local_api.item_in_trash` reads only the object's own `deleted` flag, while
+Zotero's `isInTrash()` includes the parent's state (parent `D7IV2YRB`, attachment
+`XCGCBRF7`). Serves Outcome C.
+
+- `trash_item.py`: `read_parent` reads the parent envelope once (trash included);
+  pure `in_trash_via_parent` and `deleted_label`; the preview's `deleted:` line reads
+  `false (in the trash through parent KEY)` or `true (parent KEY is in the trash
+  too)`; `--restore` on such a child prints the preview, explains that the parent owns
+  the trash state, prints `uv run trash_item.py --key PARENT --restore [--library …]`
+  (shell-quoted), ends `not accepted: in the trash through parent KEY`, exit 1, and
+  sends no PATCH with or without `--apply`; a trash preview of such a child reports
+  "already in the trash through its parent KEY"; the restore read-back re-reads the
+  parent so `verified` means Zotero's trash state, not the child's flag. `main` split
+  into `preview_outcome` and `apply_change` for the statement and branch limits.
+  `item_in_trash` itself is unchanged: `resolve.py` and the listings apply it to
+  top-level items, where own flag and trash state coincide.
+- Docs: helper docstring, `zotero-writes.md` trash section, `SKILL.md` table row (204
+  lines), changelog line.
+- Tests (`tests/test_bibliography_trash_item.py`): three new cases, restore preview
+  under a trashed parent, restore apply under a trashed parent with the child's own flag
+  set, trash preview under a trashed parent. Red before the fix for the reviewer's
+  reasons (exit 0 with the apply command offered; the PATCH reached the seam; no parent
+  mention); green after. Five existing apply-path cases now answer the parent read and
+  locate the PATCH by method.
+- Gates: focused set → 1132 passed; ruff check and format clean; `git diff --check`
+  clean.
+- Not covered: a collection listing still marks rows by the item's own flag; children
+  are listed under their parent row, so a child of a trashed parent appears under a
+  marked row. Recorded as a limit, not changed.
+
+## 2026-10-12 — Registration removal is manual: said in the preview
+
+A side note observed that `autoexport.add` has no remove counterpart (the reference and
+the helper docstring already said so) but that nothing told the human where removal
+happens, and the preview did not warn before approval. Serves Outcome E.
+
+- `register_export.py` preview gains `removal:    manual; no helper can take a
+  registration back. Delete it in Zotero under Settings > Better BibTeX > Automatic
+  export`. `zotero-writes.md` and the `SKILL.md` row say the same (204 lines).
+- `tests/test_bibliography_register_export.py`: the preview test asserts the removal
+  line; red before (`assert None` on the search), green after. Focused set → 1132
+  passed; ruff check and format clean; `git diff --check` clean.
+- E1/E3 still have no live evidence. Running them creates a standing export that only
+  the BBT preferences pane removes; use a scratch collection and a throwaway path.
+
+## 2026-10-12 — Review fix: the parent-restore command dropped the helper's directory
+
+Live, from the repository root, the refusal printed `uv run trash_item.py --key … --restore
+--library 'My Library'`, which failed to spawn. Cause: the command used
+`Path(sys.argv[0]).name`. It now keeps `sys.argv[0]`, as `collection.py` already did.
+New `test_parent_restore_command_keeps_the_helper_path_when_run_from_elsewhere` runs
+the helper under its absolute path and asserts the emitted command's first word is that
+path; red before (`'trash_item.py' == '/…/trash_item.py'`), green after. Gates: trash_item,
+collection, and skill tests → 658 passed; ruff check and format clean; `git diff --check`
+clean. The reviewer reports the parent-trash refusal works live; no writes performed.
+
+## 2026-10-12 — Live E1/E3: registration works; the host could not see the file
+
+Authorised by the human ("run it once anyways"). Scratch objects, all still live:
+
+- `collection.py --create bib019-uat-export --apply --expect-library 1` → key
+  `G333AT78`, `accepted; verified`.
+- `item_collections.py --key 7XWWDHT5 --add G333AT78 --apply --expect-version 445`
+  (the human's geography preprint, `torringtonAILessonPlanning2026`, already in Zotero
+  under Sage SRM Guide; the OSF record is pending moderation and not public) → version
+  519, `accepted; verified`.
+- `register_export.py --collection 'My Library/bib019-uat-export' --path
+  /tmp/bib019/uat-export.bib --apply --expect-collection G333AT78` → `accepted:
+  autoexport.add returned {'libraryID': 1, 'key': 'G333AT78', 'id': 161}`, then
+  `completion not observed: no modification seen within 30 s`, `content not
+  satisfied: no file`, final line `accepted; completion not observed; content not
+  satisfied; not verified`, exit 1. The preview printed the new `removal:` line.
+
+Diagnosis: Zotero is the Flatpak `org.zotero.Zotero` 10.0.6 (`bwrap`), which has a
+private `/tmp`. BBT's own record in
+`~/.zotero/zotero/jf60v7u8.default/prefs.js` (`autoExport./tmp/bib019/uat-export.bib`,
+id 161, type collection, `status: done`, `error: ""`, updated 5 s after creation) and
+the file at `/proc/<zotero-pid>/root/tmp/bib019/uat-export.bib` (380 bytes, one
+`@unpublished{torringtonAILessonPlanning2026, …}` entry; host copy at
+`/tmp/bib019/uat-export.sandbox-copy.bib`) show the export ran and is well formed.
+The helper reported truthfully from the host's view; the throwaway path was the
+mistake, not the helper. The human's existing registrations all point under
+`~/people`, which the Flatpak shares.
+
+State saved at the human's request ("not physically present, save state, tomorrow").
+
+## 2026-10-13 — Live E1/E3 re-run with a host-visible path: verified
+
+`register_export.py --collection 'My Library/bib019-uat-export' --path
+<plan-dir>/uat-export.bib`: preview exit 0 with the `removal:` line and the exact apply
+command; `--apply --expect-collection G333AT78` → `accepted: autoexport.add returned
+{'libraryID': 1, 'key': 'G333AT78', 'id': 161}`, `completion observed: mtime
+2026-10-13T01:14:31Z after the trigger`, `content satisfied:
+torringtonAILessonPlanning2026 present in a well-formed bib (1 entries)`, `file before:
+no file; after: 437 bytes`, final line `accepted; completion observed; content
+satisfied; verified`, exit 0. The file held one `@online{torringtonAILessonPlanning2026,
+…}` entry and was deleted afterwards, uncommitted. BBT's prefs now hold both
+registrations (the sandbox `/tmp/bib019/uat-export.bib` one and this one); removal is
+manual in Zotero. E1/E3 complete; all plan UAT steps now have live evidence except the
+human's two judgement calls.
+
+## 2026-10-13 — Scratch state cleaned up
+
+The human deleted both `uat-export` registrations in Zotero (prefs.js grep count 0
+afterwards). Then `item_collections.py --key 7XWWDHT5 --remove G333AT78 --apply
+--expect-version 522` → version 526, read-back collections `Sage SRM Guide (UJPGKR74)`
+only, `accepted; verified`; `collection.py --trash G333AT78 --apply --expect-version 518`
+→ `accepted; verified`, exit 0 (0 items, 0 descendants). The preprint remains in Sage
+SRM Guide. Only the reviewer's five scratch objects remain, in Zotero's trash.
+
+## 2026-10-13 — Sandboxed-Zotero symptom documented, no runtime warning
+
+The human accepted the recommended default: no sandbox detection in
+`register_export.py`. `references/troubleshooting.md` gains one row under "Stock-API
+write helpers" naming the symptom (`accepted; completion not observed …; content not
+satisfied: no file` while BBT shows the export done), the cause (Flatpak private `/tmp`),
+and the remedy (a shared path, delete the unreachable registration). Gates: skill and
+register_export tests 26 passed; `git diff --check` clean.
+
+## 2026-10-13 — E3 live: re-run and cross-collection refusal
+
+Scratch collection restored (`collection.py --restore G333AT78 --apply --expect-version
+527` → `accepted; verified`; the preview and apply both said descendants unknown, as
+designed). Registered `<plan-dir>/uat-export.bib` for it again (empty collection: BBT
+exported a 0-byte file, `content not satisfied: no live item with a citekey in the
+collection to look for`, as designed). Re-run of the identical apply: `accepted:
+autoexport.add returned {… 'id': 161}`, completion observed 6 s later, same report, exit 1
+(unverifiable content, not a failure of the write). BBT answers a re-run identically to a
+first registration and keeps the settings; the "reschedule message" the plan's UAT step
+names is the preview's registration-state line, which is present. Same path for
+`My Library/Sage SRM Guide` without `--replace`: preview printed the apply command;
+apply → `not accepted: autoexport.add error: {'code': -32602, 'message': "Auto-export
+exists with incompatible parameters, but no 'replace' was requested"}`, exit 1, nothing
+written (the registration still names G333AT78). Remaining for the human: compare the
+registration with a hand-made "Keep updated" export in BBT's preferences, then delete it.
+
+## 2026-10-13 — E1 human judgement passed; scratch state cleaned up again
+
+The human compared the live registration with a hand-made "Keep updated" export in
+BBT's preferences ("it looks fine") and deleted it (prefs.js `uat-export` count 0).
+The 0-byte export file was deleted, uncommitted. `collection.py --trash G333AT78 --apply
+--expect-version 528` → `accepted; verified`, exit 0. Items 2–7 of the plan's Human UAT
+are complete with live evidence; items 1 and 8 remain.
+
+## 2026-10-13 — UAT step 8 (Q3 live) accepted
+
+Pages 192 and 205 of the forced Borgmann 2006 render were compared with page images
+(`/tmp/bib019/borgmann2006-p192.png`, `-p205.png`, PyMuPDF 110 dpi). Observed: "Jiving"
+→ "living" on 205, but Docling's OCR displaces words to paragraph ends ("thing, living
+logs gods"; "things point points"), "HeidegIt" for "Heideg-ger's"; on 192 "in tum",
+"settlcd", "s0", "t0", "cO-opt" and a dropped clause ("populated by understand"). The
+forced render removes some slips and adds others; the state line names it OCR and the
+quoting contract requires the page-image check. The human accepted Q3 on that basis
+("um yes, that's fine"). Remaining: UAT step 1.
+
+## 2026-10-13 — UAT step 1 accepted; `contradicted` added to the quotation states
+
+One reader (Opus, xhigh, named by the human) read physical pages 192, 205 and 211 of
+the forced Borgmann 2006 render under `reading-and-quoting.md`. It located three
+quotations with `blockquote.py` (re-run by the orchestrator: all three `located`),
+rendered the page images itself, called two `verified` naming itself as inspector, and
+refused the third because the page reads "a thing, was seen" where the render reads
+"a was seen". The falsifier (a `verified` label without opening the page) did not
+occur. The state line was treated as a description of extraction, not as permission.
+The reader also reported whole dropped lines on pages 192 and 211 and reversed
+paragraph order on 211. The human accepted step 1 and chose to add the missing label
+("or we just do contradicted as a label?"): `contradicted` now sits beside
+`located`/`verified`/`unverified` in `using-bibliography/SKILL.md` (quoting rule and
+completion evidence), `references/reading-and-quoting.md` (source-fidelity, output
+template, verification record), `annotated-bibliography/SKILL.md`, and the 0.19.0
+changelog entry. `check.py` is unchanged: it can only locate. Gates: skill,
+literature-helper, and blockquote tests 13 passed; `git diff --check` clean. All eight
+Human UAT steps are now accepted or evidenced.
+
+## 2026-10-13 — History normalised after accepted UAT
+
+Accepted tree `46775cabf267d6a690c43ecb4cffef1acaae0d2c` (commit `44b91a4`); private
+series before the rewrite: `8590878 9c87200 8ad11d0 cdd585e e82e407 f637cac ff8cf89
+28e8f06 290b8fa 50d37da a1765ea cf82320 dcdac3b b270be0 4e2789a c43ee1b f14cec6 8625896
+44b91a4`. Rebuilt on a detached head from base `e417da4` by cherry-pick plus
+path-limited 3-way patch application (`/tmp/bib019/rebuild*.sh`): the design/ADR/plan
+commit unchanged; `44b91a4`'s skill-text hunks into Outcome A; `290b8fa` and `a1765ea`
+into Outcome C (the todo had named D for `a1765ea`, but the fix is to `trash_item.py`,
+Outcome C's helper); `28e8f06` into Outcome D; `50d37da` and `4e2789a` into Outcome E;
+the changelog hunks of `290b8fa` and `44b91a4` into the release commit; the plan
+directory's accepted state as one final docs commit. Three conflicts, all in
+`SKILL.md` where adjacent lines were edited by different commits (the quote/Zotero-write
+bullets twice; the write-boundary table rows once), resolved by keeping the outcome-era
+neighbour lines. `git diff --stat 44b91a4 <rebuilt>` was empty before this entry was
+added. Gates on the rebuilt checkout: `uv run pytest -q tests` → 1538 passed; `uvx ruff
+check plugins/denubis-academic` → the same 15 pre-existing findings (`copy_item.py` 6,
+`update_item.py` 6, `renderer.py` 3); `uvx ruff format --check plugins/denubis-academic`
+clean; `git diff --check` clean; version grep hits both manifests, the marketplace entry,
+and the changelog heading. Whole-repository `pytest -q` and `ruff check .` still fail
+only in the pre-existing places recorded under Outcome F.
+
+## 2026-10-13 — Rebased onto main for integration
+
+The human asked for integration into `main` ("yes"). `git merge-tree main HEAD` showed
+two conflicts (`CHANGELOG.md` top; the ADR index, where `main` added 0028 after the
+fork), so the private series was rebased onto `main` (`f6603f2`): the index keeps
+`main`'s 0028 line and this branch's 0029 line; the changelog puts the 0.19.0 entry
+first, above `main`'s token-estimator 0.3.0 and external-agents 0.24.0 entries. The
+rebased tree differs from the normalised tree (`ef52233`) only by `main`'s own commits
+and those two files. `git merge-base --is-ancestor main HEAD` holds, so the merge is a
+fast-forward; `merge-tree` is now conflict-free. Gates after the rebase: `uv run pytest
+-q tests` → 1557 passed; ruff check on the plugin → the same 15 pre-existing findings;
+format check clean; `git diff --check` clean. The merge itself is the human's
+`/denubis-plan-and-execute:merge-to-main`; no push or cleanup authority has been named.
