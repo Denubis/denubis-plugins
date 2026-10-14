@@ -9,7 +9,12 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "bibtexparser>=2.0.0b9", "hypothesis>=6.0"]
+dev = [
+    "pytest>=8.0",
+    "bibtexparser>=2.0.0b9",
+    "hypothesis>=6.0",
+    "textual==8.2.8",
+]
 
 [tool.uv.workspace]
 members = [

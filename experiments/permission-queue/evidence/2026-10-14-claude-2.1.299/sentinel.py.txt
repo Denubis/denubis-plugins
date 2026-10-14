@@ -1,0 +1,6 @@
+from pathlib import Path
+import json, time, uuid
+p = Path(__file__).with_name("executions.jsonl")
+with p.open("a") as out:
+    out.write(json.dumps({"execution": str(uuid.uuid4()), "at": time.time()}) + "\n")
+print("PERMISSION_EXPERIMENT_EXECUTED")

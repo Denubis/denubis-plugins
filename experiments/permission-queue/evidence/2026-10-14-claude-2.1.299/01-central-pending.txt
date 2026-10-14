@@ -1,0 +1,40 @@
+ ▐▛███▛█   Claude Code v2.1.299
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Max
+ ▝▝   ▝▝   /tmp/permission-queue-live-gjdlewvu
+
+▎ Debug mode enabled · logging to /tmp/permission-queue-live-gjdlewvu/claude-debug.log
+
+❯ Run this exact command once using Bash, then stop:
+  /media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+  /tmp/permission-queue-live-gjdlewvu/sentinel.py
+
+● Bash(/media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+      /tmp/permission-queue-live-gjdlewvu/sentinel.py)
+  ⎿  Waiting…
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command
+ Tip: auto mode handles these prompts for you — choose "switch to auto mode" below
+ Run sentinel script
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ │ /media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+ │ /tmp/permission-queue-live-gjdlewvu/sentinel.py
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ This command requires approval
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don’t ask again for:
+      /media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python *
+   3. Yes, and switch to auto mode · auto mode handles these prompts for you
+   4. No
+
+ Esc to cancel · Tab to amend
+
+
+
+
+
+
+
+

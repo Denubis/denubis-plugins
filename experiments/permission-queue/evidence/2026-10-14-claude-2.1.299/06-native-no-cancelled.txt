@@ -1,0 +1,40 @@
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Max
+ ▝▝   ▝▝   /tmp/permission-queue-live-gjdlewvu
+
+▎ Debug mode enabled · logging to /tmp/permission-queue-live-gjdlewvu/claude-debug.log
+
+❯ Run this exact command once using Bash, then stop:
+  /media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+  /tmp/permission-queue-live-gjdlewvu/sentinel.py
+
+● Bash(/media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+      /tmp/permission-queue-live-gjdlewvu/sentinel.py)
+  ⎿  PERMISSION_EXPERIMENT_EXECUTED
+  ⎿  Allowed by PermissionRequest hook
+
+● The sentinel command ran once and printed PERMISSION_EXPERIMENT_EXECUTED.
+
+✻ Crunched for 3s · done 2:46 PM
+
+❯ Repeat the exact same sentinel command once. This is a new permission experiment request. After success or denial,
+  stop; do not retry.
+
+● Bash(/media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+      /tmp/permission-queue-live-gjdlewvu/sentinel.py)
+  ⎿  Interrupted · What should Claude do instead?
+
+✻ Baked for 1s · done 2:47 PM
+
+❯ Run the exact same sentinel command once more. After success or denial stop, without retrying.
+
+● Bash(/media/brian/storage/.cache/uv/environments-v2/denubis-plugins-cp3.14.6-dbd7ab1fe2450c58/bin/python
+      /tmp/permission-queue-live-gjdlewvu/sentinel.py)
+  ⎿  Interrupted · What should Claude do instead?
+
+✻ Sautéed for 1s · done 2:48 PM
+
+──────────────────────────────────────────────────────────────────────────────────────────────── permission-experiment ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents
+

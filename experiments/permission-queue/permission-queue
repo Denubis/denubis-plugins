@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+viewer_directory=$(dirname -- "$(readlink -f -- "$0")")
+case "${1-}" in
+    --help|-h)
+        printf '%s\n' 'permission-queue: open the approval viewer in this terminal' 'permission-queue --ghostty: open a new Ghostty window' 'Optional arguments: --session NAME --watch-session NAME --socket PATH'
+        exit 0
+        ;;
+    --terminal)
+        shift
+        exec "$viewer_directory/open-viewer" "$@"
+        ;;
+    *) exec "$viewer_directory/open-viewer" "$@" ;;
+esac

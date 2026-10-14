@@ -1,0 +1,23 @@
+{
+  "01-central-pending.txt": "5886583f2acf450b1158052f98076bcfd5059dc4ec1778d40e777a5f99896701",
+  "02-central-applied.txt": "bb68b55cdd785dfb3c8025328b65378ab65d8fda1d600236d2c01845d7c1ce20",
+  "03-pane-deny-pending.txt": "4890e8865de5e400d7a679b01c38b4b7a3a2f70b4fbd007815ac71ca6b3d7eca",
+  "04-escape-cancelled.txt": "aef54ffddad66995adff249a45c857677a45a2c1f0f3bff54b4398927553f0fc",
+  "05-native-no-pending.txt": "9844c6ac0f72eea337aac471480fd6cdbec5485b4f96611ae46ab6f913415844",
+  "06-native-no-cancelled.txt": "f0ee57788755a48be49c63f8848c4c7035947d4c104d5b9b57aafd336c8608ed",
+  "07-identical-next-pending.txt": "1e4549130caa9ee21c1f0746ee98303c34bc289b9bd71eaf1ce62f882599959e",
+  "08-native-allow-applied.txt": "c95e7c82795b388c9a8cdf456b1a8d86bdd8749bebd13db1be7b6d488a54de84",
+  "09-next-dialog-after-old-hook-deny.txt": "c89eda8453d7d0a48f03bef5784bb39e1e12ade71db85c7ba6bcb040f947eb8f",
+  "10-central-deny-applied.txt": "384afaf5804d9b26512a1610804b9748f439a4ddba9aa693d69a9a47c0ce081c",
+  "claude-settings.json": "42e9e4ad979435b632953588b384a474d13fd029dd8c7883057bd5c82ca08aa2",
+  "debug-excerpts.json": "26745853cf39a0573d7556b491d8c830845625bf38d044cb7d10a0b202187741",
+  "executions.jsonl": "2c4c3e750e249d37aa20aec7df256a5b7be315f619ab89bfe14723804e18c4a6",
+  "launch.sh": "ad75f8134ca3a0a3bb1a732457323babf43638dfcbc41572de1854085b993e44",
+  "queue-events.jsonl": "9a770e822d4ef09862afcfa9784b17acb5e357992af69f9db381801a11b7d15a",
+  "queue-source.py.txt": "e8ca8e46257db232d3e62f112acf7b9453b97635cf2bd68f86679f6c78b2a8d9",
+  "record_event.py.txt": "37b977d7841df32b6ee63acbcd9a1c8be03bed0235e636b2ca8c0092f973e64b",
+  "requests.json": "97e95175e530c523e92b5c9dde3d74084ecf75e17fb8de40bb2676de21f4e1d2",
+  "sentinel.py.txt": "3c430cebd18b1ca29d3a364e4146bb7ca5c290df5c44702c41938f5c73baadcb",
+  "transcript-excerpts.json": "b6023eaac4d26ca6f020f3cbf54edfb24c44916bfc58c8d8c76d33040c96834d",
+  "vendor-events.jsonl": "41812b6e9faf76d4d5999ee429bc04edfc66c6835928800fa35558eac79a84ba"
+}
