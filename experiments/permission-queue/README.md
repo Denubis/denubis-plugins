@@ -106,8 +106,8 @@ From any directory, open the viewer in your current terminal:
 permission-queue
 ```
 
-`~/.local/bin/permission-queue` is a symlink to this experiment's launcher. Keep
-this worktree in place while using it. Use `permission-queue --ghostty` only when
+`~/.local/bin/permission-queue` is a symlink to this experiment's launcher in
+the main repository checkout (`~/people/Brian/brian-ed3d-plugins`). Use `permission-queue --ghostty` only when
 you want a new Ghostty window. `--terminal` remains an alias for the default;
 `permission-queue --help` lists the options. The wrapper uses the checkout's configured uv environment. It needs `uv`, `tmux`
 and, for this local option, `ghostty` on PATH. No desktop shortcut or global Byobu
