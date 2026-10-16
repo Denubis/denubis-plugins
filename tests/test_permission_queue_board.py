@@ -574,7 +574,7 @@ def test_delivered_python_safe_path_command_starts_demo_in_terminal_and_quits(tm
         os.close(master)
 
 
-def source_snapshot(pane_id, window_index, *, state="unknown", idle_since=None):
+def source_snapshot(pane_id, window_index, *, state="running", idle_since=None):
     return SimpleNamespace(
         session_id="$0",
         session_name="main",
@@ -584,6 +584,12 @@ def source_snapshot(pane_id, window_index, *, state="unknown", idle_since=None):
         pane_id=pane_id,
         pane_index=0,
         pane_pid=1234,
+        pane_start_ticks=100,
+        socket_path="/tmp/permission-board-fixture.sock",
+        server_pid=123,
+        server_start_ticks=50,
+        state_since=None,
+        state_since_source="",
         title=f"Task {window_index}",
         cwd=f"/fixture/people/Brian/project-{window_index}",
         pane_current_command="codex",
@@ -651,6 +657,253 @@ async def terminal_ready(app, pilot):
     assert app.input_ready
 
 
+def test_watch_overview_lists_known_and_opted_in_panes_with_compact_readback():
+    items = [source_snapshot(f"%{index}", index) for index in range(1, 51)]
+    items[20].state = "unknown"
+    items[20].pane_current_command = "fish"
+    items[20].title = "Ordinary shell terminal"
+    source = FakeSource(items)
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        app.preferences.set_included(items[20], True)
+        async with app.run_test(size=(180, 60)) as pilot:
+            await pilot.pause()
+            assert app.table.row_count == 50
+            assert app.table.virtual_size.height <= app.table.content_region.height
+            assert app.focused is app.table
+            assert app.native_scroll.is_on_screen
+            assert app.header_scroll.is_on_screen
+            assert app.table.get_row_at(49)[0] == "21.0"
+            assert app.table.region.right <= app.readback.region.x
+            assert app.snapshots["%21"].pane_current_command == "fish"
+            await pilot.press("1", "enter")
+            assert source.inputs == [("%1", "1", "1"), ("%1", "enter", None)]
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("size", [(60, 20), (107, 93), (180, 60)])
+def test_watch_visible_preview_has_responsive_orientation_and_explicit_collapse(size):
+    source = FakeSource([source_snapshot(f"%{index}", index) for index in range(1, 16)])
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause()
+            shared_area = app.table.region.area
+            selected = app.selected_pane_id
+            assert app.native_scroll.is_on_screen
+            preview = app.readback.region
+            assert app.table.region.bottom <= preview.y
+            assert app.table.region.height <= len(source.items) + 2
+            assert app.native_scroll.region.bottom <= app.status_view.region.y
+            assert "Question from source %1" in app.native_view.content.plain
+            assert app.table.virtual_size.width <= app.table.region.width
+            await pilot.press("v")
+            await pilot.pause()
+            assert not app.native_scroll.is_on_screen
+            assert app.table.region.area > shared_area
+            assert app.selected_pane_id == selected
+            assert app.focused is app.table
+            await pilot.press("v")
+            await pilot.pause()
+            assert app.native_scroll.is_on_screen
+            assert app.table.region.area == shared_area
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("size", [(60, 20), (180, 60)])
+def test_watch_one_blocked_row_click_reveals_its_preview_after_collapse(size):
+    source = FakeSource(
+        [
+            source_snapshot("%11", 1, state="blocked"),
+            source_snapshot("%22", 2, state="blocked"),
+        ]
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause()
+            assert app.native_scroll.is_on_screen
+            await pilot.press("v")
+            await pilot.pause()
+            assert not app.native_scroll.is_on_screen
+            await pilot.click("#window-list", offset=(2, 2))
+            await pilot.pause()
+            assert app.selected_pane_id == "%22"
+            assert app.native_scroll.is_on_screen
+            assert "Question from source %22" in app.native_view.content.plain
+            assert app.native_view.region.y >= app.native_scroll.region.y
+            assert app.native_view.region.bottom <= app.native_scroll.region.bottom
+            await pilot.press("2", "enter")
+            assert source.inputs == [("%22", "2", "2"), ("%22", "enter", None)]
+
+    asyncio.run(exercise())
+
+
+def test_watch_resize_keeps_selection_destination_and_scrolled_preview():
+    source = FakeSource([source_snapshot("%11", 1), source_snapshot("%22", 2)])
+    source.capture = lambda snapshot: "\n".join(
+        f"Source {snapshot.pane_id} line {index}" for index in range(150)
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=(107, 93)) as pilot:
+            await pilot.pause()
+            await pilot.click("#window-list", offset=(2, 2))
+            await pilot.pause()
+            app.native_scroll.scroll_to(y=20, animate=False)
+            await pilot.pause()
+            assert app.native_scroll.scroll_offset.y == 20
+            destination = app.input_destination
+            for width, height in [(180, 60), (107, 93)]:
+                await pilot.resize_terminal(width, height)
+                await pilot.pause()
+                assert app.selected_pane_id == "%22"
+                assert app.input_destination is destination
+                assert app.native_scroll.scroll_offset.y == 20
+                assert app.table.virtual_size.width <= app.table.region.width
+            await pilot.press("3", "enter")
+            assert source.inputs == [("%22", "3", "3"), ("%22", "enter", None)]
+
+    asyncio.run(exercise())
+
+
+def test_watch_age_starts_only_after_observed_transition_and_resets_on_replacement():
+    now = [100.0]
+    source = FakeSource(
+        [
+            source_snapshot("%11", 1, state="blocked"),
+            source_snapshot("%22", 2, state="idle", idle_since=1),
+            source_snapshot("%33", 3, state="running"),
+            source_snapshot("%44", 4, state="unknown"),
+        ]
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, clock=lambda: now[0])
+        app.preferences.set_included(source.items[3], True)
+        async with app.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert [app.table.get_row_at(row)[2].plain for row in range(4)] == [
+                "blocked age ?",
+                "idle age ?",
+                "running age ?",
+                "unknown age ?",
+            ]
+            now[0] = 175
+            source.items[1].idle_since = 170
+            await app.refresh_windows()
+            assert [app.table.get_row_at(row)[2].plain for row in range(4)] == [
+                "blocked age ?",
+                "idle age ?",
+                "running age ?",
+                "unknown age ?",
+            ]
+            source.items[3].state = "running"
+            await app.refresh_windows()
+            assert [app.table.get_row_at(row)[2].plain for row in range(4)] == [
+                "blocked age ?",
+                "idle age ?",
+                "running ≥0s",
+                "running age ?",
+            ]
+            replacement = source_snapshot("%44", 4, state="running")
+            replacement.pane_pid = 9999
+            source.items[3] = replacement
+            now[0] = 180
+            await app.refresh_windows()
+            assert [app.table.get_row_at(row)[0] for row in range(4)] == [
+                "1.0",
+                "2.0",
+                "3.0",
+                "4.0",
+            ]
+            assert app.table.get_row_at(3)[2].plain == "running age ?"
+
+    asyncio.run(exercise())
+
+
+def test_watch_resolved_running_pane_stays_before_unknown_and_newest_state_first():
+    now = [100.0]
+    first = source_snapshot("%11", 1, state="blocked")
+    source = FakeSource(
+        [
+            first,
+            source_snapshot("%22", 2, state="unknown"),
+            source_snapshot("%33", 3, state="idle"),
+            source_snapshot("%44", 4, state="running"),
+        ]
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, clock=lambda: now[0])
+        app.preferences.set_included(
+            next(p for p in source.items if p.pane_id == "%22"), True
+        )
+        async with app.run_test(size=(180, 60)) as pilot:
+            await pilot.pause()
+            now[0] = 120
+            first.state = "running"
+            await app.refresh_windows()
+            await pilot.pause()
+            assert [app.table.get_row_at(row)[0] for row in range(4)] == [
+                "3.0",
+                "1.0",
+                "4.0",
+                "2.0",
+            ]
+            assert app.selected_pane_id == "%33"
+            assert app.table.cursor_row == 0
+
+    asyncio.run(exercise())
+
+
+def test_watch_runtime_reordering_preserves_selected_pane_and_input_destination():
+    now = [100.0]
+    source = FakeSource(
+        [
+            source_snapshot("%11", 1, state="blocked"),
+            source_snapshot("%22", 2, state="unknown"),
+            source_snapshot("%33", 3, state="idle"),
+            source_snapshot("%44", 4, state="running"),
+        ]
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, clock=lambda: now[0])
+        app.preferences.set_included(
+            next(p for p in source.items if p.pane_id == "%22"), True
+        )
+        async with app.run_test(size=(180, 60)) as pilot:
+            await pilot.pause()
+            await pilot.click("#window-list", offset=(2, 3))
+            await pilot.pause()
+            assert app.selected_pane_id == "%44"
+            destination = app.input_destination
+            source.items[1].state = "blocked"
+            now[0] = 120
+            await app.refresh_windows()
+            await pilot.pause()
+            assert [app.table.get_row_at(row)[0] for row in range(4)] == [
+                "2.0",
+                "1.0",
+                "3.0",
+                "4.0",
+            ]
+            assert app.selected_pane_id == "%44"
+            assert app.table.cursor_row == 3
+            assert app.input_destination is destination
+            await pilot.press("3", "enter")
+            assert source.inputs == [("%44", "3", "3"), ("%44", "enter", None)]
+
+    asyncio.run(exercise())
+
+
 def test_watch_view_selects_blocked_source_before_idle_and_unknown():
     source = FakeSource(
         [
@@ -693,7 +946,7 @@ def test_watch_attention_order_covers_all_panes_before_window_grouping():
     blocked_sibling.pane_index = 1
     source = FakeSource(
         [
-            source_snapshot("%11", 1),
+            source_snapshot("%11", 1, state="unknown"),
             blocked_sibling,
             source_snapshot("%22", 2, state="blocked"),
             source_snapshot("%33", 3, state="idle", idle_since=20),
@@ -704,13 +957,16 @@ def test_watch_attention_order_covers_all_panes_before_window_grouping():
 
     async def exercise():
         app = BOARD.WindowBoard(source)
+        app.preferences.set_included(
+            next(p for p in source.items if p.pane_id == "%11"), True
+        )
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
             assert [app.table.get_row_at(row)[0] for row in range(6)] == [
                 "1.1",
                 "2.0",
-                "4.0",
                 "3.0",
+                "4.0",
                 "5.0",
                 "1.0",
             ]
@@ -760,6 +1016,7 @@ def test_watch_latest_text_and_refresh_preserve_actual_reading_position():
         app = BOARD.WindowBoard(source)
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
+            assert app.native_scroll.is_on_screen
             assert app.native_scroll.scroll_offset.y == app.native_scroll.max_scroll_y
             assert app.native_scroll.scroll_offset.y > 0
             app.native_scroll.focus()
@@ -793,6 +1050,7 @@ def test_watch_source_background_fills_reader_and_resets_for_default_pane():
         app = BOARD.WindowBoard(source)
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
+            assert app.native_scroll.is_on_screen
             assert app.native_scroll.styles.background == Color.parse("#1b0e00")
             assert app.native_scroll.styles.color == Color.parse("#ffffff")
             assert app.native_view.background_colors[1] == Color.parse("#1b0e00")
@@ -807,18 +1065,23 @@ def test_watch_source_background_fills_reader_and_resets_for_default_pane():
     asyncio.run(exercise())
 
 
-def test_watch_metadata_footer_is_visible_before_secondary_locators():
+def test_watch_metadata_remains_scrollable_when_readback_is_expanded():
     source = FakeSource([source_snapshot("%11", 1)])
 
     async def exercise():
         app = BOARD.WindowBoard(source)
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
-            assert app.footer_view.region.bottom <= app.header_scroll.region.bottom
+            await pilot.press("h")
+            await pilot.pause()
+            assert app.header_scroll.is_on_screen
             assert app.footer_view.region.y < app.facts_view.region.y
             assert app.identity_view.content.plain == "".join(
                 span["text"] for span in source.items[0].header_spans
             )
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert app.header_scroll.scroll_offset.y > 0
             await pilot.resize_terminal(107, 93)
             await pilot.resize_terminal(60, 20)
             await pilot.press("alt+p", "r")
@@ -837,6 +1100,7 @@ def test_watch_four_answer_keys_work_from_each_area_and_other_input_is_rejected(
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
             app.screen.set_focus(app.query_one(focus), scroll_visible=False)
+            assert app.focused is app.query_one(focus)
             await pilot.press("1", "2", "3", "enter")
             await pilot.press("x", "y", "z", "4", "0", "backspace", "escape")
             app.post_message(events.Paste("literal [red]paste[/red]\n"))
@@ -855,7 +1119,7 @@ def test_watch_four_answer_keys_work_from_each_area_and_other_input_is_rejected(
     asyncio.run(exercise())
 
 
-def test_watch_one_mouse_selection_focuses_exact_terminal_for_input():
+def test_watch_one_mouse_selection_targets_exact_pane_for_answers():
     source = FakeSource([source_snapshot("%11", 1), source_snapshot("%22", 2)])
 
     async def exercise():
@@ -865,7 +1129,7 @@ def test_watch_one_mouse_selection_focuses_exact_terminal_for_input():
             await pilot.click("#window-list", offset=(2, 2))
             await pilot.pause()
             assert app.selected_pane_id == "%22"
-            assert app.focused is app.native_scroll
+            assert app.focused is app.table
             await pilot.press("2", "enter")
             assert source.inputs == [("%22", "2", "2"), ("%22", "enter", None)]
 
@@ -884,7 +1148,7 @@ def test_watch_verified_resolution_advances_without_requiring_local_submit():
             await app.refresh_windows()
             await pilot.pause()
             assert app.selected_pane_id == "%22"
-            assert app.focused is app.native_scroll
+            assert app.focused is app.table
             assert app.table.row_count == 2
             await terminal_ready(app, pilot)
             await pilot.press("1", "enter")
@@ -899,6 +1163,9 @@ def test_watch_unknown_transition_and_arrival_do_not_advance():
 
     async def exercise():
         app = BOARD.WindowBoard(source)
+        app.preferences.set_included(
+            next(p for p in source.items if p.pane_id == "%11"), True
+        )
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
             await pilot.press("enter")
@@ -926,7 +1193,7 @@ def test_watch_idle_to_running_advances_only_after_successful_user_input():
             await app.refresh_windows()
             await pilot.pause()
             assert app.selected_pane_id == "%22"
-            assert app.focused is app.native_scroll
+            assert app.focused is app.table
 
     asyncio.run(exercise())
 
@@ -1032,7 +1299,7 @@ def test_watch_repeated_enter_is_suppressed_until_next_source_input_is_quiet():
                 assert not app.input_ready
             await terminal_ready(app, pilot)
             assert "Ready: 1/2/3 + Enter" in app.message
-            assert app.focused is app.native_scroll
+            assert app.focused is app.table
             await pilot.press("2", "enter")
             assert source.inputs == [
                 ("%11", "enter", None),
@@ -1081,6 +1348,7 @@ class Source:
 class Probe(board.WindowBoard):
     async def on_mount(self):
         await super().on_mount()
+        self.action_read_identity()
         self.set_interval(0.02, self.observe)
     def observe(self):
         temporary = target.with_suffix('.tmp')
@@ -1110,7 +1378,7 @@ Probe(Source()).run()
         pytest.fail(output.decode(errors="replace"))
 
     try:
-        until_focus("native-source")
+        until_focus("source-header")
         os.write(master, b"\x1bp")
         until_focus("window-list")
         os.write(master, b"\x11")
@@ -1152,6 +1420,7 @@ def test_watch_sparse_terminal_keeps_latest_approval_visible_above_blank_tail():
         app = BOARD.WindowBoard(source)
         async with app.run_test(size=(60, 20)) as pilot:
             await pilot.pause()
+            assert app.native_scroll.is_on_screen
             assert "Visible native approval" in app.native_view.content.plain
             assert app.native_view.region.bottom <= app.native_scroll.region.bottom
             assert app.native_scroll.scroll_offset.y == 0
@@ -1259,8 +1528,213 @@ def test_watch_empty_attention_accepts_new_work_without_resurrecting_same_idle(a
             await app.refresh_windows()
             await pilot.pause()
             assert app.selected_pane_id == expected
-            assert app.focused is app.native_scroll
+            assert app.focused is app.table
             await pilot.press("3")
             assert source.inputs == [(expected, "3", "3")]
+
+    asyncio.run(exercise())
+
+
+@pytest.fixture(autouse=True)
+def isolated_viewer_preferences(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+
+
+def test_watch_unknown_panes_are_individually_added_removed_and_persisted(tmp_path):
+    known = source_snapshot("%11", 1, state="blocked")
+    unknown = source_snapshot("%22", 2, state="unknown")
+    other = source_snapshot("%33", 3, state="unknown")
+    source = FakeSource([known, unknown, other])
+    preference_path = tmp_path / "preferences" / "panes.json"
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, preference_path=preference_path)
+        async with app.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert app.table.row_count == 1
+            assert "Add panes" in str(app.query_one("#watch-keys", Static).content)
+            await pilot.press("a")
+            await pilot.pause()
+            picker = app.screen
+            assert picker.table.row_count == 2
+            assert picker.table.get_row_at(picker.table.cursor_row)[1].plain.endswith(
+                "Task 2 "
+            )
+            await pilot.press("1", "enter", "3")
+            assert source.inputs == []
+            await pilot.press("space", "escape")
+            await pilot.pause()
+            assert app.table.row_count == 2
+            assert app.selected_pane_id == "%22"
+            assert app.native_scroll.is_on_screen
+            assert "Question from source %22" in app.native_view.content.plain
+        restarted = BOARD.WindowBoard(source, preference_path=preference_path)
+        async with restarted.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert restarted.pane_order == ["%11", "%22"]
+            await pilot.press("a", "space", "escape")
+            await pilot.pause()
+            assert restarted.pane_order == ["%11"]
+        final = BOARD.WindowBoard(source, preference_path=preference_path)
+        async with final.run_test() as pilot:
+            await pilot.pause()
+            assert final.pane_order == ["%11"]
+
+    asyncio.run(exercise())
+
+
+def test_pane_preferences_follow_base_pane_but_refuse_reused_server_or_pane(tmp_path):
+    preferences = BOARD.PanePreferences(tmp_path / "panes.json")
+    pane = source_snapshot("%11", 1, state="unknown")
+    preferences.set_included(pane, True)
+    assert preferences.includes(pane)
+    pane.pane_current_command = "fish"
+    pane.foreground_pid = 9876
+    assert BOARD.PanePreferences(preferences.path).includes(pane)
+    pane.pane_start_ticks += 1
+    assert not preferences.includes(pane)
+    preferences.set_included(pane, True)
+    assert preferences.includes(pane)
+    pane.server_start_ticks += 1
+    assert not preferences.includes(pane)
+    pane.pane_start_ticks = None
+    with pytest.raises(RuntimeError, match="identity"):
+        preferences.set_included(pane, True)
+
+
+def test_watch_newest_state_first_prefers_verified_history_without_changing_selection():
+    recent = source_snapshot("%11", 1, state="blocked")
+    old = source_snapshot("%22", 2, state="blocked")
+    recent.state_since, recent.state_since_source = 990, "fixture transition record"
+    old.state_since, old.state_since_source = 900, "fixture transition record"
+    source = FakeSource([old, recent])
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, clock=lambda: 100, wall_clock=lambda: 1000)
+        async with app.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert app.pane_order == ["%11", "%22"]
+            assert app.table.get_row_at(0)[2].plain == "blocked 10s"
+            assert "fixture transition record" in app.facts_view.content
+            recent.state_since = 850
+            await app.refresh_windows()
+            assert app.pane_order == ["%22", "%11"]
+            assert app.selected_pane_id == "%11"
+            assert app.table.cursor_row == 1
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("size", [(60, 30), (107, 93), (180, 60)])
+def test_watch_small_list_gives_unused_space_to_preview(size):
+    source = FakeSource([source_snapshot("%11", 1), source_snapshot("%22", 2)])
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause()
+            assert app.table.region.height <= app.table.row_count + 3
+            assert app.native_scroll.region.height >= 5
+            assert app.native_scroll.is_on_screen
+
+    asyncio.run(exercise())
+
+
+def test_watch_invalid_preferences_remain_visible_and_are_never_overwritten(tmp_path):
+    preference_path = tmp_path / "panes.json"
+    preference_path.write_text("not valid JSON")
+    source = FakeSource(
+        [
+            source_snapshot("%11", 1, state="blocked"),
+            source_snapshot("%22", 2, state="unknown"),
+        ]
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, preference_path=preference_path)
+        async with app.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert app.pane_order == ["%11"]
+            assert "Cannot read pane choices" in app.status_view.content
+            await pilot.press("a")
+            await pilot.pause()
+            assert (
+                "Cannot read pane choices"
+                in app.screen.query_one("#picker-status", Static).content
+            )
+            await pilot.press("space", "1", "enter", "escape")
+            await pilot.pause()
+            assert preference_path.read_text() == "not valid JSON"
+            assert source.inputs == []
+            assert app.pane_order == ["%11"]
+
+    asyncio.run(exercise())
+
+
+def test_watch_unmeasured_initial_state_follows_timed_states_without_inventing_age():
+    unmeasured = source_snapshot("%11", 1, state="idle")
+    measured = source_snapshot("%22", 2, state="idle")
+    measured.state_since, measured.state_since_source = 900, "fixture transition record"
+    source = FakeSource([unmeasured, measured])
+    now = [100.0]
+
+    async def exercise():
+        app = BOARD.WindowBoard(source, clock=lambda: now[0], wall_clock=lambda: 1000)
+        async with app.run_test(size=(60, 20)) as pilot:
+            await pilot.pause()
+            assert app.pane_order == ["%22", "%11"]
+            assert app.selected_pane_id == "%22"
+            assert app.table.get_row_at(1)[2].plain == "idle age ?"
+            now[0] = 175
+            await app.refresh_windows()
+            assert app.pane_order == ["%22", "%11"]
+            assert app.table.get_row_at(1)[2].plain == "idle age ?"
+            unmeasured.state = "running"
+            await app.refresh_windows()
+            assert app.table.get_row_at(1)[2].plain == "running ≥0s"
+            now[0] = 250
+            await app.refresh_windows()
+            assert app.table.get_row_at(1)[2].plain == "running ≥1m"
+            assert app.selected_pane_id == "%22"
+
+    asyncio.run(exercise())
+
+
+def test_daemon_approval_displays_full_request_and_enter_sends_exact_choice_once():
+    pane = source_snapshot("codex:thread-a", 0, state="blocked")
+    pane.thread_id = "thread-a"
+    pane.native_pane = None
+    pane.approvals = (
+        SimpleNamespace(
+            occurrence_id="generation:request-a",
+            thread_id="thread-a",
+            method="item/commandExecution/requestApproval",
+            params={"command": "printf harmless", "reason": "Full approval reason"},
+            decisions=("accept", "decline", "cancel"),
+        ),
+    )
+    source = FakeSource([pane])
+    source.select = lambda selected: selected
+    answered = []
+    source.answer = lambda selected, occurrence, decision: answered.append(
+        (selected.thread_id, occurrence, decision)
+    )
+
+    async def exercise():
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=(90, 30)) as pilot:
+            await pilot.pause()
+            assert "Full approval reason" in app.native_view.render().plain
+            await pilot.press("enter")
+            assert answered == []
+            await pilot.press("2")
+            assert answered == []
+            await pilot.press("enter")
+            await pilot.pause()
+            assert answered == [("thread-a", "generation:request-a", "decline")]
+            assert source.inputs == []
+            await pilot.press("enter")
+            await pilot.pause()
+            assert len(answered) == 1
 
     asyncio.run(exercise())

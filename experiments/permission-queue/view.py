@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
-import uuid
 from pathlib import Path
 
 
@@ -55,12 +53,12 @@ def main(argv: list[str] | None = None) -> int:
         "--ghostty", action="store_true", help="open a new local Ghostty"
     )
     parser.add_argument("--watch-session", default="main")
-    parser.add_argument("--session", help="reuse an explicitly named owned viewer")
+    parser.add_argument("--session", help=argparse.SUPPRESS)
     parser.add_argument("--socket", type=Path)
     args = parser.parse_args(argv)
-    if args.session and re.fullmatch(r"[A-Za-z0-9_-]+", args.session) is None:
+    if args.session is not None:
         parser.error(
-            "--session must contain only letters, digits, underscores, or hyphens"
+            "--session was removed: standalone viewers do not create tmux sessions"
         )
     try:
         ghostty = shutil.which("ghostty") if args.ghostty else None
@@ -69,7 +67,6 @@ def main(argv: list[str] | None = None) -> int:
                 "ghostty is not on PATH; use this helper in an existing terminal"
             )
         socket = source_socket(args.socket, args.watch_session)
-        session = args.session or "permission-queue-view-" + uuid.uuid4().hex
         environment = dict(os.environ)
         environment.pop("TMUX", None)
         environment.pop("TMUX_PANE", None)
@@ -78,8 +75,6 @@ def main(argv: list[str] | None = None) -> int:
             str(socket),
             "--watch-session",
             args.watch_session,
-            "--session",
-            session,
         ]
         if ghostty:
             subprocess.Popen(
@@ -95,29 +90,12 @@ def main(argv: list[str] | None = None) -> int:
                 env=environment,
                 start_new_session=True,
             )
-            print(f"Opened viewer {session} in a new Ghostty")
+            print("Started Ghostty for the standalone viewer")
             return 0
-        launched = subprocess.run(
-            [
-                sys.executable,
-                "-P",
-                str(Path(__file__).with_name("launch.py")),
-                *options,
-                "--return-session",
-                args.watch_session,
-            ],
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-        if launched.returncode:
-            raise ViewError(launched.stderr.strip() or launched.stdout.strip())
-        # Replace this helper with the terminal client; arguments never enter a shell.
-        os.execvpe(  # noqa: S606
-            "tmux",
-            ["tmux", "-S", str(socket), "attach-session", "-t", f"={session}"],
+        # Run the TUI directly; no viewer tmux session or client is created.
+        os.execve(  # noqa: S606
+            sys.executable,
+            [sys.executable, "-P", str(Path(__file__).with_name("board.py")), *options],
             environment,
         )
     except (ViewError, OSError, subprocess.TimeoutExpired) as error:

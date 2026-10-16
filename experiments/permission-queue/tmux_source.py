@@ -9,9 +9,8 @@ import re
 import shlex
 import subprocess
 import sys
-import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -42,6 +41,17 @@ class PaneSnapshot:
     preview_ansi: str
     foreground_pid: int | None = None
     foreground_start_ticks: int | None = None
+    socket_path: str = ""
+    server_pid: int | None = None
+    server_start_ticks: int | None = None
+    pane_start_ticks: int | None = None
+    state_since: float | None = None
+    state_since_source: str = ""
+    state_approximate: bool = False
+    thread_id: str = ""
+    approvals: tuple = ()
+    native_pane: PaneSnapshot | None = None
+    thread_data: object | None = None
 
 
 FIELDS = (
@@ -97,18 +107,21 @@ def foreground_identity(pane_pid: int) -> tuple[int | None, int | None]:
         return None, None
 
 
-@lru_cache(maxsize=1)
-def classifier():
-    path = (
-        Path(__file__).resolve().parents[2]
-        / "plugins"
-        / "denubis-external-agents"
-        / "scripts"
-        / "codex_supervisor.py"
+def process_start_ticks(pid: int) -> int | None:
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        return int(fields[19])
+    except OSError, IndexError, ValueError:
+        return None
+
+
+@lru_cache(maxsize=2)
+def sibling(name: str):
+    spec = importlib.util.spec_from_file_location(
+        "permission_queue_" + name, Path(__file__).with_name(name + ".py")
     )
-    spec = importlib.util.spec_from_file_location("permission_source_classifier", path)
     if spec is None or spec.loader is None:
-        raise SourceError("the existing Codex classifier could not be loaded")
+        raise SourceError(f"{name} adapter unavailable")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -139,10 +152,14 @@ def header_spans(strip: str) -> list[dict]:
 
 
 class TmuxSource:
-    def __init__(self, session: str = "main", socket: str | Path | None = None):
+    def __init__(
+        self, session: str = "main", socket: str | Path | None = None, *, codex=None
+    ):
         self.session = session
         self.prefix = ["tmux"] + (["-S", str(socket)] if socket is not None else [])
-        self._idle: dict[str, tuple[tuple, float]] = {}
+        self.codex = codex
+        self.last_error = ""
+        self.claude = None
 
     def command(self, *arguments: str, input_text: str | None = None) -> str:
         try:
@@ -161,6 +178,25 @@ class TmuxSource:
         if result.returncode:
             raise SourceError(result.stderr.strip() or "tmux command failed")
         return result.stdout
+
+    def server_identity(self) -> tuple[str, int | None, int | None]:
+        try:
+            fields = (
+                self.command("display-message", "-p", "#{socket_path}\t#{pid}")
+                .strip()
+                .split("\t")
+            )
+            if len(fields) != 2:
+                return "", None, None
+            socket_path, pid = fields
+            server_pid = int(pid)
+            return (
+                str(Path(socket_path).resolve()),
+                server_pid,
+                process_start_ticks(server_pid),
+            )
+        except SourceError, ValueError:
+            return "", None, None
 
     def cached_header(self, cwd: str, title: str) -> list[dict]:
         try:
@@ -183,63 +219,117 @@ class TmuxSource:
             return []
         return header_spans(strip)
 
-    def observe(self, data: dict, preview: str) -> tuple[str, float | None, str]:
-        lead = data["pane_title"].split(" | ", 1)[0].strip().casefold()
-        known = lead in {
-            "ready",
-            "working",
-            "waiting",
-            "action required",
-        } or re.fullmatch(r"\[\s*!\s*\]\s*action required", lead)
-        observation = None
-        state = "unknown"
-        if data["pane_current_command"] == "codex" and known:
-            policy = classifier()
-            observation = policy.classify_snapshot(lead, CSI.sub("", preview))
-            if observation.kind is policy.ObservationKind.APPROVAL or lead.endswith(
-                "action required"
-            ):
-                state = "blocked"
-            elif lead == "ready" and observation.kind in {
-                policy.ObservationKind.DONE,
-                policy.ObservationKind.QUESTION,
-            }:
-                state = "idle"
-            elif lead in {"working", "waiting"}:
-                state = "running"
-        pane_id = data["pane_id"]
-        if state != "idle":
-            self._idle.pop(pane_id, None)
-            return (
-                state,
-                None,
-                {
-                    "blocked": "Native action-required or pending-approval evidence",
-                    "running": "Native running state observed",
-                    "unknown": "Provider state unknown; silence is not idle evidence",
-                }[state],
-            )
-        identity = (
+    def client(self):
+        if self.codex is None:
+            self.codex = sibling("codex_server").CodexServer()
+        return self.codex
+
+    def thread_for_pane(self, data: dict, preview: str, loaded: list[str]):
+        socket_path, server_pid, server_ticks = self.server_identity()
+        pane_pid = int(data["pane_pid"])
+        foreground_pid, foreground_ticks = foreground_identity(pane_pid)
+        key = (
+            socket_path,
+            server_pid,
+            server_ticks,
             data["session_id"],
             data["window_id"],
-            data["pane_pid"],
-            data["pane_current_command"],
-            observation.key,
+            data["pane_id"],
+            pane_pid,
+            process_start_ticks(pane_pid),
+            foreground_pid,
+            foreground_ticks,
         )
-        moment = time.monotonic()
-        previous = self._idle.get(pane_id)
-        since = (
-            previous[1] if previous is not None and previous[0] == identity else moment
-        )
-        self._idle[pane_id] = (identity, since)
         return (
-            state,
-            since,
-            f"Ready first observed {int(max(0, moment - since))}s ago; "
-            "actual idle start unknown",
+            sibling("codex_identity")
+            .CodexIdentity()
+            .resolve(
+                preview,
+                pane_key=key,
+                loaded_threads=loaded,
+                height=int(data["pane_height"]),
+            )
+            .thread_id
         )
 
+    @staticmethod
+    def thread_view(thread, native: PaneSnapshot | None = None) -> PaneSnapshot:
+        key = "codex:" + thread.thread_id
+        if native is None:
+            native = PaneSnapshot(
+                session_id="codex",
+                session_name="Codex",
+                window_id=key,
+                window_index=0,
+                window_name="Codex",
+                pane_id=key,
+                pane_index=0,
+                pane_pid=0,
+                title=thread.title or thread.thread_id,
+                cwd=thread.cwd,
+                pane_current_command="codex",
+                pane_bg="",
+                pane_fg="",
+                header_spans=[],
+                state=thread.state,
+                idle_since=None,
+                status_detail="Codex server session; pane not linked",
+                preview_ansi="",
+            )
+            link = None
+        else:
+            link = native
+        return replace(
+            native,
+            pane_id=native.pane_id if link else key,
+            thread_id=thread.thread_id,
+            state=thread.state,
+            state_since=thread.state_since,
+            state_since_source=thread.state_since_source,
+            approvals=thread.requests,
+            native_pane=link,
+            thread_data=thread,
+            status_detail="Codex server state"
+            + ("; verified pane context" if link else "; pane not linked"),
+        )
+
+    def enrich_native_state(
+        self, pane: PaneSnapshot, data: dict, threads: dict
+    ) -> PaneSnapshot:
+        if pane.pane_current_command == "codex":
+            observed = sibling("codex_pane_state").observe(
+                data, pane.preview_ansi, list(threads.values()), pane.foreground_pid
+            )
+            return replace(
+                pane,
+                state=observed.state if observed.state != "unknown" else "unverified",
+                state_since=observed.since,
+                state_since_source=observed.source,
+                state_approximate=observed.approximate,
+                status_detail="Codex native state; " + observed.source,
+            )
+        if self.claude is None:
+            self.claude = sibling("claude_state").ClaudeState()
+        observed = self.claude.for_pane(pane)
+        if observed is not None:
+            return replace(
+                pane,
+                state=observed.state if observed.state != "unknown" else "unverified",
+                state_since=observed.state_since,
+                state_since_source=observed.state_since_source,
+                state_approximate=observed.approximate,
+                status_detail=observed.status_detail,
+            )
+        if pane.pane_current_command in {"claude", "claude-code"}:
+            return replace(
+                pane,
+                state="unverified",
+                status_detail="Claude native status record unavailable",
+            )
+        return pane
+
     def snapshots(self) -> list[PaneSnapshot]:
+        socket_path, server_pid, server_ticks = self.server_identity()
         rows = self.command(
             "list-panes",
             "-s",
@@ -249,6 +339,21 @@ class TmuxSource:
             "\t".join("#{" + field + "}" for field in FIELDS),
         )
         result = []
+        threads = {}
+        self.last_error = ""
+        try:
+            loaded = self.client().loaded_threads()
+            for thread_id in loaded:
+                try:
+                    thread = self.client().snapshot(thread_id)
+                except RuntimeError as error:
+                    self.last_error = f"Session {thread_id}: {error}"
+                    continue
+                if not getattr(thread, "parent_thread_id", None):
+                    threads[thread_id] = thread
+        except RuntimeError as error:
+            self.last_error = str(error)
+            threads = {}
         for row in rows.splitlines():
             values = row.split("\t")
             if len(values) != len(FIELDS):
@@ -268,7 +373,14 @@ class TmuxSource:
                 str(height - 1),
             )
             spans = self.cached_header(data["pane_current_path"], data["pane_title"])
-            state, idle_since, detail = self.observe(data, preview)
+            is_codex = data["pane_current_command"] == "codex"
+            state = "unknown"
+            detail = "Provider state unknown"
+            thread_id = (
+                self.thread_for_pane(data, preview, list(threads))
+                if is_codex and threads
+                else None
+            )
             foreground_pid, foreground_ticks = foreground_identity(
                 int(data["pane_pid"])
             )
@@ -291,20 +403,104 @@ class TmuxSource:
                     pane_fg=data["pane_fg"],
                     header_spans=spans,
                     state=state,
-                    idle_since=idle_since,
+                    idle_since=None,
                     status_detail=detail,
                     preview_ansi=preview,
                     foreground_pid=foreground_pid,
                     foreground_start_ticks=foreground_ticks,
+                    socket_path=socket_path,
+                    server_pid=server_pid,
+                    server_start_ticks=server_ticks,
+                    pane_start_ticks=process_start_ticks(int(data["pane_pid"])),
                 )
             )
-        present = {snapshot.pane_id for snapshot in result}
-        self._idle = {
-            pane: value for pane, value in self._idle.items() if pane in present
-        }
+            result[-1] = self.enrich_native_state(result[-1], data, threads)
+            if thread_id in threads:
+                native = result.pop()
+                result.append(self.thread_view(threads[thread_id], native))
         return result
 
+    def select(self, snapshot: PaneSnapshot) -> PaneSnapshot:
+        if not snapshot.thread_id:
+            return snapshot
+        thread = self.client().select(snapshot.thread_id)
+        return self.thread_view(thread, snapshot.native_pane)
+
+    def answer(self, snapshot: PaneSnapshot, occurrence_id: str, decision: str):
+        if not snapshot.thread_id or not any(
+            item.occurrence_id == occurrence_id and item.thread_id == snapshot.thread_id
+            for item in snapshot.approvals
+        ):
+            raise SourceError("Request is not part of the displayed Codex session")
+        return self.client().answer(occurrence_id, decision)
+
+    def close(self):
+        if self.codex is not None:
+            self.codex.close()
+
+    @staticmethod
+    def conversation(thread) -> str:
+        lines = []
+        for turn in reversed(thread.recent_turns):
+            for item in turn.get("items", []):
+                kind = item.get("type", "")
+                if kind in {"userMessage", "agentMessage"}:
+                    text = item.get("text")
+                    if text is None:
+                        text = "\n".join(
+                            part.get("text", "")
+                            for part in item.get("content", [])
+                            if isinstance(part, dict)
+                        )
+                    lines.extend(
+                        ["You" if kind == "userMessage" else "Codex", text, ""]
+                    )
+                elif kind == "commandExecution":
+                    lines.extend(
+                        [
+                            "Command: " + item.get("command", ""),
+                            item.get("aggregatedOutput") or "",
+                            "",
+                        ]
+                    )
+        if getattr(thread, "history_error", ""):
+            lines.append("History unavailable: " + thread.history_error)
+        return "\n".join(lines) or "No conversation history available yet."
+
     def capture(self, snapshot: PaneSnapshot) -> str:
+        if snapshot.thread_id:
+            if snapshot.native_pane is not None:
+                native = snapshot.native_pane
+                try:
+                    height = self.validate(native)
+                    data = {**vars(native), "pane_height": str(height)}
+
+                    def linked_now():
+                        viewport = self.command(
+                            "capture-pane",
+                            "-p",
+                            "-e",
+                            "-N",
+                            "-t",
+                            native.pane_id,
+                            "-S",
+                            "0",
+                            "-E",
+                            str(height - 1),
+                        )
+                        return (
+                            self.thread_for_pane(data, viewport, [snapshot.thread_id])
+                            == snapshot.thread_id
+                        )
+
+                    if linked_now():
+                        captured = self.capture(native)
+                        if linked_now():
+                            return captured
+                except SourceError:
+                    # The independently identified server conversation remains usable.
+                    return self.conversation(snapshot.thread_data)
+            return self.conversation(snapshot.thread_data)
         height = self.validate(snapshot)
         captured = self.command(
             "capture-pane",
@@ -347,6 +543,10 @@ class TmuxSource:
         return int(identity[4])
 
     def open_source(self, snapshot: PaneSnapshot) -> None:
+        if snapshot.thread_id:
+            if snapshot.native_pane is None:
+                raise SourceError("This Codex session has no verified tmux pane link")
+            snapshot = snapshot.native_pane
         self.validate(snapshot)
         caller = os.environ.get("TMUX_PANE")
         if caller is None or re.fullmatch(r"%\d+", caller) is None:
@@ -460,6 +660,10 @@ class TmuxSource:
         self, snapshot: PaneSnapshot, key: str, character: str | None = None
     ) -> None:
         """Route one human key event to its original, still-current source."""
+        if snapshot.thread_id:
+            raise SourceError(
+                "Use the displayed Codex request choices; terminal input is disabled"
+            )
         name = key.casefold()
         mapped = KEYS.get(name)
         if mapped is None and re.fullmatch(r"ctrl\+[a-z@\[\\\]\^_]", name):

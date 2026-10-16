@@ -14,6 +14,7 @@ dev = [
     "bibtexparser>=2.0.0b9",
     "hypothesis>=6.0",
     "textual==8.2.8",
+    "websockets==16.0",
 ]
 
 [tool.uv.workspace]

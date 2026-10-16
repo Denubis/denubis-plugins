@@ -72,98 +72,24 @@ class SourceFixture:
         return subprocess.CompletedProcess(arguments, 0, output, "")
 
 
-def test_native_ready_question_is_idle_observation_not_terminal_silence(monkeypatch):
-    fixture = SourceFixture()
-    monkeypatch.setattr(SOURCE.subprocess, "run", fixture.run)
-    monkeypatch.setattr(SOURCE.time, "monotonic", lambda: 100.0)
-    source = SOURCE.TmuxSource()
-    snapshot = source.snapshots()[0]
-    assert snapshot.state == "idle"
-    assert snapshot.idle_since == 100.0
-    assert "observed" in snapshot.status_detail.lower()
-    assert snapshot.preview_ansi == fixture.screen
-    assert snapshot.pane_id == "%4"
-    assert snapshot.window_id == "@3"
-    assert snapshot.window_index == 7
-    assert snapshot.pane_bg == "#1b0e00"
+@pytest.fixture(autouse=True)
+def no_real_codex_daemon(monkeypatch):
+    from types import SimpleNamespace
 
-
-def test_ready_age_resets_for_new_message_busy_state_and_process(monkeypatch):
-    fixture = SourceFixture()
-    monkeypatch.setattr(SOURCE.subprocess, "run", fixture.run)
-    clock = [100.0]
-    monkeypatch.setattr(SOURCE.time, "monotonic", lambda: clock[0])
-    source = SOURCE.TmuxSource()
-    assert source.snapshots()[0].idle_since == 100.0
-    clock[0] = 160.0
-    same = source.snapshots()[0]
-    assert same.idle_since == 100.0
-    assert "60s ago" in same.status_detail
-    fixture.screen = "• A different question?\n\u203a \nContext 58% left\n"
-    clock[0] = 200.0
-    assert source.snapshots()[0].idle_since == 200.0
-    fixture.title = (
-        "Working | project | main | Ready is a task label | GPT-6-Astra medium"
+    monkeypatch.setattr(
+        SOURCE.TmuxSource,
+        "client",
+        lambda self: SimpleNamespace(loaded_threads=lambda: []),
     )
-    assert source.snapshots()[0].state == "running"
-    fixture.title = "Ready | project | main | Task | GPT-6-Astra medium"
-    clock[0] = 250.0
-    assert source.snapshots()[0].idle_since == 250.0
-    fixture.pid = "456"
-    clock[0] = 300.0
-    assert source.snapshots()[0].idle_since == 300.0
 
 
-@pytest.mark.parametrize(
-    "title,screen",
-    [
-        (
-            "Ready | project | main | Task | model",
-            "Would you like to run this command?\n1. Yes\n2. No\n",
-        ),
-        (
-            "[ ! ] Action Required | project | main | Task | model",
-            "1 question queued\n",
-        ),
-    ],
-)
-def test_native_pending_action_preempts_idle_without_permission_hook(
-    monkeypatch, title, screen
-):
+def test_codex_native_state_is_visible_without_manual_link_or_invented_age(monkeypatch):
     fixture = SourceFixture()
-    fixture.title, fixture.screen = title, screen
     monkeypatch.setattr(SOURCE.subprocess, "run", fixture.run)
-    snapshot = SOURCE.TmuxSource().snapshots()[0]
-    assert snapshot.state == "blocked"
-    assert snapshot.idle_since is None
-
-
-@pytest.mark.parametrize(
-    "command,title",
-    [
-        ("bash", "✳ Ready task"),
-        ("fish", "Ready | project | main | Task | model"),
-        ("codex", "Unknown | project | main | Ready task | model"),
-    ],
-)
-def test_unverified_provider_or_title_remains_unknown(monkeypatch, command, title):
-    fixture = SourceFixture()
-    fixture.command, fixture.title, fixture.screen = command, title, ""
-    monkeypatch.setattr(SOURCE.subprocess, "run", fixture.run)
-    snapshot = SOURCE.TmuxSource().snapshots()[0]
-    assert snapshot.state == "unknown"
-    assert snapshot.idle_since is None
-    assert "unknown" in snapshot.status_detail.lower()
-
-
-@pytest.mark.parametrize(
-    "task", ["Fix working directory", "Review action required wording"]
-)
-def test_task_words_cannot_spoof_the_leading_ready_state(monkeypatch, task):
-    fixture = SourceFixture()
-    fixture.title = f"Ready | project | main | {task} | GPT-6-Astra medium"
-    monkeypatch.setattr(SOURCE.subprocess, "run", fixture.run)
-    assert SOURCE.TmuxSource().snapshots()[0].state == "idle"
+    pane = SOURCE.TmuxSource().snapshots()[0]
+    assert pane.state == "idle"
+    assert pane.state_since is None
+    assert "Native Codex pane" in pane.status_detail
 
 
 def test_exact_cached_header_colours_and_literal_escaped_style_are_read_only(
@@ -197,7 +123,7 @@ def test_exact_cached_header_colours_and_literal_escaped_style_are_read_only(
     assert cache.stat().st_mtime_ns == before
     assert "header unavailable" not in snapshot.status_detail
     assert all(
-        call[1] in {"list-panes", "capture-pane", "show-environment"}
+        call[1] in {"list-panes", "capture-pane", "show-environment", "display-message"}
         for call in fixture.calls
     )
 
@@ -343,6 +269,24 @@ def test_native_coloured_blank_cells_survive_capture(scratch):
     )
     assert "\x1b[48;2;54;42;30m          " in snapshot.preview_ansi
     assert "\x1b[48;2;54;42;30m          " in source.capture(snapshot)
+
+
+def test_snapshot_carries_socket_server_and_base_pane_lifetime_identity(scratch):
+    scratch.new_work("work")
+    source = SOURCE.TmuxSource(session="work", socket=scratch.socket)
+    snapshot = source.snapshots()[0]
+    server_pid = int(scratch.command("display-message", "-p", "#{pid}").stdout)
+    assert snapshot.socket_path == str(scratch.socket.resolve())
+    assert snapshot.server_pid == server_pid
+    assert snapshot.server_start_ticks == int(
+        Path(f"/proc/{server_pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
+    )
+    assert snapshot.pane_start_ticks == int(
+        Path(f"/proc/{snapshot.pane_pid}/stat")
+        .read_text()
+        .rsplit(")", 1)[1]
+        .split()[19]
+    )
 
 
 def input_receiver(scratch, name="input", *, bracketed=False, interactive_shell=False):

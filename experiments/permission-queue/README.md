@@ -27,38 +27,76 @@ flow in charge. Hold limits are greater than zero and at most 600 seconds.
 To inspect the real windows in the `main` tmux session:
 
 ```fish
-uv run --frozen python -P experiments/permission-queue/launch.py \
-    --watch-session main --return-session main
+permission-queue --watch-session main
 ```
 
-This view reads the existing pane identities, colour strip, background and native
-terminal content. It retains the source window numbers and pane locations. Blocked
-panes precede observed Ready panes; older Ready observations come first. Running
-and unknown panes remain listed. A normal question in a Ready conversation stays
-in the idle group. Idle age means when this viewer first observed Ready, not a
-recovered historical idle timestamp. Unsupported provider states remain unknown.
+The viewer runs directly in its invoking terminal, outside Byobu. It creates no
+tmux viewer session and does not attach the terminal to one. Recognized agent
+panes appear automatically; unknown panes (including ordinary shells) are hidden
+until individually included. `a` opens Add panes, Space toggles the selected pane,
+and Escape returns. These choices persist across viewer restarts, scoped to the
+source pane's lifetime so recycled pane IDs do not inherit them.
 
-Press `1`, `2`, `3`, or Enter to send that key to the displayed source. These
-four keys work without focusing the terminal or confirming again in the queue.
-They retain the provider's native meaning: read the displayed choices before
-answering. For text, other keys, or deeper inspection, press `o` or click Open
-source to switch to the original window and pane.
+The selected-pane preview is visible by default. Clicking a row selects its source
+and reveals the preview if hidden. Wide windows place the list beside the preview;
+tall or narrow windows stack them. The list uses space for its actual rows instead
+of reserving a large empty area. `v` hides or shows the preview.
 
-`Ctrl+q` closes the viewer and returns to work without detaching Byobu. Open source
-requires one viewer client and no other client attached to the source session,
-because a tmux session shares its selected window.
+The view retains source window/pane numbers, colours, directory and native terminal
+content. Groups are blocked, idle, running, then explicitly included unknown panes.
+Within each group the most recent state change comes first, so the conversations
+you have just been working on remain near the top. A Ready conversation containing
+a normal question remains idle; unknown does not imply idle or stuck.
+
+Each row represents an actual tmux pane. Loaded daemon sessions without a pane
+are excluded. State and age do not require manual linking or statusline changes.
+
+Codex uses its native pane state. Recorded ages come from process-owned rollout
+history where available. Otherwise a unique daemon session with the exact directory,
+complete task title and agreeing state can supply a display-only approximate age,
+marked `~`. This correlation never authorizes API approval routing. Ambiguous or
+truncated titles do not supply an age. No private SQLite tables are read.
+
+Claude uses its native `~/.claude/sessions/<PID>.json` registry (respecting
+`CLAUDE_CONFIG_DIR`), verified against the live process, process start time and tmux
+pane. Busy/shell is running, idle is idle, and supported human-wait reasons are
+blocked. The native status timestamp may reflect a change within the same state,
+so its age is marked `~`. No hooks or global configuration changes are required.
+
+Unavailable ages show `?`; transitions first observed by the viewer show `≥`.
+Recognized clients with unavailable state remain visible as `state ?`.
+
+The optional Codex daemon connection uses
+`$CODEX_HOME/app-server-control/app-server-control.sock`, defaulting to `~/.codex`.
+It only connects to an existing server. A complete native footer thread UUID can
+add an exact API connection to the same pane row. No separate session row is added.
+Without that exact connection, the preview and answer keys use the actual pane.
+
+Selecting an exactly linked Codex pane attaches this viewer to its approval stream and replays
+pending requests. Browsing the list without selecting a session is read-only.
+Switching sessions unsubscribes the previous selection. Attachment can cold-load a
+thread if it unloads between the precheck and resume; there is no atomic
+attach-only-if-loaded operation in this version.
+
+For supported command and file-change approvals, the viewer shows the complete
+request parameters and labels its available one-shot choices. Press `1`, `2`, or
+`3` to choose, then Enter to send; Enter alone sends nothing. Session-wide grants,
+policy amendments and other request types must be answered in Codex. Unsupported
+requests stay visible. Without an exact API link, 1/2/3 and Enter are forwarded
+to the selected native pane, with process-identity checks. API approval answers
+are never automatically retried after a disconnect. A resolved event means
+answered or cleared; it does not prove this viewer's decision won or a tool ran.
+
+`Ctrl+c` closes the standalone viewer and returns to its invoking shell. Open source (`o`) is not yet wired for standalone operation: whether it should
+switch the primary Byobu window is awaiting a human decision.
 
 The display refreshes while following its latest output and preserves a scrolled
-reading position. The next waiting conversation comes forward when native status
-observations show the selected approval has ended, or an idle conversation resumes
-after input. Sending a key alone does not establish resolution. Unknown provider
-states cannot drive automatic advance. Queued keys remain bound to their original
-pane. After automatic advance, a 750 ms quiet interval prevents the tested desktop
-held-key burst from answering the next prompt; it then becomes ready automatically.
+reading position. The next waiting conversation comes forward when the source
+shows that the selected approval has ended. Sending an answer alone does not
+establish resolution. An occurrence can be sent only once by this viewer; a new
+request requires a fresh numeric choice. After automatic advance, the existing
+750 ms quiet interval protects against a held-key burst.
 
-The launcher uses one session, `permission-queue-demo`, for either view. Close the
-live view with `Ctrl+q` (the fixture demo uses `q`) before changing modes. It refuses
-to silently reuse a different mode.
 
 ## Local Ghostty and remote viewers
 
@@ -74,9 +112,9 @@ you want a new Ghostty window. `--terminal` remains an alias for the default;
 `permission-queue --help` lists the options. The wrapper uses the checkout's configured uv environment. It needs `uv`, `tmux`
 and, for this local option, `ghostty` on PATH. No desktop shortcut or global Byobu
 binding is installed. Alt+P focuses the pane list; Up/Down chooses a pane.
-1/2/3 and Enter go to the displayed source. `o` opens that source; Ctrl+q closes
-the viewer and returns to the work session. Existing Alt+Left/Right and
-Alt+Up/Down retain their Byobu meanings.
+1/2/3 selects a displayed approval choice; Enter sends it. Ctrl+c closes
+the viewer and returns to the invoking shell. The viewer does not install Byobu
+keybindings or add another tmux navigation layer.
 
 For remote access, SSH into the machine where your agents and tmux run, as the
 same user. Use its existing SSH hostname or Tailscale hostname in place of
@@ -84,22 +122,21 @@ same user. Use its existing SSH hostname or Tailscale hostname in place of
 this checkout on that host. In terminal A:
 
 ```fish
-ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue --session permission-queue-laptop'
+ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue'
 ```
 
 In terminal B (or a second device):
 
 ```fish
-ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue --session permission-queue-phone'
+ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue'
 ```
 
-Different viewer names give each terminal its own selection, scroll position and
-size. Both observe the same `main` source session. Omit `--session` to create a
-unique viewer on each invocation. Reuse a name to reconnect after a disconnect;
-do not attach two devices to the same named viewer unless you intend to share its
-selection and terminal dimensions. Detaching or losing SSH leaves its tmux viewer
-running. Ctrl+q closes the viewer; it returns you to `main`, so use Byobu's normal
-detach action to end that SSH attachment without stopping work.
+Each command runs an independent viewer process with its own selection, scroll
+position and size. Both observe the same `main` source session. No viewer names
+or tmux viewer sessions are needed. After an SSH disconnect, run the command
+again; the underlying work in Byobu continues. Ctrl+c exits the viewer. With
+`ssh -t host command`, that also ends the remote command and returns to the local
+shell; when started inside an interactive SSH shell, it returns to that shell.
 
 For another source session, add `--watch-session NAME`. If work runs on a
 non-default tmux server, add `--socket /absolute/path/to/tmux.sock` to the wrapper.
@@ -112,22 +149,21 @@ tmux display-message -p '#{socket_path}'
 Use that same socket on the host over SSH. A socket path is local to that host;
 it is not an address to connect to from your laptop. The wrapper preserves the
 current tmux server when launched inside it, while clearing nesting variables
-before attaching the new terminal.
+before starting the standalone viewer.
 
 If SSH reports unknown `xterm-ghostty` terminal capabilities, use this compatibility
 form (the viewer still receives Alt+P):
 
 ```fish
-env TERM=xterm-256color ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue --session permission-queue-laptop'
+env TERM=xterm-256color ssh -t brian@YOUR-HOST '/home/brian/.local/bin/permission-queue'
 ```
 
-Remote limits: Open source refuses to change a work session already viewed by
-another attached client. Answer keys remain available. Multiple viewers do not
-provide atomic approval arbitration: do not answer the same prompt simultaneously
-from two devices. Status is sampled, and pane identity is not approval occurrence
-identity. Unsupported provider states remain unknown, so their automatic advance
-is not established. Actual SSH/Tailscale connectivity and phone usability have
-not been verified by the local scratch-terminal tests.
+Remote limits: Open source targeting is pending for the standalone viewer.
+Multiple viewers connect to the same daemon and use exact request occurrences;
+the native server owns arbitration. Actual SSH/Tailscale connectivity and phone
+usability remain human checks. Other providers remain unknown and individually
+opt-in; their state and approval protocols are not implemented. This backend does
+not preclude later supervision or other provider adapters.
 
 Command references: [Ghostty command launching](https://ghostty.org/docs/config/reference#initial-command)
 and [OpenSSH terminal allocation](https://man.openbsd.org/ssh#t).

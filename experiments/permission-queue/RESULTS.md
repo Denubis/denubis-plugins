@@ -1,5 +1,86 @@
 # Permission round-trip experiment — 2026-10-14
 
+## Native pane state correction, 2026-10-16
+
+The preceding daemon-only list did not satisfy the window overview requirement.
+The current view returns one row per actual tmux pane, enriches it with native
+Claude/Codex state and age, and preserves its colours and window identity.
+Manual linking is not required. Daemon-only sessions are excluded.
+
+A read-only host inventory returned 13 actual panes: five idle, two running,
+and six unknown. All seven client panes had ages: two process-owned Codex history
+ages and five display-only approximate daemon correlations, marked `~`. No exact
+UUID links were present. At 107×93, 180×40 and 60×20 the UI showed seven rows,
+hid the six ordinary unknown panes, and retained positive preview height and
+native pane context. Selection/answers were disabled for this live observation.
+Counts describe this snapshot, not hard-coded configuration.
+
+No active Claude process or native registry record was available in the host
+snapshot. Claude registry validation is covered by native-shaped fixtures and a
+harmless real kernel process, including refusal after process exit; a live Claude
+session remains unchecked. No model, GUI terminal or live approval was launched.
+
+Verification against this correction:
+
+- `uv run --frozen pytest -q`: 2,285 passed and 16 subtests passed in 51.08s.
+- Ruff check and format check passed for the seven active viewer/provider modules
+  and all permission-queue test modules (19 files).
+- `git diff --check` passed.
+- Native pane answer-key routing is exercised through an isolated tmux fixture;
+  Claude unknown-status visibility has a red-to-green integration regression.
+
+The installed-server approval experiment below remains stopped and excluded from
+normal test discovery. The state/age correction does not establish that proof.
+
+## Previous Codex daemon implementation, 2026-10-16 (superseded list design)
+
+The current viewer reads Codex 0.162.1 through its Unix WebSocket app-server API.
+State and history no longer depend on process-owned rollout files or private SQLite
+projection tables. Answers use connection-bound request occurrences. The tmux
+association supplies display context only; a missing footer does not prevent the
+server session from appearing or being answered.
+
+Verification performed by the parent against the delivered source:
+
+- `uv run --frozen pytest -q`: 2,211 passed and 16 subtests passed in 53.03s,
+  excluding the stopped installed-server candidate described below.
+- Ruff checks passed for the changed production modules and active daemon/UI tests;
+  `git diff --check` passed.
+
+- A real read-only daemon/tmux inventory returned 18 rows: five root daemon sessions,
+  six unlinked Codex panes and seven unknown panes; four sessions had recorded ages.
+  Zero native UUID footer links were available because live configuration was not
+  changed. Counts are an observation, not configuration constants.
+- Rendering those records at 107×93, 180×40 and 60×20 produced 11 visible rows and
+  positive conversation previews at each size. Seven unknown panes stayed hidden.
+  This check disabled attachment and answers to avoid changing live sessions.
+- Unix WebSocket protocol fixtures exercise replay, explicit selection, external
+  resolution, changed-payload rejection, disconnect invalidation and no answer retry.
+- Public UI tests exercise complete request display, choosing before Enter, no
+  inherited choice for a replacement request, external resolution advancing to the
+  next session, and closing the connection when Ctrl+C exits.
+- Focused regressions demonstrate one failed thread read cannot remove healthy
+  sessions, and a changed native footer falls back to the correct server history.
+
+**Installed-server approval proof is incomplete.** The preserved candidate is
+[pending/installed_daemon.py](pending/installed_daemon.py). Three setup failures
+occurred before any local model response or approval: removed `untrusted` policy,
+sandbox-hidden Unix socket directory, and `thread/start` rejecting `workspaceWrite`
+(the installed runtime expects `workspace-write`). Work on that experiment stopped
+under the human's three-failure rule. Permission to correct the final fixture field
+and retry is recorded in the main repository's open-question register. The candidate
+is retained outside normal test discovery as the rollback to the tested adapter
+baseline; normal-suite success does not establish this missing vendor proof.
+
+Retained logs: `/tmp/pytest-of-brian/pytest-1113/`, `pytest-1115/`, and `pytest-1160/`.
+The last failure is in
+`pytest-1160/test_installed_daemon_shares_o0/daemon.log`.
+No live approvals, global Codex settings, Byobu windows or GUI terminals were changed.
+No external model request was made. Native TUI prompt dismissal, live statusline
+setup, SSH/Tailscale connectivity and human usability remain unverified.
+
+The following sections retain the earlier experiments as historical evidence.
+
 Central allow and deny worked in an isolated Claude Code 2.1.299 terminal. Native
 answers behaved differently: Escape and No cancelled the held hook; Yes executed the
 command but left the hook alive. This supports a small approval board experiment, but
@@ -275,3 +356,103 @@ current terminal; only explicit `--ghostty` opens a new window. `--terminal` rem
 a compatibility alias. Parent checked all three routes through the installed
 symlink with a recording uv stand-in; all eight viewer tests passed. No GUI
 window was opened by those checks.
+
+
+## Standalone pane overview, 2026-10-16
+
+The new candidate runs the board directly in the invoking terminal, with no
+viewer tmux session or attachment. Ghostty remains explicit. The overview lists
+all source panes and starts focused; v shows/hides a 33%-height details region.
+Parent read-only inspection of the actual main session observed all 13 current
+panes, a 57-row list at 107×60, and a 38-row list with details expanded. No source
+input was sent. The desktop fixture also fits 50 panes including an ordinary shell.
+
+Parent verification: 2165 tests and 16 subtests passed in 45.73 s; 12 actual
+watch/standalone launcher checks passed. After test-only formatting cleanup, the
+three affected watch tests passed again. Ruff checks passed. Scratch PTYs verify
+that two viewers create no tmux sessions, preserve source selection, and each
+returns to its invoking shell on Ctrl+q. GUI and network SSH remain unchecked.
+
+Open source from the standalone runner is unfinished pending the human decision
+about switching the primary Byobu window. The previous implementation depends on
+a viewer tmux client; it has not been silently retargeted. This candidate is not
+committed or declared accepted. Existing running tmux viewers were not restarted.
+
+Ctrl+C now uses the viewer quit action; Ctrl+Q remains an alias. A scratch
+PTY regression first failed because Ctrl+C displayed help instead of returning
+to the invoking shell, then passed after the binding change. The affected board
+and launcher suites passed 62 tests; after removing the unused help action, all
+13 launcher tests passed again. Checks cover standalone shell return and the
+legacy tmux-hosted viewer returning its attached client to work without detaching.
+No live terminal was sent a quit or interrupt key. Ruff and diff checks passed.
+
+## Visible responsive readback and state durations, 2026-10-16
+
+The earlier collapsed-by-default trial above was rejected: the user asked for a
+smaller preview, not a hidden one. Readback now starts visible; one row click
+selects and reveals it. Wide terminals place the list beside it, while tall or
+narrow terminals stack the regions. The list keeps the larger share.
+
+The answered-pane demotion previously overrode state ordering, putting resolved
+running panes below unknown panes. Rows now stay grouped as blocked, idle, running,
+then unknown, with oldest observed state first within each group. Every state
+shows a lower-bound duration (for example, `idle ≥1m`) under `State · seen`. These
+are viewer-local monotonic observations, reset on state or source-process change;
+refreshes and backend idle timestamp changes do not reset them.
+
+Parent read-only rendering of the actual main session retained all 13 panes and
+the selected source through 107×60 → 180×40 → 60×20 → 107×60. Preview content was
+visible at every size; native content had 12, 21, 5, then 12 rows respectively.
+No input was sent to the source. Regression checks exercise one-click reveal,
+resize with preserved reading position and answer destination, all four state
+ages, and resolved running panes sorting before unknown panes.
+
+Parent verification after the final code/test changes: `uv run --frozen pytest -q`
+passed 2173 tests and 16 subtests in 51.39 seconds. Ruff check and formatting checks
+passed for the changed Python files. Actual SSH, Ghostty GUI, and human acceptance
+of the new layout remain unverified.
+
+## Recency, individual inclusion, and existing history, 2026-10-16
+
+The user's subsequent correction supersedes the oldest-first and all-panes defaults
+above: blocked → idle → running → included unknown, most recent dated state first
+within each group. Unknown panes are hidden unless individually included through
+`a` Add panes, Space, Escape. Preferences are atomically saved and merged under a
+lock in XDG_CONFIG_HOME/permission-queue/panes.json (default ~/.config), keyed by
+socket, server PID/start ticks, session/pane IDs, and pane PID/start ticks. They
+survive viewer restarts without transferring to recycled panes or servers.
+
+Short lists now occupy their rows rather than most of a tall terminal. Actual main
+read-only checks at 107×93, 180×40, and 60×20 showed six classified panes out of 13,
+an eight-row list, visible native content, and preserved selection on resizing back.
+The final 107×93 preview occupied 81 rows. The Alt+P and Add panes shortcuts remain
+visible in a two-line footer.
+
+The source reader reuses codex_supervisor's foreground-process lock/rollout identity
+and queries thread_history_1.sqlite read-only. Latest-turn native state must agree,
+and the database projection must exactly cover the stable rollout file size.
+Completion time supplies idle age; active turn start supplies running turn age.
+This is not an approval wait timestamp. The final host check recovered persisted
+idle times for panes %115 and %79; the 13-pane snapshot took 0.407 seconds.
+
+Initial states lacking historical evidence show age ?, after dated states within
+the same group. Only a same-process transition observed by this viewer starts a
+lower-bound ≥ timer. Restarting the viewer never invents new recency. Metadata no
+longer repeats a conflicting viewer-start idle timer.
+
+The daemon-backed clients lack the lock/rollout link in their TUI process. Checked
+native process descendants/FDs, installed RPC schema and CLI, and matching 0.162.1
+TUI source. No supported per-TUI process-to-current-thread lookup was found in
+those surfaces. Shell snapshot TMUX_PANE was rejected after a concrete mismatch
+(actual %14, inherited %10). Ordinary hook file mtimes were rejected because
+working hooks repeatedly overwrite them. Matching a title/directory is not used.
+Full session-id can be rendered by a future configured native status line; the
+terminal-title version truncates it. No client configuration was changed, no
+live source input sent, and no daemon restarted. Claude historical state and
+historical blocked duration remain unsupported.
+
+Final parent verification: uv run --frozen pytest -q passed 2190 tests and 16
+subtests in 52.27 seconds. The 13 launcher checks include selecting an actual
+unknown scratch pane in one viewer and observing its persisted inclusion in a
+second viewer. Ctrl+C/Ctrl+Q return to the calling shell. Ruff and diff checks
+passed. Network SSH, Ghostty GUI, and human acceptance remain unverified.

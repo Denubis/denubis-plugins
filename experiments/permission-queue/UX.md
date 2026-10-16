@@ -1,8 +1,56 @@
 # Permission queue interaction experiment
 
-The conversation-first fixture flow was accepted by Brian. The next trial adds
-source-window identity and four answer-key shortcuts to the main tmux windows.
-Scope authority: [ADR 0030](../../docs/architecture/decisions/0030-permission-queue-starts-with-an-experiment-and-does-not-preclude-later-messaging.md).
+## Current native pane state integration (2026-10-16)
+
+The list contains actual tmux panes, preserving window/pane numbers and native
+colours. Daemon-only sessions are excluded. Neither Claude nor Codex needs a
+manual link to display state and age. Order remains blocked → idle → running →
+unknown, most recent first within each group; ordinary unknown panes require opt-in.
+
+Codex native state is enriched with process-owned history or, where unambiguous,
+an approximate daemon age matched by directory and complete task title. Claude
+uses its process-verified native status registry. `~` marks approximate ages,
+`≥` marks viewer-observed lower bounds, and `?` means the age is unavailable.
+Approximate display correlation cannot route API answers.
+
+1/2/3 and Enter pass through to the native pane unless a full native thread UUID
+establishes an exact Codex API connection. That optional path presents explicit
+one-shot choices and never retries uncertain delivery. No double confirmation.
+
+Human checks: familiar context and preview sizing in portrait/landscape; approval
+resolution advancing selection; independent SSH viewers. Open source targeting
+remains the existing unanswered question.
+
+## Current trial: standalone pane overview (2026-10-16)
+
+Brian rejected the viewer's extra Byobu/tmux navigation layer and the amount of
+space occupied by selected-pane readback. He explicitly rejected a grid: every
+terminal pane in the primary Byobu session should be represented in the overview.
+
+The viewer runs directly in Ghostty or the invoking SSH terminal. It creates no
+viewer tmux session. The latest refinement shows recognized agents automatically
+and hides unknown panes unless individually opted in through `a` (Add panes).
+Space toggles inclusion and Escape returns; saved choices survive viewer restarts
+but do not transfer to a replacement pane. Source window/pane numbers and colours
+remain visible.
+
+The user's clarified order is blocked, idle, running, then included unknown panes,
+with most recent state first within each group. Earlier oldest-first and
+viewer-startup-only timers did not serve the intended recency workflow.
+
+Readback starts visible. One row click selects and reveals it. Wide terminals place
+the list beside the preview; tall or narrow terminals stack them. List height follows
+the rows present rather than reserving most of a tall screen for empty space.
+Resizing preserves the selected source and reading position. `v` hides/shows
+readback; Up/Down selects a pane; Alt+P focuses the list. The four answer keys target
+the selected source, and are suspended while the Add panes selector is open.
+Ctrl+c returns to the invoking shell; Ctrl+q remains an alias.
+
+Open source targeting from a standalone viewer remains a human question: the old
+implementation switches the viewer's tmux client, which no longer exists. No
+implicit desktop-window switch is authorized by merely selecting a list row.
+
+The following sections retain the earlier experiment and its findings.
 
 ## Starting point
 

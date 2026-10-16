@@ -6,6 +6,7 @@ import importlib.util
 import os
 import pty
 import select
+import shlex
 import subprocess
 import sys
 import threading
@@ -38,9 +39,7 @@ class Commands:
         self.terminals.append((arguments, kwargs))
 
 
-def test_ghostty_opens_new_terminal_with_captured_socket_and_unique_viewers(
-    monkeypatch, tmp_path
-):
+def test_ghostty_opens_standalone_terminals_with_captured_socket(monkeypatch, tmp_path):
     socket = tmp_path / "original,server.sock"
     fixture = Commands(socket)
     monkeypatch.setenv("TMUX", f"{socket},123,0")
@@ -51,21 +50,21 @@ def test_ghostty_opens_new_terminal_with_captured_socket_and_unique_viewers(
     assert VIEW.main(["--ghostty"]) == 0
     assert VIEW.main(["--ghostty"]) == 0
     assert len(fixture.terminals) == 2
-    sessions = []
     for arguments, kwargs in fixture.terminals:
-        assert arguments[:3] == [
+        assert arguments == [
             "/usr/bin/ghostty",
             "--gtk-single-instance=false",
             "-e",
+            sys.executable,
+            "-P",
+            str(HELPER),
+            "--socket",
+            str(socket),
+            "--watch-session",
+            "main",
         ]
-        assert arguments[3:6] == [sys.executable, "-P", str(HELPER)]
-        assert arguments[arguments.index("--socket") + 1] == str(socket)
-        assert arguments[arguments.index("--watch-session") + 1] == "main"
-        sessions.append(arguments[arguments.index("--session") + 1])
         assert "TMUX" not in kwargs["env"]
         assert "TMUX_PANE" not in kwargs["env"]
-    assert sessions[0] != sessions[1]
-    assert all(name.startswith("permission-queue-view-") for name in sessions)
     assert os.environ["TMUX"] == f"{socket},123,0"
     assert os.environ["TMUX_PANE"] == "%77"
     queries = [
@@ -74,7 +73,7 @@ def test_ghostty_opens_new_terminal_with_captured_socket_and_unique_viewers(
     assert all(arguments[:3] == ["tmux", "-S", str(socket)] for arguments in queries)
 
 
-def test_explicit_socket_session_and_source_are_forwarded_without_shell_parsing(
+def test_explicit_socket_and_source_are_forwarded_without_shell_parsing(
     monkeypatch, tmp_path
 ):
     socket = tmp_path / "chosen socket.sock"
@@ -89,8 +88,6 @@ def test_explicit_socket_session_and_source_are_forwarded_without_shell_parsing(
                 "--ghostty",
                 "--socket",
                 str(socket),
-                "--session",
-                "reuse-me",
                 "--watch-session",
                 "work",
             ]
@@ -98,10 +95,51 @@ def test_explicit_socket_session_and_source_are_forwarded_without_shell_parsing(
         == 0
     )
     arguments = fixture.terminals[0][0]
-    assert arguments[arguments.index("--session") + 1] == "reuse-me"
     assert arguments[arguments.index("--watch-session") + 1] == "work"
     assert arguments[arguments.index("--socket") + 1] == str(socket)
     assert fixture.calls[0][0][:3] == ["tmux", "-S", str(socket)]
+
+
+def test_obsolete_viewer_session_option_is_rejected_with_standalone_explanation(capsys):
+    with pytest.raises(SystemExit) as exit_status:
+        VIEW.main(["--session", "old-viewer"])
+    assert exit_status.value.code == 2
+    assert "standalone" in capsys.readouterr().err.lower()
+
+
+def test_current_terminal_executes_board_with_captured_socket_and_clean_environment(
+    monkeypatch, tmp_path
+):
+    socket = tmp_path / "source.sock"
+    fixture = Commands(socket)
+    monkeypatch.setenv("TMUX", f"{socket},123,0")
+    monkeypatch.setenv("TMUX_PANE", "%77")
+    monkeypatch.setattr(VIEW.subprocess, "run", fixture.run)
+    executed = []
+
+    class ExecBoard(Exception):
+        pass
+
+    def execute(program, arguments, environment):
+        executed.append((program, arguments, environment))
+        raise ExecBoard
+
+    monkeypatch.setattr(VIEW.os, "execve", execute)
+    monkeypatch.setattr(VIEW.os, "execvpe", execute)
+    with pytest.raises(ExecBoard):
+        VIEW.main([])
+    program, arguments, environment = executed[0]
+    assert program == sys.executable
+    assert arguments == [
+        sys.executable,
+        "-P",
+        str(HELPER.with_name("board.py")),
+        "--socket",
+        str(socket),
+        "--watch-session",
+        "main",
+    ]
+    assert "TMUX" not in environment and "TMUX_PANE" not in environment
 
 
 def test_missing_ghostty_reports_error_without_creating_a_viewer(
@@ -153,9 +191,25 @@ def test_missing_source_reports_error_without_creating_session(tmp_path, capsys)
         server.close()
 
 
-@pytest.mark.parametrize("reuse", [False, True])
-def test_direct_terminal_invocations_attach_independently_unless_name_requested(
-    tmp_path, reuse
+def include_unknown_pane(master, output, config):
+    until(lambda: b"Add panes" in output, "viewer did not expose its pane selector")
+    os.write(master, b"a")
+    until(
+        lambda: b"STANDALONE_SOURCE_FIXTURE" in output,
+        "pane selector did not list the unknown source",
+    )
+    os.write(master, b" ")
+    until(
+        (config / "permission-queue" / "panes.json").exists,
+        "pane selection was not persisted",
+    )
+    os.write(master, b"\x1b")
+
+
+@pytest.mark.parametrize("quit_key", [b"\x03", b"\x11"], ids=["ctrl-c", "ctrl-q"])
+def test_two_standalone_viewers_create_no_sessions_and_quit_to_their_calling_shells(
+    tmp_path,
+    quit_key,
 ):
     if TMUX is None:
         pytest.skip("tmux is required for the real terminal integration")
@@ -170,14 +224,18 @@ def test_direct_terminal_invocations_attach_independently_unless_name_requested(
             "main",
             "printf 'REAL_SOURCE_READY\\n'; exec sleep 3600",
         )
+        server.command("select-pane", "-t", "main:", "-T", "STANDALONE_SOURCE_FIXTURE")
+        sessions_before = server.command(
+            "list-sessions", "-F", "#{session_id}\t#{session_name}"
+        ).stdout
+        assert sessions_before.endswith("\tmain\n")
         original = server.command(
             "display-message", "-p", "-t", "main:", "#{window_id}\t#{pane_id}"
         ).stdout
         assert original.startswith("@") and "%" in original
         viewers = []
-        for _ in range(2):
+        for viewer_index in range(2):
             master, slave = pty.openpty()
-            previous = set(server.attached())
             arguments = [
                 sys.executable,
                 "-P",
@@ -185,56 +243,72 @@ def test_direct_terminal_invocations_attach_independently_unless_name_requested(
                 "--socket",
                 str(server.socket),
             ]
-            if reuse:
-                arguments += ["--session", "named-viewer"]
-            environment = {**os.environ, "TERM": "xterm-256color"}
-            # The helper must clear inherited nesting identity before native attach.
+            environment = {
+                **os.environ,
+                "TERM": "xterm-256color",
+                "XDG_CONFIG_HOME": str(tmp_path / "viewer-config"),
+            }
+            # Socket discovery must precede clearing the inherited tmux identity.
             environment["TMUX"] = f"{server.socket},123,0"
             environment["TMUX_PANE"] = "%999"
             child = subprocess.Popen(
-                arguments, stdin=slave, stdout=slave, stderr=slave, env=environment
+                [
+                    "bash",
+                    "--noprofile",
+                    "--norc",
+                    "-c",
+                    shlex.join(arguments) + "; printf '\\nCALLER_SHELL_RESUMED\\n'",
+                ],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                env=environment,
             )
             os.close(slave)
             server.clients.append((child, master))
 
-            def drain(terminal=master):
+            output = bytearray()
+
+            def drain(terminal=master, output=output):
                 while not stop.is_set():
                     ready, _, _ = select.select([terminal], [], [], 0.05)
                     if ready:
                         try:
-                            os.read(terminal, 65536)
+                            output.extend(os.read(terminal, 65536))
                         except OSError:
                             return
 
             reader = threading.Thread(target=drain)
             reader.start()
             readers.append(reader)
-            client = until(
-                lambda previous=previous: next(
-                    (name for name in server.attached() if name not in previous), None
-                ),
-                "new terminal did not attach its own viewer client",
-            )
-            session = server.attached()[client]
-            assert session != "main"
+            if viewer_index == 0:
+                include_unknown_pane(master, output, tmp_path / "viewer-config")
             until(
-                lambda session=session: (
-                    "REAL_SOURCE_READY"
-                    in server.command("capture-pane", "-p", "-t", session + ":").stdout
-                ),
-                "new viewer did not replay the requested source",
+                lambda output=output: b"REAL_SOURCE_READY" in output,
+                "standalone viewer did not replay the opted-in source pane",
             )
-            viewers.append((master, client, session))
-        assert (viewers[0][2] == viewers[1][2]) is reuse
-        if reuse:
-            assert viewers[0][2] == "named-viewer"
-        else:
-            os.write(viewers[0][0], b"\x11")
+            viewers.append((master, child, output))
+        assert (
+            server.command(
+                "list-sessions", "-F", "#{session_id}\t#{session_name}"
+            ).stdout
+            == sessions_before
+        )
+        for index, (master, child, output) in enumerate(viewers):
+            os.write(master, quit_key)
             until(
-                lambda: server.attached().get(viewers[0][1]) == "main",
-                "closing one independent viewer did not return its client to work",
+                lambda output=output: b"CALLER_SHELL_RESUMED" in output,
+                "quit key did not return to the invoking shell",
             )
-            assert server.attached()[viewers[1][1]] == viewers[1][2]
+            assert child.wait(timeout=5) == 0
+            if index == 0:
+                assert viewers[1][1].poll() is None
+        assert (
+            server.command(
+                "list-sessions", "-F", "#{session_id}\t#{session_name}"
+            ).stdout
+            == sessions_before
+        )
         assert (
             server.command(
                 "display-message", "-p", "-t", "main:", "#{window_id}\t#{pane_id}"
