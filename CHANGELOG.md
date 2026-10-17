@@ -1,5 +1,23 @@
 # Changelog
 
+## [denubis-academic] 0.20.0
+
+Brian, 2026-10-18, on the Sage SRM Guide draft: "this is genuinely to find problematic prosedy patterns", then "I mean total count of sentences under 12 words, those are very short. They should be sparing, not just in a row", then "we probably need to report sentence length as histogram? Rather than hardcoding? Since each register will demand number of commas per sentence and sentence length being different?", "and sentences per paragraph as well please", and "any way to detect passives".
+
+**Added:**
+- `academic-writing/prose_shape.py`, a descriptive prose-shape report for a Markdown manuscript: histograms with mean, median, standard deviation and quartiles for sentence length, commas per sentence and sentences per paragraph; every sentence length in order per section; and, each with its sentence, coordinated series of exactly three and of four or more (from the dependency parse, with the heads it counted), foils ("not X but Y", "rather than", "instead of", and the two-sentence "It is not X. It is Y." correction frame), two or more distinct hedges in one sentence, passive clauses (agentless or with a `by` agent), section announcements and "worth noting", and sentence-initial -ing words split into gerund subjects and participial clauses. Comments, headings, fenced code, blockquotes and citation tokens are not counted as the author's prose; bullets are counted but not sentence-analysed.
+- The helper carries no thresholds. A register note's fenced `toml prose-shape` block (`short_words`, `run_words`, `run_length`, `long_words`, `mean_words`, `commas_per_sentence`, `paragraph_sentences_min`, `paragraph_sentences_max`) supplies them through `--register`, flags override the block, an unknown key is an error, and without either the report holds distributions and structural shapes only. The register template gains a "Measured shape" section holding that block with a source line for each number.
+- spaCy's English transformer pipeline is the default. On the 219-sentence Sage draft it found 29 coordinated triads where the small model found 19, of which about 3 are parse errors and 1 real series is missed (checked by hand in the same session, not independently); `--model en_core_web_sm` remains available.
+
+**Changed:**
+- `academic-writing/SKILL.md` "Verify the revision" names the helper, its register block, and the rule that every line is an observation for the deletion test and never a gate.
+
+**Requires:** `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` on the first run on Python 3.14, because spacy-alignments 0.9.2 ships no 3.14 wheel and its Rust extension builds only with that flag; uv caches the wheel afterwards. torch warns that its JIT path is unsupported on 3.14; the pipeline does not use it, and the 3.13 and 3.14 reports on the Sage draft were identical.
+
+**Tests:** `tests/test_academic_prose_shape.py`: Markdown handling, register block reading and override, histogram binning and report rendering run without spaCy; the parser-dependent findings skip without spaCy and run under the documented `--with` command (22 passed).
+
+**Not verified:** no independent reader has checked the triad or passive hits; stress-pattern scansion is not implemented; general grammar checking is out of scope for this helper.
+
 ## [denubis-academic] 0.19.0
 
 Seven defects from the Sage SRM Guide work of 10 and 11 October 2026 (a scanned book's embedded OCR presented as exact-quotation authority, a trashed item resolving as live, filing an item only possible by copying it, an undocumented listing, no way to trash an attachment, create an item, or register an auto-export). Brian, 2026-10-12: "right, please generalise. I don't want increasing clockwork epicycles", then "great, lock it in" to three contracts (design `docs/design-plans/2026-10-12-bibliography-0.19-scan-detection-and-zotero-crud.md`, ADR 0029).

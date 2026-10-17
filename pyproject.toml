@@ -92,6 +92,7 @@ ignore = [
 # core stays importable and unit-testable without those (gigabyte) deps. The
 # parsers' branch/statement counts are inherent to the formats they handle.
 "plugins/denubis-academic/skills/using-bibliography/annotate.py" = ["PLC0415"]
+"plugins/denubis-academic/skills/academic-writing/prose_shape.py" = ["PLC0415"]
 "plugins/denubis-academic/skills/using-bibliography/fetch.py" = [
     "PLC0415",
     "PLR0912",

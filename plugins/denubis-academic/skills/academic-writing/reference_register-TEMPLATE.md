@@ -35,6 +35,26 @@ type: reference
 - Citation and quotation presentation:
 - Literal material that blanket normalization must not touch:
 
+## Measured shape
+
+Optional. Targets the author has attested for this register, with the source of each
+number. `prose_shape.py --register` reads the fenced block and reports against it; every
+key is optional, an omitted key produces no section, and an unknown key is an error.
+Delete the block rather than leave guessed values in it.
+
+```toml prose-shape
+# short_words = 12            # count sentences under this many words
+# run_words = 10              # a run is consecutive sentences under this
+# run_length = 3              # sentences that make a run (default 3)
+# long_words = 45             # flag sentences over this
+# mean_words = 22             # informational target for mean length
+# commas_per_sentence = 1.0   # informational target for the mean
+# paragraph_sentences_min = 2 # flag paragraphs shorter than this
+# paragraph_sentences_max = 6 # flag paragraphs longer than this
+```
+
+- Source of each target (author ruling, corpus measurement, venue guidance):
+
 ## Attested exceptions
 
 Record each departure from the portable academic-writing method positively, with its

@@ -70,5 +70,25 @@ survives at the intended strength. Read it aloud for cadence and paragraph flow.
 the bounded current manuscript for changed facts or terms and inspect each real occurrence;
 do not treat an empty search or a banned-phrase count as prose quality.
 
+The bundled `prose_shape.py` describes a Markdown manuscript's shape so the read-aloud
+has numbers beside it: histograms of sentence length, commas per sentence, and sentences
+per paragraph; the lengths in order; and every coordinated series, foil, stacked hedge,
+section announcement, and sentence-initial -ing word, each with its sentence. It carries
+no thresholds of its own. When the project register names targets in a
+`toml prose-shape` block (see the register template), pass the note with `--register`
+and the report adds those sections; command-line flags override the block.
+
+```bash
+PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
+export PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1   # first run only; builds one Rust wheel
+uv run "$PLUGIN_DIR/skills/academic-writing/prose_shape.py" manuscript.md \
+  --register .notes/reference_register.md --output prose-shape.md
+```
+
+The default pipeline is spaCy's English transformer model, a large first-run download;
+`--model en_core_web_sm` is quicker and misses about a third of coordinated series. Every
+line of the report is an observation for the author's deletion test, never a gate: a
+series or a short sentence stands when a distinction in the evidence requires it.
+
 Leave dated historical records unchanged. A working note or prior model draft is not
 verified source material; recover facts from the primary source before promoting them.
