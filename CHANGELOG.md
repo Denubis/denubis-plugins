@@ -1,5 +1,20 @@
 # Changelog
 
+## [denubis-academic] 0.21.0
+
+Brian, 2026-10-18, after a textlint and slopless trial on the Sage draft found 206 messages of which the apostrophe, terminology and acronym rules were the only ones worth keeping, and after both tools' regex passive rules caught a gerund passive the parse-based check missed: "yes" to folding those into the helper.
+
+**Fixed:**
+- `prose_shape.py` finds subjectless passives ("Being challenged on our ideas forces...") by the passive auxiliary as well as the passive subject. On the Sage draft this raised the passive count from 8 to 9; the missed sentence was the one textlint caught.
+
+**Added:**
+- A "Quote marks and apostrophes" section counting straight and curly forms and, when both occur, listing the sentences with the minority form.
+- An "Acronyms" table: every three-to-five-letter capital token with its count, first sentence, and whether any sentence pairs it with a parenthesised expansion.
+
+**Tests:** `tests/test_academic_prose_shape.py` gains the quote-mark count, acronym detection, minority-form rendering, and gerund-passive cases (12 run without spaCy, 26 with it).
+
+**Not adopted:** LanguageTool (on the draft: one grammar hit, wrong; the real finds were locale spellings, and Sage wants en-US), textlint's English rules (readability and wordiness rules argue with the register), and slopless (no LLM-vocabulary hits; its paragraph and repetition checks duplicate the histograms).
+
 ## [denubis-academic] 0.20.0
 
 Brian, 2026-10-18, on the Sage SRM Guide draft: "this is genuinely to find problematic prosedy patterns", then "I mean total count of sentences under 12 words, those are very short. They should be sparing, not just in a row", then "we probably need to report sentence length as histogram? Rather than hardcoding? Since each register will demand number of commas per sentence and sentence length being different?", "and sentences per paragraph as well please", and "any way to detect passives".

@@ -169,6 +169,56 @@ def test_report_with_targets_adds_threshold_column_and_section():
     assert "Eight words." in text
 
 
+# --- Quote marks and acronyms (no parser) ---------------------------------------
+
+
+def test_quote_marks_counts_straight_and_curly_separately():
+    assert ps.quote_marks('It\'s "fine"') == (3, 0)
+    assert ps.quote_marks("It\u2019s \u201cfine\u201d") == (0, 3)
+
+
+def test_acronyms_report_count_first_use_and_expansion():
+    sentences = [
+        "A large language model (LLM) answers questions.",
+        "The LLM is not a search engine.",
+        "We submitted to BJET in March.",
+        "The HTML comments are not prose.",
+    ]
+    found = ps.acronyms(sentences)
+    assert found["LLM"]["count"] == 2
+    assert found["LLM"]["expanded"] is True
+    assert found["LLM"]["first"].startswith("A large language model")
+    assert found["BJET"]["expanded"] is False
+    assert found["HTML"]["expanded"] is False
+    assert "A" not in found
+
+
+def test_report_lists_minority_quote_form_and_unexpanded_acronyms():
+    whole = ps.Shape(
+        lengths=[5, 5],
+        commas=[0, 0],
+        paragraph_sentences=[2],
+        straight_marks=1,
+        curly_marks=4,
+        sentences_text=["It\u2019s the LLM\u2019s turn.", "It's BJET's turn."],
+    )
+    hits = [
+        ps.Hit("curly-mark", "S", "It\u2019s the LLM\u2019s turn."),
+        ps.Hit("straight-mark", "S", "It's BJET's turn."),
+    ]
+    text = ps.render(
+        ps.Report(whole=whole, sections=[], hits=hits, targets=ps.Targets()), "d"
+    )
+    assert "straight 1, curly 4" in text
+    assert "- **S**: It's BJET's turn." in text
+    assert (
+        "It\u2019s the LLM\u2019s turn."
+        not in text.split("## Quote marks")[1].split("## Acronyms")[0]
+    )
+    assert "| BJET | 1 | no |" in text
+    assert "| LLM | 1 | no |" in text
+
+
 # --- Parser-dependent findings ---------------------------------------------------
 
 
@@ -290,6 +340,13 @@ def test_passives_are_found_and_agent_presence_is_told_apart(nlp):
     ]
     assert "with agent" in hits[0].detail
     assert "agentless" in hits[1].detail
+
+
+def test_subjectless_gerund_passive_is_found(nlp):
+    text = "## S\n\nBeing challenged on our ideas forces us to think about them.\n"
+    hits = [h for h in analyse(nlp, text).hits if h.kind == "passive"]
+    assert len(hits) == 1
+    assert "challenged" in hits[0].detail
 
 
 def test_section_announcement_is_flagged(nlp):

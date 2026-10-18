@@ -227,6 +227,9 @@ class Shape:
     semicolons: int = 0
     colons: int = 0
     bullets: int = 0
+    straight_marks: int = 0
+    curly_marks: int = 0
+    sentences_text: list[str] = field(default_factory=list)
 
     @property
     def sentences(self) -> int:
@@ -301,15 +304,17 @@ def _hedges(sent) -> list[str]:
 
 
 def _passives(sent) -> list[tuple[str, bool]]:
-    """Passive clauses as (verb, has_agent). A passive subject marks the clause;
-    an agent is a ``by`` phrase attached to the same verb."""
-    out = []
+    """Passive clauses as (verb, has_agent).
+
+    A passive subject or a passive auxiliary marks the clause, so a subjectless
+    gerund passive ("Being challenged on our ideas forces...") is found as well
+    as the ordinary kind. An agent is a ``by`` phrase attached to the same verb.
+    """
+    verbs = []
     for tok in sent:
-        if tok.dep_ == "nsubjpass":
-            verb = tok.head
-            has_agent = any(c.dep_ == "agent" for c in verb.children)
-            out.append((verb.text, has_agent))
-    return out
+        if tok.dep_ in {"nsubjpass", "auxpass"} and tok.head not in verbs:
+            verbs.append(tok.head)
+    return [(v.text, any(c.dep_ == "agent" for c in v.children)) for v in verbs]
 
 
 def _opener_kind(first) -> str:
@@ -413,7 +418,40 @@ def _paragraph_hit(paragraph: str, n: int, t: Targets) -> tuple | None:
     return None
 
 
+STRAIGHT_MARKS = re.compile(r"[\"']")
+CURLY_MARKS = re.compile("[\u2018\u2019\u201c\u201d]")
+ACRONYM = re.compile(r"\b[A-Z]{3,5}s?\b")
+
+
+def quote_marks(text: str) -> tuple[int, int]:
+    """Counts of straight and curly quotation marks or apostrophes in ``text``."""
+    return len(STRAIGHT_MARKS.findall(text)), len(CURLY_MARKS.findall(text))
+
+
+def acronyms(sentences: list[str]) -> dict[str, dict]:
+    """Every three-to-five-letter capital token, with its count, first sentence,
+    and whether any sentence pairs it with an expansion in parentheses, either
+    "Expansion (ACR)" or "ACR (expansion)"."""
+    seen: dict[str, dict] = {}
+    joined = "\n".join(sentences)
+    for sentence in sentences:
+        for m in ACRONYM.finditer(sentence):
+            acr = m.group(0).rstrip("s")
+            entry = seen.setdefault(
+                acr, {"count": 0, "first": sentence, "expanded": False}
+            )
+            entry["count"] += 1
+    for acr, entry in seen.items():
+        entry["expanded"] = bool(
+            re.search(rf"\({acr}s?\)", joined) or re.search(rf"\b{acr}s? \(", joined)
+        )
+    return seen
+
+
 def _tally(acc: Shape, text: str, words: int) -> None:
+    straight, curly = quote_marks(text)
+    acc.straight_marks += straight
+    acc.curly_marks += curly
     acc.lengths.append(words)
     acc.commas.append(text.count(","))
     acc.em_dashes += text.count("—")
@@ -447,6 +485,11 @@ def _analyse_section(
             words = _word_count(sent)
             _tally(whole, text, words)
             _tally(row, text, words)
+            whole.sentences_text.append(text)
+            if STRAIGHT_MARKS.search(text):
+                record(("straight-mark", text, ""))
+            if CURLY_MARKS.search(text):
+                record(("curly-mark", text, ""))
             for found in _structural_hits(sent, text, previous_text):
                 record(found)
             for found in _threshold_hits(text, words, targets):
@@ -684,9 +727,44 @@ def render(report: Report, source: str) -> str:
         if row.lengths:
             out.append(f"- **{row.heading}**: {' '.join(str(n) for n in row.lengths)}")
     out.append("")
+    out.extend(_quote_section(report))
+    out.extend(_acronym_section(report))
     out.extend(_hit_sections(report, THRESHOLD_KINDS))
     out.extend(_hit_sections(report, STRUCTURAL_KINDS))
     return "\n".join(out)
+
+
+def _quote_section(report: Report) -> list[str]:
+    straight, curly = report.whole.straight_marks, report.whole.curly_marks
+    out = ["## Quote marks and apostrophes", ""]
+    out.append(f"straight {straight}, curly {curly}.")
+    if straight and curly:
+        minority = "straight-mark" if straight <= curly else "curly-mark"
+        hits = [h for h in report.hits if h.kind == minority]
+        out.append(f"Mixed. The {len(hits)} sentence(s) with the minority form:")
+        out.append("")
+        out.extend(f"- **{h.section}**: {h.sentence}" for h in hits)
+    elif straight or curly:
+        out.append("Consistent.")
+    out.append("")
+    return out
+
+
+def _acronym_section(report: Report) -> list[str]:
+    found = acronyms(report.whole.sentences_text)
+    out = ["## Acronyms", ""]
+    if not found:
+        out.extend(["None.", ""])
+        return out
+    out.append("| Acronym | Uses | Expanded in text | First use |")
+    out.append("|---|---|---|---|")
+    for acr, e in sorted(found.items(), key=lambda kv: -kv[1]["count"]):
+        first = e["first"] if len(e["first"]) <= 90 else e["first"][:87] + "..."
+        out.append(
+            f"| {acr} | {e['count']} | {'yes' if e['expanded'] else 'no'} | {first} |"
+        )
+    out.append("")
+    return out
 
 
 # --- CLI ------------------------------------------------------------------------
