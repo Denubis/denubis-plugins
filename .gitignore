@@ -12,3 +12,7 @@ __pycache__/
 # They name a phase, a worktree, and a context that all expire.
 RESUME*.md
 codex-prompts/
+
+# Literature-scout raw API responses: evidence the reports cite by path, kept on
+# disk for re-verification but too large and too churny to commit.
+docs/research/*/responses/
