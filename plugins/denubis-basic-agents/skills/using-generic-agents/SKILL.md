@@ -18,8 +18,16 @@ Use these when you need a general-purpose executor without domain-specific defau
 
 | Functional role | Claude Code implementation | Codex implementation |
 |---|---|---|
-| General-purpose | `general-purpose` | Native general-purpose subagent using `gpt-6-sol` at `xhigh` |
-| Deep-judgment | `deep-judgment`, using `claude-opus-5-5` | Native subagent using `gpt-6-sol` with `xhigh` reasoning |
+| General-purpose | `general-purpose`, using latest Opus at `xhigh` | Native general-purpose subagent using latest Sol at `xhigh` |
+| Deep-judgment | `deep-judgment`, using latest Opus at `xhigh` | Native subagent using latest Sol at `xhigh` |
+
+The model default is **latest Sol at `xhigh`, or latest Opus at `xhigh`**, according
+to the current provider. As of 2026-10-19, these are **GPT-6.1 Sol**
+(`gpt-6.1-sol`) and **Claude Opus 5.5** (`claude-opus-5-5`). The versions record
+the current selection; the policy follows the latest model in each family. Resolve
+the current identifier from the runtime model roster or current official provider
+documentation before dispatch. Confirm the selected model and effort; if either
+cannot be selected or confirmed, surface that limitation before launching.
 
 Default to the general-purpose role. Use the deep-judgment role when the task needs
 sustained analysis or a consequential qualitative judgment. The legacy
@@ -36,7 +44,7 @@ for the effort level before dispatching. Do not infer, increase, or default that
 Carry the human's exact request in the scoped brief. If the host cannot select and
 confirm both settings, stop that dispatch and report the limitation.
 
-These are operator defaults as of 2026-09-24, not capability rankings or a request to
+These are operator defaults as of 2026-10-19, not capability rankings or a request to
 choose the most expensive model. A request for an "Opus subagent" means the deep-judgment
 role on the current provider unless the human explicitly requests a Claude process.
 Use the runtime's actual delegation API and explicit model/effort controls. In Codex,
@@ -53,8 +61,15 @@ process separation. When the task specifically requires a different model, estab
 that difference before dispatch; changing an agent's name does not provide it.
 
 Model fields and identifiers: [Claude subagents](https://code.claude.com/docs/en/sub-agents)
-and [GPT-6 Sol](https://developers.openai.com/api/docs/models/gpt-6-sol), checked
-2026-09-24. Task-specific human instructions override this dated routing policy.
+and the [OpenAI model catalogue](https://developers.openai.com/api/docs/models).
+Task-specific human instructions override these defaults.
+
+Current default authority (Brian, 2026-10-19):
+
+> please go fix that. and let's just set it as "latest sol, currently 6-1 at xhigh, or latest opus, currently 5.5 at xhigh"
+
+Exact source: `/home/brian/.codex/sessions/2026/10/14/rollout-2026-10-14T17-41-01-01a13924-9506-7913-9553-3041a1d73764.jsonl:866`.
+Resolver: `sed -n '866p' /home/brian/.codex/sessions/2026/10/14/rollout-2026-10-14T17-41-01-01a13924-9506-7913-9553-3041a1d73764.jsonl`.
 
 Earlier dispatch authority:
 

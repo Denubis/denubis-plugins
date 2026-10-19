@@ -1,6 +1,6 @@
 {
   "name": "denubis-basic-agents",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Choose functional roles for general-purpose and domain-specific delegated work.",
   "author": {
     "name": "Brian Ballsun-Stanton",

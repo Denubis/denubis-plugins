@@ -1,5 +1,11 @@
 # Changelog
 
+## [denubis-basic-agents] 3.0.1
+
+**Fixed:**
+- Generic agent routing follows the latest Sol or latest Opus at `xhigh`, currently GPT-6.1 Sol and Claude Opus 5.5, as directed by Brian on 2026-10-19.
+- Dispatch resolves the current model identifier and confirms both model and effort before launching. The skill records the exact human instruction and its source.
+
 ## [denubis-academic] 0.21.0
 
 Brian, 2026-10-18, after a textlint and slopless trial on the Sage draft found 206 messages of which the apostrophe, terminology and acronym rules were the only ones worth keeping, and after both tools' regex passive rules caught a gerund passive the parse-based check missed: "yes" to folding those into the helper.
