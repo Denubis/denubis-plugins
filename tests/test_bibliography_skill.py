@@ -16,9 +16,6 @@ PLUGIN_ROOT = REPO_ROOT / "plugins" / "denubis-academic"
 SKILL_ROOT = PLUGIN_ROOT / "skills" / "using-bibliography"
 SKILL = SKILL_ROOT / "SKILL.md"
 SETUP = SKILL_ROOT / "references" / "setup-and-migration.md"
-GLOBAL_CODEX_CANDIDATE = (
-    REPO_ROOT / "deployment" / "instruction-control" / "foa4008439" / "AGENTS.md"
-)
 REQUIRED_REFERENCES = (
     "references/setup-and-migration.md",
     "references/resolve-and-render.md",
@@ -145,16 +142,6 @@ def test_setup_names_are_derived_from_the_current_manifest() -> None:
         "uninstall",
         "denubis-bibliography@denubis-plugins",
     ) in setup_commands
-
-
-def test_deployment_candidate_points_to_the_live_bibliography_skill() -> None:
-    text = GLOBAL_CODEX_CANDIDATE.read_text(encoding="utf-8")
-    matches = re.findall(r"`(/[^`]+/skills/using-bibliography/SKILL\.md)`", text)
-    assert matches, "global Codex candidate has no bibliography skill path"
-
-    missing = [path for path in matches if not Path(path).is_file()]
-    assert not missing, f"global Codex candidate points to missing skills: {missing}"
-    assert all("/plugins/denubis-academic/" in path for path in matches)
 
 
 def test_relative_markdown_links_resolve() -> None:

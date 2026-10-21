@@ -94,9 +94,11 @@ Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineerin
   need is established.
 
 Source: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5>
-(verified 2026-08-12). The operator observation about performative self-critique is bound
-as `IC04` in `deployment/instruction-control/foa4008439/candidate-manifest.json`; inspect
-that raw record with the manifest's source verifier.
+(verified 2026-08-12). The operator observation about performative self-critique is the
+human turn at line 314 of the Codex rollout
+`~/.codex/sessions/2026/08/10/rollout-2026-08-10T14-13-59-019fe9e0-9c27-70b2-b485-2a603b698ecb.jsonl`
+(resolve it with `cc-search-chats`; the retired candidate manifest that bound it as
+`IC04` is preserved at tag `instruction-control-candidate-foa4008439`).
 
 ### Sonnet 5
 
