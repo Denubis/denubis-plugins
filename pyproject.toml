@@ -15,6 +15,14 @@ dev = [
     "hypothesis>=6.0",
     "textual==8.2.8",
     "websockets==16.0",
+    # Lint, type and complexity tooling, added 2026-10-21 after the approver
+    # project's 2026-10-13 layout. Exact pins where a release changes the
+    # finding set; bump deliberately and re-baseline scripts/lint.sh.
+    "complexipy==8.0.1",
+    "pre-commit>=4.6.2",
+    "ruff==0.16.9",
+    "ty==0.0.84",
+    "vulture>=2.16",
 ]
 
 [tool.uv.workspace]
@@ -31,12 +39,43 @@ testpaths = [
     "plugins/denubis-token-estimator/tests",
 ]
 
+# Lint, type and complexity gates, added 2026-10-21. Warn-only for now:
+# scripts/lint.sh prints every tool's result and exits 0 unless LINT_STRICT=1,
+# because the tree predates the gates (baseline on 2026-10-21: ruff 81 findings
+# and 43 unformatted files, ty 184 diagnostics, complexipy 62 functions over 15
+# outside tests, vulture 9). The thresholds are the target, not the current
+# state. The pre-commit hooks that DO block are plugin validation, pytest,
+# gitleaks and the broken-file checks, which are not lint noise.
+
 [tool.ruff]
 target-version = "py314"
 line-length = 88
+extend-exclude = [".worktrees"]
 
+# A file's target must match its PEP 723 `requires-python`: at py314 the
+# formatter rewrites `except (A, B):` into the parenthesis-free form, which is
+# a SyntaxError below 3.14 (see CLAUDE.md, caught 2026-09-03). Verified on
+# 2026-10-21 that this table governs `ruff format`, not only the linter.
 [tool.ruff.per-file-target-version]
 "plugins/*/hooks/*.py" = "py39"
+"plugins/denubis-external-agents/skills/supervising-codex/hooks/install-codex-hooks.py" = "py39"
+"plugins/denubis-external-agents/scripts/update_codex_profile.py" = "py310"
+# The nine `>=3.11` bibliography scripts and every module they import.
+# resolve.py and register_export.py declare `>=3.14` and stay at the default.
+"plugins/denubis-academic/skills/using-bibliography/annotate.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/bbt.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/collection.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/copy_item.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/create_item.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/fetch.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/ingest.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/item_collections.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/renderer.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/trash_item.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/update_item.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/write_gate.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/zotero_auth.py" = "py311"
+"plugins/denubis-academic/skills/using-bibliography/zotero_local_api.py" = "py311"
 
 [tool.ruff.lint]
 select = [
@@ -138,3 +177,21 @@ ignore = [
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.ty.src]
+exclude = [".worktrees"]
+
+[tool.complexipy]
+paths = ["."]
+max_complexity_allowed = 15
+# Test functions are not subject to the complexity gate, as in the sibling
+# projects. Nothing else is excluded: the ratchet is a count, not a list.
+exclude = ["**/tests/**", "**/test_*.py", "**/.venv/**", "**/.worktrees/**"]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["plugins", "scripts", "tests", "docs"]
+exclude = ["*__pycache__*", ".venv", ".worktrees"]

@@ -44,7 +44,8 @@ Claude Code plugins for design, implementation, and development workflows.
 - Current topology and constraints: `docs/architecture/README.md`.
 - Design decisions: `docs/architecture/decisions/`.
 - Testing commands: `.ed3d/testing-guidance.md` when present, otherwise `pyproject.toml`
-  and `scripts/pre-commit`.
+  and `.pre-commit-config.yaml`. Lint, type and complexity report: `scripts/lint.sh`
+  (warn-only until `LINT_STRICT=1`).
 - Task-invocation syntax and directive structure:
   `denubis-extending-agents:writing-claude-directives`.
 - Repository search flags, scope, and negative-result handling:
