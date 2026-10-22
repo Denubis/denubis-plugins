@@ -10,6 +10,9 @@ byobu-codex-quota = "workflow_statusline.codex_quota:main"
 byobu-claude-quota = "workflow_statusline.claude_quota:main"
 
 [dependency-groups]
+# pytest stays so a sync scoped to this package (`uv sync --package
+# workflow-statusline`) can still run its tests. The lint, type and complexity
+# tools are pinned once, in the root dev group; do not add them here.
 dev = ["pytest>=8.0"]
 
 [build-system]
@@ -19,5 +22,21 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/workflow_statusline"]
 
+# Used only by a pytest run started in this directory. A run from the repository
+# root reads the root pyproject.toml, whose testpaths include this tests/.
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Lint, type and complexity standards: the root pyproject.toml
+# (../../../../pyproject.toml) governs this package. This file deliberately has
+# no [tool.ruff], [tool.ty], [tool.complexipy] or [tool.vulture] table.
+# - ruff takes settings from the nearest pyproject.toml with a [tool.ruff]
+#   table, which is the root's. `extend = "../../../../pyproject.toml"` is not
+#   equivalent: it moves ruff's `src` here, so isort reclassifies this package's
+#   imports as first-party and reports new I001 findings (checked 2026-10-22).
+# - ty cannot extend another file, and a [tool.ty] table here would make
+#   `ty check` run from this directory a separate project with only this
+#   table's settings. Without one, ty uses the root project from here too.
+#   scripts/lint.sh runs it with --all-packages so this package resolves.
+# - complexipy and vulture run from the root, and their root paths include
+#   this directory.

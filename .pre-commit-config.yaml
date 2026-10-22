@@ -23,9 +23,13 @@ repos:
         always_run: true
         pass_filenames: false
 
+      # Bare pytest runs every root testpath: tests/ plus the token-estimator,
+      # crash-recovery and status-line suites. --all-packages installs the
+      # workspace members those suites import; a checkout synced without it
+      # fails collection.
       - id: pytest
-        name: pytest (repository suite)
-        entry: uv run --frozen pytest tests/ -q
+        name: pytest (all configured testpaths)
+        entry: uv run --frozen --all-packages pytest -q
         language: system
         always_run: true
         pass_filenames: false

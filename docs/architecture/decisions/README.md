@@ -39,6 +39,8 @@ and consequences section. One ADR per decision.
   (applies 0018 and 0025)
 - [0029 — Zotero writes go through Zotero 10's stock local API, delete means trash, and zotero-api-plus is kept only for what stock cannot do](0029-zotero-writes-use-the-stock-local-api-and-delete-means-trash.md)
 - [0030 — Start with a permission experiment; later messaging is not precluded](0030-permission-queue-starts-with-an-experiment-and-does-not-preclude-later-messaging.md)
+- [0031 — `ruff format` covers Markdown code blocks; vendored upstream files are excluded](0031-ruff-formats-markdown-code-blocks-except-vendored-files.md)
+- [0032 — PEP 723 scripts and workspace members carry the root lint standards in their own configuration](0032-pep-723-scripts-and-workspace-members-carry-the-root-lint-standards.md)
 
 ## Status lifecycle
 

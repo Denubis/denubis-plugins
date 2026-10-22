@@ -34,7 +34,9 @@ cd "$ROOT"
 
 run "ruff check" uv run --frozen ruff check .
 run "ruff format --check" uv run --frozen ruff format --check .
-run "ty check" uv run --frozen ty check
+# ty resolves the workspace members (crash_recovery, workflow_statusline) and
+# their dependencies only when they are installed; --all-packages installs them.
+run "ty check" uv run --frozen --all-packages ty check
 run "complexipy (max 15)" uv run --frozen complexipy --failed --plain .
 run "vulture" uv run --frozen vulture
 

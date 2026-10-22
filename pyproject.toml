@@ -42,7 +42,7 @@ testpaths = [
 # Lint, type and complexity gates, added 2026-10-21. Warn-only for now:
 # scripts/lint.sh prints every tool's result and exits 0 unless LINT_STRICT=1,
 # because the tree predates the gates (baseline on 2026-10-21: ruff 81 findings
-# and 43 unformatted files, ty 184 diagnostics, complexipy 62 functions over 15
+# and 40 unformatted files (18 Markdown), ty 184 diagnostics, complexipy 58 functions over 15
 # outside tests, vulture 9). The thresholds are the target, not the current
 # state. The pre-commit hooks that DO block are plugin validation, pytest,
 # gitleaks and the broken-file checks, which are not lint noise.
@@ -174,6 +174,11 @@ ignore = [
 ]
 
 [tool.ruff.format]
+# Markdown code blocks are formatted (ADR 0031). Files vendored verbatim from an
+# upstream repository are excluded by name so the next upstream sync diffs clean.
+exclude = [
+    "plugins/denubis-extending-agents/skills/writing-skills/anthropic-best-practices.md",
+]
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
