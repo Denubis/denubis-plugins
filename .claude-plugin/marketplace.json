@@ -44,7 +44,7 @@
     {
       "name": "denubis-research-agents",
       "description": "Agents for codebase investigation and internet research.",
-      "version": "1.3.4",
+      "version": "1.3.5",
       "source": "./plugins/denubis-research-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",

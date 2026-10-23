@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-research-agents] 1.3.5
+
+**Fixed:**
+- Quote four agent descriptions as valid YAML without changing their text or agent bodies.
+
+**Marketplace tooling:**
+- Generate temporary Antigravity installation copies with inherited models and translated tool metadata; validate all copies before installing. Shared agent sources remain unchanged apart from the YAML quoting repair.
+- Preserve command files without promising native conversion: installed Antigravity currently leaves them unloaded.
+
 ## [denubis-basic-agents] 3.0.1
 
 **Fixed:**

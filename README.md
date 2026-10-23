@@ -126,11 +126,16 @@ shared skill trees. Validate and install them with:
 scripts/install_antigravity_plugins.sh
 ```
 
-The installer validates every bundle before installing any of them. Start a new `agy`
-session after installation, then use `agy plugin list` to inspect the imported set.
-Supported agents and commands are converted by Antigravity's validator. Codex metadata,
-Claude hook registrations, and unsupported hook bundles are skipped rather than copied
-into a parallel repository.
+The installer projects each bundle to a temporary Antigravity copy, validates every copy
+before installing any, and installs those same copies. Agent model tiers are set to
+`inherit` in the copy, and Claude tool names are translated to Antigravity tool names;
+the shared agent bodies, skills, and commands stay intact. Projection uses the repository's
+existing PyYAML environment through `uv run --no-sync`, so that environment must already
+be prepared. Start a new `agy` session after installation, then use `agy plugin list` to
+inspect the imported set. The source `commands/` tree is carried through for
+preservation, but the verified Antigravity install leaves those commands unloaded;
+no command-to-skill conversion is provided. Codex metadata and Claude hook
+registrations are copied unchanged; Antigravity loads only its supported components.
 
 ## Requirements
 

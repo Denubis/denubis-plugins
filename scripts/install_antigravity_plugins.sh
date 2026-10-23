@@ -48,13 +48,22 @@ marketplace = json.loads(
 )
 for entry in marketplace["plugins"]:
     plugin_root = repo_root / entry["source"]
-    if any((plugin_root / "skills").glob("*/SKILL.md")):
+    if (plugin_root / "plugin.json").is_file():
         print(entry["name"])
 PY
 )
 
+projection_root="$(mktemp -d)"
+trap 'rm -rf -- "$projection_root"' EXIT
+
 for plugin_name in "${plugin_names[@]}"; do
-    agy plugin validate "$repo_root/plugins/$plugin_name"
+    uv run --no-sync --project "$repo_root" python \
+        "$repo_root/scripts/project_antigravity_plugin.py" \
+        "$repo_root/plugins/$plugin_name" "$projection_root/$plugin_name"
+done
+
+for plugin_name in "${plugin_names[@]}"; do
+    agy plugin validate "$projection_root/$plugin_name"
 done
 
 if [[ "$validate_only" == "true" ]]; then
@@ -62,7 +71,7 @@ if [[ "$validate_only" == "true" ]]; then
 fi
 
 for plugin_name in "${plugin_names[@]}"; do
-    agy plugin install "$repo_root/plugins/$plugin_name"
+    agy plugin install "$projection_root/$plugin_name"
 done
 
 echo "Start a new agy session to load the installed plugins."
