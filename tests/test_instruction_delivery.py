@@ -36,7 +36,9 @@ def _marketplace_hook_events() -> set[tuple[str, str]]:
         hooks_path = _claude_hooks_path(plugin_root)
         if not hooks_path.is_file():
             continue
-        hooks = json.loads(hooks_path.read_text(encoding="utf-8"))["hooks"]
+        # A hooks file that names only a hooks module (`modules`) registers no
+        # settings-hook events; its function hooks are outside this inventory.
+        hooks = json.loads(hooks_path.read_text(encoding="utf-8")).get("hooks", {})
         events.update((plugin["name"], event) for event in hooks)
 
     return events

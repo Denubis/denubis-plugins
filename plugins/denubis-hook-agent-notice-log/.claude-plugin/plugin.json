@@ -1,0 +1,25 @@
+{
+  "name": "denubis-hook-agent-notice-log",
+  "version": "0.1.0",
+  "description": "Logs the first 300 characters of every submitted prompt and every inbound delivery, with its origin, to a JSONL file, changing nothing",
+  "author": {
+    "name": "Brian Ballsun-Stanton",
+    "github": "denubis"
+  },
+  "homepage": "https://github.com/denubis/denubis-plugins",
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": [
+    "mods",
+    "agents",
+    "logging",
+    "claude-code"
+  ],
+  "userConfig": {
+    "log_path": {
+      "type": "string",
+      "title": "Log file",
+      "description": "Absolute path of the JSONL log, or one starting with ~/. Leave empty to write agent-notice-log.jsonl in the Claude config directory: $CLAUDE_CONFIG_DIR when set, else ~/.claude."
+    }
+  }
+}

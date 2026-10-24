@@ -255,6 +255,41 @@
         "claude-code",
         "codex"
       ]
+    },
+    {
+      "name": "denubis-hook-quiet-agents",
+      "description": "Takes a teammate's idle notice once its report arrived, mutes repeated agent notices, frames agent-started turns, shows idle agents, asks the model at a turn's end to stop idle or finished agents, and adds /tidy to stop them",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-hook-quiet-agents",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "mods",
+        "agents",
+        "agent-teams",
+        "notifications",
+        "claude-code"
+      ]
+    },
+    {
+      "name": "denubis-hook-agent-notice-log",
+      "description": "Logs the first 300 characters of every submitted prompt and every inbound delivery, with its origin, to a JSONL file, changing nothing",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-hook-agent-notice-log",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "mods",
+        "agents",
+        "logging",
+        "claude-code"
+      ]
     }
   ]
 }

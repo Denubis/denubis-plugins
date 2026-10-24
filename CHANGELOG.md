@@ -1,5 +1,32 @@
 # Changelog
 
+## [denubis-hook-quiet-agents] 0.1.0
+
+A Claude Code mod that keeps subagents and teammates from starting turns that restate what the person already knows. Moved from a development mods folder into the marketplace; behaviour as built and ruled there on 2026-10-24.
+
+**Added:**
+- The report-received rule: a teammate's idle notice is taken out of the conversation while its report to the main conversation stands, and the main conversation's next message to it clears the mark. An idle notice with no standing report reaches the model behind a one-line `[quiet-agents]` prefix. Taken-out teammates are named once beside the next prompt.
+- Repeated agent notices that arrive as prompts are muted; a new one is framed as agent-started. The system prompt ends with a short agent-hygiene section.
+- A status line naming idle teammates and counting done and failed agents.
+- A turn-end nudge naming idle or finished agents, sent once per changed set and only after a turn that ended with an answer.
+- `/tidy`, which stops idle, completed and failed agents one at a time through TaskStop and the usual permission check. The plugin never stops an agent on its own.
+
+**Tests:** `plugins/denubis-hook-quiet-agents/tests/quiet-agents.test.ts`, run with `claude plugin test` (40 pass).
+
+**Not verified:** the nudge has not been observed in a live session; which of the `session.send` hook and the SendMessage `tool.call` hook clears a report mark live is unknown; the prompt-side notice matching has not been seen carrying a notice.
+
+## [denubis-hook-agent-notice-log] 0.1.0
+
+A Claude Code mod that records what reaches the main conversation, changing nothing. It writes the first 300 characters of every submitted prompt, the person's own included, and of every inbound delivery to a JSONL file on disk.
+
+**Added:**
+- One JSON line per prompt or delivery, appended with `tee -a`, in the order the hooks saw them. A write that fails leaves the prompt passing and says so in the debug log and status line.
+- The `log_path` option: an absolute path or one under `~/`. Unset, the file is `agent-notice-log.jsonl` in `$CLAUDE_CONFIG_DIR`, else `~/.claude`. The development copy wrote to a fixed path under one user's home.
+
+**Tests:** `plugins/denubis-hook-agent-notice-log/tests/notice-log.test.ts`, run with `claude plugin test` (9 pass).
+
+**Marketplace tooling:** `tests/test_instruction_delivery.py` reads a `hooks.json` holding only `modules` as registering no settings-hook events, where it previously raised `KeyError`.
+
 ## [denubis-research-agents] 1.3.5
 
 **Fixed:**
