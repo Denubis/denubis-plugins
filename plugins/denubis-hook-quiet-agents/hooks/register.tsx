@@ -226,6 +226,42 @@ const forget = async ($: EngineInterface, to: string): Promise<void> => {
   }
 }
 
+// The main conversation as an agent's SendMessage spells it: "main", per the
+// tool's schema, or the lead's name in its team, `team-lead`, per
+// SessionReceiveOrigin.teammate. Any other recipient is another agent.
+const MAIN_CONVERSATION: readonly string[] = ['main', 'team-lead']
+
+const isToMain = (to: string): boolean => MAIN_CONVERSATION.includes(to.replace(REF_SUFFIX, ''))
+
+// The name the agent's idle notice will carry as `origin.teammate`: its name,
+// else the `<name>` of its `teammateId`; none for an agent with neither.
+const teammateNameOf = (agent: AgentInfo): string | undefined =>
+  agent.name ?? agent.teammateId?.split('@')[0]
+
+// An agent's delivered send to the main conversation is its report, marked at
+// the send. Its SendMessage call waits on this chain for its result (the model
+// reads a refused send's `reason` as the tool's result), so the mark is set
+// before that agent's turn can end and its idle notice arrive. The report
+// itself may reach the main conversation only when dequeued, after the idle
+// notice was judged (agent-notice-log.jsonl, 2026-10-24: the idle notice at
+// 22:59:24.29Z, the report at 22:59:24.99Z). An agent the list cannot name is
+// not marked.
+const markSender = async ($: EngineInterface, agentId: string): Promise<void> => {
+  const sender = (await listAgents($)).find(agent => agent.id === agentId)
+  const teammate = sender === undefined ? undefined : teammateNameOf(sender)
+  if (teammate === undefined) {
+    $.ui.log(
+      `quiet-agents: no name for agent ${agentId}, which sent to the main conversation, so its report is not marked`,
+      { to: 'debug' },
+    )
+    return
+  }
+
+  if (!isReported(await read($, reports), teammate)) {
+    await update($, reports, state => markReported(state, teammate))
+  }
+}
+
 // Removes exactly the names it answers, so a name consumed meanwhile waits
 // for the next prompt.
 const takePending = async ($: EngineInterface): Promise<readonly string[]> => {
@@ -413,10 +449,11 @@ export const register: Register = on => {
   })
 
   // Part 1, primary path: a verified teammate's message to the main
-  // conversation records that it reported; its idle notice is consumed while
-  // that report stands, and framed with the prefix otherwise. A delivery to a
-  // teammate's own loop (`e.agentId` set, agent-notice-log.jsonl line 3) is
-  // left alone.
+  // conversation records that it reported (an in-process teammate's report
+  // arrives here; an agent's report is also marked at its send, below); its
+  // idle notice is consumed while that report stands, and framed with the
+  // prefix otherwise. A delivery to a teammate's own loop (`e.agentId` set,
+  // agent-notice-log.jsonl line 3) is left alone.
   on('session.receive', async ($, e, next) => {
     if (e.agentId !== undefined) {
       return next(e)
@@ -458,13 +495,20 @@ export const register: Register = on => {
   // `agentId` absent for the main conversation, but its doc names "a
   // plain-text message"; SendMessage also carries a plan approval or a
   // shutdown request, which only tool.call is known to see. Both run;
-  // the second finds nothing left to clear.
+  // the second finds nothing left to clear. An agent's delivered message to
+  // the main conversation marks its report (markSender).
   on('session.send', async ($, e, next) => {
     if (e.agentId === undefined) {
       await forget($, e.to)
+      return next(e)
     }
 
-    return next(e)
+    const result = await next(e)
+    if (result.isDelivered && isToMain(e.to)) {
+      await markSender($, e.agentId)
+    }
+
+    return result
   })
 
   on('tool.call', { tool: 'SendMessage' }, async ($, e, next) => {

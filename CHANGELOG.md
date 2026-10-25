@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-hook-quiet-agents] 0.1.1
+
+A subagent's idle notice is now taken out once the subagent has sent its report to the main conversation, even when the report is dequeued after the notice arrives.
+
+**Fixed:**
+- An agent's delivered send to the main conversation, addressed `main` or `team-lead`, marks its report at the send, under the name Claude Code lists for the agent. Before, only a report arriving through the team mailbox set the mark. A subagent's report reaches the conversation when it is dequeued: on 2026-10-24 its idle notice arrived at 22:59:24.29Z and the report was dequeued at 22:59:24.99Z, so the notice went through with the prefix.
+- An agent the list cannot name is not marked, and the debug log says so. A send from one agent to another, or one that was not delivered, marks nothing.
+
+**Tests:** `plugins/denubis-hook-quiet-agents/tests/quiet-agents.test.ts`, run with `claude plugin test` (45 pass).
+
+**Observed live:** the turn-end nudge fired twice, on 2026-10-24 and 2026-10-25, each time once, naming the finished agent.
+
+**Not verified:** the mark at an agent's send stays unobserved until 0.1.1 is installed; which hook clears a report mark live is unknown; the prompt-side notice matching has not been seen carrying a notice.
+
+**Marketplace tooling:** `tests/test_instruction_delivery.py` now reads the hooks modules a `hooks.json` names under `modules`. It flags `prompt.submit` hooks that attach context and `prompt.compose` hooks that add a system-prompt section, with a positive and a non-match control. A flagged mod delivery fails unless an allowance names the plugin, the door and the human ruling that permits it. quiet-agents' system-prompt section and prompt context are permitted by the human's ruling of 2026-10-25. An allowance whose delivery is gone also fails.
+
 ## [denubis-hook-quiet-agents] 0.1.0
 
 A Claude Code mod that keeps subagents and teammates from starting turns that restate what the person already knows. Moved from a development mods folder into the marketplace; behaviour as built and ruled there on 2026-10-24.

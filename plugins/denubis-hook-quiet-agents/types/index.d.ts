@@ -5,8 +5,8 @@ export type NoticeHashes = Record<string, string>
 // mailbox's verified `origin.teammate` stamps it.
 export type TeammateReports = {
   // Teammate -> true once a non-idle message from it reached the main
-  // conversation; the key is removed when the main conversation next sends
-  // it a message.
+  // conversation, or its own send to the main conversation was delivered;
+  // the key is removed when the main conversation next sends it a message.
   reported: Record<string, true>
   // Teammates whose idle notice was consumed and that the main conversation
   // has not messaged since: the names the status line shows. Sorted, no

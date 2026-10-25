@@ -331,6 +331,105 @@ test('a SendMessage call from another agent’s loop leaves the report standing'
   expect(result.consumed).toBe(consumedReason('researcher'))
 })
 
+// An agent's own send to the main conversation: its report, marked at the
+// send. A subagent's report reaches the main conversation only when it is
+// dequeued, after its idle notice was judged (agent-notice-log.jsonl,
+// 2026-10-24: the notice at 22:59:24.29Z, the report at 22:59:24.99Z).
+
+const agentSends = (agentId: string, to: string, text: string): SessionSendInput => ({
+  to,
+  text,
+  origin: { kind: 'model' },
+  agentId,
+})
+
+const PROBE_ID = 'a-live-probe-7c'
+const PROBE_REPORT = 'live-probe report: 2+2 printed 4; task complete, nothing further.'
+const PROBE_IDLE = idleNotice('live-probe', 'The probe ran.')
+
+// Records each line the plugin logs, with where it goes.
+const logLines = (on: On): { text: string; to: string }[] => {
+  const lines: { text: string; to: string }[] = []
+  on('ui.log', (_, e) => {
+    lines.push({ text: e.text, to: e.to })
+    return { value: undefined }
+  })
+  return lines
+}
+
+test('a subagent’s report sent to main, then its idle notice: the notice is consumed', async ($, on) => {
+  const { queued, statuses } = engine(on, [agent(PROBE_ID, 'live-probe', 'running')])
+
+  const sent = await $.session.send(agentSends(PROBE_ID, 'main', PROBE_REPORT))
+  const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
+
+  expect(sent.isDelivered).toBe(true)
+  expect(result.consumed).toBe(consumedReason('live-probe'))
+  expect(queued).toEqual([])
+  expect(statuses).toEqual(['agents idle: live-probe'])
+})
+
+test('a teammate’s report sent to team-lead is marked under its name in the team', async ($, on) => {
+  const scout: AgentInfo = {
+    id: 'a-scout-2',
+    teammateId: 'scout@session-1',
+    description: 'scout’s task',
+    type: 'teammate',
+    status: 'running',
+  }
+  engine(on, [scout])
+
+  await $.session.send(agentSends('a-scout-2', 'team-lead', REPORT))
+  const result = await $.session.receive(fromTeammate('scout', idleNotice('scout', 'done')))
+
+  expect(result.consumed).toBe(consumedReason('scout'))
+})
+
+test('a send from one agent to another does not mark the sender', async ($, on) => {
+  const { queued } = engine(on, [
+    agent(PROBE_ID, 'live-probe', 'running'),
+    agent('a-helper-3', 'helper', 'running'),
+  ])
+
+  await $.session.send(agentSends(PROBE_ID, 'helper', 'Over to you.'))
+  const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
+
+  expect(result.consumed).toBeUndefined()
+  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+})
+
+test('a send to main from an agent the list cannot name marks nothing and says so in the debug log', async ($, on) => {
+  const { queued } = engine(on, [agent('a-helper-3', 'helper', 'running')])
+  const lines = logLines(on)
+
+  await $.session.send(agentSends('a-gone-9', 'main', PROBE_REPORT))
+  const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
+
+  expect(result.consumed).toBeUndefined()
+  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+  expect(lines.map(line => line.to)).toEqual(['debug'])
+  expect(lines[0]?.text).toContain('a-gone-9')
+})
+
+test('a report the engine did not deliver marks nothing', async ($, on) => {
+  // The engine's stand-ins written out: engine() delivers every send.
+  const queued: string[] = []
+  on('session.receive', (_, e) => {
+    queued.push(e.text)
+    return { text: e.text }
+  })
+  on('session.send', () => ({ isDelivered: false, reason: 'nobody by that name' }))
+  on('agent.list', () => ({ value: [agent(PROBE_ID, 'live-probe', 'running')] }))
+  on('ui.status', () => ({ value: undefined }))
+
+  const sent = await $.session.send(agentSends(PROBE_ID, 'main', PROBE_REPORT))
+  const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
+
+  expect(sent.isDelivered).toBe(false)
+  expect(result.consumed).toBeUndefined()
+  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+})
+
 test('consumed idle notices are named once, in the next prompt’s context', async ($, on) => {
   engine(on)
   const entered = engineTakesPrompts(on)

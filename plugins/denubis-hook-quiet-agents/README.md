@@ -13,13 +13,26 @@ stay idle across many turns, because nothing asks the model to stop them.
 
 ## What it does
 
-**The report-received rule.** When a teammate sends the main conversation a message, the
-plugin marks the teammate as reported. If that teammate's idle notice arrives while the
-mark stands, the plugin takes the notice out of the conversation: the model never sees it
-and no turn starts. The mark lasts until the main conversation next sends the teammate a
-message. From then on the teammate is working on something new, so its next idle notice
-is let through. Only verified teammate messages to the main conversation count. The
-teammate is the one the mailbox stamps, never the name the notice text claims.
+**The report-received rule.** When a teammate or subagent sends the main conversation a
+message, the plugin marks it as reported. If its idle notice arrives while the mark
+stands, the plugin takes the notice out of the conversation: the model never sees it and
+no turn starts. The mark lasts until the main conversation next sends that agent a
+message. From then on the agent is working on something new, so its next idle notice is
+let through.
+
+The mark is set at two points, and neither takes a name from the message text:
+
+- A message that arrives through the team mailbox is marked on arrival, when the mailbox
+  has verified the sender. The name is the one the mailbox stamps.
+- A message that an agent of this session sends to the main conversation, addressed
+  `main` or `team-lead`, is marked once the send is delivered. The name is the one Claude
+  Code lists for that agent. An agent it cannot name is not marked, and the debug log
+  says so. A message from one agent to another marks nothing.
+
+The second point exists because a subagent's report can reach the conversation after its
+idle notice. On 2026-10-24 a subagent's idle notice arrived at 22:59:24.29Z, and its
+report was taken from the queue at 22:59:24.99Z. Marking only on arrival let that notice
+through.
 
 **A one-line prefix for unreported idle notices.** An idle notice from a teammate whose
 report has not arrived, or whose mark was cleared, reaches the model with this line in
@@ -83,8 +96,13 @@ survive a reload of the plugin and start empty in a new session.
 
 ## Not yet verified
 
-- **The nudge has not been observed in a live session.** Its behaviour is established
+- **The nudge has been observed live twice.** On 2026-10-24 at 22:59:30Z and on
+  2026-10-25 at 00:32:24Z it fired once after an agent finished, named that agent, and
+  was not repeated. Its other behaviour, including the answer-only guard, is established
   by the plugin's tests only.
+- **The mark set at an agent's send has not been seen live.** It ships in 0.1.1 and stays
+  unobserved until that release is installed. It relies on the documented `session.send`
+  event for a send from an agent's own loop. The plugin's tests establish its behaviour.
 - **Which hook clears the report mark is not known.** Both the `session.send` hook and the
   SendMessage `tool.call` hook clear it, and whichever runs second finds nothing left to
   clear. The `session.send` documentation describes a plain-text message, while
