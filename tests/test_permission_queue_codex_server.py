@@ -33,6 +33,8 @@ def daemon(tmp_path):
         def __init__(self):
             self.path = tmp_path / "daemon.sock"
             self.connections = []
+            self.finished_connections = []
+            self.handler_finished = threading.Condition()
             self.calls = []
             self.answers = []
             self.status = {"type": "idle"}
@@ -152,9 +154,28 @@ def daemon(tmp_path):
             except ConnectionClosed:
                 return
 
+        def serve_connection(self, connection):
+            try:
+                self.handler(connection)
+            finally:
+                # Iterating a connection stops only once websockets has closed it.
+                with self.handler_finished:
+                    self.finished_connections.append(connection)
+                    self.handler_finished.notify_all()
+
+        def wait_for_handlers(self, timeout=3):
+            with self.handler_finished:
+                self.handler_finished.wait_for(
+                    lambda: all(
+                        connection in self.finished_connections
+                        for connection in self.connections
+                    ),
+                    timeout,
+                )
+
     fixture = Daemon()
     with unix_serve(
-        fixture.handler, path=str(fixture.path), close_timeout=0.1
+        fixture.serve_connection, path=str(fixture.path), close_timeout=0.1
     ) as server:
         thread = threading.Thread(target=server.serve_forever)
         thread.start()

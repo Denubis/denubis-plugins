@@ -160,11 +160,15 @@ def test_quit_returns_client_to_exact_last_work_without_detaching(server, tmp_pa
     assert (
         server.command("has-session", "-t", "=beta-other", check=False).returncode == 0
     )
-    assert (
-        server.command(
-            "has-session", "-t", "=permission-queue-demo", check=False
-        ).returncode
-        != 0
+    # The launcher returns the clients before it exits; tmux then ends the session.
+    until(
+        lambda: (
+            server.command(
+                "has-session", "-t", "=permission-queue-demo", check=False
+            ).returncode
+            != 0
+        ),
+        "the scratch session outlived the board after q",
     )
 
 

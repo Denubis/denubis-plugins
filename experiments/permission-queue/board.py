@@ -984,6 +984,9 @@ class WindowBoard(App):
         self.refreshing = True
         try:
             items = await asyncio.to_thread(self.source.snapshots)
+            if not self.is_running:
+                # The view closed while the source answered; leave its DOM alone.
+                return
             self.snapshots = {item.pane_id: item for item in items}
             self.observe_states(items)
             self.render_source_list(items)

@@ -1015,15 +1015,23 @@ def test_watch_latest_text_and_refresh_preserve_actual_reading_position():
     async def exercise():
         app = BOARD.WindowBoard(source)
         async with app.run_test(size=(60, 20)) as pilot:
-            await pilot.pause()
+            # Both scrolls below land only after a later screen refresh; one
+            # pause() can return before that refresh, so wait for the offset.
+            await wait_ui(
+                pilot,
+                lambda: (
+                    app.native_scroll.max_scroll_y > 0
+                    and app.native_scroll.scroll_offset.y
+                    == app.native_scroll.max_scroll_y
+                ),
+            )
             assert app.native_scroll.is_on_screen
             assert app.native_scroll.scroll_offset.y == app.native_scroll.max_scroll_y
             assert app.native_scroll.scroll_offset.y > 0
             app.native_scroll.focus()
-            app.native_scroll.scroll_to(
-                y=app.native_scroll.max_scroll_y - 5, animate=False
-            )
-            await pilot.pause()
+            target = app.native_scroll.max_scroll_y - 5
+            app.native_scroll.scroll_to(y=target, animate=False)
+            await wait_ui(pilot, lambda: app.native_scroll.scroll_offset.y == target)
             position = app.native_scroll.scroll_offset.y
             assert 0 < position < app.native_scroll.max_scroll_y
             await pilot.press("alt+p", "r")
@@ -1153,6 +1161,35 @@ def test_watch_verified_resolution_advances_without_requiring_local_submit():
             await terminal_ready(app, pilot)
             await pilot.press("1", "enter")
             assert source.inputs == [("%22", "1", "1"), ("%22", "enter", None)]
+
+    asyncio.run(exercise())
+
+
+def test_watch_refresh_answered_after_view_closes_leaves_closed_view_alone():
+    source = FakeSource([source_snapshot("%11", 1, state="blocked")])
+    started = threading.Event()
+    release = threading.Event()
+    hold = False
+    original_snapshots = source.snapshots
+
+    def snapshots():
+        if hold:
+            started.set()
+            release.wait(5)
+        return original_snapshots()
+
+    source.snapshots = snapshots
+
+    async def exercise():
+        nonlocal hold
+        app = BOARD.WindowBoard(source)
+        async with app.run_test(size=(60, 20)):
+            refresh = asyncio.ensure_future(app.refresh_windows())
+            hold = True
+            assert await asyncio.to_thread(started.wait, 5)
+        # The source answers only after the view has closed.
+        release.set()
+        await refresh
 
     asyncio.run(exercise())
 

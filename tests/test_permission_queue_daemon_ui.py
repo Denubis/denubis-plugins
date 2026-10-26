@@ -132,6 +132,8 @@ def test_ctrl_c_closes_view_and_main_releases_daemon_connection(
     try:
         assert BOARD.main() == 0
         assert daemon.connections
+        # The fixture server records each close on its own connection thread.
+        daemon.wait_for_handlers()
         assert all(
             connection.close_code is not None for connection in daemon.connections
         )
