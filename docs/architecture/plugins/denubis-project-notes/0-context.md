@@ -25,7 +25,7 @@ flowchart LR
 
 | Boundary | Contract | Evidence |
 |---|---|---|
-| Repository resolution | Resolve the main repository from `git rev-parse --git-common-dir`, so a worktree reads the main checkout's `.notes/`; outside Git, use the current project root. | `plugins/denubis-project-notes/skills/scanning-project-notes/SKILL.md::Resolve the notes universe` |
+| Repository resolution | Resolve the main repository from `git rev-parse --git-common-dir`, so a worktree reads the main checkout's notes directory; outside Git, use the current project root. | `plugins/denubis-project-notes/skills/scanning-project-notes/SKILL.md::Resolve the notes universe` |
 | Bounded inventory | List Markdown notes with hidden and ignored paths included, state the selection boundary, and read the bodies that could change the task. | `plugins/denubis-project-notes/skills/scanning-project-notes/SKILL.md::Read before selecting` |
 | Direct execution | The main session performs retrieval. The plugin ships no hook and no advisor. | `tests/test_instruction_delivery.py::test_project_notes_retrieval_is_direct_main_agent_work` |
 | Explicit invocation | Codex cannot invoke the skill implicitly. Ordinary edits do not acquire a project-memory or chat-search prerequisite. | `tests/test_codex_marketplace.py::test_expensive_project_memory_retrieval_requires_explicit_invocation` |

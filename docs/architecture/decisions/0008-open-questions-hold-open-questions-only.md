@@ -30,7 +30,7 @@ sed -n '98p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-pl
 
 ## Context
 
-ADR 0005 made `.notes/project_open-questions.md` the durable queue and said an answered
+ADR 0005 made the `project_open-questions.md` file in the main checkout's notes directory the durable queue and said an answered
 ticket stays in the file as the record. In practice every answered ticket accumulated its
 answer, the dispatcher's reading of the answer, follow-up measurements, and "state of the
 fix" status paragraphs. This repository's own file reached five tickets, four of them

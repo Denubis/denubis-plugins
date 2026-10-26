@@ -88,7 +88,7 @@ Brian's first instinct was to suppress offers in panes; he withdrew that at line
   those sessions, and hands any unforwarded `offer` or `explained` view to the model as
   additional context naming the teammate. Forwarded keys live in a pane option on the
   lead's pane. Everything read is written by Claude Code; nothing is stamped, spooled, or
-  watched by a daemon (`.notes/project_cross-provider-messaging-critical-review.md`: no
+  watched by a daemon ([critical review](../../design-plans/2026-10-09-cross-provider-messaging/critical-review.md): no
   epicycles). When the record exists, the same read becomes a record insert and the
   pointer travels by ADR 0018's channel.
 - A session with no supervisor has no recipient under this ADR; whether its offers go to

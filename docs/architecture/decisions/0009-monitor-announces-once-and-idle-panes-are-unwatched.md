@@ -62,7 +62,7 @@ prompt on his own side, where repeating cannot help.
 
 ## Consequences
 
-- `tests/test_codex_supervisor_reminders.py` (the ladder's tests) is removed;
+- The ladder's former test module `test_codex_supervisor_reminders` is removed;
   `tests/test_codex_supervisor_announce_once.py` drives the monitor's poll step across
   an hour of identical screens and expects one line.
 - The 57-minute blocked pane of 2026-07-27, which the ladder was built for, is again

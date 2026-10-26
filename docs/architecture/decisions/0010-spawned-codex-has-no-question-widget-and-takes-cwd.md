@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-10-08, recording rulings of 2026-09-19 and 2026-09-30).
 Released as `denubis-external-agents` 0.18.0 (`--cwd`, `--question`/`--answer`) and
-0.21.0 (catalogue pinning). Moved here from `.notes/project_open-questions.md` tickets
+0.21.0 (catalogue pinning). Moved here from the `project_open-questions.md` file in the main checkout's notes directory, tickets
 Q1, Q2 and Q3 under ADR 0008.
 
 ## Authority evidence

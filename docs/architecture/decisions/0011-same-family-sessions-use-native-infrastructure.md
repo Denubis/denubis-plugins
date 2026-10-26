@@ -31,10 +31,10 @@ sessions."
 
 ## Context
 
-The 2026-10-09 design fanout (seven proposer agents, in the gitignored
-`codex-prompts/out/2026-10-09-messaging/`) asked whether "any supervises any" overrides
+The 2026-10-09 design fanout (seven proposer agents, recorded in the
+[design](../../design-plans/2026-10-09-cross-provider-messaging/00-cross-provider-messaging-design.md)) asked whether "any supervises any" overrides
 the August rulings that same-family pairs use native facilities (DR11) and that "this
-system never makes Claude an approver for Claude" (property 7). Proposal 05 (Supervise)
+system never makes Claude an approver for Claude" (property 7). [Proposal 05 (Supervise)](../../design-plans/2026-10-09-cross-provider-messaging/05-supervise-proposal.md)
 and proposal 06 (Authority) both stopped on it.
 
 ## Decision

@@ -9,8 +9,8 @@ This document separates repository source from the live state observed on host
 `foa4008439` on 2026-08-11. The project-note inventory was rechecked on 2026-08-12. The
 governing design is
 [`2026-08-11-instruction-control-system.md`](../../design-plans/2026-08-11-instruction-control-system.md).
-Its global-instruction deployment candidate (`deployment/instruction-control/foa4008439/`,
-with its manifest, verifier, and hash-binding tests) was never installed and was retired
+Its global-instruction deployment candidate (the former host-named instruction-control
+deployment directory, with its manifest, verifier, and hash-binding tests) was never installed and was retired
 on 2026-10-21; the last commit carrying it is tagged
 `instruction-control-candidate-foa4008439`.
 
@@ -70,7 +70,7 @@ it.
 | Instruction-budget alarm | `denubis-hook-instruction-budget` source | Human at Claude Code or Codex startup | Measures the effective global-plus-local instruction chain and emits `systemMessage` when it exceeds 200 lines or 32,768 bytes | Shared checker, provider registrations, and behavioral tests | Advisory only: it neither blocks startup nor adds model context. Codex's separate project-chain loader limit is reported independently. |
 | Skills and commands | Plugin source | Main session when invoked or selected | Shared Markdown procedures load on demand; provider metadata controls discovery and invocation | Plugin context pages and source files | Applicability and completion usually depend on model judgement unless a separate check supplies evidence. |
 | Agents and external advisors | Plugin source plus model/runtime | Main session and human | Delegated work returned as model output | Source-tagged result; some paths verify source access | A fluent report is not proof. The proposer and verifier can share blind spots. |
-| Project `.notes/` | Human-approved, gitignored project memory | Main session when recovery is explicitly invoked or a named dependency requires it | `denubis-project-notes` inventories the main repository and resolves relied-on raw sources; Codex implicit invocation is disabled | Project `.notes/`, including hidden and ignored scope | Hidden and ignored scope makes incomplete search look empty. Selection can omit a relevant note; frontmatter and referenced evidence can drift. Operational coordination databases are not durable project memory. |
+| Project notes directory | Human-approved, gitignored project memory | Main session when recovery is explicitly invoked or a named dependency requires it | `denubis-project-notes` inventories the main repository and resolves relied-on raw sources; Codex implicit invocation is disabled | Project notes directory, including hidden and ignored scope | Hidden and ignored scope makes incomplete search look empty. Selection can omit a relevant note; frontmatter and referenced evidence can drift. Operational coordination databases are not durable project memory. |
 | Human transcripts | Claude and Codex runtimes | Human, search tools, authority-bearing documents | Vendor JSONL and transcript archives; installed `cc-search-chats` 2.0.0a5 currently describes itself as Claude-only | Raw record and exact message locator | Provider schemas and paths differ. Cross-vendor search is prospective. A summary or model quotation is not the human invocation. |
 | Plans, ADRs, notes, constraints, and architecture | Repository or project authors | Humans and future sessions | Markdown memorials and living maps | Resolvable source pointer or repository evidence | A broken pointer is an integrity defect. Correction layers create palimpsests rather than current documents. |
 | Tests and hook logs | Executed mechanism | Human or a downstream gate | External result bound to an artifact or event | Test output or structured log | Self-report is not evidence. A result without subject identity or invalidation rules cannot bind later action. A test that only matches source wording observes the edit rather than correctness. |
@@ -97,7 +97,7 @@ fires successfully on every machine.
 |---|---|---|
 | Human authority | The original human invocation in a raw transcript | Notes, ADRs, plans, and model reports can point to authority; they do not manufacture it. |
 | Current system description | Living architecture | Architecture describes deployed reality. The design plan owns proposed removals and contracts until implementation lands. |
-| Project memory | `.notes/` | Notes preserve local observations and feedback. They are neither executable policy nor decision authority by themselves. |
+| Project memory | the project notes directory | Notes preserve local observations and feedback. They are neither executable policy nor decision authority by themselves. |
 | Decisions | ADRs and dated decision records | A decision record memorialises one decision. Documents relying on a human ruling point to the original record and an exact resolver (`cc-search-chats`). |
 | Situational procedure | Skills and commands | Procedures say how to act in a named situation. Their prose does not prove invocation or success. |
 | Mechanical action control | Permission hooks and executable gates | Only the matching boundary is controlled. Advisory context from the same hook remains prose. |
@@ -119,7 +119,7 @@ Observed machine-local artifacts on 2026-08-11:
 | `/home/brian/.claude/settings.json` | `14f32d5ab7d9c4affd133a9b5e30bd7f3a4cf8f014329d41cd964e052e3741f0` |
 | `/home/brian/.claude/plugins/installed_plugins.json` | `5b144defd1eab7ca2f1f3471724939ff6f3725d1d146f350e0f13ffa3e274311` |
 | `/home/brian/.claude/rules/context7.md` | `89bb452cb064b48513f318508c0ece59a31cd6d9fec334a2dccd763f64a5e46a` |
-| Installed `denubis-academic/0.14.0/output-styles/academic-writing.md` | `039898cbcce93e8ac421392efa9c8644dd4b4f4dd5484435dfa4461be0c525a7` |
+| Installed `denubis-academic` 0.14.0, output style `academic-writing` | `039898cbcce93e8ac421392efa9c8644dd4b4f4dd5484435dfa4461be0c525a7` |
 | `/home/brian/.local/bin/cc-search-chats`, package metadata 2.0.0a5 | `1d94f04e95cefc02ad84981d2444619aad93aaf1b0ca0fc0438c7f2ec815e35c` |
 
 These are observation stamps, not synchronization policy. Recompute them before relying

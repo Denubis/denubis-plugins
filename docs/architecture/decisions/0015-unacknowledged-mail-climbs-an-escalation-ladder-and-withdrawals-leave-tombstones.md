@@ -31,7 +31,7 @@ Proposal 04 (Acknowledge) asked whether "give up" may mean stop nudging and list
 item for Brian, and whether a sender may close its own unanswered message. Brian's
 answer is that giving up is not the end of the ladder: a supervisee that never
 acknowledges is a problem to be interrupted, not merely reported. The August Local Mail
-bug report (`.notes/local-mail/messages/d7bb97bc…`) had already asked for a guarded
+bug report had already asked for a guarded
 interrupt verb that refuses unsafe pane states.
 
 ## Decision

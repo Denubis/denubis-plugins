@@ -29,7 +29,7 @@ default and rulings made in a pane stayed oral.
 ## Decision
 
 - A question for the human is a ticket appended to
-  `<main-repository-root>/.notes/project_open-questions.md`, resolved through Git's common
+  the `project_open-questions.md` file in the main checkout's notes directory, resolved through Git's common
   directory so worktrees share it. Any agent, including a dispatched subagent, may pause
   and file one at any point; pausing to push back is always welcome.
 - A ticket closes only when the human answers it. Compaction, `/clear`, scroll, elapsed
@@ -37,12 +37,12 @@ default and rulings made in a pane stayed oral.
   every task entry.
 - Creating the ticket file and creating a decision record need no prior approval. Every
   other `.notes` write keeps the proposal gate.
-- The default decision register is `<main-repository-root>/.notes/decisions/` with a
+- The default decision register is the `decisions` directory in the main checkout's notes directory, with a
   `README.md` index. A project with an existing register keeps it. This repository keeps
   `docs/architecture/decisions/`.
 - An indifferent human answer is not delegation; the agent thinks the implications through
   with the human before recording.
-- `.notes/` is durable passive memory, never transport. Prompt exchange, mail, and other
+- The notes directory is durable passive memory, never transport. Prompt exchange, mail, and other
   operational state live in their own gitignored directories.
 
 ## Consequences
@@ -52,7 +52,7 @@ default and rulings made in a pane stayed oral.
   creates the defaults.
 - The global `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` carry the same rule in their
   Delegation and Open Questions sections, synced through `claude-settings-sync`.
-- A repository gains a `.notes/` directory the first time an agent has a question, even if
+- A repository gains a notes directory the first time an agent has a question, even if
   it had none before.
 - Two register conventions now coexist across repositories; the default applies only where
   none existed.

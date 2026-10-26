@@ -54,7 +54,7 @@ Observed outside the frozen files, in the session record named above:
   about 18:04:45, so the hook fired about 61 seconds later. A second `/clear`, at about
   18:05:22, had produced no `SessionEnd` when Codex quit about 28 seconds later; the quit
   produced it.
-- Codex holds a lock under `thread-writer-locks/` for each session before it writes
+- Codex holds a lock under `~/.codex/thread-writer-locks/` for each session before it writes
   anything else, keeps the old session's lock after `/clear`, and released it 59 seconds
   later in one measurement.
 - A `/status` panel on a 200x25 pane lost its top rows and the `/status` echo line, and

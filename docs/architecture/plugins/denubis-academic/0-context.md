@@ -42,7 +42,7 @@ flowchart LR
 
 | Entity | Contract |
 |---|---|
-| Project `.notes/` | Project-specific register and writing rules override the portable floor after the procedure opens them. |
+| Project notes directory | Project-specific register and writing rules override the portable floor after the procedure opens them. |
 | Zotero and Better BibTeX | Own bibliographic records, citekeys, attachment resolution, and registered project exports. On Zotero 10 the plugin files, trashes, restores, creates, and renames items and collections through Zotero's stock local API (PATCH and POST only; delete means trash, never `DELETE`; ADR 0029) and registers auto-exports through BBT's `autoexport.add`. The plugin does not silently create, copy, repair, annotate, fetch, or trash corpus items. |
 | `zotero-api-plus` | Optionally exposes capability-probed copy, fetch, repair, annotation, and forced-export endpoints, and the `/api/plus/libraries` listing every write helper uses to resolve library and collection names (so the stock-API helpers require it too). Every user-data mutation is previewed and confirmed. |
 | Zettelkasten | Stores rendered paper text by resolved citekey for source inspection. |
