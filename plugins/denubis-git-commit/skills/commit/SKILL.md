@@ -36,6 +36,33 @@ fresh gates needed for the changed boundary. Do not invent a fallback language c
 if no gate is configured, state the evidence available rather than running an unrelated
 suite. A failing required gate blocks the commit.
 
+Resolve `../../scripts/check_durable_records.py` from this skill's directory. From the
+repository root run `uv run --script <resolved-script-path> --staged`, using `--register`
+and `--records` when project locations differ from labelled finding aids in `CLAUDE.md`
+(or the `AGENTS.md` fallback, including one level of standalone `@file` includes) or
+defaults. Default registers are `docs/architecture/decisions/`, `docs/decisions/`, and
+`.notes/decisions/`; a Markdown file may also be a one-file register. It checks
+staged Markdown only under `docs/`, `.notes/`, or configured register/records locations,
+along with explicitly named Markdown, whole decision registers, and the open-questions file; `--all` audits
+whole records locations (by default `.notes/` and `docs/architecture/`), plus
+Markdown directly under `docs/` and `docs/decisions/`. Register and records scans include
+tracked and non-ignored untracked Markdown; notes also include ignored Markdown except
+`.notes/local-mail/`. Staged paths use working-checkout contents.
+Citation defects block in decision registers, records selected by `--all`,
+configured records locations, `.notes`, and
+`docs/architecture/`. On blockquote lines (first non-space character `>`), every citation
+kind is advisory and keeps its prefix. Elsewhere, `ABSENT` is advisory outside those
+locations; `WORKTREE`, `EXCHANGE`, and `IGNORED` still block. The summary counts all
+citations and separately counts all advisory citations as `advisory`. `--strict` also
+blocks wording/ticket findings, but leaves advisory citations advisory.
+A usage or Git error leaves the check incomplete.
+Justify or fix each transitional-wording and open-questions finding before committing; never silently
+wave one through. Rerun after staging or changing a checked record. Confirm that rulings
+made during the work are in the decision register
+with original-record resolvers, answered tickets have left the open-questions file, and
+decision records carry no unexplained transitional state
+([ADR 0042](../../../../docs/architecture/decisions/0042-citation-and-memory-checks-belong-to-the-commit-skill-and-run-in-every-repository.md)).
+
 Update current architecture, directives, runbooks, or user documentation only when the
 implemented contract changed and those files own it. Historical plans do not need
 palimpsest edits.

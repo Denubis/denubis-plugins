@@ -87,6 +87,44 @@ A Claude Code mod that records what reaches the main conversation, changing noth
 **Fixed:**
 - Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
 
+## [denubis-git-commit] 1.5.0
+
+**Added:**
+- A portable `uv run --script` durable-record checker for decision registers and
+  selected Markdown, with `--all` for a full audit of records locations. Ignored notes
+  are discovered from the main checkout's filesystem, excluding operational mail. It reports
+  ignored, worktree, exchange, and absent citations; decision wording and open-ticket
+  findings are advisory unless `--strict` is given. Register locations are configurable.
+- Reference extraction distinguishes bare prose from quoted paths, strips pytest node
+  suffixes, and excludes external system paths and slash commands while preserving
+  worktree and exchange defects.
+- `--staged` selects only Markdown under `docs/`, `.notes/`, or configured register/records locations; other staged Markdown is omitted, while positional paths retain their checks.
+
+**Fixed:**
+- Resolve trailing `:identifier` locators against the cited file.
+- Resolve `:start-end` line-range locators against the cited file.
+- Resolve existing backticked paths with spaces before splitting command tokens.
+- Expand comma-separated brace sets and report only failing path alternatives.
+- Exclude conventional branch names only when they name nothing tracked or present.
+- Detect registered linked-worktree paths outside the checkout as `WORKTREE`.
+- Classify nonexistent targets under ignored directories as `ABSENT`.
+- Keep unknown `word:` prefixes from hiding exchange, worktree or ignored citations.
+- Use tracked names and ignored-but-present names to identify bare paths in prose.
+- Exclude SCP-style Git remotes from repository file citations.
+- Exclude named-user tilde paths without expanding them; warn and skip references whose path normalisation fails.
+- Treat every citation kind on Markdown blockquote lines as advisory, preserving its prefix and counting it in `SUMMARY advisory`.
+- Include untracked, non-ignored Markdown in register and records scans, including direct `docs/` selections under `--all`.
+- Cover `docs/decisions/`, Markdown file registers, direct `docs/` records under `--all`, and `AGENTS.md` finding aids with one level of standalone includes.
+
+**Changed:**
+- Outside record locations, absent citations are advisory; ephemeral citations still block.
+- The commit skill runs the checker before committing, blocks in-scope citation defects, and
+  requires each wording or ticket finding to be justified or fixed. It also confirms
+  rulings have original-record resolvers and answered tickets have left the queue.
+
+**Tests:** Temporary Git repositories exercise citation parsing, exclusions, selection,
+linked worktrees, finding aids, ticket structure, and exit codes.
+
 ## [denubis-basic-agents] 3.0.1
 
 **Fixed:**
