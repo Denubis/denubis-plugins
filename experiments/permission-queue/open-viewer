@@ -1,9 +1,0 @@
-#!/bin/sh
-set -eu
-
-viewer_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if ! command -v uv >/dev/null 2>&1; then
-    printf '%s\n' 'open-viewer: uv is not on PATH; use the project environment on this host' >&2
-    exit 127
-fi
-exec uv run --frozen --project "$viewer_directory/../.." python -P "$viewer_directory/view.py" "$@"

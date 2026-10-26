@@ -1,5 +1,0 @@
-from pathlib import Path
-import json, sys, time
-event = json.load(sys.stdin)
-with Path(__file__).with_name("vendor-events.jsonl").open("a") as out:
-    out.write(json.dumps({"at": time.time(), "event": event}) + "\n")

@@ -13,8 +13,6 @@ dev = [
     "pytest>=8.0",
     "bibtexparser>=2.0.0b9",
     "hypothesis>=6.0",
-    "textual==8.2.8",
-    "websockets==16.0",
     # Lint, type and complexity tooling, added 2026-10-21 after the approver
     # project's 2026-10-13 layout. Exact pins where a release changes the
     # finding set; bump deliberately and re-baseline scripts/lint.sh.
