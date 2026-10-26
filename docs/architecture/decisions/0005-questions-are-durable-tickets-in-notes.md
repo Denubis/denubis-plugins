@@ -1,6 +1,8 @@
 # ADR 0005 — Questions are durable tickets in `.notes`, and rulings go to a register there
 
-**Status:** Accepted (2026-09-14)
+**Status:** Accepted (2026-09-14). Amended 2026-10-26: the default decision register moves
+into the tracked docs tree (see the amendment below); the ticket file stays in the notes
+directory (ADR 0044).
 
 ## Authority evidence
 
@@ -56,3 +58,26 @@ default and rulings made in a pane stayed oral.
   it had none before.
 - Two register conventions now coexist across repositories; the default applies only where
   none existed.
+
+## Amendment (2026-10-26): the default decision register is a `decisions` directory under tracked `docs`
+
+The ticket stays a note (ADR 0044), but a decision register is durable material that other
+machines and sessions cite, so under ADR 0043 it does not live in the notes directory. Brian,
+asked whether to repair the registers the 2026-10-26 survey found inside notes directories
+across his repositories, ruled: "let's go fix those repos please. both telling and the 15."
+(line 5997, `user` record `0f7e5856-cc69-40bd-843b-7d77a2450c2f`, 2026-10-26T05:25:17Z, in
+session `3d3778b3-cc7f-4fd5-9aaa-8bc5704aeb29`; "the 15" are the fifteen registers found under
+a notes directory.)
+
+- The default register for a project without one is a `decisions` directory directly under
+  the main checkout's tracked `docs` directory, with a `README.md` index. The
+  `docs/architecture/decisions/` form this repository uses and the one-file
+  `adr-register.md` form inside such a directory remain accepted existing conventions.
+- A register found inside a notes directory is moved into `docs/`, each record keeping its
+  original-message resolvers, and the register index and project instructions repointed.
+- The skills that create or read the default register follow this amendment in their next
+  releases; until then the ADR governs.
+
+```sh
+sed -n '5997p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/3d3778b3-cc7f-4fd5-9aaa-8bc5704aeb29.jsonl
+```
