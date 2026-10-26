@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-instruction-budget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Warn when always-on agent instructions exceed their agreed budget.",
   "author": {
     "name": "Brian Ballsun-Stanton",

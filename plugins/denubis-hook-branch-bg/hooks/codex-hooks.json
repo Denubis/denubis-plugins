@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${PLUGIN_ROOT}/hooks/branch-bg.py\"",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"branch-bg: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --script --python '>=3.14' --no-project --no-config \"${PLUGIN_ROOT}/hooks/branch-bg.py\"",
             "timeout": 5
           }
         ]

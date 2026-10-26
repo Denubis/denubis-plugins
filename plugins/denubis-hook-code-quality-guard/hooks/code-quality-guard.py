@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Block concrete code writes that bypass user-facing tests or migrations."""
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
 
-from __future__ import annotations
+"""Block concrete code writes that bypass user-facing tests or migrations."""
 
 import json
 import re
@@ -132,7 +137,7 @@ def _deny(reason: str, *, include_system_message: bool) -> dict:
 def main() -> int:
     try:
         input_data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    except json.JSONDecodeError, EOFError:
         return 0
 
     if not isinstance(input_data, dict) or input_data.get("tool_name") not in {

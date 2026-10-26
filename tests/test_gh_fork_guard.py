@@ -339,8 +339,30 @@ def test_codex_plugin_routes_bash_to_shared_guard() -> None:
     assert _PLUGIN_ROOT / manifest["hooks"] == _CODEX_HOOKS_PATH
     command = hooks["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
     assert hooks["hooks"]["PreToolUse"][0]["matcher"] == "Bash"
-    assert command == (
-        'DENUBIS_HOOK_PROVIDER=codex python3 "${PLUGIN_ROOT}/hooks/gh-fork-guard.py"'
+    result = subprocess.run(
+        ["/bin/sh", "-c", command],
+        env={
+            **os.environ,
+            "PLUGIN_ROOT": str(_PLUGIN_ROOT),
+            "ALLOWED_GH_REPO": "denubis/denubis-plugins",
+        },
+        input=json.dumps(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh issue list --repo upstream/project"},
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert "systemMessage" not in output
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert (
+        "upstream/project" in output["hookSpecificOutput"]["permissionDecisionReason"]
     )
 
 

@@ -20,7 +20,9 @@ delivery is gone fails too, so no exemption outlives its subject.
 """
 
 import json
+import os
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,11 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 PROJECT_NOTES_ROOT = REPO_ROOT / "plugins" / "denubis-project-notes"
 PLAN_HOOKS = (
-    REPO_ROOT
-    / "plugins"
-    / "denubis-plan-and-execute"
-    / "hooks"
-    / "claude-hooks.json"
+    REPO_ROOT / "plugins" / "denubis-plan-and-execute" / "hooks" / "claude-hooks.json"
 )
 
 
@@ -528,7 +526,9 @@ def test_project_notes_retrieval_is_direct_main_agent_work() -> None:
     ).is_file()
 
 
-def test_session_start_keeps_side_effects_without_generic_workflow_context() -> None:
+def test_session_start_keeps_side_effects_without_generic_workflow_context(
+    tmp_path: Path,
+) -> None:
     events = _marketplace_hook_events()
     plan_hooks = json.loads(PLAN_HOOKS.read_text(encoding="utf-8"))["hooks"]
     session_commands = [
@@ -538,6 +538,30 @@ def test_session_start_keeps_side_effects_without_generic_workflow_context() -> 
     ]
 
     assert ("denubis-basic-agents", "SessionStart") not in events
-    assert session_commands == [
-        'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/update-live-marker.py"'
-    ]
+    assert len(session_commands) == 1
+    marker = tmp_path / "session.live"
+    marker.write_text("session_id=old\nstart_time=unchanged\n", encoding="utf-8")
+    session_id = "01234567-89ab-cdef-0123-456789abcdef"
+    result = subprocess.run(
+        ["/bin/sh", "-c", session_commands[0]],
+        env={
+            **os.environ,
+            "CLAUDE_PLUGIN_ROOT": str(PLAN_HOOKS.parents[1]),
+            "CR_LIVE_FILE": str(marker),
+        },
+        input=json.dumps(
+            {
+                "hook_event_name": "SessionStart",
+                "transcript_path": str(tmp_path / f"{session_id}.jsonl"),
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert marker.read_text(encoding="utf-8") == (
+        f"session_id={session_id}\nstart_time=unchanged\n"
+    )

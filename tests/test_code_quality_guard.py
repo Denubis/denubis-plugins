@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -353,27 +354,30 @@ def test_codex_plugin_routes_apply_patch_to_shared_guard() -> None:
 
     assert manifest["name"] == "denubis-hook-code-quality-guard"
     assert PLUGIN_ROOT / manifest["hooks"] == CODEX_HOOKS_PATH
-    assert hooks == {
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": "apply_patch",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": "".join(
-                                (
-                                    'python3 "${PLUGIN_ROOT}/hooks/',
-                                    'code-quality-guard.py"',
-                                )
-                            ),
-                            "timeout": 5,
-                        }
-                    ],
-                }
-            ]
-        }
-    }
+    assert set(hooks["hooks"]) == {"PreToolUse"}
+    registration = hooks["hooks"]["PreToolUse"][0]
+    assert registration["matcher"] == "apply_patch"
+    handler = registration["hooks"][0]
+    assert handler["type"] == "command"
+    result = subprocess.run(
+        ["/bin/sh", "-c", handler["command"]],
+        env={**os.environ, "PLUGIN_ROOT": str(PLUGIN_ROOT)},
+        input=json.dumps(
+            {
+                "tool_name": "apply_patch",
+                "tool_input": {
+                    "command": "*** Begin Patch\n"
+                    "*** Add File: tests/e2e/test_editor.py\n"
+                    '+await page.evaluate("document.body.click()")\n*** End Patch\n'
+                },
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    _assert_explained_deny(result, expects_system_message=False, expected_returncode=0)
 
 
 def test_codex_marketplace_exposes_code_quality_guard() -> None:

@@ -58,7 +58,6 @@ extend-exclude = [".worktrees"]
 # a SyntaxError below 3.14 (see CLAUDE.md, caught 2026-09-03). Verified on
 # 2026-10-21 that this table governs `ruff format`, not only the linter.
 [tool.ruff.per-file-target-version]
-"plugins/*/hooks/*.py" = "py39"
 "plugins/denubis-external-agents/skills/supervising-codex/hooks/install-codex-hooks.py" = "py39"
 "plugins/denubis-external-agents/scripts/update_codex_profile.py" = "py310"
 # The nine `>=3.11` bibliography scripts and every module they import.

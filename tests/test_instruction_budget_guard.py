@@ -8,9 +8,12 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOK_PATH = (
@@ -181,7 +184,7 @@ def test_codex_honors_configured_fallback_and_project_limit(
     project = tmp_path / "project"
     config_root.mkdir(parents=True)
     config_root.joinpath("config.toml").write_text(
-        'project_doc_max_bytes = 40000\n'
+        "project_doc_max_bytes = 40000\n"
         'project_doc_fallback_filenames = ["CLAUDE.md"]\n',
         encoding="utf-8",
     )
@@ -306,6 +309,7 @@ def test_provider_manifests_run_the_shared_alarm_only_at_startup(
     provider: str,
     manifest_directory: str,
     root_variable: str,
+    tmp_path: Path,
 ) -> None:
     manifest = json.loads(
         (PLUGIN_ROOT / manifest_directory / "plugin.json").read_text(encoding="utf-8")
@@ -319,7 +323,31 @@ def test_provider_manifests_run_the_shared_alarm_only_at_startup(
     assert registration["matcher"] == "startup"
     assert len(registration["hooks"]) == 1
     command = registration["hooks"][0]["command"]
-    assert command == (
-        f'python3 "${{{root_variable}}}/hooks/instruction-budget.py" '
-        f"--provider {provider}"
+    project = tmp_path / "project"
+    config_root = tmp_path / "config"
+    config_root.mkdir()
+    filename = "AGENTS.md" if provider == "codex" else "CLAUDE.md"
+    _write_lines(project / filename, 201)
+    environment = {
+        **os.environ,
+        root_variable: str(PLUGIN_ROOT),
+        "CLAUDE_CONFIG_DIR": str(config_root),
+        "CODEX_HOME": str(config_root),
+    }
+    result = subprocess.run(
+        ["/bin/sh", "-c", command],
+        cwd=project,
+        env=environment,
+        input=json.dumps({"hook_event_name": "SessionStart", "cwd": str(project)}),
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
     )
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert set(output) == {"systemMessage"}
+    assert (
+        f"Always-on {provider} instruction budget exceeded" in output["systemMessage"]
+    )
+    assert "201 lines" in output["systemMessage"]

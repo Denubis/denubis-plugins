@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Alarm when always-on agent instructions exceed their agreed budget."""
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
 
-from __future__ import annotations
+"""Alarm when always-on agent instructions exceed their agreed budget."""
 
 import argparse
 import ast
@@ -12,11 +17,11 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     import tomllib as tomllib_module
-except ImportError:  # pragma: no cover - exercised by the Python 3.9 hook runtime
+except ImportError:  # pragma: no cover - defensive TOML fallback
     tomllib_module: Any = None
 
 LINE_LIMIT = 200
@@ -70,10 +75,10 @@ class BudgetReport:
         return self.provider == "codex" and self.project_bytes > self.project_limit
 
 
-def _read_source(path: Path, scope: str) -> Optional[InstructionSource]:
+def _read_source(path: Path, scope: str) -> InstructionSource | None:
     try:
         data = path.read_bytes()
-    except (FileNotFoundError, IsADirectoryError, PermissionError):
+    except FileNotFoundError, IsADirectoryError, PermissionError:
         return None
     if not data.strip():
         return None
@@ -100,7 +105,7 @@ def _directories(project_root: Path, cwd: Path) -> tuple[Path, ...]:
     return tuple(directories)
 
 
-def _first_non_empty(paths: tuple[Path, ...], scope: str) -> Optional[InstructionSource]:
+def _first_non_empty(paths: tuple[Path, ...], scope: str) -> InstructionSource | None:
     for path in paths:
         source = _read_source(path, scope)
         if source is not None:
@@ -111,7 +116,7 @@ def _first_non_empty(paths: tuple[Path, ...], scope: str) -> Optional[Instructio
 def _is_path_scoped_rule(path: Path) -> bool:
     try:
         text = path.read_text(encoding="utf-8")
-    except (FileNotFoundError, IsADirectoryError, PermissionError, UnicodeDecodeError):
+    except FileNotFoundError, IsADirectoryError, PermissionError, UnicodeDecodeError:
         return False
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
@@ -138,7 +143,7 @@ def _rule_candidates(root: Path, scope: str) -> list[tuple[Path, str]]:
 def _claude_imports(source: InstructionSource, home: Path) -> tuple[Path, ...]:
     try:
         text = source.path.read_text(encoding="utf-8")
-    except (FileNotFoundError, IsADirectoryError, PermissionError, UnicodeDecodeError):
+    except FileNotFoundError, IsADirectoryError, PermissionError, UnicodeDecodeError:
         return ()
     imports: list[Path] = []
     in_fence = False
@@ -191,7 +196,7 @@ def _claude_sources(
     cwd: Path,
     home: Path,
     project_root: Path,
-    config_root: Optional[Path],
+    config_root: Path | None,
 ) -> tuple[InstructionSource, ...]:
     config_root = config_root or home / ".claude"
     candidates: list[tuple[Path, str]] = [(config_root / "CLAUDE.md", "global")]
@@ -223,7 +228,7 @@ def _codex_sources(
     cwd: Path,
     home: Path,
     project_root: Path,
-    config_root: Optional[Path],
+    config_root: Path | None,
     fallback_filenames: tuple[str, ...],
 ) -> tuple[InstructionSource, ...]:
     config_root = config_root or home / ".codex"
@@ -265,7 +270,7 @@ def _fallback_codex_config(text: str) -> dict[str, Any]:
             continue
         try:
             values[key] = ast.literal_eval(raw_value)
-        except (SyntaxError, ValueError):
+        except SyntaxError, ValueError:
             continue
     return values
 
@@ -274,7 +279,7 @@ def _codex_config(config_root: Path) -> tuple[int, tuple[str, ...]]:
     path = config_root / "config.toml"
     try:
         data = path.read_bytes()
-    except (FileNotFoundError, IsADirectoryError, PermissionError):
+    except FileNotFoundError, IsADirectoryError, PermissionError:
         return DEFAULT_CODEX_PROJECT_LIMIT, ()
     if tomllib_module is not None:
         values = tomllib_module.loads(data.decode("utf-8"))
@@ -302,8 +307,8 @@ def inspect_instruction_budget(
     cwd: Path,
     home: Path,
     project_root: Path,
-    config_root: Optional[Path] = None,
-    project_limit: Optional[int] = None,
+    config_root: Path | None = None,
+    project_limit: int | None = None,
 ) -> BudgetReport:
     """Measure applicable global and project files as one policy budget."""
 
@@ -328,12 +333,14 @@ def inspect_instruction_budget(
     return BudgetReport(
         provider=provider,
         sources=sources,
-        project_bytes=sum(source.bytes for source in sources if source.scope == "project"),
+        project_bytes=sum(
+            source.bytes for source in sources if source.scope == "project"
+        ),
         project_limit=resolved_project_limit,
     )
 
 
-def warning_output(report: BudgetReport) -> Optional[dict[str, str]]:
+def warning_output(report: BudgetReport) -> dict[str, str] | None:
     """Return a visible advisory without adding more model instructions."""
 
     if report.within_limits and not report.project_truncated:
@@ -407,8 +414,7 @@ def main() -> None:
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         output = {
             "systemMessage": (
-                "Instruction budget guard could not inspect the startup chain: "
-                f"{error}"
+                f"Instruction budget guard could not inspect the startup chain: {error}"
             )
         }
     if output is not None:

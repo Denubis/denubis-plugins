@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-code-quality-guard",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Block concrete browser-test, schema-migration, and shell-authorship violations.",
   "author": {
     "name": "Brian Ballsun-Stanton",

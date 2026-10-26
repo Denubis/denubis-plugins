@@ -1,7 +1,7 @@
 {
     "name": "denubis-hook-branch-bg",
     "description": "SessionStart hook plus a tmux pane-title strip: every pane shows [person][repo][branch][session] as coloured blocks with black-or-white text, colours assigned through a per-machine registry, the field behind text a near-black shade of the repo colour (tmux pane and OSC 11).",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

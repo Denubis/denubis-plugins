@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
+
 """Colour tmux panes and the terminal by person, repo, branch, and session.
 
 Every pane gets a title strip of up to four coloured blocks, drawn by tmux from
@@ -26,8 +33,6 @@ Modes:
 Brian, 2026-10-09: the colour is a highlight, not the field under white text;
 one block per person, repo, branch and session; black or white text as needed.
 """
-
-from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
 
 import fcntl
 import hashlib

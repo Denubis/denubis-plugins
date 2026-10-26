@@ -52,6 +52,41 @@ A Claude Code mod that records what reaches the main conversation, changing noth
 - Generate temporary Antigravity installation copies with inherited models and translated tool metadata; validate all copies before installing. Shared agent sources remain unchanged apart from the YAML quoting repair.
 - Preserve command files without promising native conversion: installed Antigravity currently leaves them unloaded.
 
+## [denubis-external-agents] 0.24.1
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-hook-branch-bg] 0.3.1
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-hook-code-quality-guard] 0.3.1
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-hook-gh-fork-guard] 1.2.5
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-hook-instruction-budget] 0.1.1
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.5
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
+## [denubis-plan-and-execute] 4.2.3
+
+**Fixed:**
+- Launch Python hooks through `uv run --script --python '>=3.14'` with matching PEP 723 metadata, independently of the caller's project and configuration (ADR 0038). A missing uv reports its installation URL and exits with nonblocking status 1.
+
 ## [denubis-basic-agents] 3.0.1
 
 **Fixed:**

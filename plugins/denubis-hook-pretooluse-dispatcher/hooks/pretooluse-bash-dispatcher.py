@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
+
 """PreToolUse:Bash dispatcher — discover, run, and merge hooks by priority.
 
 Port of pretooluse-bash-dispatcher.sh. Two hook sources, run in priority order:
@@ -30,8 +37,6 @@ with a literal "\\n\\n" (an uninterpreted escape in a double-quoted string);
 this port joins with real newlines, which was the evident intent. No test
 pinned the separator.
 """
-
-from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
 
 import contextlib
 import hashlib
@@ -71,10 +76,6 @@ _MARKETPLACE_GLOB = f"*/plugins/*/hooks/{CONVENTION_FILE}"
 
 
 def _load_settings() -> dict | None:
-    # Kept as two single-exception clauses, not a tuple: this hook runs via
-    # `uv run python` in the user's CWD, whose project may pin Python < 3.14.
-    # A tuple except would be rewritten to PEP 758 (3.14-only) form by ruff and
-    # then SyntaxError there. Do not recombine.
     try:
         text = SETTINGS_FILE.read_text(encoding="utf-8")
     except OSError:
@@ -297,7 +298,7 @@ def normalize_deny_output(out: str) -> str:
     """Give every deny both model-facing and transcript-facing reasons."""
     try:
         data = json.loads(out)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return out
     if not isinstance(data, dict):
         return out

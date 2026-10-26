@@ -14,12 +14,15 @@ Claude Code plugins for design, implementation, and development workflows.
   `[tool.ruff.per-file-target-version]`. Evidence: the `except OSError` comment in
   `plugins/denubis-academic/skills/using-bibliography/zotero_auth.py`, caught on
   2026-09-03 when the formatter produced the rewrite.
-- Hook programs under `plugins/*/hooks/*.py` must parse and import on Python 3.9 or
-  newer. Keep annotations runtime-safe with `from __future__ import annotations` and
-  use portable exception clauses. Hooks run through the caller's resolved Python, not a
-  PEP 723 script environment.
+- Hook programs under `plugins/*/hooks/*.py` are launched as
+  `uv run --script "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.py"` and carry a PEP 723 block
+  declaring the repository floor (`requires-python = ">=3.14"`), so uv resolves or
+  downloads the interpreter on Linux and macOS and the hook may import plugin packages.
+  No fallback to a bare `python3`. A hook that reaches a local service makes one call and
+  exits zero when the service is absent. ADR 0038 (2026-10-24) retired the earlier 3.9
+  carve-out.
 - In this uv project, invoke repository Python and tools through `uv run`; prefer console
-  entry points over `python -m`. Packaged hooks follow the runtime exception above.
+  entry points over `python -m`.
   Authority: `cc-search-chats context e3d35d8d-bfe1-4677-adc1-e92ef3ad6e9d --json`
   and `cc-search-chats context 8fc827c0-b9d3-4e7d-8f92-268a7743e930 --json` (raw
   records: `/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/64611e50-8793-451a-82ca-0b4fc5264e02.jsonl:58` and `:69`).

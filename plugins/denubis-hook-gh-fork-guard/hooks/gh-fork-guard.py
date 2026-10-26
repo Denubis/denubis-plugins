@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
+
 """
 PreToolUse hook that blocks gh CLI commands targeting repos other than the user's fork.
 
@@ -16,8 +23,6 @@ Detection covers:
 - gh api paths containing repos/OWNER/REPO where OWNER/REPO is not the fork
 - gh repo clone/fork/view with explicit non-fork targets
 """
-
-from __future__ import annotations  # keep PEP 604 annotations runtime-free on <3.10
 
 import json
 import os

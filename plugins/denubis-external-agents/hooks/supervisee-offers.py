@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
+
 """Bubble a teammate pane's "You should know" offer up to its team lead.
 
 ADR 0028: an offer that Claude Code's builtin `cc-plugin-you-should-know` shows
@@ -23,11 +30,9 @@ remembered in the `@ysk_forwarded` option on the lead's own tmux pane, so they
 live and die with the pane. A missing or unreadable store is reported, not
 swallowed, whenever there is a teammate to report it for.
 
-Layouts observed on Claude Code 2.1.296, 2026-10-12. Must import and run on
-Python 3.9 (repo hook rule); keep annotations deferred.
+Layouts observed on Claude Code 2.1.296, 2026-10-12. Launched through uv at
+the repository Python floor (ADR 0038).
 """
-
-from __future__ import annotations
 
 import json
 import os
@@ -200,7 +205,7 @@ def _claude_dir() -> Path:
 def _read_json(path: Path) -> dict | None:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     return value if isinstance(value, dict) else None
 
@@ -247,7 +252,7 @@ def _tmux(*args: str) -> str | None:
         result = subprocess.run(
             ["tmux", *args], capture_output=True, text=True, timeout=3, check=False
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return None
     return result.stdout if result.returncode == 0 else None
 
@@ -320,7 +325,7 @@ def _context_for(session_id: str) -> str | None:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except (ValueError, OSError):
+    except ValueError, OSError:
         payload = {}
     event = str(payload.get("hook_event_name") or "PostToolUse")
     context = _context_for(str(payload.get("session_id") or ""))

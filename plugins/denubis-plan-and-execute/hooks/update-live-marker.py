@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.14"
+# dependencies = []
+# [tool.ty.environment]
+# python-version = "3.14"
+# ///
+
 """SessionStart hook (denubis-plan-and-execute) — keep the crash-recovery .live
 marker's session_id= line pointed at the LIVE transcript across /clear rotation,
 so correlate()'s exact match names the live work (ADR 0003).
 
 Stdlib only (json, os, re, sys, pathlib, tempfile). Invoked as a SessionStart
-command via plain `python3` (NOT `uv run`): the hook runs with arbitrary cwd and
-must not depend on a uv project. Stdlib-only keeps that safe.
+command via `uv run --script` at the repository Python floor, independently
+of the caller's project and configuration (ADR 0038).
 
 Contract (Phase 2b Task 1, revised 2026-06-17):
   - No-op + exit 0 unless CR_LIVE_FILE is set/non-empty AND names an existing
@@ -30,8 +37,6 @@ Contract (Phase 2b Task 1, revised 2026-06-17):
   - ALWAYS exit 0. Any internal error -> stderr diagnostic + exit 0; never a
     partial write. Emit nothing on stdout.
 """
-
-from __future__ import annotations
 
 import contextlib
 import json
