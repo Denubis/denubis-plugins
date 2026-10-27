@@ -2,6 +2,21 @@
 
 Companion to `todo.md`. One entry per dispatch or ruling, newest first.
 
+## 2026-10-27
+
+- Brian: "sure, commit., do the cutover." Landed and pushed to origin main (eleven commits
+  rebased onto the three incoming ones, plus one follow-up fixing a test that could not
+  collect the two new mod plugins' manifests): hook migration, ADR 0033, the 2026-10-09
+  documents and citation repairs, the flaky-test fix, the rulings with the specification and
+  plans, the permission-queue removal under ADR 0034, and the commit-skill 1.5.0 release with
+  the checker. The permission-queue repository has its first commit (f71a619), the installed
+  launcher points at it, and its two tickets moved with it. Phaedra/Paper: "no local mail"
+  recorded as that register's record 0008; approver keeps its ticket file under docs (ADR
+  0044 amendment). The fifteen register moves are staged in their repositories but every
+  commit gate there exits 1, almost entirely on missing-path findings in registers, which
+  awaits Brian's ruling on whether that kind is advisory. Full suite after the rebase: 2395
+  passed, 14 skipped.
+
 ## 2026-10-26
 
 - Brian asked whether his global instruction (a ticket file under `docs/`) or ADRs 0005 and
