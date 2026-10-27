@@ -27,9 +27,10 @@ _SCRIPT_REFERENCE = re.compile(r"hooks/([a-z-]+\.py)")
 
 def _commands(path: Path) -> list[str]:
     data = json.loads(path.read_text(encoding="utf-8"))
+    # A mod manifest registers `modules` and carries no command hooks.
     return [
         handler["command"]
-        for groups in data["hooks"].values()
+        for groups in data.get("hooks", {}).values()
         for group in groups
         for handler in group["hooks"]
         if handler["type"] == "command" and ".py" in handler["command"]
