@@ -182,7 +182,11 @@ an empty defect list is bounded by a positive inventory.
 ## Implementation ownership
 
 ```text
-scripts/verify.py   raw-log rules, Codex thread parser, live diagnostics
+scripts/agent_logs/ denubis-agent-logs: log roots, tolerant JSONL reading, Claude
+                    transcript discovery, usage records and the audited
+                    deduplication rule, timestamps, weekly windows, cost weights
+scripts/verify.py   Claude pass over the library, its own cwd binding, Codex thread
+                    parser, live diagnostics
 scripts/mapper.py   project-path mapping
 scripts/estimate.py report collection, rollup, exact-window CLI
 tests/              fixture corpora with explicit expected answers

@@ -9,6 +9,7 @@ exclude-newer-span = "P14D"
 [manifest]
 members = [
     "crash-recovery",
+    "denubis-agent-logs",
     "denubis-plugins",
     "workflow-statusline",
 ]
@@ -133,6 +134,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [{ name = "typer", specifier = ">=0.12" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0" }]
+
+[[package]]
+name = "denubis-agent-logs"
+version = "0.1.0"
+source = { editable = "plugins/denubis-token-estimator/scripts/agent_logs" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]

@@ -22,7 +22,10 @@ finding is more useful than a padded list.
 ## Constraints
 
 - Read logs only. Write probes and the final report outside the log stores.
-- Use an implementation independent of `verify.py` and `estimate.py`.
+- Use an implementation independent of `verify.py`, `estimate.py` and the
+  `denubis-agent-logs` library under `scripts/agent_logs/`, which holds the
+  deduplication, record-selection and subagent rules those scripts apply. Do not import
+  it.
 - Treat negative searches as unproven until you establish which files and record types
   the probe could see.
 - Report malformed and unparseable records rather than silently skipping them.

@@ -28,6 +28,7 @@ dev = [
 members = [
     "plugins/denubis-plan-and-execute/scripts/workflow_statusline",
     "plugins/denubis-crash-recovery/scripts/crash_recovery",
+    "plugins/denubis-token-estimator/scripts/agent_logs",
 ]
 
 [tool.pytest.ini_options]
@@ -36,6 +37,7 @@ testpaths = [
     "plugins/denubis-plan-and-execute/scripts/workflow_statusline/tests",
     "plugins/denubis-crash-recovery/scripts/crash_recovery/tests",
     "plugins/denubis-token-estimator/tests",
+    "plugins/denubis-token-estimator/scripts/agent_logs/tests",
 ]
 
 # Lint, type and complexity gates, added 2026-10-21. Warn-only for now:
@@ -196,5 +198,5 @@ exclude = ["**/tests/**", "**/test_*.py", "**/.venv/**", "**/.worktrees/**"]
 
 [tool.vulture]
 min_confidence = 80
-paths = ["plugins", "scripts", "tests", "docs"]
+paths = ["plugins", "scripts", "tests"]
 exclude = ["*__pycache__*", ".venv", ".worktrees"]

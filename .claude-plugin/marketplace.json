@@ -11,7 +11,7 @@
     {
       "name": "denubis-00-getting-started",
       "description": "Getting started guide and onboarding for denubis-plugins",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "source": "./plugins/denubis-00-getting-started",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-      "version": "4.2.3",
+      "version": "4.2.4",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -55,7 +55,7 @@
     {
       "name": "denubis-extending-agents",
       "description": "Authoring and maintaining agent extensions for Claude Code and Codex: plugins, agents, skills, directives, CLAUDE.md and AGENTS.md files, marketplaces, and upstream sync",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "source": "./plugins/denubis-extending-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -66,7 +66,7 @@
     {
       "name": "denubis-git-commit",
       "description": "Git commit skill for Claude Code. Handles /commit as a proper skill.",
-      "version": "1.5.0",
+      "version": "1.5.1",
       "source": "./plugins/denubis-git-commit",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -81,7 +81,7 @@
     {
       "name": "denubis-hook-code-quality-guard",
       "description": "PreToolUse guard for concrete browser-test and schema-migration violations.",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "source": "./plugins/denubis-hook-code-quality-guard",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -100,7 +100,7 @@
     {
       "name": "denubis-hook-gh-fork-guard",
       "description": "PreToolUse hook that blocks gh CLI commands targeting any repo other than the user's fork. Auto-discovered by the pretooluse-bash dispatcher.",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "source": "./plugins/denubis-hook-gh-fork-guard",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -116,7 +116,7 @@
     {
       "name": "denubis-hook-pretooluse-dispatcher",
       "description": "PreToolUse:Bash dispatcher with auto-discovery from marketplace plugins and drop directory. Runs hooks sequentially and merges outputs.",
-      "version": "1.1.5",
+      "version": "1.1.6",
       "source": "./plugins/denubis-hook-pretooluse-dispatcher",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -132,7 +132,7 @@
     {
       "name": "denubis-hook-branch-bg",
       "description": "SessionStart hook plus a tmux pane-title strip: every pane shows [person][repo][branch][session] as coloured blocks with black-or-white text, colours assigned through a per-machine registry, the field behind text a near-black shade of the repo colour (tmux pane and OSC 11).",
-      "version": "0.3.1",
+      "version": "0.3.3",
       "source": "./plugins/denubis-hook-branch-bg",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -187,7 +187,7 @@
     {
       "name": "denubis-token-estimator",
       "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Output tokens are origin-deduplicated and split between root threads and subagent fan-out; human input words exclude injected records and named machine markers and are split into own authorship and pasted text. Report per project, by month or exact time window. WIP \u2014 independent audit pending.",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "source": "./plugins/denubis-token-estimator",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -206,7 +206,7 @@
     {
       "name": "denubis-external-agents",
       "description": "Consult other agent sessions without merging their authority into the caller. Run Codex peer reviews, launch a human-triggered Fable consultation with an explicit tool-surface check, or supervise a Codex pane. Review findings require resolvable provenance. WIP.",
-      "version": "0.24.1",
+      "version": "0.24.2",
       "source": "./plugins/denubis-external-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -241,7 +241,7 @@
     {
       "name": "denubis-hook-instruction-budget",
       "description": "SessionStart alarm for oversized global and project instruction chains in Claude Code and Codex.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": "./plugins/denubis-hook-instruction-budget",
       "author": {
         "name": "Brian Ballsun-Stanton",

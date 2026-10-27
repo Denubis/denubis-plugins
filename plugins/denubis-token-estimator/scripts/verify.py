@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["denubis-agent-logs"]
+#
+# [tool.uv.sources]
+# denubis-agent-logs = { path = "agent_logs", editable = true }
+# ///
 """Reproducible audit harness for the token/word estimator methodology.
 
 Every headline number in DESIGN.md is re-derived here directly from the live logs,
@@ -13,10 +20,14 @@ Use it as the starting point, then write INDEPENDENT probes to falsify the assum
 called out in docs/AUDIT-BRIEF.md.
 
 Usage:
-  python3 verify.py            # human report
-  python3 verify.py --json     # machine-readable results for an external auditor
+  uv run --script verify.py          # human report
+  uv run --script verify.py --json   # machine-readable results for an external auditor
 
-Read-only. Stdlib only. Reads ~/.claude/projects and ~/.codex/sessions.
+Read-only. Standard library plus this plugin's own `denubis-agent-logs` library
+(`scripts/agent_logs`), which the inline metadata above installs. Reads
+$CLAUDE_CONFIG_DIR/projects (default ~/.claude/projects) and $CODEX_HOME/sessions
+(default ~/.codex/sessions). Claude lines and files it cannot read are counted on
+stderr; the Codex pass skips an unreadable file or line silently.
 """
 
 from __future__ import annotations
@@ -26,13 +37,25 @@ import json
 import re
 import sys
 import tomllib
-from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
 
-CLAUDE_ROOT = Path.home() / ".claude" / "projects"
-CODEX_ROOT = Path.home() / ".codex" / "sessions"
+from denubis_agent_logs.claude import (
+    SUBAGENT_DIRECTORY,
+    TranscriptFile,
+    text_blocks,
+    transcript_files,
+    usage_record,
+)
+from denubis_agent_logs.records import ReadReport, iter_records, summarise
+from denubis_agent_logs.roots import claude_projects_root, codex_sessions_root
+from denubis_agent_logs.timestamps import parse_timestamp
+
+CLAUDE_ROOT = claude_projects_root()
+CODEX_ROOT = codex_sessions_root()
 LARGEST_KEEP = 10  # retained original-word blocks listed for hand-checking
+# Every Claude line either pass counts carries one of these; others are not parsed.
+_CLAUDE_NEEDLES = (b'"assistant"', b'"user"')
 
 
 # People-roots are NOT hardcoded. They come from ~/.token-estimator (TOML) as a
@@ -205,7 +228,33 @@ def pct(a, b):
 
 
 def claude_files():
-    return list(CLAUDE_ROOT.rglob("*.jsonl"))
+    return [
+        transcript.path
+        for transcript in transcript_files(CLAUDE_ROOT, include_subagents=True)
+    ]
+
+
+def claude_transcripts():
+    """Every Claude transcript, marked as a subagent's by its own path.
+
+    A transcript is a subagent's when a directory on its path is named
+    ``subagents``. The mark is taken from each path rather than from discovery, so
+    the transcripts follow whatever ``claude_files`` returns.
+    """
+    return [
+        TranscriptFile(path, SUBAGENT_DIRECTORY in path.parts[:-1])
+        for path in claude_files()
+    ]
+
+
+def iter_claude_records(report):
+    """Yield ``(transcript, record)`` for each assistant or user line of every file.
+
+    Torn lines and unreadable files are skipped and counted in ``report``.
+    """
+    for transcript in claude_transcripts():
+        for record in iter_records([transcript.path], report, needles=_CLAUDE_NEEDLES):
+            yield transcript, record
 
 
 def codex_files():
@@ -246,154 +295,144 @@ def _display_path(fp):
 
 
 # ---------------------------------------------------------------- Claude pass
-def claude_pass():
-    """One pass: node 1 (tokens/origin), node 5 (cwd/id), node 3 (human words)."""
-    # node1/5: per message.id -> max out, occurrences (main/sub), cwd@max-out line
-    out_max = collections.defaultdict(int)
-    in_main = collections.defaultdict(bool)
-    in_sub = collections.defaultdict(bool)
-    cwd_atmax = {}  # id -> cwd of the line that set the running max
-    cwds_all = collections.defaultdict(set)
-    # node3
-    blocks = 0
-    words = 0
-    pasted_words = 0
-    pasted_blocks = 0
-    seen_uuid = set()
-    wrap_hist = collections.Counter()
-    record_drop_hist = collections.Counter()
-    # Largest retained original-word blocks: pastes made before the paste wrapper
-    # existed are indistinguishable from typing, so these are the hand-check list.
-    largest = []
+class _ClaudeAudit:
+    """Running node 1, 3 and 5 state for one pass over the Claude transcripts."""
 
-    for fp in claude_files():
-        is_subfile = "/subagents/" in str(fp)
-        try:
-            with fp.open(encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    if '"assistant"' not in line and '"user"' not in line:
-                        continue
-                    try:
-                        r = json.loads(line)
-                    except ValueError:
-                        continue
-                    t = r.get("type")
-                    if t == "assistant":
-                        m = r.get("message") or {}
-                        mid, model = m.get("id"), m.get("model")
-                        if not mid or not model or "synthetic" in model:
-                            continue
-                        cwd = r.get("cwd")
-                        is_main = not (is_subfile or r.get("isSidechain") is True)
-                        if is_main:
-                            in_main[mid] = True
-                        else:
-                            in_sub[mid] = True
-                        cwds_all[mid].add(cwd)
-                        out = (m.get("usage") or {}).get("output_tokens") or 0
-                        # bind cwd to the MAX-token occurrence (node 5 rule)
-                        if (
-                            out > out_max[mid]
-                            or (
-                                out == out_max[mid]
-                                and cwd_atmax.get(mid)
-                                and str(cwd) < str(cwd_atmax[mid])
-                            )
-                        ) and out >= out_max[mid]:
-                            cwd_atmax[mid] = cwd
-                        out_max[mid] = max(out_max[mid], out)
-                    elif t == "user" and not is_subfile:
-                        uid = r.get("uuid")
-                        if uid in seen_uuid:
-                            continue
-                        seen_uuid.add(uid)
-                        dropped = claude_user_excluded(r)
-                        if dropped:
-                            record_drop_hist[dropped] += 1
-                            continue
-                        msg = r.get("message") or {}
-                        content = msg.get("content")
-                        texts = []
-                        if isinstance(content, str):
-                            texts = [content]
-                        elif isinstance(content, list):
-                            texts = [
-                                b.get("text", "")
-                                for b in content
-                                if isinstance(b, dict) and b.get("type") == "text"
-                            ]
-                        for tx in texts:
-                            if not tx or not tx.strip():
-                                continue
-                            marker = claude_machine_marker(tx)
-                            if marker:
-                                wrap_hist[marker] += 1
-                                continue
-                            original, pasted = split_pasted(tx)
-                            blocks += 1
-                            own = len(original.split())
-                            words += own
-                            if pasted.strip():
-                                pasted_blocks += 1
-                                pasted_words += len(pasted.split())
-                            if own:
-                                largest.append(
-                                    (
-                                        own,
-                                        " ".join(original.split()[:8]),
-                                        _display_path(fp),
-                                        uid,
-                                    )
-                                )
-                                if len(largest) > LARGEST_KEEP * 4:
-                                    largest.sort(reverse=True)
-                                    del largest[LARGEST_KEEP:]
-        except OSError:
-            continue
+    def __init__(self):
+        # node1/5: per message.id -> max out, occurrences (main/sub), cwd@max-out line
+        self.out_max = collections.defaultdict(int)
+        self.in_main = collections.defaultdict(bool)
+        self.in_sub = collections.defaultdict(bool)
+        self.cwd_atmax = {}  # id -> cwd of the line that set the running max
+        self.cwds_all = collections.defaultdict(set)
+        # node3
+        self.blocks = 0
+        self.words = 0
+        self.pasted_words = 0
+        self.pasted_blocks = 0
+        self.seen_uuid = set()
+        self.wrap_hist = collections.Counter()
+        self.record_drop_hist = collections.Counter()
+        # Largest retained original-word blocks: pastes made before the paste wrapper
+        # existed are indistinguishable from typing, so these are the hand-check list.
+        self.largest = []
 
-    ids = set(out_max)
-    main_tok = sum(out_max[i] for i in ids if in_main[i])
-    sub_tok = sum(out_max[i] for i in ids if in_main[i] is False and in_sub[i])
-    cross_part = sum(1 for i in ids if in_main[i] and in_sub[i])
-    # node 5 reconciliation: distinct (person,project)/person per id over ALL its cwds
-    cross_person = cross_pp = 0
-    for i in ids:
-        pps = {attribute(c)[:2] for c in cwds_all[i]}
-        if len({p for p, _ in pps}) > 1:
-            cross_person += 1
-        if len(pps) > 1:
-            cross_pp += 1
-    return {
-        "distinct_ids": len(ids),
-        "main_tok": main_tok,
-        "sub_tok": sub_tok,
-        "share": pct(sub_tok, main_tok + sub_tok),
-        "cross_partition": cross_part,
-        "node3_blocks": blocks,
-        "node3_words": words,
-        "node3_pasted_blocks": pasted_blocks,
-        "node3_pasted_words": pasted_words,
-        "node3_largest": [
+    def add_assistant(self, usage):
+        mid, cwd, out = usage.message_id, usage.cwd, usage.output_tokens
+        if usage.is_main:
+            self.in_main[mid] = True
+        else:
+            self.in_sub[mid] = True
+        self.cwds_all[mid].add(cwd)
+        # bind cwd to the MAX-token occurrence (node 5 rule). Kept as written: unlike
+        # estimate.py, a zero-output first occurrence binds no cwd here (ticket L9).
+        if (
+            out > self.out_max[mid]
+            or (
+                out == self.out_max[mid]
+                and self.cwd_atmax.get(mid)
+                and str(cwd) < str(self.cwd_atmax[mid])
+            )
+        ) and out >= self.out_max[mid]:
+            self.cwd_atmax[mid] = cwd
+        self.out_max[mid] = max(self.out_max[mid], out)
+
+    def add_user(self, record, path):
+        uid = record.get("uuid")
+        if uid in self.seen_uuid:
+            return
+        self.seen_uuid.add(uid)
+        dropped = claude_user_excluded(record)
+        if dropped:
+            self.record_drop_hist[dropped] += 1
+            return
+        for text in text_blocks(record):
+            self._add_text(text, path, uid)
+
+    def _add_text(self, tx, path, uid):
+        if not tx or not tx.strip():
+            return
+        marker = claude_machine_marker(tx)
+        if marker:
+            self.wrap_hist[marker] += 1
+            return
+        original, pasted = split_pasted(tx)
+        self.blocks += 1
+        own = len(original.split())
+        self.words += own
+        if pasted.strip():
+            self.pasted_blocks += 1
+            self.pasted_words += len(pasted.split())
+        if own:
+            self.largest.append(
+                (own, " ".join(original.split()[:8]), _display_path(path), uid)
+            )
+            if len(self.largest) > LARGEST_KEEP * 4:
+                self.largest.sort(reverse=True)
+                del self.largest[LARGEST_KEEP:]
+
+    def _cross_attribution(self, ids):
+        # node 5 reconciliation: distinct (person,project)/person per id over ALL
+        # its cwds
+        cross_person = cross_pp = 0
+        for i in ids:
+            pps = {attribute(c)[:2] for c in self.cwds_all[i]}
+            if len({p for p, _ in pps}) > 1:
+                cross_person += 1
+            if len(pps) > 1:
+                cross_pp += 1
+        return cross_person, cross_pp
+
+    def _largest_rows(self):
+        return [
             {"words": n, "lead": lead, "file": file, "uuid": uid}
-            for n, lead, file, uid in sorted(largest, reverse=True)[:LARGEST_KEEP]
-        ],
-        "wrap_hist": dict(wrap_hist),
-        "record_drop_hist": dict(record_drop_hist),
-        "cross_person": cross_person,
-        "cross_person_project": cross_pp,
-    }
+            for n, lead, file, uid in sorted(self.largest, reverse=True)[:LARGEST_KEEP]
+        ]
+
+    def result(self):
+        out_max, in_main, in_sub = self.out_max, self.in_main, self.in_sub
+        ids = set(out_max)
+        main_tok = sum(out_max[i] for i in ids if in_main[i])
+        sub_tok = sum(out_max[i] for i in ids if in_main[i] is False and in_sub[i])
+        cross_part = sum(1 for i in ids if in_main[i] and in_sub[i])
+        cross_person, cross_pp = self._cross_attribution(ids)
+        return {
+            "distinct_ids": len(ids),
+            "main_tok": main_tok,
+            "sub_tok": sub_tok,
+            "share": pct(sub_tok, main_tok + sub_tok),
+            "cross_partition": cross_part,
+            "node3_blocks": self.blocks,
+            "node3_words": self.words,
+            "node3_pasted_blocks": self.pasted_blocks,
+            "node3_pasted_words": self.pasted_words,
+            "node3_largest": self._largest_rows(),
+            "wrap_hist": dict(self.wrap_hist),
+            "record_drop_hist": dict(self.record_drop_hist),
+            "cross_person": cross_person,
+            "cross_person_project": cross_pp,
+        }
+
+
+def claude_pass(report=None):
+    """One pass: node 1 (tokens/origin), node 5 (cwd/id), node 3 (human words).
+
+    Lines and files that could not be read are counted in ``report`` when given.
+    """
+    audit = _ClaudeAudit()
+    records = iter_claude_records(ReadReport() if report is None else report)
+    for transcript, record in records:
+        kind = record.data.get("type")
+        if kind == "assistant":
+            usage = usage_record(record, transcript)
+            if usage is not None:
+                audit.add_assistant(usage)
+        elif kind == "user" and not transcript.is_subagent:
+            audit.add_user(record.data, transcript.path)
+    return audit.result()
 
 
 # ----------------------------------------------------------------- Codex pass
-def parse_timestamp(value):
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
 def _is_new_task(payload):
     return payload.get("type") == "agent_message" and any(
         isinstance(item, dict)
@@ -669,7 +708,9 @@ def base(name, computed, prior):
 def main():
     want_json = "--json" in sys.argv
     sys.stderr.write("scanning Claude logs (one pass)...\n")
-    c = claude_pass()
+    report = ReadReport()
+    c = claude_pass(report)
+    sys.stderr.write(summarise("Claude", report))
     sys.stderr.write("scanning Codex logs (one pass)...\n")
     x = codex_pass()
 

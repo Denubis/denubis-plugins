@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v uv >/dev/null 2>&1 || { echo \"gh-fork-guard: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; DENUBIS_HOOK_PROVIDER=codex uv run --script --python '>=3.14' --no-project --no-config \"${PLUGIN_ROOT}/hooks/gh-fork-guard.py\"",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"gh-fork-guard: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; DENUBIS_HOOK_PROVIDER=codex uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/gh-fork-guard.py\"",
             "timeout": 5
           }
         ]

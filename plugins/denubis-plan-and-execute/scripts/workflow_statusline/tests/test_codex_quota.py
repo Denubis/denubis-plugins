@@ -164,6 +164,21 @@ class CodexQuotaTests(unittest.TestCase):
         self.assertAlmostEqual(at_8am, 100 / 105)
         self.assertEqual(next_7am, at_10pm)
 
+    def test_pace_never_exceeds_one_hundred_after_the_reset(self) -> None:
+        quota = codex_quota
+        start = time.mktime((2026, 8, 11, 7, 0, 0, 0, 0, -1))
+        reset = start + 7 * 86_400
+
+        # 22:00 on reset day: 120 active hours since the window opened against
+        # 105 in the window, so an unclamped pace would read 114.
+        past_reset = quota.pace_percent(
+            now=reset + 15 * 3_600,
+            resets_at=reset,
+            window_minutes=10_080,
+        )
+
+        self.assertEqual(past_reset, 100.0)
+
     def test_renders_usage_over_pace_in_red(self) -> None:
         quota = codex_quota
         reset = time.mktime((2026, 8, 18, 10, 13, 0, 0, 0, -1))

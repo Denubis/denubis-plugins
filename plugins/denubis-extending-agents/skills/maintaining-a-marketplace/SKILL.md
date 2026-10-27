@@ -105,8 +105,53 @@ When releasing a new plugin version, update these files **in this order**:
 1. **`plugins/<name>/.claude-plugin/plugin.json`** — Bump `version`
 2. **`.claude-plugin/marketplace.json`** — Update matching plugin entry's `version` to the same value
 3. **`CHANGELOG.md`** — Add entry at the top (after `# Changelog` heading)
-4. **Validate** — Run `claude plugin validate .` or `/plugin validate .` from the marketplace root
-5. **Commit and push** — Single commit with all three file changes
+4. **Shared-library pins** — Read `[tool.uv.workspace] members` in the root
+   `pyproject.toml`. For every member directory the release touches
+   (`git diff --name-only <base> -- <member path>` is non-empty), find its consumers in
+   other plugins:
+   `rg -n --hidden 'subdirectory *= *["'"'"']<member path>/?["'"'"']' plugins`, where
+   `<member path>` is the member's repository-relative directory exactly as written in
+   `members`. Run it once against a known consumer first, or against the fixture under
+   `tests/`, so an empty result means "no consumer" and not "wrong pattern". If any
+   consumer exists, the release is two-stage: see "Shared libraries" below. The library
+   change must already be pushed on the default branch before this step; then move each
+   consumer's `rev` to that commit's full 40-character hash and bump each consumer
+   plugin's version (steps 1 to 3 for each consumer) in this release. A stale `rev`, a
+   short hash, or an unbumped consumer each ship the old library to installed users
+   while the repository looks correct.
+5. **Validate** — Run `claude plugin validate .` or `/plugin validate .` from the marketplace root
+6. **Commit and push** — One commit with the file changes above. For a shared-library
+   release that is the second of the two commits; the first is the library change itself.
+
+### Shared libraries
+
+An installed plugin runs from its own copy under
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. Only that plugin's directory
+is copied, so a library that lives in another plugin's directory is unreachable by a
+relative path once installed, even though every script can import it inside the
+repository. A consuming script's PEP 723 header declares the library by distribution name
+in `dependencies` and points `[tool.uv.sources]` at the marketplace repository's git URL,
+a full 40-character commit `rev`, and the library's `subdirectory`. uv fetches it over
+the network on first run and serves later runs from its cache. A short hash does not
+cache: uv re-fetches on every run and fails offline (observed with uv 0.13.5).
+
+Rules that follow (ADR 0046):
+
+- **Two stages.** A commit cannot contain its own hash, so the library change lands and
+  is pushed on the default branch first. The release commit that moves consumers' `rev`
+  values and bumps their versions comes second. Pin only hashes that exist on the pushed
+  default branch; checkpoint commits that will be folded are never valid pins.
+- **Consumers bump too.** Claude Code keeps every user on a plugin's cached copy until
+  its manifest version string changes. Moving a `rev` without bumping that plugin's
+  version changes nothing for installed users.
+- **Hooks do not pin.** `hooks/*.py` scripts run at session start inside a timeout and
+  must work offline, so they never take a git-pinned library. They vendor the few
+  functions they need or do not adopt the library. Tools and skill scripts may pin.
+- **Fail noisy, then repair.** Each hook launcher reports a failed `uv run --script` with
+  a `systemMessage` naming the plugin and the repair command. The getting-started
+  plugin's `/setup` command resolves every installed plugin's script
+  environments and, in this repository, compares each consumer's `rev` with the
+  library's last commit.
 
 ### Changelog Format
 
@@ -223,6 +268,8 @@ Manual install uses existing git credential helpers. For background auto-updates
 | Missing source in plugin entry | Plugin can't be installed | Every plugin entry needs `source` |
 | Relative paths in URL-based marketplace | "path not found" errors | Only use relative paths with git-based marketplace add |
 | Not committing all sync files together | Partial release, version mismatch | Single commit for plugin.json + marketplace.json + CHANGELOG.md |
+| Stale shared-library `rev` in a consuming script | Installed plugin runs the old library; repo tests pass | Push the library change first, then move every consumer's `rev` to that full hash and bump each consumer's version (step 4) |
+| Short hash in a `rev` | Works online, fails offline; re-fetches every run | Use the full 40-character hash |
 | Forgetting to push | Local changes, users see old version | Commit AND push after release |
 
 ## Quick Reference

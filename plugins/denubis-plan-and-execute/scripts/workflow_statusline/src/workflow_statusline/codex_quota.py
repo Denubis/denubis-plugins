@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from workflow_statusline.ratelimit import elapsed_active_fraction
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -61,43 +63,16 @@ def quota_from_event(event: object) -> QuotaSnapshot | None:
     return None
 
 
-def active_seconds_in_range(
-    start_ts: float,
-    end_ts: float,
-    *,
-    active_start_hour: int = _ACTIVE_START_HOUR,
-    active_end_hour: int = _ACTIVE_END_HOUR,
-) -> float:
-    """Count local-time seconds in the configured daily active-hours range."""
-    if end_ts <= start_ts:
-        return 0.0
-
-    start = datetime.datetime.fromtimestamp(start_ts)
-    end = datetime.datetime.fromtimestamp(end_ts)
-    total = 0.0
-    day = start.date()
-    while day <= end.date():
-        active_start = datetime.datetime.combine(
-            day, datetime.time(active_start_hour, 0)
-        )
-        active_end = datetime.datetime.combine(day, datetime.time(active_end_hour, 0))
-        overlap_start = max(active_start, start)
-        overlap_end = min(active_end, end)
-        if overlap_end > overlap_start:
-            total += (overlap_end - overlap_start).total_seconds()
-        day += datetime.timedelta(days=1)
-    return total
-
-
 def pace_percent(*, now: float, resets_at: float, window_minutes: int) -> float:
     """Return the active-hours-scaled target percentage for this instant."""
-    window_seconds = window_minutes * 60.0
-    window_start = resets_at - window_seconds
-    active_total = active_seconds_in_range(window_start, resets_at)
-    if active_total <= 0:
-        return 0.0
-    active_elapsed = active_seconds_in_range(window_start, now)
-    return min(max(active_elapsed / active_total * 100.0, 0.0), 100.0)
+    fraction = elapsed_active_fraction(
+        now,
+        resets_at,
+        window_minutes * 60.0,
+        active_start_hour=_ACTIVE_START_HOUR,
+        active_end_hour=_ACTIVE_END_HOUR,
+    )
+    return fraction * 100.0
 
 
 def reset_label(resets_at: float, *, now: float) -> str:

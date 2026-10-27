@@ -34,13 +34,23 @@ settings-discovery failure is absent from stderr, the one property the launcher
 flags change. Each hook's own logic is covered by that plugin's tests and by
 `test_hook_portability`; conflating the two here would couple this guard to hook
 behaviour it does not own.
+
+Since 2026-10-27 (ADR 0046) the launchers drop `--no-config`, which also skipped
+the user's `~/.config/uv/uv.toml`, and pass `--project` with the plugin root
+instead. uv then discovers `pyproject.toml` and `uv.toml` by walking up from the
+plugin directory, never from the caller's cwd, while the hook keeps the caller's
+cwd. Claude and Codex launchers are both checked, and a malformed `uv.toml` in the
+caller's cwd is now a second wedge case.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -48,6 +58,9 @@ import pytest
 # tests/ -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PLUGINS_DIR = _REPO_ROOT / "plugins"
+_FLOOR = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+    "project"
+]["requires-python"]
 
 # uv's configuration-discovery failure signature. Present when uv chokes on the
 # caller's malformed pyproject; absent once `--no-config` takes it out of the
@@ -70,6 +83,19 @@ description = "ours"
 description = "theirs"
 >>>>>>> other
 """
+
+# A uv.toml a merge left mid-conflict. uv names a uv.toml found in its cwd by the
+# bare file name, and one found elsewhere by its full path.
+_MALFORMED_UV_TOML = """\
+<<<<<<< HEAD
+link-mode = "copy"
+=======
+link-mode = "hardlink"
+>>>>>>> other
+"""
+_CWD_UV_TOML_WEDGE = re.compile(r"Failed to parse: `?uv\.toml")
+# `--project` with the plugin root as Claude or Codex names it.
+_ANCHOR = re.compile(r'--project "\$\{(?:CLAUDE_)?PLUGIN_ROOT\}"')
 
 # First run may provision an interpreter via uv; later runs hit the cache.
 _TIMEOUT_S = 180
@@ -100,34 +126,44 @@ def _iter_commands(node: object) -> list[str]:
 
 
 def _uv_run_launchers() -> list[tuple[str, Path]]:
-    """(command, plugin_root) for every Claude ``uv run`` launcher.
+    """(command, plugin_root) for every Claude and Codex ``uv run`` launcher.
 
     plugin_root is the manifest's plugin directory, i.e. the value the hook
-    receives as CLAUDE_PLUGIN_ROOT at runtime.
+    receives as CLAUDE_PLUGIN_ROOT (Claude) or PLUGIN_ROOT (Codex) at runtime.
+    A Codex manifest names its hooks file explicitly; it has no default.
     """
     launchers: list[tuple[str, Path]] = []
     for plugin_root in sorted(path for path in _PLUGINS_DIR.iterdir() if path.is_dir()):
-        manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        hooks_json = plugin_root / manifest.get("hooks", "hooks/hooks.json")
-        try:
-            data = json.loads(hooks_json.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        for command in _iter_commands(data):
-            if "uv run" in command:
-                launchers.append((command, plugin_root))
+        for manifest_dir, default in (
+            (".claude-plugin", "hooks/hooks.json"),
+            (".codex-plugin", None),
+        ):
+            manifest_path = plugin_root / manifest_dir / "plugin.json"
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except OSError, json.JSONDecodeError:
+                continue
+            hooks_name = manifest.get("hooks", default)
+            if hooks_name is None:
+                continue
+            try:
+                data = json.loads(
+                    (plugin_root / hooks_name).read_text(encoding="utf-8")
+                )
+            except OSError, json.JSONDecodeError:
+                continue
+            for command in _iter_commands(data):
+                if "uv run" in command:
+                    launchers.append((command, plugin_root))
     return launchers
 
 
 def _launcher_id(entry: tuple[str, Path]) -> str:
-    """Readable id: '<plugin>/<script>'."""
+    """Readable id: '<plugin>/<script>', with a Codex suffix for Codex launchers."""
     command, plugin_root = entry
-    tail = command.rsplit("/", 1)[-1].rstrip('"').removesuffix(".py")
-    return f"{plugin_root.name}/{tail}"
+    script = re.search(r"/hooks/([a-z-]+)\.py", command)
+    provider = "" if "CLAUDE_PLUGIN_ROOT" in command else "[codex]"
+    return f"{plugin_root.name}/{script[1] if script else command}{provider}"
 
 
 _LAUNCHERS = _uv_run_launchers()
@@ -136,9 +172,10 @@ _LAUNCHERS = _uv_run_launchers()
 def _run_from(cwd: Path, command: str, plugin_root: Path) -> subprocess.CompletedProcess[str]:
     """Run a launcher command from ``cwd`` with a neutralised hook environment.
 
-    ``${CLAUDE_PLUGIN_ROOT}`` is expanded by the shell from the env. The
-    DISPATCHER_* overrides point the PreToolUse dispatcher at empty temp paths so
-    it discovers and dispatches nothing (no reach into the real ~/.claude).
+    ``${CLAUDE_PLUGIN_ROOT}`` and the Codex ``${PLUGIN_ROOT}`` are expanded by
+    the shell from the env. The DISPATCHER_* overrides point the PreToolUse
+    dispatcher at empty temp paths so it discovers and dispatches nothing (no reach
+    into the real ~/.claude).
     """
     empty = cwd / "_empty"
     empty.mkdir(exist_ok=True)
@@ -146,6 +183,7 @@ def _run_from(cwd: Path, command: str, plugin_root: Path) -> subprocess.Complete
         "PATH": _os_path(),
         "HOME": str(cwd),
         "CLAUDE_PLUGIN_ROOT": str(plugin_root),
+        "PLUGIN_ROOT": str(plugin_root),
         "DISPATCHER_DROP_DIR": str(empty),
         "DISPATCHER_MARKETPLACE_DIR": str(empty),
         "DISPATCHER_SETTINGS_FILE": str(cwd / "settings.json"),
@@ -179,15 +217,24 @@ def test_at_least_one_uv_launcher_discovered() -> None:
 def test_launcher_carries_wedge_flags(entry: tuple[str, Path]) -> None:
     """Every uv launcher must be independent of the caller's project + config.
 
-    Static, uv-free guard: a launcher missing either flag will wedge when the
-    caller's cwd holds a malformed pyproject.
+    Static, uv-free guard: each uv invocation must pass `--project` with the plugin
+    root, so configuration discovery starts there rather than in the caller's cwd,
+    and `uv run` must pass `--no-project`. `--no-config` is absent so the user's
+    uv.toml applies.
     """
     command, _ = entry
-    missing = [flag for flag in ("--no-project", "--no-config") if flag not in command]
-    assert not missing, (
-        f"launcher is missing {missing}; a `uv run` hook must carry "
-        f"`--no-project --no-config` so a malformed pyproject.toml in the "
-        f"caller's cwd cannot wedge it:\n  {command}"
+    invocations = re.findall(r"\buv (?:run|sync) [^;]*", command)
+    assert invocations, f"no uv run or uv sync invocation found:\n  {command}"
+    unanchored = [
+        invocation for invocation in invocations if not _ANCHOR.search(invocation)
+    ]
+    assert not unanchored, (
+        f"uv invocations without `--project` at the plugin root read the caller's "
+        f"cwd for configuration:\n  {unanchored}"
+    )
+    assert "--no-project" in command, f"launcher lacks --no-project:\n  {command}"
+    assert "--no-config" not in command, (
+        f"launcher passes --no-config, which skips the user's uv.toml:\n  {command}"
     )
 
 
@@ -211,6 +258,96 @@ def test_bare_uv_run_wedges_on_conflicted_pyproject(tmp_path: Path) -> None:
         "bare `uv run` was expected to wedge on the conflicted pyproject, so the "
         "behavioural guard has teeth. It did not:\n"
         f"exit={proc.returncode}\nstdout={proc.stdout!r}\nstderr={proc.stderr!r}"
+    )
+
+
+@pytest.mark.parametrize("entry", _LAUNCHERS, ids=_launcher_id)
+def test_launcher_runs_hook_in_callers_cwd(
+    entry: tuple[str, Path], tmp_path: Path
+) -> None:
+    """The hook process starts in the caller's cwd, not the plugin directory.
+
+    branch-bg reads `Path.cwd()`, gh-fork-guard runs `git remote` without a `cwd`,
+    and the dispatcher's child hooks inherit its cwd, so anchoring configuration
+    discovery must not move the process. A fixture stands in for the hook in a
+    temporary plugin copy and records `os.getcwd()`.
+    """
+    _require_uv()
+    command, plugin_root = entry
+    script = re.search(r"/hooks/([a-z-]+)\.py", command)
+    assert script is not None, command
+    copy = tmp_path / plugin_root.name
+    (copy / "hooks").mkdir(parents=True)
+    (copy / "hooks" / f"{script[1]}.py").write_text(
+        "# /// script\n"
+        f'# requires-python = "{_FLOOR}"\n'
+        "# dependencies = []\n"
+        "# ///\n"
+        "import os, pathlib\n"
+        "pathlib.Path(os.environ['HOOK_FIXTURE_CWD']).write_text(os.getcwd())\n",
+        encoding="utf-8",
+    )
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    (caller / "pyproject.toml").write_text(_CONFLICTED_PYPROJECT, encoding="utf-8")
+    (caller / "uv.toml").write_text(_MALFORMED_UV_TOML, encoding="utf-8")
+    record = tmp_path / "cwd.txt"
+    proc = subprocess.run(
+        ["/bin/sh", "-c", command],
+        cwd=caller,
+        env={
+            **os.environ,
+            "CLAUDE_PLUGIN_ROOT": str(copy),
+            "PLUGIN_ROOT": str(copy),
+            "HOOK_FIXTURE_CWD": str(record),
+        },
+        input="{}",
+        capture_output=True,
+        text=True,
+        timeout=_TIMEOUT_S,
+        check=False,
+    )
+    assert proc.returncode == 0, proc
+    assert record.read_text(encoding="utf-8") == str(caller)
+
+
+def test_bare_uv_run_wedges_on_malformed_uv_toml(tmp_path: Path) -> None:
+    """Teeth: a bare `uv run` dies parsing a malformed `uv.toml` in its cwd."""
+    _require_uv()
+    (tmp_path / "uv.toml").write_text(_MALFORMED_UV_TOML, encoding="utf-8")
+    proc = subprocess.run(
+        ["uv", "run", "python", "-c", "print('ran')"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=_TIMEOUT_S,
+        check=False,
+    )
+    assert proc.returncode != 0 and _CWD_UV_TOML_WEDGE.search(proc.stderr), (
+        "bare `uv run` was expected to fail parsing the cwd's uv.toml, so the "
+        "behavioural guard has teeth. It did not:\n"
+        f"exit={proc.returncode}\nstdout={proc.stdout!r}\nstderr={proc.stderr!r}"
+    )
+
+
+@pytest.mark.parametrize("entry", _LAUNCHERS, ids=_launcher_id)
+def test_launcher_survives_malformed_uv_toml(
+    entry: tuple[str, Path], tmp_path: Path
+) -> None:
+    """Each launcher runs from a cwd holding a malformed uv.toml without reading it.
+
+    With configuration discovery on, the launcher must anchor discovery at the
+    plugin directory. uv 0.13.5 already starts script-mode discovery at the
+    script's directory, so on that version this passes without the anchor; uv
+    0.11.0 read the caller's uv.toml (observed 2026-10-27).
+    """
+    _require_uv()
+    (tmp_path / "uv.toml").write_text(_MALFORMED_UV_TOML, encoding="utf-8")
+    command, plugin_root = entry
+    proc = _run_from(tmp_path, command, plugin_root)
+    assert not _CWD_UV_TOML_WEDGE.search(proc.stderr), (
+        f"{_launcher_id(entry)} parsed the caller's uv.toml when launched from a "
+        f"directory holding a malformed one.\nstderr:\n{proc.stderr}"
     )
 
 

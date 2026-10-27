@@ -1,5 +1,157 @@
 # Changelog
 
+## [denubis-token-estimator] 0.4.0
+
+The plugin now ships `denubis-agent-logs`, a standard-library uv workspace member under `scripts/agent_logs/` that holds the Claude log reading the estimator and verifier shared by copy (ADR 0045). `estimate.py` and `verify.py` consume it through a PEP 723 path source; reports are byte-identical to 0.3.0 on a frozen snapshot of both log stores (2026-10-27).
+
+**New:**
+- `scripts/agent_logs/` (`denubis_agent_logs`): log roots honouring `CLAUDE_CONFIG_DIR` and `CODEX_HOME`; tolerant JSONL reading that counts torn lines, non-object lines and unreadable files instead of skipping them silently; Claude transcript discovery with an explicit subagent flag; usage records and the audited maximum-output-per-message deduplication; a timestamp parser returning an aware datetime or nothing; weekly quota windows anchored on wall-clock time; cost-unit weights. 50 tests with hand-built expectations, plus a live-store equivalence check against `estimate.collect_claude`.
+
+**Changed:**
+- `estimate.py` and `verify.py` take roots, discovery, line reading, timestamps and (for `estimate.py`) deduplication from the library. `verify.py`'s Claude pass falls from complexity 107 to 9 and keeps its own working-directory binding and its own Codex pass. The Claude pass now prints a skip summary on stderr; the Codex pass still skips silently, and the skill text says so.
+- Invocation is `uv run --script <script>` in the skill, the `/estimate` command and the README; the previous `uv run --no-project python3` form cannot resolve the library. `--no-config` is not used because it would skip the user's `uv.toml` (cache directory, `exclude-newer`, link mode).
+- `docs/AUDIT-BRIEF.md` extends the independence rule to the library; `docs/DESIGN.md` maps it; the README notes that the first run fetches the `hatchling` build backend.
+
+**Not verified:** resolution from an empty uv cache, and the installed-copy layout beyond a relocated copy under `/tmp`.
+
+## [denubis-00-getting-started] 1.6.0
+
+`/denubis-00-getting-started:setup` gains step 8, which checks and repairs the script environments of every enabled plugin and, in this repository, checks shared-library pins (ADR 0046 decision 8). It is the repair command that the hook launchers' failure message names. Minor release: the command gains behaviour.
+
+**Added:**
+- Steps 8a and 8b: every PEP 723 `.py` script in each enabled `@denubis-plugins` plugin's installed copy is found and grouped. Scripts under `hooks/` or `scripts/` are hook and tool scripts; every other script is a skill script. The scan covers skill directories because ADR 0046 names skills' scripts as library consumers. Enabled plugins without an install record, and install records whose directory is missing, are reported.
+- Step 8c: hook and tool scripts are synced with `uv sync --script` without asking. The first attempt is offline with the flags the script's launcher uses. A failure is retried online, then offline again, to tell a repair from an environment that resolves only with network access. uv's complete error is reported for a script that still fails.
+- Step 8d: skill scripts are listed with their declared dependencies and a cache state from `uv sync --script --check --offline`, which builds nothing: ready, builds from cache, needs download, or cannot resolve offline. If any is not ready, the user is asked once, through AskUserQuestion, whether to resolve all of them, only those that build from cache, or none. Skipped scripts are reported by name, and the report states that a resolved line does not cover them. The bibliography environment for `ingest.py` measured 6.0 GB on 2026-10-27.
+- Step 8e: when the marketplace checkout has a `[tool.uv.workspace]` table, each script whose `[tool.uv.sources]` entry names a workspace member as `subdirectory` has its `rev` compared with `git log -1 --format=%H -- <member>`. Short, stale and missing pins are reported, never edited. Both scan counts are reported so an empty result shows what was scanned.
+- The uv flags were checked against `uv help sync` (uv 0.13.5) and the published uv command reference on 2026-10-27: `--script` syncs from the script's inline metadata, `--check` exits with an error when the environment is out of date, and `--offline` uses only cached data.
+
+**Changed:**
+- cc-search-chats and Report are now steps 9 and 10, and the report lists script environments and pins.
+
+**Observed** (2026-10-27, Linux, uv 0.13.5): a throwaway driver applying the sync commands found 14 scripts in denubis-academic and 2 in denubis-external-agents; `skills/academic-writing/prose_shape.py` failed offline and resolved online. The installed hook plugins' copies predate PEP 723 hooks and carry no scripts. The `--check --offline` output was recorded for a ready environment, one that builds from cache and one that needs a download, and created no environment. Step 8e's search found no git-pinned consumer among the marketplace clone's 17 PEP 723 scripts; on a fixture it matched both the inline-table and table forms and skipped a path source.
+
+**Not verified:** a fresh agent following the step text; Windows.
+
+## [denubis-hook-branch-bg] 0.3.3
+
+When uv cannot start the SessionStart hook, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8). Before, it showed a hook error notice carrying only the first line of uv's error. The hook now also runs with the user's uv configuration.
+
+**Changed:**
+- `hooks/claude-hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints `{"systemMessage": "denubis-hook-branch-bg: branch-bg could not run (uv exit N); run /denubis-00-getting-started:setup to check and repair plugin environments"}` and exits 0. uv's stderr still goes to the debug log. A hook that started keeps its own exit status, stdout and stderr.
+- Both launchers pass `--project` with the plugin directory instead of `--no-config`. uv now reads the user's `uv.toml` (cache directory, `exclude-newer`, link mode), which `--no-config` skipped, and finds project configuration only from the plugin directory upward. The hook still starts in the session's working directory, which it reads to name the repository and branch, so a malformed `pyproject.toml` or `uv.toml` there cannot stop it. Moving the process into the plugin directory instead would have coloured every pane by the plugin's own directory.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py` runs each Claude launcher against a temporary plugin copy, from a directory holding a conflict-marked `pyproject.toml` and `uv.toml`. An unresolvable dependency, malformed script metadata and a malformed user-level `uv.toml` must produce the message with uv's exit status, measured by a direct uv control run; a started hook exiting 0, 1 or 2 must pass its status and output through unchanged. `tests/test_hook_launcher_cwd_independence.py` checks every Claude and Codex launcher: the hook starts in the caller's working directory, and a malformed `uv.toml` there is not read. `tests/test_hook_uv_script_contract.py` holds the registration form.
+
+**Observed live** (Claude Code 2.1.310, 2026-10-27): with a plugin copy whose hook could not resolve, an interactive session showed `SessionStart:startup says: denubis-hook-branch-bg: branch-bg could not run (uv exit 1); run /denubis-00-getting-started:setup to check and repair plugin environments`. With uv 0.11.0, dropping `--no-config` without `--project` read the caller's `uv.toml` and failed; `--project` did not.
+
+**Known limit:** a user-level `uv.toml` that the installed uv cannot parse now stops the hook, where `--no-config` ignored it. On 2026-10-27 uv 0.11.0 rejected a `uv.toml` carrying `preview-features` that uv 0.13.5 accepts. The Claude launcher reports this through the message; the Codex launcher has no message. A start failure that outlasts the hook's 5-second timeout is killed before the launcher can print the message.
+
+## [denubis-hook-code-quality-guard] 0.3.2
+
+When uv cannot start the guard, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8), and the Write or Edit goes ahead.
+
+**Changed:**
+- `hooks/hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints a `systemMessage` naming `denubis-hook-code-quality-guard`, the hook, uv's exit status and `/denubis-00-getting-started:setup`, and exits 0. Before, a uv failure that exited 2 (no compatible interpreter, malformed script metadata, missing script) blocked every Write and Edit with uv's error as the reason; one that exited 1 showed a hook error notice. A guard that cannot start now fails open with a warning, as it already did when uv is missing. The guard's own exit 2 still blocks.
+- Both launchers pass `--project` with the plugin directory instead of `--no-config`, so uv reads the user's `uv.toml` and finds project configuration only from the plugin directory upward. The guard still starts in the session's working directory.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py` (status 2 passes through with the guard's own stderr), `tests/test_hook_launcher_cwd_independence.py` and `tests/test_hook_uv_script_contract.py`.
+
+**Observed live** (Claude Code 2.1.310, 2026-10-27, `claude -p` with stream-json hook events): the PreToolUse:Write hook response was a success with exit code 0 and the `systemMessage`, and the write went ahead. How an interactive transcript renders a PreToolUse `systemMessage` was not observed.
+
+**Known limit:** a user-level `uv.toml` that the installed uv cannot parse now stops the guard, where `--no-config` ignored it. On 2026-10-27 uv 0.11.0 rejected a `uv.toml` carrying `preview-features` that uv 0.13.5 accepts. The Claude launcher reports this through the message. The Codex launcher has no message, and how Codex treats that uv exit status was not checked.
+
+## [denubis-hook-pretooluse-dispatcher] 1.1.6
+
+When uv cannot start the dispatcher, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8), and the Bash call goes ahead.
+
+**Changed:**
+- `hooks/hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints a `systemMessage` naming `denubis-hook-pretooluse-dispatcher`, the hook, uv's exit status and `/denubis-00-getting-started:setup`, and exits 0. Before, a uv failure that exited 2 blocked every Bash call, including the calls that would repair it; one that exited 1 showed a hook error notice. While it cannot start, the dispatched hooks do not run, as when uv is missing. A dispatched hook's own block is unaffected.
+- The launcher passes `--project` with the plugin directory instead of `--no-config`, so uv reads the user's `uv.toml` and finds project configuration only from the plugin directory upward. The dispatcher still starts in the session's working directory, which its child hooks inherit; gh-fork-guard reads the repository's remote from it.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py`, `tests/test_hook_launcher_cwd_independence.py` and `tests/test_hook_uv_script_contract.py`.
+
+**Known limit:** a user-level `uv.toml` that the installed uv cannot parse now stops the dispatcher, where `--no-config` ignored it, and the launcher message reports it. On 2026-10-27 uv 0.11.0 rejected a `uv.toml` carrying `preview-features` that uv 0.13.5 accepts.
+
+## [denubis-hook-instruction-budget] 0.1.2
+
+When uv cannot start the startup alarm, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8).
+
+**Changed:**
+- `hooks/claude-hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints a `systemMessage` naming `denubis-hook-instruction-budget`, the hook, uv's exit status and `/denubis-00-getting-started:setup`, and exits 0. A started hook's own exit status and output, including an argument error's exit 2, pass through unchanged.
+- Both launchers pass `--project` with the plugin directory instead of `--no-config`, so uv reads the user's `uv.toml` and finds project configuration only from the plugin directory upward. The hook still starts in the session's working directory, its fallback when the payload carries no `cwd`.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py`, `tests/test_hook_launcher_cwd_independence.py`, `tests/test_hook_uv_script_contract.py`, and `tests/test_instruction_budget_guard.py`, which runs both real launchers and parses their warning.
+
+**Known limit:** the Codex launcher has no failure message.
+
+## [denubis-plan-and-execute] 4.2.4
+
+When uv cannot start the live-marker SessionStart hook, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8).
+
+**Changed:**
+- `hooks/claude-hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints a `systemMessage` naming `denubis-plan-and-execute`, `update-live-marker`, uv's exit status and `/denubis-00-getting-started:setup`, and exits 0. A hook that started keeps its own exit status and output.
+- The launcher passes `--project` with the plugin directory instead of `--no-config`, so uv reads the user's `uv.toml` and finds project configuration only from the plugin directory upward. The hook still starts in the session's working directory.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py`, `tests/test_hook_uv_script_contract.py`, and `tests/test_instruction_delivery.py`, which runs the real launcher.
+
+## [denubis-external-agents] 0.24.2
+
+When uv cannot start the supervisee-offers PostToolUse hook, the transcript now shows a warning naming the plugin and the repair command (ADR 0046 decision 8).
+
+**Changed:**
+- `hooks/hooks.json`: when `uv run --script` fails and an offline `uv sync --script` of the same hook also fails, the launcher prints a `systemMessage` naming `denubis-external-agents`, `supervisee-offers`, uv's exit status and `/denubis-00-getting-started:setup`, and exits 0. Before, a uv failure that exited 2 sent uv's error to Claude after every tool call; one that exited 1 showed a hook error notice. The hook matches every tool, so the warning repeats after each tool call until the environment is repaired.
+- The launcher passes `--project` with the plugin directory instead of `--no-config`, so uv reads the user's `uv.toml` and finds project configuration only from the plugin directory upward. The hook still starts in the session's working directory.
+
+**Tests:** `tests/test_hook_launcher_failure_report.py`, `tests/test_hook_launcher_cwd_independence.py` and `tests/test_hook_uv_script_contract.py`.
+
+## [denubis-hook-gh-fork-guard] 1.2.6
+
+The Codex launcher now runs the guard with the user's uv configuration (ADR 0046).
+
+**Changed:**
+- `hooks/codex-hooks.json`: the launcher passes `--project` with the plugin directory instead of `--no-config`. uv now reads the user's `uv.toml` (cache directory, `exclude-newer`, link mode) and finds project configuration only from the plugin directory upward. The guard still starts in the session's working directory, where it reads the repository's `origin` remote, so a malformed `pyproject.toml` or `uv.toml` there cannot stop it.
+
+**Tests:** `tests/test_hook_launcher_cwd_independence.py` (the hook starts in the caller's working directory; a malformed caller `uv.toml` is not read), `tests/test_hook_uv_script_contract.py` and `tests/test_gh_fork_guard.py`, which runs the real launcher.
+
+**Known limit:** the Codex launcher has no failure message, and a user-level `uv.toml` that uv cannot parse now stops the guard; how Codex treats that uv exit status was not checked. The Claude path runs through the PreToolUse dispatcher and is unchanged.
+
+## [denubis-git-commit] 1.5.1
+
+The durable-record checker no longer mistakes a cited file that was moved or deleted out of `docs/` for a branch name.
+
+**Fixed:**
+- `check_durable_records.py` dropped any absent, untracked token whose first segment is a conventional branch prefix (`docs/`, `fix/`, `feat/`, ...), so a citation to `docs/branch-bg-colour-eval.py` after that file was moved raised nothing, even under `--all`. A token whose last segment ends in a letter-led file extension is now a path and stays ABSENT; dotted branch names such as `release/1.5.0` stay prose. Found on 2026-10-27 while moving Python out of `docs/` (ADR 0045).
+
+- A token containing a shell variable (`$NAME`, `${...}`), an ellipsis (`…` or a segment of three or more dots) or an angle-bracket placeholder (`<uid>`) is never a citation, in code spans, links, bare prose and reference definitions. Before, the branch-bg architecture page carried eight such ABSENT findings for `$XDG_STATE_HOME/...`, `"${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"` and the like; across `docs/` the rule removes 210 findings, all of forms that could never resolve, and adds none. A bare single directory segment in a code span (`people/`) stays a citation by the existing contract.
+
+**Changed:**
+- The commit skill's release paragraph now points at the `maintaining-a-marketplace` release checklist, including the two-stage shared-library pin step (ADR 0046).
+
+**Tests:** `tests/test_commit_durable_records.py`, `test_files_moved_out_of_docs_stay_absent_beside_branch_names`, six cases over `.py`/`.md` and code, link and bare citations.
+
+**Known limit:** an extensionless or directory `docs/...` citation that no longer exists is still read as a branch name.
+
+## [denubis-extending-agents] 2.1.0
+
+The marketplace-maintenance skill's release checklist now owns the shared-library pin step (ADR 0046): a plugin that consumes a library shipped inside another plugin declares it as a commit-pinned git dependency in its script header, and every consumer's pin moves in the same release as the library change.
+
+**Changed:**
+- `maintaining-a-marketplace`: new checklist step 4, "Shared-library pins", run for every workspace member a release touches, with the consumer search and its positive control; a "Shared libraries" section giving the rules from ADR 0046 and its 2026-10-27 amendment (two-stage release with the library change pushed first, full 40-character hashes because a short hash re-fetches and fails offline, consumer plugins bump their own version, hooks never pin, launcher failure message and setup-command repair); Common Mistakes rows for a stale `rev` and a short hash.
+
+## [denubis-hook-branch-bg] 0.3.2
+
+The generator behind the hook's 40 block colours now ships with the plugin as `scripts/palette.py`, cut to generating the table and reporting its metrics (ADR 0045). The hook's behaviour is unchanged.
+
+**Changed:**
+- `scripts/palette.py` replaces the repository's `docs/branch-bg-colour-eval.py`. Every run prints the palette's metrics: the weakest label contrast, the closest two blocks by deltaEOK and deltaE2000, and one row per block. `--emit-blocks PATH` also writes the table, and `--show` prints swatches. The colour science sits beside it in `scripts/colour_science.py`.
+- The hook's comments name the new generator command.
+
+**Removed:**
+- The current-against-proposed evaluation mode, with its branch-step families, trade-off and contrast-floor sweeps, colour-name model and real-repository report. It compared against the hashed mapping that 0.3.0 removed and failed on start with `AttributeError: module 'branch_bg_hook' has no attribute 'git_info_to_colour'`.
+- The script's start-up self-check, now owned by tests.
+
+**Tests:** `tests/test_branch_bg_palette.py`. Oklab is checked against Ottosson's reference table, CIEDE2000 against all 34 Sharma, Wu and Dalal pairs, and APCA against the apca-w3 test values, each fetched and compared on 2026-10-27. The test also checks WCAG black on white at 21:1, every block's label at 4.5:1 or better, and every pair of blocks at least 5 JND apart by both metrics. It reruns the architecture page's documented generator command and requires it to reproduce `BLOCKS` exactly.
+
 ## [denubis-hook-quiet-agents] 0.1.1
 
 A subagent's idle notice is now taken out once the subagent has sent its report to the main conversation, even when the report is dequeued after the notice arrives.

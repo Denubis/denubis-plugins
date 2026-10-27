@@ -1,6 +1,6 @@
 {
   "name": "denubis-token-estimator",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Measure replay-aware model output tokens and human input words, split into own authorship and pasted text, by project and time window.",
   "author": {
     "name": "Brian Ballsun-Stanton",

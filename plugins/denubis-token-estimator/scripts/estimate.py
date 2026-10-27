@@ -1,20 +1,29 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["denubis-agent-logs"]
+#
+# [tool.uv.sources]
+# denubis-agent-logs = { path = "agent_logs", editable = true }
+# ///
 """Token/word estimator — per project, rolled up from the directory (via the
 .token-estimator mapper), optionally broken down by month.
 
 Reuses the audited methodology in verify.py as the single source of truth
 (origin dedup, machine-tag allow-lists, replay-aware Codex counters) and the mapper in
-mapper.py for directory rollup. People-roots come from ~/.token-estimator (else the
+mapper.py for directory rollup. Claude transcripts are read and deduplicated through
+this plugin's `denubis-agent-logs` library (`scripts/agent_logs`), which the inline
+metadata above installs. People-roots come from ~/.token-estimator (else the
 target/local directory) — see verify.load_roots.
 
-Usage:
-  python3 estimate.py --dir .                 # project of a directory (cwd)
-  python3 estimate.py --dir <path> --month    # ... broken down by month
-  python3 estimate.py --dir <path> --start <ISO> --end <ISO>
-  python3 estimate.py --person Jodie          # every project for a person
-  python3 estimate.py --person Jodie --month  # ... with month rows
-  python3 estimate.py --all                   # every person/project (rollup)
-  python3 estimate.py --dir <path> --csv out.csv
+Usage (run with `uv run --script estimate.py ...`):
+  estimate.py --dir .                 # project of a directory (cwd)
+  estimate.py --dir <path> --month    # ... broken down by month
+  estimate.py --dir <path> --start <ISO> --end <ISO>
+  estimate.py --person Jodie          # every project for a person
+  estimate.py --person Jodie --month  # ... with month rows
+  estimate.py --all                   # every person/project (rollup)
+  estimate.py --dir <path> --csv out.csv
 """
 
 from __future__ import annotations
@@ -22,10 +31,12 @@ from __future__ import annotations
 import argparse
 import collections
 import csv
-import json
 import re
 import sys
 from pathlib import Path
+
+from denubis_agent_logs.claude import deduplicate, text_blocks, usage_record
+from denubis_agent_logs.records import ReadReport, summarise
 
 sys.path.insert(0, str(Path(__file__).parent))
 import mapper as M
@@ -55,17 +66,6 @@ def _blank():
 def _remember_claude_user(human_by_uuid, record):
     uid = record.get("uuid")
     when = V.parse_timestamp(record.get("timestamp"))
-    content = (record.get("message") or {}).get("content")
-    if isinstance(content, str):
-        blocks = [content]
-    elif isinstance(content, list):
-        blocks = [
-            block.get("text", "")
-            for block in content
-            if isinstance(block, dict) and block.get("type") == "text"
-        ]
-    else:
-        blocks = []
     previous = human_by_uuid.get(uid)
     if previous is None or (
         when is not None and (previous[0] is None or when < previous[0])
@@ -74,7 +74,7 @@ def _remember_claude_user(human_by_uuid, record):
             when,
             record.get("cwd"),
             record.get("timestamp"),
-            blocks,
+            text_blocks(record),
         )
 
 
@@ -99,67 +99,57 @@ def _add_claude_human_words(leaves, attr, human_by_uuid, start, end):
             leaf[3] += pasted_words
 
 
-def collect_claude(leaves, attr, *, start=None, end=None):
-    out_max = collections.defaultdict(int)
-    in_main = collections.defaultdict(bool)
-    cwd_atmax = {}
-    month_atmax = {}
-    first_main = {}
-    first_sub = {}
+def _claude_usage(human_by_uuid, report):
+    """Yield the usage of every countable assistant record in the Claude transcripts.
+
+    The same single pass remembers each retained main-thread human turn in
+    ``human_by_uuid``, so the map is complete once the generator is exhausted.
+    """
+    for transcript, record in V.iter_claude_records(report):
+        kind = record.data.get("type")
+        if kind == "assistant":
+            usage = usage_record(record, transcript)
+            if usage is not None:
+                yield usage
+        elif (
+            kind == "user"
+            and not transcript.is_subagent
+            and not V.claude_user_excluded(record.data)
+        ):
+            _remember_claude_user(human_by_uuid, record.data)
+
+
+def collect_claude(leaves, attr, *, start=None, end=None, report=None):
+    """Add Claude output tokens and human words to ``leaves``.
+
+    Output is counted once per message under the audited rule that
+    ``denubis_agent_logs.claude.deduplicate`` implements: the maximum output per
+    message id, main when any record of it is main, at the origin of the counted
+    partition, attributed to the working directory and month of the record holding
+    that maximum. Lines and files that could not be read are counted in ``report``.
+    """
     human_by_uuid = {}
-    for fp in V.claude_files():
-        is_sub = "/subagents/" in str(fp)
-        try:
-            fh = fp.open(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        with fh:
-            for line in fh:
-                if '"assistant"' not in line and '"user"' not in line:
-                    continue
-                try:
-                    r = json.loads(line)
-                except ValueError:
-                    continue
-                t = r.get("type")
-                if t == "assistant":
-                    m = r.get("message") or {}
-                    mid, model = m.get("id"), m.get("model")
-                    if not mid or not model or "synthetic" in model:
-                        continue
-                    is_main = not (is_sub or r.get("isSidechain") is True)
-                    if is_main:
-                        in_main[mid] = True
-                    when = V.parse_timestamp(r.get("timestamp"))
-                    origins = first_main if is_main else first_sub
-                    if when is not None and (mid not in origins or when < origins[mid]):
-                        origins[mid] = when
-                    out = (m.get("usage") or {}).get("output_tokens") or 0
-                    previous_cwd = cwd_atmax.get(mid)
-                    if (
-                        mid not in cwd_atmax
-                        or out > out_max[mid]
-                        or (
-                            out == out_max[mid]
-                            and previous_cwd is not None
-                            and str(r.get("cwd")) < str(previous_cwd)
-                        )
-                    ):
-                        out_max[mid] = out
-                        cwd_atmax[mid] = r.get("cwd")
-                        month_atmax[mid] = (r.get("timestamp") or "")[:7] or "(no-date)"
-                elif t == "user" and not is_sub:
-                    if V.claude_user_excluded(r):
-                        continue
-                    _remember_claude_user(human_by_uuid, r)
+    usage = _claude_usage(human_by_uuid, ReadReport() if report is None else report)
+    messages = deduplicate(usage)
     _add_claude_human_words(leaves, attr, human_by_uuid, start, end)
-    for mid, out in out_max.items():
-        origin = first_main.get(mid) if in_main[mid] else first_sub.get(mid)
-        if start is not None and not (origin is not None and start <= origin < end):
+    for message in messages:
+        if start is not None and not _within(message.origin, start, end):
             continue
-        person, project, _ = attr(cwd_atmax.get(mid))
-        month = "(window)" if start is not None else month_atmax[mid]
-        leaves[("claude", person, project, month)][0 if in_main[mid] else 1] += out
+        peak = message.peak
+        person, project, _ = attr(peak.cwd)
+        month = "(window)" if start is not None else _month(peak.timestamp)
+        leaves[("claude", person, project, month)][0 if message.is_main else 1] += (
+            peak.output_tokens
+        )
+
+
+def _within(when, start, end):
+    """Return whether ``when`` falls in the window ``[start, end)``."""
+    return when is not None and start <= when < end
+
+
+def _month(when):
+    return when.strftime("%Y-%m") if when is not None else "(no-date)"
 
 
 def collect_codex(leaves, attr, *, start=None, end=None):
@@ -295,11 +285,13 @@ def write_csv(leaves, path):
 
 
 def _window_timestamp(value):
+    # The shared parser returns None both for text that is not ISO 8601 and for a
+    # timestamp without an offset, which names no single instant.
     parsed = V.parse_timestamp(value)
     if parsed is None:
-        raise argparse.ArgumentTypeError("must be an ISO 8601 timestamp")
-    if parsed.utcoffset() is None:
-        raise argparse.ArgumentTypeError("must include a UTC offset or Z")
+        raise argparse.ArgumentTypeError(
+            "must be an ISO 8601 timestamp with a UTC offset or Z"
+        )
     return parsed
 
 
@@ -350,7 +342,9 @@ def main(argv=None):
 
     leaves = collections.defaultdict(_blank)
     sys.stderr.write("scanning Claude logs...\n")
-    collect_claude(leaves, attr, start=args.start, end=args.end)
+    report = ReadReport()
+    collect_claude(leaves, attr, start=args.start, end=args.end, report=report)
+    sys.stderr.write(summarise("Claude", report))
     sys.stderr.write("scanning Codex logs...\n")
     collect_codex(leaves, attr, start=args.start, end=args.end)
 

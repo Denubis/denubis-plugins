@@ -19,70 +19,6 @@ Issues are numbered sequentially. Add new ones at the bottom of the Open section
 
 ## Open
 
-### ISSUE-01: Promote `phase_05_cross_ref_audit.py` to common Typer-based tool with architecture coverage
-
-- **Status:** open
-- **Opened:** 2026-04-19
-- **Origin:** `critical-peer-review-2026-04-18` of `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/` — H1 discussion in that plan's revision session. The in-scope revision shrank back to the regex fix in the embedded script; tool promotion was recognised as legitimately out-of-scope for the upstream sync plan.
-
-**Description:**
-
-The cross-reference audit currently lives as an embedded Python script in `phase_05.md` Task 1 of the skill-skills upstream sync plan — plan-specific, five hard-coded TARGETS, argparse-based. During H1 discussion we identified several structural improvements that together warrant a proper tool rather than an ever-growing embedded script:
-
-1. **Common tool, not plan-scoped script.** The audit should be reusable across plans and periodic audits, not re-authored per plan.
-2. **Typer CLI with proper help infrastructure.** Rich `--help`, repeatable target arguments, `--repo-root` with git-toplevel auto-detect, `--check-architecture` flag, `--json` output, `--verbose` / `-v` flag. `typer.Exit` for exit codes.
-3. **Follow the `workflow_statusline` pattern** under `plugins/denubis-plan-and-execute/scripts/`. Structure:
-   ```
-   plugins/denubis-plan-and-execute/scripts/xref_audit/
-   ├── pyproject.toml          # hatchling-built, typer dep, pytest dev dep
-   ├── uv.lock
-   ├── src/
-   │   └── xref_audit/
-   │       ├── __init__.py
-   │       ├── __main__.py     # Typer entry point
-   │       ├── audit.py        # core audit logic
-   │       └── architecture.py # architecture-presence check
-   └── tests/
-       ├── __init__.py
-       ├── test_audit.py
-       └── test_architecture.py
-   ```
-4. **Extend target coverage to `architecture-update`.** Part of the motivation is that architecture-update's `SKILL.md` and DFD templates currently teach bare-filename cross-reference form — path-form is what the audit can validate. The tool should audit the architecture-update skill AND the architecture-update skill should teach path-form examples.
-5. **New architecture-presence check.** WARN (not FAIL) when `docs/architecture/` is absent, reporting "consider `/maintain-architecture` to scaffold." WARN messages print separate from FAILs; do not affect exit code.
-6. **Template updates as part of the promotion:** `architecture-update/SKILL.md` "Cross-Reference Format" section (lines ~66-71 and the "See `template-X.md`" line ~75) and `architecture-update/template-dfd-context.md` line 38 + `architecture-update/template-dfd-process.md` lines 58-59 should be converted from bare-filename to path-form examples (`docs/architecture/dfd/0-context-diagram.md`, `./template-dfd-context.md`, etc.). Other five templates were grepped clean during the H1 discussion.
-7. **Skill gates for internal documentation consistency.** The tool's value compounds when it runs automatically at the right moments. A skill (e.g., `/audit-xref` or invoked transitively from an orchestrator skill) wraps the tool; Claude Code hooks invoke that skill as gates on documentation-touching operations. Proposed trigger points:
-   - `PostToolUse` on `Edit` / `Write` when the touched path matches `**/SKILL.md`, `docs/**/*.md`, or known plan/design directories — run the audit, surface FAILs as `additionalContext`.
-   - `Stop` — run the full audit at session end; emit `decision: "block"` with `reason` if there are unresolved FAILs in the working tree.
-   - Optional pre-commit-style via `PreToolUse` on `Bash` when the command is `git commit …` — block commits that would ship broken references.
-   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the `code-quality-guard.py` hook's deny/warn surfacing pattern.)
-
-**Why deferred from skill-skills upstream sync:**
-
-The in-scope work for that plan is the upstream sync itself (renaming/syncing five skills from obra, keeping terminology current). Promoting the audit script to a common tool + editing the architecture-update skill is legitimately orthogonal. Doing both in the revision session would have batch-fixed without the Ripple-Rule discipline that `critical-peer-review` reviewer-2026-04-18 flagged as missing from the prior revision.
-
-**Proposed approach:**
-
-Treat this as its own design plan via `/starting-a-design-plan`. Brainstorm → design → plan → implement.
-
-Entry context for that session:
-- Current embedded script location (post-H1 regex fix, see skill-skills upstream sync phase_05.md Task 1)
-- The two regexes the H1 fix lands: `PATH_REF_RE` (requires `/`) and `LINK_REF_RE` (markdown link form)
-- `workflow_statusline` directory as structural reference
-- Architecture-update's current bare-filename teaching + which templates are affected
-- Question to resolve in design: auto-discovery (`--all` walks `plugins/*/skills/*`) vs explicit-target-only; the in-scope-for-H1 decision was explicit-target-only, but the tool may want `--all` as a proper feature.
-
-**Related:**
-
-- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05.md` — embedded script (post-H1 regex fix)
-- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/critical-peer-review-2026-04-18.md` — H1 finding that surfaced the discussion
-- `plugins/denubis-plan-and-execute/skills/architecture-update/SKILL.md`
-- `plugins/denubis-plan-and-execute/skills/architecture-update/template-dfd-context.md`
-- `plugins/denubis-plan-and-execute/skills/architecture-update/template-dfd-process.md`
-- `plugins/denubis-plan-and-execute/scripts/workflow_statusline/` — reference tool pattern
-- `plugins/denubis-plan-and-execute/skills/maintain-architecture/SKILL.md` — context on the architecture-presence gap
-
----
-
 ### ISSUE-03: Parts 2–4 of the upstream sync programme — design sessions not yet started
 
 - **Status:** open (blocked on ISSUE-06 for Part 2)
@@ -382,4 +318,77 @@ approval occurrence identity, and panel freshness as separate observable structu
 
 ## Closed
 
-*(No closed issues yet.)*
+### ISSUE-01: Promote `phase_05_cross_ref_audit.py` to common Typer-based tool with architecture coverage
+
+- **Status:** closed, superseded
+- **Closed:** 2026-10-27
+- **Outcome:** the script was deleted (ADR 0045; Brian's "yesa" at
+  `ccchat:v1:claude:f30676a7-e08c-43cb-86f8-9dc704202a5a:uuid:fc905634-890c-4164-8eec-c0a2b73d1cb0`,
+  2026-10-27T06:35Z, to "Can I delete it?"). It had not run since 2026-07-08 and failed
+  on four renamed target directories. Its `plugin:name` reference check is owned by
+  `tests/test_skill_reference_integrity.py`; its path and link resolution by the commit
+  skill's `check_durable_records.py` (ADR 0042). Git history keeps the script at
+  `fb35c1a8`. The design notes in the original record below remain available if a
+  general cross-reference tool is wanted later.
+
+#### ISSUE-01 original record (2026-04-19), retained for its design notes
+
+- **Status:** closed (superseded, 2026-10-27)
+- **Opened:** 2026-04-19
+- **Origin:** `critical-peer-review-2026-04-18` of `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/` — H1 discussion in that plan's revision session. The in-scope revision shrank back to the regex fix in the embedded script; tool promotion was recognised as legitimately out-of-scope for the upstream sync plan.
+
+**Description:**
+
+The cross-reference audit currently lives as an embedded Python script in `phase_05.md` Task 1 of the skill-skills upstream sync plan — plan-specific, five hard-coded TARGETS, argparse-based. During H1 discussion we identified several structural improvements that together warrant a proper tool rather than an ever-growing embedded script:
+
+1. **Common tool, not plan-scoped script.** The audit should be reusable across plans and periodic audits, not re-authored per plan.
+2. **Typer CLI with proper help infrastructure.** Rich `--help`, repeatable target arguments, `--repo-root` with git-toplevel auto-detect, `--check-architecture` flag, `--json` output, `--verbose` / `-v` flag. `typer.Exit` for exit codes.
+3. **Follow the `workflow_statusline` pattern** under `plugins/denubis-plan-and-execute/scripts/`. Structure:
+   ```
+   plugins/denubis-plan-and-execute/scripts/xref_audit/
+   ├── pyproject.toml          # hatchling-built, typer dep, pytest dev dep
+   ├── uv.lock
+   ├── src/
+   │   └── xref_audit/
+   │       ├── __init__.py
+   │       ├── __main__.py     # Typer entry point
+   │       ├── audit.py        # core audit logic
+   │       └── architecture.py # architecture-presence check
+   └── tests/
+       ├── __init__.py
+       ├── test_audit.py
+       └── test_architecture.py
+   ```
+4. **Extend target coverage to `architecture-update`.** Part of the motivation is that architecture-update's `SKILL.md` and DFD templates currently teach bare-filename cross-reference form — path-form is what the audit can validate. The tool should audit the architecture-update skill AND the architecture-update skill should teach path-form examples.
+5. **New architecture-presence check.** WARN (not FAIL) when `docs/architecture/` is absent, reporting "consider `/maintain-architecture` to scaffold." WARN messages print separate from FAILs; do not affect exit code.
+6. **Template updates as part of the promotion:** `architecture-update/SKILL.md` "Cross-Reference Format" section (lines ~66-71 and the "See `template-X.md`" line ~75) and `architecture-update/template-dfd-context.md` line 38 + `architecture-update/template-dfd-process.md` lines 58-59 should be converted from bare-filename to path-form examples (`docs/architecture/dfd/0-context-diagram.md`, `./template-dfd-context.md`, etc.). Other five templates were grepped clean during the H1 discussion.
+7. **Skill gates for internal documentation consistency.** The tool's value compounds when it runs automatically at the right moments. A skill (e.g., `/audit-xref` or invoked transitively from an orchestrator skill) wraps the tool; Claude Code hooks invoke that skill as gates on documentation-touching operations. Proposed trigger points:
+   - `PostToolUse` on `Edit` / `Write` when the touched path matches `**/SKILL.md`, `docs/**/*.md`, or known plan/design directories — run the audit, surface FAILs as `additionalContext`.
+   - `Stop` — run the full audit at session end; emit `decision: "block"` with `reason` if there are unresolved FAILs in the working tree.
+   - Optional pre-commit-style via `PreToolUse` on `Bash` when the command is `git commit …` — block commits that would ship broken references.
+   The hooks themselves must fail cleanly: sensible exit codes, actionable messages, no stack traces to the user, no noisy false alarms. (Reference for "fails cleanly" in this repo: the `code-quality-guard.py` hook's deny/warn surfacing pattern.)
+
+**Why deferred from skill-skills upstream sync:**
+
+The in-scope work for that plan is the upstream sync itself (renaming/syncing five skills from obra, keeping terminology current). Promoting the audit script to a common tool + editing the architecture-update skill is legitimately orthogonal. Doing both in the revision session would have batch-fixed without the Ripple-Rule discipline that `critical-peer-review` reviewer-2026-04-18 flagged as missing from the prior revision.
+
+**Proposed approach:**
+
+Treat this as its own design plan via `/starting-a-design-plan`. Brainstorm → design → plan → implement.
+
+Entry context for that session:
+- Current embedded script location (post-H1 regex fix, see skill-skills upstream sync phase_05.md Task 1)
+- The two regexes the H1 fix lands: `PATH_REF_RE` (requires `/`) and `LINK_REF_RE` (markdown link form)
+- `workflow_statusline` directory as structural reference
+- Architecture-update's current bare-filename teaching + which templates are affected
+- Question to resolve in design: auto-discovery (`--all` walks `plugins/*/skills/*`) vs explicit-target-only; the in-scope-for-H1 decision was explicit-target-only, but the tool may want `--all` as a proper feature.
+
+**Related:**
+
+- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/phase_05.md` — embedded script (post-H1 regex fix)
+- `docs/implementation-plans/2026-04-17-skill-skills-upstream-sync/critical-peer-review-2026-04-18.md` — H1 finding that surfaced the discussion
+- `plugins/denubis-plan-and-execute/skills/architecture-update/SKILL.md`
+- `plugins/denubis-plan-and-execute/skills/architecture-update/template-dfd-context.md`
+- `plugins/denubis-plan-and-execute/skills/architecture-update/template-dfd-process.md`
+- `plugins/denubis-plan-and-execute/scripts/workflow_statusline/` — reference tool pattern
+- `plugins/denubis-plan-and-execute/skills/maintain-architecture/SKILL.md` — context on the architecture-presence gap

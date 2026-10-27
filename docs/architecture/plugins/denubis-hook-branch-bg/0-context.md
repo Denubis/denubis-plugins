@@ -47,8 +47,8 @@ flowchart LR
 ## System Boundary
 
 **In scope:**
-- One table of 40 block colours with their black-or-white label colour (`branch-bg.py::BLOCKS`), produced by `docs/branch-bg-colour-eval.py --text-flip --ratio 4.5 --repo-gap 5 --max-chroma 0.16 --min-lightness 0.30 --emit-blocks`, in farthest-point order.
-- Reading a pane: person = directory under a `people/` path segment (`person_of`); repo = git common dir, displayed by its directory name (`repo_name`); branch; session = Claude's `✳ <name>` or the fourth ` | ` field of Codex's title (`session_of`); place = first directory under home or a short path prefix (`place_of`).
+- One table of 40 block colours with their black-or-white label colour (`branch-bg.py::BLOCKS`), produced by `uv run --script plugins/denubis-hook-branch-bg/scripts/palette.py --text-flip --ratio 4.5 --repo-gap 5 --max-chroma 0.16 --min-lightness 0.30 --emit-blocks blocks.json`, in farthest-point order (`tests/test_branch_bg_palette.py` reruns this command against the table).
+- Reading a pane: person = directory under a path segment named people (`person_of`); repo = git common dir, displayed by its directory name (`repo_name`); branch; session = Claude's `✳ <name>` or the fourth ` | ` field of Codex's title (`session_of`); place = first directory under home or a short path prefix (`place_of`).
 - Pinned colours: `main` and `master` are always `#ff0000` with black text and take no registry slot (`branch-bg.py::PINNED`, `block_colour`).
 - Assigning colours: person, repo and branch through the registry (lowest free slot from a per-kind offset; least-recently-seen slot reused when the table is full; hash fallback when the registry is unusable); session and place by hash, a session stepping past any block already on its strip (`assign`).
 - Drawing: the strip format `#[bg=…,fg=…,bold] label ` per known block, `#` escaped (`strip_format`); the field as an 80% shade toward black of the repo colour, else person, else place (`field_for`, `shade`).
@@ -62,16 +62,17 @@ flowchart LR
 
 ## Hook Registration
 
-Claude Code: `plugins/denubis-hook-branch-bg/hooks/claude-hooks.json`, `SessionStart`, matcher `startup|resume|clear|compact`, command `uv run --no-project --no-config python "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"`, timeout 5 s, `suppressOutput: true`. `--no-project --no-config` keeps a malformed `pyproject.toml` in the caller's cwd from wedging `uv` (guarded by `tests/test_hook_launcher_cwd_independence.py`).
+Claude Code: `plugins/denubis-hook-branch-bg/hooks/claude-hooks.json`, `SessionStart`, matcher `startup|resume|clear|compact`, command `uv run --project "${CLAUDE_PLUGIN_ROOT}" --script --python '>=3.14' --no-project "${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py"` (preceded by a `command -v uv` guard that exits 1 with an install pointer when uv is absent), timeout 5 s, `suppressOutput: true`. `--project` anchors uv's configuration discovery at the plugin directory while the hook keeps the caller's cwd, and `--no-project` stops a malformed `pyproject.toml` in that cwd from wedging `uv` (guarded by `tests/test_hook_launcher_cwd_independence.py`); the user-level `uv.toml` still applies. When the script exits non-zero, the launcher probes `uv sync --script ... --offline`; a failing probe is reported as a `systemMessage` pointing at the getting-started `/setup` command and the hook exits 0 (`tests/test_hook_launcher_failure_report.py`).
 
-Codex: `plugins/denubis-hook-branch-bg/hooks/codex-hooks.json`, `python3 "${PLUGIN_ROOT}/hooks/branch-bg.py"`.
+Codex: `plugins/denubis-hook-branch-bg/hooks/codex-hooks.json`, the same `uv run --project "${PLUGIN_ROOT}" --script --python '>=3.14' --no-project` form without the failure probe.
 
 `branch-strip.sh` prefers `uv run --no-project --no-config python` and falls back to `python3`.
 
 ## Cross-References
 
-- **Plugin manifests:** `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`, version 0.3.0.
+- **Plugin manifests:** `plugins/denubis-hook-branch-bg/.claude-plugin/plugin.json` and `plugins/denubis-hook-branch-bg/.codex-plugin/plugin.json`, version 0.3.3.
 - **Marketplace entries:** `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
-- **Design evidence:** `docs/handover-branch-bg-colour.md` (diagnosis, metrics, sources), `docs/branch-bg-colour-eval.py` (generator and evaluation).
+- **Design evidence:** `docs/handover-branch-bg-colour.md` (diagnosis, metrics, sources, from the 2026-10-09 evaluation mode retired under ADR 0045).
+- **Generator:** `plugins/denubis-hook-branch-bg/scripts/palette.py` (block table and its metrics), with its colour science in `plugins/denubis-hook-branch-bg/scripts/colour_science.py`; reference-value and provenance tests in `tests/test_branch_bg_palette.py`.
 - **Related architecture docs:** `../../README.md` (index), `../../glossary.md`, `../../constraints.md`.
 - **Sibling hook plugins:** `denubis-hook-gh-fork-guard`, `denubis-hook-pretooluse-dispatcher`.

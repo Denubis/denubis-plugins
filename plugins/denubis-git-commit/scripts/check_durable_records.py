@@ -16,9 +16,14 @@ to whitespace-delimited command tokens. Comma-separated brace sets such as
 sources/{docx,pdf,email} expand into separately checked alternatives.
 Bare slash tokens need ./, ../, ~/, /, a tracked repository top-level name,
 an ignored-but-present top-level name, or a file extension in the last segment.
-Links and code spans retain the broader rule. Conventional branch prefixes are
+Links and code spans retain the broader rule. A single directory segment such as
+people/ follows the same split: prose when bare unless that top-level name is tracked
+or present and ignored, and a directory citation in a link or code span, the form
+finding aids use for registers. Conventional branch prefixes are
 defined once in BRANCH_PREFIXES; slash tokens using those prefixes are prose only
-when they name nothing tracked or present at either relative base. Tracked paths,
+when they name nothing tracked or present at either relative base and do not end in
+a letter-led file extension, so a moved docs/eval.py stays ABSENT while a dotted
+release/1.5.0 stays prose. Tracked paths,
 including deleted targets, and present ignored paths keep their citation checks.
 Links may name a sibling file without a slash. Link spans and code spans are removed
 before looking for bare tokens; repeated references on one line are emitted once.
@@ -26,7 +31,14 @@ Trailing prose punctuation, local #fragments, ::node, :identifier, :line[:column
 and :start-end suffixes are removed for resolution. scheme:// URLs,
 SCP-style Git remotes, mailto:, ccchat:, claude:, protocol-relative URLs,
 anchor-only targets, leading '-' shell options, and tokens containing glob
-metacharacters '*?[]' are excluded. Named-user '~user' paths are
+metacharacters '*?[]' are excluded. A placeholder token is never a citation: one
+containing a $NAME or ${...} shell variable, a '…' anywhere, a path segment of three
+or more dots, or an angle-bracket <...> placeholder. Each extracted token, reference
+definitions included, is tested before trailing punctuation is stripped, so src/...
+is a placeholder rather than a citation of src/, while src/a.md... still cites
+src/a.md. Bare prose treats '<' and '>' as token boundaries (inline HTML), so an
+angle placeholder never joins a bare token and the bare fragments beside it are
+judged alone. Named-user '~user' paths are
 external and excluded without home-directory expansion; bare '~' and '~/' paths
 retain their normal expansion. A reference that fails path normalisation is
 skipped with one source-located WARN on stderr. A lone '/' and a single
@@ -123,6 +135,8 @@ LINK_DEFINITION = re.compile(r"^ {0,3}\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))")
 CODE = re.compile(r"`+([^`]+)`+")
 TOKEN = re.compile(r"[^\s`<>()\"']+")
 BRACE_SET = re.compile(r"\{([^{}]*,[^{}]*)\}")
+FILE_EXTENSION = re.compile(r"\.[A-Za-z][A-Za-z0-9]*$")
+PLACEHOLDER = re.compile(r"\$(?:\{|[A-Za-z_])|…|(?:^|/)\.{3,}(?:/|$)|<[^<>]+>")
 URL_SCHEME = r"(?:[a-zA-Z][a-zA-Z0-9+.-]*://|(?:mailto|ccchat|claude):)"
 SCHEME = re.compile(
     rf"^(?:{URL_SCHEME}|[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:)", re.IGNORECASE
@@ -492,7 +506,11 @@ def references(line: str, root: Path, *, directory: Path | None = None) -> list[
     """Extract destinations once; do not reinterpret excluded links as bare paths."""
     definition = LINK_DEFINITION.match(line)
     if definition:
-        return expand_braces(definition[1] or definition[2])
+        return [
+            expanded
+            for expanded in expand_braces(definition[1] or definition[2])
+            if not PLACEHOLDER.search(expanded)
+        ]
     found = [match[1] or match[2] for match in LINK.finditer(line)]
     remainder = LINK.sub(" ", line)
     for match in CODE.finditer(remainder):
@@ -507,6 +525,7 @@ def references(line: str, root: Path, *, directory: Path | None = None) -> list[
             expanded.rstrip(".,;!")
             for reference in found
             for expanded in expand_braces(reference)
+            if not PLACEHOLDER.search(expanded)
         )
     )
 
@@ -576,10 +595,15 @@ def candidate_kind(root: Path, candidate: Path) -> str | None:
 
 
 def untracked_branch_name(root: Path, path: str, candidates: list[Path]) -> bool:
-    """Recognise conventional branch prefixes only when no candidate names a path."""
+    """Recognise conventional branch prefixes only when no candidate names a path.
+
+    A last segment ending in a letter-led file extension names a file, not a branch,
+    so docs/eval.py moved out of docs/ stays ABSENT while release/1.5.0 stays prose.
+    """
     return (
         "/" in path
         and path.split("/", 1)[0] in BRANCH_PREFIXES
+        and not FILE_EXTENSION.search(path)
         and not any(
             candidate.exists()
             or candidate.is_symlink()

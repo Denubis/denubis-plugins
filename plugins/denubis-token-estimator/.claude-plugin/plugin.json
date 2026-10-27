@@ -1,7 +1,7 @@
 {
     "name": "denubis-token-estimator",
     "description": "Measure AI token/word usage from Claude Code and Codex logs for AI-use disclosures. Reports origin-deduplicated output split between root threads and subagents, plus human input words split into own authorship and pasted text, per project, by month or exact time window. WIP — independent audit pending.",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "author": {
         "name": "Brian Ballsun-Stanton",
         "github": "denubis"

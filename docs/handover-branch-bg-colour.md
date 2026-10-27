@@ -12,6 +12,12 @@ version 0.2.6. Claims are tagged **[measured]** (script output), **[source]**, o
 > flat table of 40 block colours legible under black or white text at 4.5:1, rather than
 > the 11 dark families below. The diagnosis, metrics and sources here still hold.
 
+> **Evaluation mode retired, 2026-10-27.** The script's current-against-proposed mode
+> compared against the hashed mapping plugin 0.3.0 removed, so it no longer ran. The
+> generator moved to `plugins/denubis-hook-branch-bg/scripts/palette.py`, cut to the block
+> table and its metrics ([ADR 0045](architecture/decisions/0045-python-leaves-docs-and-shared-script-logic-becomes-a-library.md)).
+> The `docs/branch-bg-colour-eval.py` commands below record the 2026-10-09 runs.
+
 ## Result
 
 The current mapping gives **3** repo colours that are mutually well separated; a

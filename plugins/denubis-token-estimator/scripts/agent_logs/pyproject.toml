@@ -1,0 +1,37 @@
+[project]
+name = "denubis-agent-logs"
+version = "0.1.0"
+description = "Read Claude Code and Codex session logs: roots, tolerant JSONL, usage records"
+requires-python = ">=3.14"
+
+[dependency-groups]
+# pytest stays so a sync scoped to this package (`uv sync --package
+# denubis-agent-logs`) can still run its tests. The lint, type and complexity
+# tools are pinned once, in the root dev group; do not add them here.
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# No [tool.*] table at all (ADR 0045 item 4). Hatchling finds the package without
+# one: the distribution name normalises to `denubis_agent_logs`, and its default
+# wheel selection picks up `src/denubis_agent_logs/`. A pytest run started in this
+# directory collects tests/ from the working directory; a run from the repository
+# root reads the root pyproject.toml, whose testpaths include this tests/.
+
+# Lint, type and complexity standards: the root pyproject.toml
+# (../../../../pyproject.toml) governs this package (ADR 0032). This file
+# deliberately has no [tool.ruff], [tool.ty], [tool.complexipy] or [tool.vulture]
+# table.
+# - ruff takes settings from the nearest pyproject.toml with a [tool.ruff]
+#   table, which is the root's. `extend = "../../../../pyproject.toml"` is not
+#   equivalent: it moves ruff's `src` here, so isort reclassifies this package's
+#   imports as first-party and reports new I001 findings (checked 2026-10-22 on
+#   the sibling members).
+# - ty cannot extend another file, and a [tool.ty] table here would make
+#   `ty check` run from this directory a separate project with only this
+#   table's settings. Without one, ty uses the root project from here too.
+#   scripts/lint.sh runs it with --all-packages so this package resolves.
+# - complexipy and vulture run from the root, and their root paths include
+#   this directory.

@@ -1351,6 +1351,110 @@ def test_branch_prefixes_keep_tracked_absent_and_present_ignored_paths(
     }
 
 
+@pytest.mark.parametrize("syntax", ["code", "link", "bare"])
+@pytest.mark.parametrize("name", ["evaluation.py", "evaluation.md"])
+def test_files_moved_out_of_docs_stay_absent_beside_branch_names(
+    repository: Path, syntax: str, name: str
+) -> None:
+    moved = f"docs/{name}"
+    write(repository, moved, "Evidence.\n")
+    (repository / "scripts").mkdir()
+    git(repository, "mv", "--", moved, f"scripts/{name}")
+    citation = {
+        "code": f"`{moved}`",
+        "link": f"[source]({moved})",
+        "bare": moved,
+    }[syntax]
+    write(
+        repository,
+        DECISION,
+        f"{citation}\n`fix/queued-human-dialogue`\n`release/1.5.0`\n",
+    )
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {("ABSENT", DECISION, 1, moved)}
+
+
+@pytest.mark.parametrize("syntax", ["code", "link", "bare"])
+@pytest.mark.parametrize(
+    "placeholder",
+    [
+        "$XDG_STATE_HOME/branch-bg/registry.json",
+        "${CLAUDE_PLUGIN_ROOT}/hooks/missing.py",
+        '"${PLUGIN_ROOT}/hooks/missing.py"',
+        "src/missing-$UID/state.json",
+        "src/${NAME}-cache/state.json",
+        "${CLAUDE_REAL_BINARY:-src/missing/claude}",
+        "…/branch-strip.sh",
+        "src/…/missing.md",
+        "src/missing/…",
+        ".../branch-strip.sh",
+        "src/.../missing.md",
+        "src/missing/...",
+        "cache/branch-bg-<uid>/<md5(path,title)>",
+        "src/<name>/missing.md",
+        "<repo>/src/missing.md",
+        "plugins/<name>/hooks/",
+    ],
+)
+def test_placeholder_tokens_are_not_citations_beside_a_missing_control(
+    repository: Path, syntax: str, placeholder: str
+) -> None:
+    citation = {
+        "code": f"`{placeholder}`",
+        "link": f"[source]({placeholder})",
+        "bare": placeholder,
+    }[syntax]
+    write(repository, DECISION, f"{citation} beside `missing/control.md`\n")
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {("ABSENT", DECISION, 1, "missing/control.md")}
+
+
+@pytest.mark.parametrize(
+    "placeholder",
+    [
+        "$XDG_STATE_HOME/branch-bg/registry.json",
+        "…/branch-strip.sh",
+        "src/missing/...",
+        "src/<name>/missing.md",
+    ],
+)
+def test_placeholder_reference_definitions_are_not_citations(
+    repository: Path, placeholder: str
+) -> None:
+    write(repository, DECISION, f"[source]: {placeholder}\n`missing/control.md`\n")
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {("ABSENT", DECISION, 2, "missing/control.md")}
+
+
+def test_prose_ellipsis_after_a_path_keeps_the_path_checked(repository: Path) -> None:
+    write(repository, DECISION, "See src/missing.md... and ../missing/file.md\n")
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {
+        ("ABSENT", DECISION, 1, "src/missing.md"),
+        ("ABSENT", DECISION, 1, "../missing/file.md"),
+    }
+
+
+def test_single_directory_segment_is_prose_bare_and_cited_when_quoted(
+    repository: Path,
+) -> None:
+    write(
+        repository,
+        DECISION,
+        "a people/ path segment\n`people/`\n[segment](people/)\n`src/`\n",
+    )
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {
+        ("ABSENT", DECISION, 2, "people/"),
+        ("ABSENT", DECISION, 3, "people/"),
+    }
+
+
 @pytest.mark.parametrize("exists", [False, True])
 @pytest.mark.parametrize("syntax", ["code", "link", "symlink"])
 def test_registered_external_worktree_paths_are_worktree_findings(

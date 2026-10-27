@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-branch-bg",
-  "version": "0.3.1",
+  "version": "0.3.3",
   "description": "Colour every tmux pane with a [person][repo][branch][session] title strip and a matching dark field, from the current Git repository and branch.",
   "author": {
     "name": "Brian Ballsun-Stanton",

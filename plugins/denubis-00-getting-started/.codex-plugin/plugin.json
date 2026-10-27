@@ -1,6 +1,6 @@
 {
   "name": "denubis-00-getting-started",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Getting-started policy and onboarding for the Denubis plugin suite.",
   "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
   "repository": "https://github.com/denubis/denubis-plugins",

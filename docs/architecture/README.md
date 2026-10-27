@@ -47,8 +47,8 @@ or plugin boundary is not assumed to be the right axis for a cross-cutting behav
 - [`denubis-academic/0-context.md`](plugins/denubis-academic/0-context.md) — five
   academic skills, one output style, and bibliography helper scripts.
 - [`denubis-token-estimator/0-context.md`](plugins/denubis-token-estimator/0-context.md)
-  — one shared methodology skill, provider entry points, and read-only Claude/Codex log
-  analysis.
+  — one shared methodology skill, provider entry points, read-only Claude/Codex log
+  analysis, and the `denubis-agent-logs` workspace member other scripts share (ADR 0045).
 - [`denubis-crash-recovery/0-context.md`](plugins/denubis-crash-recovery/0-context.md) —
   deterministic session classification, rendering, and triage over its SQLite state.
 

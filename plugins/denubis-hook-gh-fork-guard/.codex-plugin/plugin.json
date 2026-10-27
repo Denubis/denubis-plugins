@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-gh-fork-guard",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Guard direct gh CLI commands from targeting repositories other than the configured fork.",
   "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
   "repository": "https://github.com/denubis/denubis-plugins",

@@ -62,6 +62,10 @@ and consequences section. One ADR per decision.
   (applies 0042; amends 0005 and 0028)
 - [0044 — The ticket file stays in the notes directory: an open question is situational, and its answer moves to a record about its subject](0044-the-ticket-file-stays-in-the-notes-directory-because-open-questions-are-situational-and-answers-move-to-records-about-their-subject.md)
   (confirms 0005 and 0008; bounds 0043)
+- [0045 — Python leaves `docs/`; logic shared across scripts becomes a library](0045-python-leaves-docs-and-shared-script-logic-becomes-a-library.md)
+  (closes lint ticket L5; first library `denubis-agent-logs`)
+- [0046 — Installed plugins take shared libraries as commit-pinned git dependencies; the release skill owns the pin step](0046-installed-plugins-take-shared-libraries-as-commit-pinned-git-dependencies-and-the-release-skill-owns-the-pin-step.md)
+  (applies 0040 to 0045; closes ticket L5c)
 
 ## Status lifecycle
 

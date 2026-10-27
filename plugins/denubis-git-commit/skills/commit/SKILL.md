@@ -21,9 +21,13 @@ to relocate work already completed on the default branch. Disclose the branch, p
 pre-existing changes, and apply the authority the human actually granted.
 
 A combined skill/plugin request such as `commit, marketplace, push`, `release`, or `ship`
-is broader than this local commit procedure. Complete the release metadata here, then hand
-the accepted tree to the integration workflow; never interpret it as permission to push
-the current non-default branch.
+is broader than this local commit procedure. Complete the release metadata here following
+the release checklist in `denubis-extending-agents:maintaining-a-marketplace` (manifest
+and marketplace versions, changelog, and the shared-library pin step: a release that
+changes a uv workspace member another plugin consumes is two commits, the pushed library
+change first and the consumers' full-hash `rev` moves with their own version bumps
+second), then hand the accepted tree to the integration workflow; never interpret it as
+permission to push the current non-default branch.
 
 ## Inspect the real scope
 

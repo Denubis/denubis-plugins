@@ -12,23 +12,31 @@ Report model output tokens and human-authored input words as separate units. Spl
 output between root threads and subagents. Never describe tokens as equivalent to
 words or use one as a proxy for the other.
 
-The scripts read `~/.claude/projects` and `~/.codex/sessions`; they do not modify
-either log store.
+The scripts read `$CLAUDE_CONFIG_DIR/projects` (default `~/.claude/projects`) and
+`$CODEX_HOME/sessions` (default `~/.codex/sessions`); they do not modify either log
+store.
 
 ## Run the estimator
 
-Resolve the provider-supplied plugin root, then invoke the report script:
+Resolve the provider-supplied plugin root, then invoke the report script with
+`uv run --script`, which installs the log library the script declares in its inline
+metadata. A plain `python3` launch cannot import that library.
 
 ```bash
 PLUGIN_DIR="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:?plugin root unavailable}}"
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py"                     # current project
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --month
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> \
+uv run --script "$PLUGIN_DIR/scripts/estimate.py"   # current project
+uv run --script "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --month
+uv run --script "$PLUGIN_DIR/scripts/estimate.py" --dir <path> \
   --start 2026-08-11T05:37:40Z --end 2026-08-16T07:44:15Z
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --person <name>
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --all
-uv run --no-project python3 "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --csv out.csv
+uv run --script "$PLUGIN_DIR/scripts/estimate.py" --person <name>
+uv run --script "$PLUGIN_DIR/scripts/estimate.py" --all
+uv run --script "$PLUGIN_DIR/scripts/estimate.py" --dir <path> --csv out.csv
 ```
+
+For the Claude logs only, the estimator reports on stderr how many transcript lines and
+files it could not read (a torn line counts only when it carries an assistant or user
+record). The Codex pass has no such report and skips an unreadable file or line
+silently, so a Codex gap shows up only in the verification step.
 
 `--start` and `--end` must be provided together as timezone-aware ISO timestamps.
 They define `[start, end)` and cannot be combined with `--month`.
@@ -114,7 +122,7 @@ old paths so historical log entries still resolve.
 Run the live implementation checks:
 
 ```bash
-uv run --no-project python3 "$PLUGIN_DIR/scripts/verify.py"
+uv run --script "$PLUGIN_DIR/scripts/verify.py"
 ```
 
 Require positive population evidence: thread/file inventory, Codex counter modes,

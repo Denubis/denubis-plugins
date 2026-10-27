@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v uv >/dev/null 2>&1 || { echo \"branch-bg: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --script --python '>=3.14' --no-project --no-config \"${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py\"",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"branch-bg: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; hook=\"${CLAUDE_PLUGIN_ROOT}/hooks/branch-bg.py\"; uv run --project \"${CLAUDE_PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"$hook\"; rc=$?; [ \"$rc\" -eq 0 ] && exit 0; uv sync --project \"${CLAUDE_PLUGIN_ROOT}\" --script \"$hook\" --python '>=3.14' --offline >/dev/null 2>&1 && exit \"$rc\"; printf '{\"systemMessage\": \"denubis-hook-branch-bg: branch-bg could not run (uv exit %d); run /denubis-00-getting-started:setup to check and repair plugin environments\"}\\n' \"$rc\"; exit 0",
             "timeout": 5,
             "suppressOutput": true
           }

@@ -4,6 +4,8 @@ The June 2026 Mac incident happened because the old launcher ignored script
 metadata and ran a 3.9 interpreter. Check the PEP 723 declaration and the complete
 registration consumed by each host, including the explicit interpreter request
 that overrides UV_PYTHON. The missing-uv diagnostic is exercised in a real shell.
+A Claude launcher also reports a hook uv could not start (ADR 0046 decision 8); that
+behaviour is exercised in `test_hook_launcher_failure_report.py`.
 """
 
 import json
@@ -73,13 +75,32 @@ def _assert_registration(path: Path, command: str) -> None:
         else ""
     )
     arguments = f" --provider {provider}" if name == "instruction-budget" else ""
-    expected = (
+    preflight = (
         "command -v uv >/dev/null 2>&1 || { "
         f'echo "{name}: uv is required to run this hook; '
         f'install it from {_INSTALL_URL}" >&2; exit 1; }}; '
-        f"{environment}uv run --script --python '{_FLOOR}' "
-        f'--no-project --no-config "${{{root}}}/hooks/{script}"{arguments}'
     )
+    # `--project` anchors uv's configuration discovery at the plugin directory, so
+    # the user's uv.toml applies and the caller's cwd is never read (ADR 0046).
+    anchor = f'--project "${{{root}}}"'
+    if provider == "codex":
+        expected = (
+            f"{preflight}{environment}uv run {anchor} --script --python '{_FLOOR}' "
+            f'--no-project "${{{root}}}/hooks/{script}"{arguments}'
+        )
+    else:
+        plugin = path.parents[1].name
+        expected = (
+            f'{preflight}hook="${{{root}}}/hooks/{script}"; '
+            f"uv run {anchor} --script --python '{_FLOOR}' "
+            f'--no-project "$hook"{arguments}; '
+            'rc=$?; [ "$rc" -eq 0 ] && exit 0; '
+            f"uv sync {anchor} --script \"$hook\" --python '{_FLOOR}' --offline "
+            '>/dev/null 2>&1 && exit "$rc"; '
+            f'printf \'{{"systemMessage": "{plugin}: {name} could not run '
+            "(uv exit %d); run /denubis-00-getting-started:setup to check and "
+            'repair plugin environments"}\\n\' "$rc"; exit 0'
+        )
     assert command == expected, (
         f"{path}: expected the fixed preflight and uv script launcher at {_FLOOR}\n"
         f"expected: {expected}\nactual: {command}"
@@ -158,18 +179,38 @@ def test_metadata_gate_accepts_valid_script_and_rejects_missing_block(
             _assert_metadata(hook)
 
 
-@pytest.mark.parametrize("defect", [None, "bare-python", "wrong-floor", "no-preflight"])
+@pytest.mark.parametrize(
+    "defect",
+    [
+        None,
+        "bare-python",
+        "wrong-floor",
+        "no-preflight",
+        "no-failure-report",
+        "caller-config",
+    ],
+)
 def test_registration_gate_accepts_valid_launcher_and_rejects_regressions(
     defect: str | None,
 ) -> None:
-    path = Path("hooks/hooks.json")
-    command = (
+    path = Path("plugins/example-plugin/hooks/hooks.json")
+    preflight = (
         "command -v uv >/dev/null 2>&1 || { "
         'echo "example: uv is required to run this hook; '
         'install it from https://docs.astral.sh/uv/getting-started/installation/" '
         ">&2; exit 1; }; "
-        f"uv run --script --python '{_FLOOR}' --no-project --no-config "
-        '"${CLAUDE_PLUGIN_ROOT}/hooks/example.py"'
+    )
+    command = (
+        preflight + 'hook="${CLAUDE_PLUGIN_ROOT}/hooks/example.py"; '
+        'uv run --project "${CLAUDE_PLUGIN_ROOT}" '
+        f"--script --python '{_FLOOR}' --no-project \"$hook\"; "
+        'rc=$?; [ "$rc" -eq 0 ] && exit 0; '
+        'uv sync --project "${CLAUDE_PLUGIN_ROOT}" '
+        f"--script \"$hook\" --python '{_FLOOR}' --offline "
+        '>/dev/null 2>&1 && exit "$rc"; '
+        'printf \'{"systemMessage": "example-plugin: example could not run '
+        "(uv exit %d); run /denubis-00-getting-started:setup to check and repair "
+        'plugin environments"}\\n\' "$rc"; exit 0'
     )
     if defect == "bare-python":
         command = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/example.py"'
@@ -177,6 +218,14 @@ def test_registration_gate_accepts_valid_launcher_and_rejects_regressions(
         command = command.replace(f"--python '{_FLOOR}'", "--python '>=3.9'")
     elif defect == "no-preflight":
         command = command.split("}; ", 1)[1]
+    elif defect == "no-failure-report":
+        command = (
+            preflight + 'uv run --project "${CLAUDE_PLUGIN_ROOT}" '
+            f"--script --python '{_FLOOR}' --no-project "
+            '"${CLAUDE_PLUGIN_ROOT}/hooks/example.py"'
+        )
+    elif defect == "caller-config":
+        command = command.replace('--project "${CLAUDE_PLUGIN_ROOT}" ', "")
     if defect is None:
         _assert_registration(path, command)
     else:

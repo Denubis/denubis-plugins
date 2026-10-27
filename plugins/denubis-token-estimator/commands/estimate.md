@@ -9,8 +9,11 @@ argument-hint: "[--dir <path> | --person <name> | --all] [--month | --start <ISO
 Run the estimator and present its table to the user. Execute via Bash:
 
 ```
-uv run --no-project python3 "${CLAUDE_PLUGIN_ROOT}/scripts/estimate.py" $ARGUMENTS
+uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/estimate.py" $ARGUMENTS
 ```
+
+(`uv run --script` installs the log library the script declares in its inline
+metadata; a plain `python3` launch cannot import it.)
 
 (If `${CLAUDE_PLUGIN_ROOT}` is not set in your shell, resolve it to this plugin's
 installed directory — the `scripts/estimate.py` under `denubis-token-estimator`.)
@@ -40,7 +43,9 @@ own words are an upper bound for sessions older than Claude Code's paste wrapper
 earlier pastes are indistinguishable from typing. The grand total equals the sum of the
 monthly rows by construction. If a figure looks surprising,
 re-derive the headline numbers from the live logs with
-`uv run --no-project python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify.py"`.
+`uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/verify.py"`.
 
 People-roots come from `~/.token-estimator`; without it the tool scopes to the local
-directory. This is read-only over `~/.claude` and `~/.codex` logs.
+directory. This is read-only over the Claude Code and Codex logs
+(`$CLAUDE_CONFIG_DIR/projects`, default `~/.claude/projects`; `$CODEX_HOME/sessions`,
+default `~/.codex/sessions`).

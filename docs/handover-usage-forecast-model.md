@@ -3,8 +3,24 @@
 Written 2026-10-09 by the dispatching Claude Code session (Fable 5.1) after a first-cut
 probe of Brian's transcript history. Nothing here is implemented in the status line.
 Human rulings are marked **human**; everything else is **observed** from the probe
-scripts in `docs/usage-forecast-probe/` (first run from `/tmp/usage-fit/`) or
-**proposed**.
+scripts (first run from `/tmp/usage-fit/`, since rebuilt as `scripts/usage_profile.py`)
+or **proposed**.
+
+**Note added 2026-10-27.** The three probe scripts are now one command,
+`scripts/usage_profile.py`, with `extract`, `profile` and `backtest` subcommands built on
+the `denubis-agent-logs` library (ADR 0045). The 2026-10-09 figures below used the
+probe's first-seen rule, which kept the first record per session and message id. Claude
+Code writes several records per streamed message with growing output counts, so that
+rule undercounts output tokens by about 15% (ADR 0045). The command now uses the
+token-estimator's audited rule: the maximum output per message id, at the message's
+origin time. The backtest's division by zero at `blend_from=168` is fixed, and the
+backtest now evaluates only windows that have ended. The figures below were not
+recomputed. One rerun on live logs on 2026-10-27 at 06:34Z used the audited rule over
+369,484 messages from 2026-01-12 to 2026-10-27 and evaluated 16 of 19 selected windows
+(**observed**). Its mean absolute errors at 12, 24, 48, 72, 96, 120 and 144 hours were
+79, 69, 55, 38, 32, 21 and 14% for linear pace, and 33, 33, 29, 26, 23, 20 and 14% for
+the profile. That data runs 18 days further than §3's, so it is not a like-for-like
+comparison.
 
 ## 0. Human rulings (this session)
 
@@ -68,8 +84,8 @@ window's final total, by hours into the window:
 Scaling the profile by the current window's intensity-so-far made it worse early
 (152% at 12h) because 12 hours of a window is too little to estimate intensity. The
 profile beats linear until about day five; after that both are within the noise.
-Script: `docs/usage-forecast-probe/backtest.py` (its last experiment has a division-by-zero at
-`blend_from=168`; harmless, fix or drop).
+Script: `scripts/usage_profile.py backtest` (the division by zero its last experiment
+hit at `blend_from=168` is fixed; that row is now the profile-only baseline).
 
 Conclusion: covariates carry large signal, linear pace is the wrong baseline for the
 first four days, and a hand-tuned profile is not the answer because it cannot absorb
