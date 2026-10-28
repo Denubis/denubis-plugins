@@ -66,7 +66,7 @@
     {
       "name": "denubis-git-commit",
       "description": "Git commit skill for Claude Code. Handles /commit as a proper skill.",
-      "version": "1.5.1",
+      "version": "1.5.2",
       "source": "./plugins/denubis-git-commit",
       "author": {
         "name": "Brian Ballsun-Stanton",

@@ -121,22 +121,24 @@ def test_ignored_untracked_records_are_excluded(
     control = f"{location}/visible.md"
     write(repository, control, "`missing/control.md`\n", tracked=False)
     result = check(repository, *arguments)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", control, 1, "missing/control.md")}
 
 
 @pytest.mark.parametrize(
-    ("reference", "kind"),
+    ("reference", "kind", "status"),
     [
-        (".worktrees/task/report.md", "WORKTREE"),
-        ("codex-prompts/out/report.md", "EXCHANGE"),
-        ("missing/report.md", "ABSENT"),
+        (".worktrees/task/report.md", "WORKTREE", 1),
+        ("codex-prompts/out/report.md", "EXCHANGE", 1),
+        ("missing/report.md", "ABSENT", 0),
     ],
 )
-def test_citation_defect_kinds(repository: Path, reference: str, kind: str) -> None:
+def test_citation_defect_kinds(
+    repository: Path, reference: str, kind: str, status: int
+) -> None:
     write(repository, DECISION, f"Evidence: `{reference}`.\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == status, result.stdout + result.stderr
     assert findings(result) == {(kind, DECISION, 1, reference)}
 
 
@@ -147,7 +149,7 @@ def test_citation_defect_kinds(repository: Path, reference: str, kind: str) -> N
 def test_each_citation_syntax(repository: Path, citation: str) -> None:
     write(repository, DECISION, f"# Decision\n\nEvidence: {citation}.\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 3, "lost/file.md")}
 
 
@@ -212,7 +214,7 @@ def test_current_user_home_paths_keep_repository_checks(
     monkeypatch.setenv("HOME", str(repository))
     write(repository, DECISION, "`~/x.md`\n[home](~)\n")
     missing = check(repository)
-    assert missing.returncode == 1, missing.stdout + missing.stderr
+    assert missing.returncode == 0, missing.stdout + missing.stderr
     assert findings(missing) == {("ABSENT", DECISION, 1, "~/x.md")}
     write(repository, "x.md", "# Evidence\n")
     present = check(repository)
@@ -230,12 +232,12 @@ def test_unreadable_reference_warns_once_and_other_references_are_checked(
         repository,
         DECISION,
         f"`{reference}` [same]({reference}) {reference}\n"
-        "`src/record.txt`\n" + ("`missing/control.md`\n" if blocking else ""),
+        "`src/record.txt`\n" + ("`private/evidence.md`\n" if blocking else ""),
     )
     result = check(repository)
     assert result.returncode == int(blocking), result.stdout + result.stderr
     assert findings(result) == (
-        {("ABSENT", DECISION, 3, "missing/control.md")} if blocking else set()
+        {("IGNORED", DECISION, 3, "private/evidence.md")} if blocking else set()
     )
     assert result.stderr == f"WARN {DECISION}:1 unreadable reference {reference}\n"
 
@@ -267,7 +269,7 @@ def test_reference_exclusions_with_a_defect_control(
 ) -> None:
     write(repository, DECISION, f"{excluded}\n`missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/control.md")}
 
 
@@ -363,7 +365,7 @@ def test_quoted_advisories_do_not_hide_an_unquoted_blocker(repository: Path) -> 
         "> `private/evidence.md`\n"
         "> `codex-prompts/out/report.md`\n"
         "> `.worktrees/task/report.md`\n"
-        "`missing/blocker.md`\n",
+        "`codex-prompts/out/blocker.md`\n",
     )
     result = check(repository)
     assert result.returncode == 1, result.stdout + result.stderr
@@ -371,7 +373,7 @@ def test_quoted_advisories_do_not_hide_an_unquoted_blocker(repository: Path) -> 
         ("IGNORED", DECISION, 1, "private/evidence.md"),
         ("EXCHANGE", DECISION, 2, "codex-prompts/out/report.md"),
         ("WORKTREE", DECISION, 3, ".worktrees/task/report.md"),
-        ("ABSENT", DECISION, 4, "missing/blocker.md"),
+        ("EXCHANGE", DECISION, 4, "codex-prompts/out/blocker.md"),
     }
     assert "citations=4 advisory=3 " in result.stdout
 
@@ -459,7 +461,7 @@ def test_locations_can_override_the_default_registers_and_records(
     write(repository, "rulings/0001.md", "`missing/ruling.md`\n", tracked=tracked)
     write(repository, "memory/record.md", "`missing/memory.md`\n", tracked=tracked)
     result = check(repository, "--register", "rulings", "--records", "memory", "--all")
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", "rulings/0001.md", 1, "missing/ruling.md"),
         ("ABSENT", "memory/record.md", 1, "missing/memory.md"),
@@ -484,7 +486,7 @@ def test_full_audit_reaches_every_conventional_location(
         tracked=False,
     )
     result = check(repository, "--all")
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", path, 1, "missing/evidence.md") for path in locations
     } | {("ABSENT", "docs/architecture/untracked.md", 1, "missing/untracked.md")}
@@ -645,7 +647,7 @@ def test_claude_finding_aid_selects_a_custom_decision_register(
         "The evidence is pending.\n`missing/finding.md`\n",
     )
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("TRANSITIONAL", "decisions/0001.md", 1, "pending"),
         ("ABSENT", "decisions/0001.md", 2, "missing/finding.md"),
@@ -674,7 +676,7 @@ def test_markdown_reference_definitions_and_balanced_destinations(
         "[evidence](file(v1).md)\n[missing evidence][source]\n\n[source]: missing.md\n",
     )
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 4, "missing.md")}
 
 
@@ -698,14 +700,14 @@ def test_cli_register_override_takes_precedence_over_finding_aids(
     write(repository, "old-register/0001.md", "`missing/old.md`\n")
     write(repository, "new-register/0001.md", "`missing/new.md`\n")
     result = check(repository, "--register", "new-register")
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", "new-register/0001.md", 1, "missing/new.md")}
 
 
 def test_summary_counts_each_finding_and_strict_cannot_relax_citations(
     repository: Path,
 ) -> None:
-    write(repository, DECISION, "The decision is pending.\n`missing/report.md`\n")
+    write(repository, DECISION, "The decision is pending.\n`private/evidence.md`\n")
     write(
         repository,
         ".notes/project_open-questions.md",
@@ -739,7 +741,7 @@ def test_double_separator_in_local_path_is_not_a_protocol_relative_url(
 ) -> None:
     write(repository, DECISION, "missing//local.md\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 1, "missing//local.md")}
 
 
@@ -755,7 +757,7 @@ def test_selected_record_does_not_select_its_siblings(
     write(repository, selected, "`missing/selected.md`\n")
     arguments = [selected] if selection == "named" else ["--staged"]
     result = check(repository, "--records", location, *arguments)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 1, "missing/register.md"),
         ("ABSENT", selected, 1, "missing/selected.md"),
@@ -797,7 +799,7 @@ def test_globally_ignored_notes_use_filesystem_and_skip_operational_mail(
     )
     assert git(repository, "ls-files", "--", ".notes").stdout == ""
     result = check(repository, *(["--all"] if audit_all else []))
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     expected = {("ABSENT", ".notes/decisions/0001.md", 1, "missing/ruling.md")}
     if audit_all:
         expected.add(("ABSENT", ".notes/reference.md", 1, "missing/note.md"))
@@ -850,7 +852,7 @@ def test_pytest_node_ids_resolve_the_file_before_the_suffix(
     }[syntax]
     write(repository, DECISION, f"{citation}\n`missing/report.py::test_missing`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 2, "missing/report.py::test_missing")
     }
@@ -864,7 +866,7 @@ def test_external_paths_are_not_repository_citations(
 ) -> None:
     write(repository, DECISION, f"`{outside}`\n`missing/real.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/real.md")}
 
 
@@ -891,7 +893,7 @@ def test_single_segment_commands_and_root_separator_are_not_citations(
     ]
     write(repository, DECISION, f"{citation}\n`missing/real.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/real.md")}
 
 
@@ -903,7 +905,7 @@ def test_bare_prose_pairs_are_skipped_but_quoted_paths_remain_checked(
 ) -> None:
     write(repository, DECISION, f"{pair}\n`{pair}`\n[reference]({pair})\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 2, pair),
         ("ABSENT", DECISION, 3, pair),
@@ -926,7 +928,7 @@ def test_bare_path_signals_still_find_real_missing_paths(
     write(repository, "README", "Fixture\n")
     write(repository, DECISION, f"{reference}\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 1, reference)}
 
 
@@ -943,7 +945,7 @@ def test_symbolic_suffix_resolves_the_file(
     }[syntax]
     write(repository, DECISION, f"{citation}\n")
     result = check(repository)
-    assert result.returncode == (0 if exists else 1), result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == (
         set() if exists else {("ABSENT", DECISION, 1, reference)}
     )
@@ -957,7 +959,7 @@ def test_nonexistent_candidates_under_ignored_directories_are_absent(
     document = ".notes/decisions/0001.md"
     write(repository, document, f"`{reference}`\n", tracked=False)
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", document, 1, reference)}
 
 
@@ -996,7 +998,7 @@ def test_untracked_directory_does_not_turn_bare_prose_into_a_path(
     (repository / "deployment").mkdir()
     write(repository, DECISION, "The deployment/viewer pair.\nsrc/missing/noext\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "src/missing/noext")}
 
 
@@ -1018,35 +1020,67 @@ def test_bare_ignored_present_note_is_still_a_citation(repository: Path) -> None
         ("private/evidence.md", "IGNORED"),
     ],
 )
-def test_staged_design_plan_absent_is_advisory_but_ephemeral_is_blocking(
-    repository: Path, strict: bool, reference: str, kind: str
+@pytest.mark.parametrize(
+    ("record", "arguments"),
+    [
+        (DECISION, ()),
+        ("docs/decisions/0001.md", ()),
+        ("docs/guide.md", ("--all",)),
+        ("docs/architecture/evidence.md", ("--all",)),
+        ("docs/architecture/evidence.md", ("docs/architecture/evidence.md",)),
+        ("docs/architecture/evidence.md", ("--staged",)),
+        (".notes/evidence.md", (".notes/evidence.md",)),
+        (".notes/evidence.md", ("--staged",)),
+        ("memory/evidence.md", ("--records", "memory", "memory/evidence.md")),
+        ("memory/evidence.md", ("--records", "memory", "--staged")),
+        ("docs/design-plans/future.md", ("--staged",)),
+    ],
+)
+def test_absent_is_advisory_and_ephemeral_citations_block_in_every_location(
+    repository: Path,
+    *,
+    record: str,
+    arguments: tuple[str, ...],
+    reference: str,
+    kind: str,
+    strict: bool,
 ) -> None:
-    plan = "docs/design-plans/future.md"
-    write(repository, plan, f"`missing/future.md`\n`{reference}`\n")
-    arguments = ["--staged", *(["--strict"] if strict else [])]
-    result = check(repository, *arguments)
+    selection = [*arguments, *(["--strict"] if strict else [])]
+    write(repository, record, f"`missing/evidence.md`\n`{reference}`\n")
+    result = check(repository, *selection)
     assert result.returncode == 1, result.stdout + result.stderr
     assert findings(result) == {
-        ("ABSENT", plan, 1, "missing/future.md"),
-        (kind, plan, 2, reference),
+        ("ABSENT", record, 1, "missing/evidence.md"),
+        (kind, record, 2, reference),
     }
-    write(repository, plan, "`missing/future.md`\n")
-    advisory_only = check(repository, *arguments)
-    assert advisory_only.returncode == 0, advisory_only.stdout + advisory_only.stderr
-    assert findings(advisory_only) == {("ABSENT", plan, 1, "missing/future.md")}
-
-
-@pytest.mark.parametrize("location", [".notes", "docs/architecture", "memory"])
-@pytest.mark.parametrize("selection", ["named", "staged"])
-def test_selected_records_keep_absent_blocking(
-    repository: Path, location: str, selection: str
-) -> None:
-    record = f"{location}/evidence.md"
+    assert "citations=2 advisory=1 " in result.stdout
     write(repository, record, "`missing/evidence.md`\n")
-    arguments = [record] if selection == "named" else ["--staged"]
-    result = check(repository, "--records", location, *arguments)
-    assert result.returncode == 1, result.stdout + result.stderr
-    assert findings(result) == {("ABSENT", record, 1, "missing/evidence.md")}
+    advisory_only = check(repository, *selection)
+    assert advisory_only.returncode == 0, advisory_only.stdout + advisory_only.stderr
+    assert findings(advisory_only) == {("ABSENT", record, 1, "missing/evidence.md")}
+    assert "citations=1 advisory=1 " in advisory_only.stdout
+
+
+@pytest.mark.parametrize("strict", [False, True])
+def test_absent_only_register_lists_advisory_findings_and_exits_zero(
+    repository: Path, strict: bool
+) -> None:
+    write(repository, DECISION, "`missing/first.md`\n[second](missing/second.md)\n")
+    result = check(repository, *(["--strict"] if strict else []))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert findings(result) == {
+        ("ABSENT", DECISION, 1, "missing/first.md"),
+        ("ABSENT", DECISION, 2, "missing/second.md"),
+    }
+    counts = dict(
+        field.split("=") for field in result.stdout.splitlines()[-1].split()[1:]
+    )
+    assert counts == {
+        "citations": "2",
+        "advisory": "2",
+        "transitional": "0",
+        "open_questions": "0",
+    }
 
 
 @pytest.mark.parametrize("suffix", ["open_source", "42", "42:7"])
@@ -1060,21 +1094,24 @@ def test_sibling_file_locators_are_not_mistaken_for_scheme_prefixes(
         f"[source](evidence.txt:{suffix})\n[missing](missing.txt:{suffix})\n",
     )
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, f"missing.txt:{suffix}")}
 
 
 @pytest.mark.parametrize(
-    ("reference", "kind"),
-    [("word:private/evidence", "IGNORED"), ("word:src/missing/noext", "ABSENT")],
+    ("reference", "kind", "status"),
+    [
+        ("word:private/evidence", "IGNORED", 1),
+        ("word:src/missing/noext", "ABSENT", 0),
+    ],
 )
 def test_prefixed_bare_paths_keep_tracked_and_ignored_name_signals(
-    repository: Path, reference: str, kind: str
+    repository: Path, reference: str, kind: str, status: int
 ) -> None:
     write(repository, "private/evidence", "Ephemeral evidence.\n", tracked=False)
     write(repository, DECISION, f"{reference}\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == status, result.stdout + result.stderr
     assert findings(result) == {(kind, DECISION, 1, reference)}
 
 
@@ -1134,16 +1171,19 @@ def test_all_adds_tracked_and_untracked_markdown_directly_under_docs_and_decisio
 
 
 @pytest.mark.parametrize("selection", ["named", "staged"])
-def test_all_direct_records_keep_their_rules_when_also_selected(
+def test_all_direct_records_are_checked_once_when_also_selected(
     repository: Path, selection: str
 ) -> None:
     record = "docs/guide.md"
-    write(repository, record, "`missing/evidence.md`\n")
+    write(repository, record, "`missing/evidence.md`\n`private/evidence.md`\n")
     arguments = [record] if selection == "named" else ["--staged"]
     result = check(repository, "--all", *arguments)
     assert result.returncode == 1, result.stdout + result.stderr
-    assert findings(result) == {("ABSENT", record, 1, "missing/evidence.md")}
-    assert "advisory=0" in result.stdout
+    assert findings(result) == {
+        ("ABSENT", record, 1, "missing/evidence.md"),
+        ("IGNORED", record, 2, "private/evidence.md"),
+    }
+    assert "citations=2 advisory=1 " in result.stdout
 
 
 @pytest.mark.parametrize("claude", [None, "  @AGENTS.md  \n", "# Rules\n@AGENTS.md\n"])
@@ -1234,7 +1274,7 @@ def test_line_ranges_resolve_existing_files_and_keep_missing_files(
     }[syntax]
     write(repository, DECISION, f"{citation}\n`missing/report.md:9-12`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/report.md:9-12")}
 
 
@@ -1246,7 +1286,7 @@ def test_backticked_paths_with_spaces_resolve_before_splitting(
     write(repository, base + reference, "{}\n")
     write(repository, DECISION, f"`{reference}`\n`missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/control.md")}
 
 
@@ -1284,7 +1324,7 @@ def test_brace_sets_report_only_failing_alternatives(
     }[syntax]
     write(repository, DECISION, f"{citation}\n")
     result = check(repository)
-    assert result.returncode == int(missing), result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == (
         {("ABSENT", DECISION, 1, "sources/email")} if missing else set()
     )
@@ -1295,7 +1335,7 @@ def test_multiple_brace_sets_expand_each_path_segment(repository: Path) -> None:
         write(repository, f"sources/{path}.md", "Evidence.\n")
     write(repository, DECISION, "`sources/{docx,pdf}/{draft,final}.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 1, "sources/pdf/final.md")}
 
 
@@ -1329,7 +1369,7 @@ def test_branch_names_are_prose_with_a_missing_path_control(
     }[syntax]
     write(repository, DECISION, f"{citation}\n`feature/bugfix`\n`missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 3, "missing/control.md")}
 
 
@@ -1371,7 +1411,7 @@ def test_files_moved_out_of_docs_stay_absent_beside_branch_names(
         f"{citation}\n`fix/queued-human-dialogue`\n`release/1.5.0`\n",
     )
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 1, moved)}
 
 
@@ -1407,7 +1447,7 @@ def test_placeholder_tokens_are_not_citations_beside_a_missing_control(
     }[syntax]
     write(repository, DECISION, f"{citation} beside `missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 1, "missing/control.md")}
 
 
@@ -1425,14 +1465,14 @@ def test_placeholder_reference_definitions_are_not_citations(
 ) -> None:
     write(repository, DECISION, f"[source]: {placeholder}\n`missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/control.md")}
 
 
 def test_prose_ellipsis_after_a_path_keeps_the_path_checked(repository: Path) -> None:
     write(repository, DECISION, "See src/missing.md... and ../missing/file.md\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 1, "src/missing.md"),
         ("ABSENT", DECISION, 1, "../missing/file.md"),
@@ -1448,7 +1488,7 @@ def test_single_directory_segment_is_prose_bare_and_cited_when_quoted(
         "a people/ path segment\n`people/`\n[segment](people/)\n`src/`\n",
     )
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 2, "people/"),
         ("ABSENT", DECISION, 3, "people/"),
@@ -1497,7 +1537,7 @@ def test_absolute_main_checkout_paths_are_not_linked_worktree_citations(
     git(repository, "worktree", "add", "-b", "repair", str(worktree))
     write(worktree, DECISION, f"`{repository}/src/record.txt`\n`missing/control.md`\n")
     result = check(worktree)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {("ABSENT", DECISION, 2, "missing/control.md")}
 
 
@@ -1507,7 +1547,7 @@ def test_branch_prefix_without_a_slash_still_checks_a_sibling_link(
 ) -> None:
     write(repository, DECISION, f"[source]({prefix})\n`missing/control.md`\n")
     result = check(repository)
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert findings(result) == {
         ("ABSENT", DECISION, 1, prefix),
         ("ABSENT", DECISION, 2, "missing/control.md"),

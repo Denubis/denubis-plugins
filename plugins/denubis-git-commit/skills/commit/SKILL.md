@@ -52,11 +52,10 @@ whole records locations (by default `.notes/` and `docs/architecture/`), plus
 Markdown directly under `docs/` and `docs/decisions/`. Register and records scans include
 tracked and non-ignored untracked Markdown; notes also include ignored Markdown except
 `.notes/local-mail/`. Staged paths use working-checkout contents.
-Citation defects block in decision registers, records selected by `--all`,
-configured records locations, `.notes`, and
-`docs/architecture/`. On blockquote lines (first non-space character `>`), every citation
-kind is advisory and keeps its prefix. Elsewhere, `ABSENT` is advisory outside those
-locations; `WORKTREE`, `EXCHANGE`, and `IGNORED` still block. The summary counts all
+In every checked document, `ABSENT` (a cited path missing from the checkout) is advisory:
+read and repair it, but it never blocks. `WORKTREE`, `EXCHANGE`, and `IGNORED` block,
+except on blockquote lines (first non-space character `>`), where every citation kind is
+advisory and keeps its prefix. The summary counts all
 citations and separately counts all advisory citations as `advisory`. `--strict` also
 blocks wording/ticket findings, but leaves advisory citations advisory.
 A usage or Git error leaves the check incomplete.

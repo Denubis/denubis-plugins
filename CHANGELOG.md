@@ -1,5 +1,15 @@
 # Changelog
 
+## [denubis-git-commit] 1.5.2
+
+A citation of a path missing from the checkout no longer blocks a commit anywhere; the durable-record checker reports it as an advisory finding.
+
+**Changed:**
+- `check_durable_records.py` applies one citation rule to every selected document, following ADR 0042's 2026-10-28 amendment: `ABSENT` is always reported and counted in `advisory=`, and never affects the exit status. Before, it blocked in decision registers, records selected by `--all`, configured records locations, `.notes` and `docs/architecture/`. `WORKTREE`, `EXCHANGE` and `IGNORED` still block outside blockquote lines, and every kind stays advisory on blockquote lines. The location test that decided this (`Document.full_rule`) is removed. On this repository on 2026-10-28, `--all` moved from exit 1 (`citations=164 advisory=2`) to exit 0 (`citations=164 advisory=164`); the default selection was already exit 0, since its only finding is on a blockquote line.
+- The commit skill's checker paragraph states the new rule.
+
+**Tests:** `tests/test_commit_durable_records.py`. `test_absent_is_advisory_and_ephemeral_citations_block_in_every_location` (66 cases: eleven location and selection routes, each blocking kind, with and without `--strict`) replaces `test_staged_design_plan_absent_is_advisory_but_ephemeral_is_blocking` and `test_selected_records_keep_absent_blocking`. New `test_absent_only_register_lists_advisory_findings_and_exits_zero`. `test_all_direct_records_keep_their_rules_when_also_selected` becomes `test_all_direct_records_are_checked_once_when_also_selected`. Three tests whose claim needs a blocking control now use a blocking kind instead of `ABSENT`: `test_unreadable_reference_warns_once_and_other_references_are_checked`, `test_quoted_advisories_do_not_hide_an_unquoted_blocker`, and `test_summary_counts_each_finding_and_strict_cannot_relax_citations`. Thirty-five tests whose only findings are `ABSENT` (in two of them, only the `ABSENT` parameter row) now expect exit 0 and keep the same finding assertions.
+
 ## [denubis-token-estimator] 0.4.0
 
 The plugin now ships `denubis-agent-logs`, a standard-library uv workspace member under `scripts/agent_logs/` that holds the Claude log reading the estimator and verifier shared by copy (ADR 0045). `estimate.py` and `verify.py` consume it through a PEP 723 path source; reports are byte-identical to 0.3.0 on a frozen snapshot of both log stores (2026-10-27).

@@ -78,11 +78,10 @@ docs/decisions/. Register and records directories are recursive; these two addit
 docs selections are not. Non-notes locations select tracked and nonignored untracked
 Markdown; notes include ignored Markdown but exclude .notes/local-mail/.
 Naming a record never selects its siblings.
-Citation defects block in decision registers, records selected by --all, configured
-records locations, .notes, and docs/architecture. Every citation kind is advisory on
-Markdown blockquote lines (first non-space character '>'), retaining its prefix without
-affecting the exit status. Elsewhere ABSENT is advisory outside those record locations;
-WORKTREE, EXCHANGE and IGNORED remain blocking outside blockquotes.
+One citation rule applies to every selected document. ABSENT is always advisory: it is
+reported with its prefix but never affects the exit status. WORKTREE, EXCHANGE and
+IGNORED block, except on Markdown blockquote lines (first non-space character '>'),
+where every citation kind is advisory and keeps its prefix.
 The summary counts all citations and separately counts all advisory citations as
 advisory. --strict also blocks wording/ticket findings, but does not promote advisory
 citation findings.
@@ -189,7 +188,6 @@ class Document:
     root: Path
     path: Path
     decision: bool
-    full_rule: bool = True
 
 
 def arguments() -> Options:
@@ -441,16 +439,7 @@ def extra_documents(
         if not markdown(path) or not path.is_file():
             raise ValueError(f"expected an existing Markdown file: {value}")
         decision = any(path.is_relative_to(owner / register) for register in registers)
-        full_rule = any(
-            path.is_relative_to(owner / location)
-            for location in [
-                *registers,
-                *records,
-                Path(".notes"),
-                Path("docs/architecture"),
-            ]
-        )
-        documents.append(Document(owner, path, decision, full_rule))
+        documents.append(Document(owner, path, decision))
     return documents
 
 
@@ -643,10 +632,8 @@ def classify_reference(root: Path, document: Path, reference: str) -> str | None
     )
 
 
-def citation_findings(
-    root: Path, document: Path, text: str, *, absent_advisory: bool = False
-) -> list[Finding]:
-    """Identify each defective path citation with its source line."""
+def citation_findings(root: Path, document: Path, text: str) -> list[Finding]:
+    """Identify each defective path citation; ABSENT and quoted lines are advisory."""
     found: list[Finding] = []
     for number, line in enumerate(text.splitlines(), 1):
         for reference in references(line, root, directory=document.parent):
@@ -666,8 +653,7 @@ def citation_findings(
                         str(document.relative_to(root)),
                         number,
                         reference,
-                        advisory=line.lstrip().startswith(">")
-                        or (kind == "ABSENT" and absent_advisory),
+                        advisory=kind == "ABSENT" or line.lstrip().startswith(">"),
                     )
                 )
     return found
@@ -771,14 +757,7 @@ def check_documents(root: Path, main_root: Path, options: Options) -> list[Findi
     found: list[Finding] = []
     for document in selected_documents(root, main_root, options):
         text = document.path.read_text(encoding="utf-8")
-        found.extend(
-            citation_findings(
-                document.root,
-                document.path,
-                text,
-                absent_advisory=not document.full_rule,
-            )
-        )
+        found.extend(citation_findings(document.root, document.path, text))
         if document.decision:
             found.extend(
                 transitional_findings(

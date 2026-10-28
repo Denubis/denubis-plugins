@@ -92,3 +92,25 @@ decision register and is advisory elsewhere, since the ruling is about gitignore
 ```sh
 sed -n '4384p;4440p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/3d3778b3-cc7f-4fd5-9aaa-8bc5704aeb29.jsonl
 ```
+
+## Amendment (2026-10-28): a citation of a missing path is advisory everywhere
+
+The previous amendment kept a missing-path citation blocking inside the decision register.
+Moving fifteen registers from notes directories into tracked `docs/` (ADR 0005 amendment)
+left every one of their commit gates failing on that rule alone, mostly on example paths,
+quoted lines and evidence that had moved. Asked "Does a missing-path citation inside a
+register become a warning rather than a block?", Brian ruled: "yes" (line 7577, `user`
+record `108a093b-a993-4d27-ab98-a7586bfb6fb9`, 2026-10-28T00:21:48Z, 2026-10-28 11:21
+Australia/Sydney, session `3d3778b3-cc7f-4fd5-9aaa-8bc5704aeb29`).
+
+- A citation of a path that does not exist in the checkout is reported, counted as
+  advisory, and never fails the check, in the decision register and everywhere else.
+- Citations of gitignored objects, worktree paths and the prompt-exchange directory stay
+  blocking wherever decision 1 and the 2026-10-26 amendment place them. The ruling of
+  2026-10-26 was about gitignored objects; this amendment makes the rule say only that.
+- The committer still reads the advisory lines: a moved or deleted path in a register is
+  a defect to repair, just not one that holds the commit.
+
+```sh
+sed -n '7577p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/3d3778b3-cc7f-4fd5-9aaa-8bc5704aeb29.jsonl
+```
