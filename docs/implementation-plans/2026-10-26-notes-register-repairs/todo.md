@@ -134,3 +134,22 @@ with their answered content landed. Every ticket file is audited for answered qu
 - A branch name such as `fix/queued-human-dialogue` reads as a path (BJET).
 - A worktree path outside the checkout (`/tmp/...` linked checkout) is skipped as external
   (BJET), though it is the same defect class.
+
+## Committed 2026-10-28
+
+Brian ruled that a missing-path citation is advisory everywhere (ADR 0042, 2026-10-28
+amendment; checker release 1.5.2) and then that the leftover register copies in the notes
+directories may be deleted on this machine once `docs/decisions/` holds them. With both,
+the staged moves were committed in nine repositories: approver (by its own session,
+`c4947e5`), SupervisionGuidanceNote `3adfd73`, cc-search-chats `cf1ebd1` (four worktree
+and exchange citations reworded as prose first), tmux-codex-quota `d52a856`, BJET
+`0a9df75`, expenses `0c6226f`, Phaedra/Paper `89b50ef` (Brian's quoted words in 0002 set
+as blockquotes), maxmyliteracy `7e26933`, transcriber `58aee80`. The six removed notes
+copies are held under a temporary directory on this machine, not deleted outright. Nothing
+was pushed in those repositories. Worktree and vendor paths in the transcriber and
+Phaedra ticket files were reworded as prose.
+
+Still open: 2026-promotion and CollegeOfLaw (no commits in either, first-commit decision),
+sillytavern, faims, philosophyofwork and localscribe (Brian's skim), sage (parked),
+bbs-cv-overleaf (another session's tree), the laptop's register copies, and the wave 3
+citations.
