@@ -327,7 +327,8 @@ NOTICE_LOG = "denubis-hook-agent-notice-log"
 # fine. And context line is fine.", answering whether quiet-agents' two
 # deliveries may stand under the extended contract.
 _QUIET_AGENTS_RULING = (
-    ".notes/decisions/0005-instruction-delivery-contract-reads-mods.md; raw record "
+    "docs/architecture/decisions/0051-instruction-delivery-contract-reads-mods.md; "
+    "raw record "
     "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/"
     "e159b867-7a1e-4e2a-a524-058f6b7e72b6.jsonl:1237 "
     "(message 2e705937-f326-469e-b25c-9e95e1441cea)"

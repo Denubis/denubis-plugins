@@ -66,6 +66,12 @@ and consequences section. One ADR per decision.
   (closes lint ticket L5; first library `denubis-agent-logs`)
 - [0046 — Installed plugins take shared libraries as commit-pinned git dependencies; the release skill owns the pin step](0046-installed-plugins-take-shared-libraries-as-commit-pinned-git-dependencies-and-the-release-skill-owns-the-pin-step.md)
   (applies 0040 to 0045; closes ticket L5c)
+- [0047 — agent-notice-log appends without a size limit](0047-agent-notice-log-appends-without-a-size-limit.md)
+- [0048 — quiet-agents takes an idle notice by the report-received rule, not a time window](0048-quiet-agents-report-received-rule.md)
+- [0049 — quiet-agents nudges only after an answered turn](0049-quiet-agents-nudges-only-after-an-answered-turn.md)
+- [0050 — Hooks-only plugins carry the `hook-` infix](0050-hooks-only-plugins-carry-the-hook-infix.md)
+  (adopted default, not a human ruling)
+- [0051 — The instruction-delivery contract reads mods; quiet-agents' system-prompt section and its prompt context are permitted](0051-instruction-delivery-contract-reads-mods.md)
 
 ## Status lifecycle
 
