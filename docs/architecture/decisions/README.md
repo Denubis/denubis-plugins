@@ -72,6 +72,8 @@ and consequences section. One ADR per decision.
 - [0050 — Hooks-only plugins carry the `hook-` infix](0050-hooks-only-plugins-carry-the-hook-infix.md)
   (adopted default, not a human ruling)
 - [0051 — The instruction-delivery contract reads mods; quiet-agents' system-prompt section and its prompt context are permitted](0051-instruction-delivery-contract-reads-mods.md)
+- [0052 — The default decision register is tracked in the repository in every project, never the notes directory](0052-the-default-decision-register-is-tracked-in-every-project-never-the-notes-directory.md)
+  (amends 0005; carries 0043 beyond this repository; leaves 0044 standing)
 
 ## Status lifecycle
 
