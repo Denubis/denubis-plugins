@@ -73,7 +73,7 @@ and consequences section. One ADR per decision.
   (adopted default, not a human ruling)
 - [0051 — The instruction-delivery contract reads mods; quiet-agents' system-prompt section and its prompt context are permitted](0051-instruction-delivery-contract-reads-mods.md)
 - [0052 — The default decision register is tracked in the repository in every project, never the notes directory](0052-the-default-decision-register-is-tracked-in-every-project-never-the-notes-directory.md)
-  (amends 0005; carries 0043 beyond this repository; leaves 0044 standing)
+  (duplicated the 2026-10-26 amendment to 0005; superseded by it)
 
 ## Status lifecycle
 

@@ -1,7 +1,9 @@
 # ADR 0052 — The default decision register is tracked in the repository in every project, never the notes directory
 
-**Status:** Accepted (2026-11-06). Amends the fourth Decision bullet of ADR 0005. Carries
-ADR 0043 beyond this repository. ADR 0044 stands: the ticket file is not a register.
+**Status:** Superseded by ADR 0005 (2026-11-06). It duplicated ADR 0005's 2026-10-26
+amendment, which it missed and which governs the default register: `docs/decisions/`, or
+a project's existing register under `docs/`. Decision 4 is wrong, since that amendment
+names the path. Decision 3 agrees with ADR 0044, which stands.
 
 ## Authority evidence
 
