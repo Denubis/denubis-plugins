@@ -75,6 +75,7 @@ and consequences section. One ADR per decision.
 - [0052 — The default decision register is tracked in the repository in every project, never the notes directory](0052-the-default-decision-register-is-tracked-in-every-project-never-the-notes-directory.md)
   (duplicated the 2026-10-26 amendment to 0005; superseded by it)
 - [2026-11-02-bbs-fresh-session-passes-context-floor — A freshly cleared session has no context to measure, so the context floor does not refuse it](2026-11-02-bbs-fresh-session-passes-context-floor.md)
+- [2026-11-02-bbs-claude-codex-adapter-no-scraping — Claude drives Codex through a per-client adapter without reading its screen; a send needs no typing protection, and a clear is a new session](2026-11-02-bbs-claude-codex-adapter-no-scraping.md)
 - [2026-11-07-bbs-adrs-named-by-date-slug — A new decision record is named by its date, the ruler's initials and a short slug; existing numbers stay](2026-11-07-bbs-adrs-named-by-date-slug.md)
   (replaces numbering for new records in every repository)
 - [2026-11-07-bbs-codex-notes-use-shared-service — Codex's hook sends its notes through the shared local service, not straight into the supervisor's inbox](2026-11-07-bbs-codex-notes-use-shared-service.md)
