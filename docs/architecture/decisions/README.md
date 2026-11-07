@@ -76,6 +76,9 @@ and consequences section. One ADR per decision.
   (duplicated the 2026-10-26 amendment to 0005; superseded by it)
 - [2026-11-07-bbs-adrs-named-by-date-slug — A new decision record is named by its date, the ruler's initials and a short slug; existing numbers stay](2026-11-07-bbs-adrs-named-by-date-slug.md)
   (replaces numbering for new records in every repository)
+- [2026-11-07-bbs-codex-notes-use-shared-service — Codex's hook sends its notes through the shared local service, not straight into the supervisor's inbox](2026-11-07-bbs-codex-notes-use-shared-service.md)
+  (applies 0039 item 4)
+- [2026-11-07-bbs-new-codex-worker-starts-fresh — A worker made by `new` is a new worker; it does not inherit the old worker's folder, model or effort](2026-11-07-bbs-new-codex-worker-starts-fresh.md)
 
 ## Status lifecycle
 
