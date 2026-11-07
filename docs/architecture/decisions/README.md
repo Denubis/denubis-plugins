@@ -59,7 +59,7 @@ and consequences section. One ADR per decision.
 - [0042 — No durable record cites a gitignored object; the check for that, and proper note-taking, belong to the commit skill and run in every repository](0042-citation-and-memory-checks-belong-to-the-commit-skill-and-run-in-every-repository.md)
   (applies 0008 and 0041; extends `denubis-git-commit:commit`)
 - [0043 — The notes directory holds nothing durable that other machines rely on; durable content lives in `docs/`, and a register citation of a path in the notes directory is a defect](0043-notes-hold-nothing-durable-that-other-machines-rely-on-durable-content-lives-in-docs.md)
-  (applies 0042; amends 0005 and 0028)
+  (applies 0042; amends 0005 and 0028; amended 2026-11-07: an exchange prompt is never evidence)
 - [0044 — The ticket file stays in the notes directory: an open question is situational, and its answer moves to a record about its subject](0044-the-ticket-file-stays-in-the-notes-directory-because-open-questions-are-situational-and-answers-move-to-records-about-their-subject.md)
   (confirms 0005 and 0008; bounds 0043)
 - [0045 — Python leaves `docs/`; logic shared across scripts becomes a library](0045-python-leaves-docs-and-shared-script-logic-becomes-a-library.md)
@@ -74,6 +74,8 @@ and consequences section. One ADR per decision.
 - [0051 — The instruction-delivery contract reads mods; quiet-agents' system-prompt section and its prompt context are permitted](0051-instruction-delivery-contract-reads-mods.md)
 - [0052 — The default decision register is tracked in the repository in every project, never the notes directory](0052-the-default-decision-register-is-tracked-in-every-project-never-the-notes-directory.md)
   (duplicated the 2026-10-26 amendment to 0005; superseded by it)
+- [2026-11-07-bbs-adrs-named-by-date-slug — A new decision record is named by its date, the ruler's initials and a short slug; existing numbers stay](2026-11-07-bbs-adrs-named-by-date-slug.md)
+  (replaces numbering for new records in every repository)
 
 ## Status lifecycle
 
@@ -81,15 +83,19 @@ and consequences section. One ADR per decision.
   in the post-implementation review.
 - **Accepted** — decision has been used and the post-acceptance pass
   promoted it from Proposed.
-- **Superseded by ADR-NNNN** — the replacement records the current decision. Retire the
+- **Superseded by** the replacement's name or number — the replacement records the current decision. Retire the
   superseded document to Git or an explicit archive rather than layering corrections
   into a living decision.
 
-## Numbering
+## Naming
 
-Four-digit zero-padded, in the order ADRs were authored. Numbers are never reused. A gap
-means that Git or an explicit archive holds a retired decision; it is not an invitation
-to reconstruct the old argument in the living set.
+A new ADR is named `YYYY-MM-DD-<initials>-<slug>.md`: the date of the ruling, the lowercase
+initials of the person whose ruling it records, and a kebab-case slug of at most five
+words; if that name exists, change the slug
+([2026-11-07-bbs-adrs-named-by-date-slug](2026-11-07-bbs-adrs-named-by-date-slug.md)).
+ADRs 0001 to 0052 keep their four-digit numbers, assigned in authoring order and never
+reused. A gap in them means that Git or an explicit archive holds a retired decision; it
+is not an invitation to reconstruct the old argument in the living set.
 
 ## Decision-source integrity
 

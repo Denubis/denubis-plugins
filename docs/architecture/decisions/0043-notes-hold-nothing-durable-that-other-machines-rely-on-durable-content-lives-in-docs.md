@@ -1,7 +1,8 @@
 # ADR 0043 — The notes directory holds nothing durable that other machines rely on; durable content lives in `docs/`, and a register citation of a path in the notes directory is a defect
 
 **Status:** Accepted (2026-10-26). Applies ADR 0042 to the one case it left open. Amends
-ADR 0005 and ADR 0028 as stated under Consequences.
+ADR 0005 and ADR 0028 as stated under Consequences. Amended 2026-11-07: a prompt in the
+exchange is never evidence (see the amendment below).
 
 ## Authority evidence
 
@@ -60,3 +61,26 @@ open-questions queue's path as the convention they establish, not as evidence.
   home of content other machines rely on.
 - The commit-skill check's `IGNORED` classification for paths in the notes directory is
   the intended behaviour and needs no exemption switch.
+
+## Amendment (2026-11-07): a prompt in the exchange is never evidence, by path or by description
+
+A ticket in this repository's ticket file rested its evidence on two deliverable items of
+a prompt file in the gitignored prompt exchange, and the commit check blocked that
+citation under decision 2. Asked whether to reword the evidence so it named the prompt
+without its path, Brian ruled: "nothing should ever just describe prompt such and such.
+evidence goes in docs." (line 1875, `user` record `0cd1af6b-d325-4474-9246-d997c6cd94ac`,
+2026-11-07T00:38:40Z, 11:38 Australia/Sydney, in session
+`d280d2b3-8069-40c1-8f99-fcd0694017d7`.)
+
+- Decision 2's second repair, rewording a claim so it rests on evidence a clone can open,
+  never means naming or describing a prompt in the exchange. A claim that rests on what a
+  prompt says moves that content into a tracked document under `docs/`, such as the
+  design document or decision record the prompt serves, and cites it there.
+- A resolver to the original human message in a transcript remains evidence.
+- The rule covers tickets as well as durable records. The ticket file is situational
+  (ADR 0044), but a ticket's evidence still cites only what a clone can open or a
+  transcript resolver.
+
+```sh
+sed -n '1875p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d280d2b3-8069-40c1-8f99-fcd0694017d7.jsonl
+```
