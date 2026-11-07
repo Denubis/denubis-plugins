@@ -99,6 +99,14 @@ original-message resolvers, with the index and project instructions repointed (A
 amended 2026-10-26). Follow that register's format and authority-evidence rule. Creating
 a decision record needs no approval; the ruling it records did.
 
+Name a new decision record `YYYY-MM-DD-<initials>-<slug>.md`: the date of the ruling, the
+lowercase initials of the person whose ruling it records, and a kebab-case slug of at most
+five words, such as `2026-11-07-bbs-adrs-named-by-date-slug.md`. Cite it by that name. If
+the name already exists, change the slug. Never take "the next number": two branches
+taking it from different bases collide. Records that already carry numbers keep them, and
+the index lists both forms. In a one-file register, title the new entry with the same
+name (ADR 2026-11-07-bbs-adrs-named-by-date-slug in denubis-plugins).
+
 The ticket file stays in `.notes/` because an open question is situational; its answer is
 the durable thing and leaves for the register (ADR 0044). A project whose own
 instructions name a different ticket file keeps that file.

@@ -1,5 +1,14 @@
 # Changelog
 
+## [denubis-project-notes] 0.3.2
+
+`recording-project-notes` names a new decision record by the date of the ruling, the ruler's initials and a slug of at most five words, instead of taking the next number (ADR 2026-11-07-bbs-adrs-named-by-date-slug).
+
+**Changed:**
+- `recording-project-notes`: a new decision record is `YYYY-MM-DD-<initials>-<slug>.md`, with lowercase initials of the person whose ruling it records and a kebab-case slug of at most five words, cited by that name. A name that already exists changes its slug. Numbered records keep their numbers, the index lists both forms, and a one-file register titles a new entry with the same name. Two branches that each took the next number from different bases had collided (two ADR 0048s in this repository).
+
+**Not verified:** no automated test covers this guidance.
+
 ## [denubis-project-notes] 0.3.1
 
 The default decision register moves from the notes directory to the tracked `docs/decisions/`, and the skills stop routing durable content into `.notes/`, following ADR 0005's 2026-10-26 amendment and ADR 0043. The open-questions ticket file stays in `.notes/` (ADR 0044).
