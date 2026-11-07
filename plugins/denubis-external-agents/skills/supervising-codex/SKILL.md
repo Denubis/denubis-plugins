@@ -56,11 +56,12 @@ the loop works, and neither is optional (Brian, 2026-07-28):
 - **An ADR register.** Anything ruled along the way belongs in the project's decision
   records, indexed. Codex is told to say so when a prompt produces a ruling, because a
   decision that lives only in a pane is a decision that gets re-litigated next week. The
-  default register is `.notes/decisions/` in the main checkout, indexed by its
-  `README.md` (ruled 2026-09-14, ADR 0005); a project that already keeps one elsewhere
-  (`docs/decisions/adr-register.md` and `docs/architecture/decisions/` are both in use
-  across Brian's repos) keeps it there. A project with none gets the default created,
-  without asking, before the first prompt is written.
+  default register is `docs/decisions/` in the main checkout, tracked and indexed by its
+  `README.md` (ADR 0005, amended 2026-10-26); a project that already keeps a tracked one
+  elsewhere under `docs/` (`docs/decisions/adr-register.md` and
+  `docs/architecture/decisions/` are both in use across Brian's repos) keeps it there. A
+  register found in `.notes/` moves into `docs/`. A project with none gets the default
+  created, without asking, before the first prompt is written.
 - **An open-questions ticket file**, `.notes/project_open-questions.md` in the main
   checkout. Codex's questions, and the supervisor's, are appended there as tickets rather
   than left in a pane to scroll past. A ticket closes only when the human answers it;
@@ -72,8 +73,8 @@ the loop works, and neither is optional (Brian, 2026-07-28):
   `denubis-project-notes:recording-project-notes` owns the format.
 
 If the prompt directory is missing, say so and stop rather than improvising a substitute:
-a prompt directory that is tracked leaks working drafts into history. `.notes/` is durable
-passive memory, never transport, so `codex-prompts/` never lives inside it.
+a prompt directory that is tracked leaks working drafts into history. `.notes/` holds
+situational memory, never transport, so `codex-prompts/` never lives inside it.
 
 ## Invoking the supervisor
 

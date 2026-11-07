@@ -1,5 +1,24 @@
 # Changelog
 
+## [denubis-project-notes] 0.3.1
+
+The default decision register moves from the notes directory to the tracked `docs/decisions/`, and the skills stop routing durable content into `.notes/`, following ADR 0005's 2026-10-26 amendment and ADR 0043. The open-questions ticket file stays in `.notes/` (ADR 0044).
+
+**Changed:**
+- `recording-project-notes`: the default register is `<main-repository-root>/docs/decisions/` with a `README.md` index. An existing tracked register under `docs/` (`docs/architecture/decisions/`, a one-file `docs/decisions/adr-register.md`) is kept, and a register found inside `.notes/` moves into `docs/` with its resolvers. The skill states why the ticket file stays in `.notes/`, and that a project whose own instructions name another ticket file keeps it. `.notes/` is described as situational memory that nothing tracked cites, replacing "durable passive memory".
+- `scanning-project-notes`: the opening paragraph and section 6 send durable facts, references and evidence that another machine may cite to an existing or proposed document under `docs/`; `.notes/` records cover feedback, local preferences and working context. The proposal gate is unchanged. The ruling-recording bypass names the tracked register, `docs/decisions/` by default.
+
+**Not verified:** no automated test covers this guidance. The suite does not read the changed wording, and no skill evaluation was run.
+
+## [denubis-external-agents] 0.24.3
+
+`supervising-codex` names the tracked `docs/decisions/` as the default decision register a supervised project gets, following ADR 0005's 2026-10-26 amendment.
+
+**Changed:**
+- `supervising-codex`: the default register is `docs/decisions/` in the main checkout, tracked and indexed by its `README.md`; existing tracked registers under `docs/` are kept, and a register found in `.notes/` moves into `docs/`. `.notes/` is described as situational memory rather than durable memory. The ticket file is unchanged at `.notes/project_open-questions.md`, and `codex_supervisor.py` is byte-identical to 0.24.2.
+
+**Not verified:** no automated test covers this guidance.
+
 ## [denubis-git-commit] 1.5.2
 
 A citation of a path missing from the checkout no longer blocks a commit anywhere; the durable-record checker reports it as an advisory finding.

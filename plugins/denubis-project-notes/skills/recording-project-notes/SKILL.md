@@ -89,15 +89,24 @@ removed"; 2026-10-08: the file "is for *open* questions, not *answered* question
 Until then an answered ticket stayed in the file, and the file became a second decision
 register that nobody could read.
 
-Anything the human rules is a decision record. The default register is
-`<main-repository-root>/.notes/decisions/`, with an index at
-`.notes/decisions/README.md`; a project that already keeps its register elsewhere, such
-as `docs/architecture/decisions/`, keeps it there. Follow that register's format and
-authority-evidence rule. Creating a decision record needs no approval; the ruling it
-records did.
+Anything the human rules is a decision record, and decision records are tracked in the
+repository so every clone and machine has them. The default register is
+`<main-repository-root>/docs/decisions/`, with an index at `docs/decisions/README.md`; a
+project that already keeps a tracked register elsewhere under `docs/`, such as
+`docs/architecture/decisions/` or a one-file `docs/decisions/adr-register.md`, keeps it
+there. A register found inside `.notes/` moves into `docs/`, each record keeping its
+original-message resolvers, with the index and project instructions repointed (ADR 0005,
+amended 2026-10-26). Follow that register's format and authority-evidence rule. Creating
+a decision record needs no approval; the ruling it records did.
 
-`.notes/` is durable passive memory, never transport. Prompt exchange with an external
-agent, mail, and other operational state stay in their own gitignored directories.
+The ticket file stays in `.notes/` because an open question is situational; its answer is
+the durable thing and leaves for the register (ADR 0044). A project whose own
+instructions name a different ticket file keeps that file.
+
+`.notes/` holds situational memory that no tracked file cites, never transport. Content
+another machine or session may need to cite lives under `docs/` (ADR 0043). Prompt
+exchange with an external agent, mail, and other operational state stay in their own
+gitignored directories.
 
 ## Verify the new owner
 

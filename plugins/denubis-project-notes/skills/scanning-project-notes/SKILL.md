@@ -12,8 +12,9 @@ every note, read enough frontmatter to select by the current task, and open only
 bodies. Prior-chat recovery is a separate, conditional action.
 
 Ordinary repository instructions, current code, and an accepted plan remain the first
-owners of implementation facts. Notes carry durable project facts, preferences,
-references, and feedback.
+owners of implementation facts. Notes carry situational memory: feedback, local
+preferences, and working context. Durable facts, references, and evidence that another
+machine or session may need to cite live under tracked `docs/` (ADR 0043).
 
 Notes do not create authority or decisions: resolve any human instruction they rely on to
 the original human record. Do not dispatch an advisor and do not wait for a SessionStart
@@ -103,11 +104,14 @@ owned by code or tests do not earn a memory record.
 
 Choose the current semantic owner:
 
-- revise an existing `.notes/` record for a durable project fact, preference, reference,
-  or feedback;
+- revise an existing `.notes/` record for feedback, a local preference, or working
+  context;
+- revise an existing document under `docs/` for a durable fact or reference that another
+  machine or session may cite;
 - revise an existing ADR for a current architectural decision and its rationale; or
-- when no existing owner fits, propose one new `.notes/` path and use
-  `denubis-project-notes:recording-project-notes` only after the user approves it; or
+- when no existing owner fits, propose one new path, `.notes/` for situational memory or
+  `docs/` for durable content, and use `denubis-project-notes:recording-project-notes`
+  for a `.notes/` record only after the user approves it; or
 - use code, tests, or ordinary documentation when they already reveal the fact.
 
 Prefer revising the existing owner over appending a new lesson. Before changing a note or
@@ -126,8 +130,8 @@ this gate, finish without proposing or writing project memory.
 Two writes bypass the proposal gate, because they carry questions and rulings to the human
 rather than waiting on the human: appending a ticket to
 `.notes/project_open-questions.md` when the work is unclear, and recording a ruling the
-human has already made in the decision register (`.notes/decisions/` by default, or the
-project's existing register). `recording-project-notes` owns both formats. Raise open
+human has already made in the tracked decision register (`docs/decisions/` by default, or
+the project's existing register under `docs/`). `recording-project-notes` owns both formats. Raise open
 tickets to the human one at a time, marked as a question for them and placed last; an
 indifferent answer is not delegation, so think its implications through with the human
 before recording anything.

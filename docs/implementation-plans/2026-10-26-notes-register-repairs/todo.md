@@ -119,12 +119,15 @@ with their answered content landed. Every ticket file is audited for answered qu
 - ADR 0005 amendment (2026-10-26): the default decision register is `docs/decisions/`, not the
   notes directory. The three skills that still name the notes directory as the default register
   (`recording-project-notes`, `scanning-project-notes`, `supervising-codex`) need releases.
+  Done 2026-11-07: denubis-project-notes 0.3.1 and denubis-external-agents 0.24.3.
 - gemini-argon's stale ticket file: delete or trim to Q4 when that clone is fast-forwarded.
 
 ## Open with Brian
 
 - The word to commit in each repaired repository.
-- The global instruction line naming `docs/open-questions.md` (ADR 0044 decision 4).
+- The global instruction line naming `docs/open-questions.md` (ADR 0044 decision 4). Done
+  2026-11-06: both global instruction files name `.notes/project_open-questions.md`,
+  synced as claude-settings-sync `5f7d39a`.
 
 ## Checker false positives found in wave 2 (for the checker's owner)
 
