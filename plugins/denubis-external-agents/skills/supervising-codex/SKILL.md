@@ -337,11 +337,14 @@ codex_supervisor.py --answer "option B" # type one answer and confirm it landed
 
 `--question` sends exactly one keystroke, `M-,`, and reads the pane back; it types
 nothing. `--answer` types literally, checks its own text is on screen, presses Enter as
-a separate call, and reports success only once the queued question is gone from the
-pane — a pane that still shows it is raised as a failure with its tail. Both refuse
+a separate call, and reports success once the count decreases or the Action Required
+title clears. A missing count while that title remains is unreadable and refuses.
+A pane that still shows the question is raised as a failure with its tail. Both refuse
 unless a queued question is detected, and both refuse a pending approval dialog first,
 because the expansion key answers a dialog like any other keystroke. A multi-line answer
 is refused: it goes in as keystrokes, so a newline would submit half of it.
+Wrapped answer text still refuses before Enter, with the pane's width and height;
+accepting it requires evidence about the expanded widget's layout that is not yet available.
 
 **Both are UNPROVEN against a live pane.** They were built on 2026-09-19 from one
 after-the-fact observation — after Brian pressed alt+, himself, the composer held the
@@ -475,8 +478,10 @@ figures out and leaves the rest on screen rather than carrying it back.
 
 The v0.157.0 panel is about nineteen rows, and codex draws on the alternate screen, so a
 shorter pane cuts off its top, echo line included, and no capture recovers it. On
-2026-09-28 that failed a 25-row pane with "drew no status panel". The fallback now says
-the pane is too short and gives its height; give it more height and run the check again.
+2026-09-28 that failed a 25-row pane with "drew no status panel". The fallback names that
+clipping and reports the pane's width and height. Width can also wrap the weekly label
+and value: a recognized wrapped panel refuses as too narrow to read safely, with both
+dimensions. Give the pane enough space and run the check again.
 
 Two details of the panel are worth knowing, because both have already caught a naive
 reading. A second model's allowance is reported directly beneath the first, so the
@@ -556,7 +561,8 @@ lock was held 0.22s after Enter while the title still read `Ready`, and the titl
 
 `/compact` keeps the same session and transcript, so `--compact` requires that no new
 session id appeared. It also requires codex's new compaction marker and reports the
-context meter either side, refusing when the figure has fallen.
+context reading either side, preferring the meter and otherwise reading the held main
+rollout. It refuses an unreadable after-reading or a falling percentage.
 
 The confirmations cannot be shared, and that is what makes them worth having. Codex's
 completion list puts `/compact` first on the prefix `/c`, so a `/clear` typed one
@@ -581,8 +587,27 @@ strand codex mid-task with nothing able to release it.
 
 `--under-floor` carries a human ruling past the refusal. It exists so that a human can
 say yes, not so that the supervisor has a way around a halt, and reaching for it without
-having asked is the same improvisation as reaching for `send-keys`. An unreadable meter
-refuses on the same terms, because a gate that passes when it cannot see is not a gate.
+having asked is the same improvisation as reaching for `send-keys`.
+
+The meter is preferred when visible. Both width and height can hide it: a Working pane
+on 2026-11-02 showed 79% at 90 columns and no meter at 60, 43, 30 or 20 columns, all
+32 lines tall. The older 127x5 missing-composer observation does not establish a current
+minimum height. Ready, composer and approval checks still apply before every dispatch;
+pane refusals include actual width and height.
+
+With no meter, context comes from the same foreground-process locks and self-naming
+main rollout used by `--quota`. The newest token-count info supplies latest-call usage
+and the model's context window, with Codex's 12,000-token baseline and rounding, rather
+than cumulative session usage. One live wide-pane comparison matched the meter on
+2026-11-02. The [official hooks reference](https://learn.chatgpt.com/docs/hooks) warns
+that transcript format is unstable; unreadable or ambiguous files still refuse.
+
+**A session with no model call yet has no context to measure** (ADR 2026-11-02-bbs-fresh-session-passes-context-floor, Brian,
+2026-11-02). Exactly one held lock without a rollout qualifies, including while the old
+readable main session remains held after a clear. The lock's own session store is also
+checked so an existing but unopened rollout cannot qualify. Dispatch reports
+`no model call yet`, without inventing a percentage. Multiple unwritten locks, unreadable
+metadata or discovery, ambiguous main rollouts, and no held locks still refuse.
 
 ## Same-window event monitor
 

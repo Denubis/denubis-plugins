@@ -113,12 +113,35 @@ CommandRunner = Callable[[Command], str]
 class MonitorError(RuntimeError):
     """An operational condition that prevents safe monitoring."""
 
+    def __init__(self, message: str, *, pane_id: str | None = None) -> None:
+        if pane_id is not None:
+            try:
+                geometry = run_command(
+                    (
+                        "tmux",
+                        "display-message",
+                        "-p",
+                        "-t",
+                        pane_id,
+                        "#{pane_width} #{pane_height}",
+                    )
+                ).split()
+            except MonitorError:
+                geometry = []
+            dimensions = (
+                f"{geometry[0]} columns x {geometry[1]} lines tall"
+                if len(geometry) >= 2
+                else "geometry unavailable"
+            )
+            message = f"{message}; pane {pane_id}: {dimensions}"
+        super().__init__(message)
+
 
 class PaneNotReadyError(MonitorError):
     """A preflight refusal carrying the title that was actually observed."""
 
-    def __init__(self, title: str, message: str) -> None:
-        super().__init__(message)
+    def __init__(self, title: str, message: str, *, pane_id: str | None = None) -> None:
+        super().__init__(message, pane_id=pane_id)
         self.title = title
 
 
@@ -428,7 +451,7 @@ def _approval_is_pending(recent_content: str) -> bool:
     """
     prompts = list(
         re.finditer(
-            r"would you like to run|press enter to confirm",
+            r"would\s+you\s+like\s+to\s+run|press\s+enter\s+to\s+confirm",
             recent_content,
             re.IGNORECASE,
         )
@@ -572,7 +595,6 @@ def queued_questions(title: str, recent_content: str) -> int | None:
 def _action_required_observation(
     title: str,
     content: str,
-    recent_content: str,
 ) -> Observation:
     """Tell an approval dialog from a queued question under the same title.
 
@@ -582,8 +604,8 @@ def _action_required_observation(
     cannot take. A live dialog still wins, because it blocks the run, where a queued
     question expires after thirty seconds and lets Codex carry on.
     """
-    queued = queued_questions(title, recent_content)
-    if queued is not None and not _approval_is_pending(recent_content):
+    queued = queued_questions(title, content)
+    if queued is not None and not _approval_is_pending(content):
         material = f"{queued} queued follow-up question(s)"
         key = _action_key(ObservationKind.QUESTION, material)
         return Observation(
@@ -600,7 +622,7 @@ def classify_snapshot(title: str, content: str) -> Observation:
     """Classify a bounded TUI snapshot, defaulting unknown states to busy."""
     recent_content = "\n".join(content.splitlines()[-12:])
     if re.search(r"action required", title, re.IGNORECASE):
-        return _action_required_observation(title, content, recent_content)
+        return _action_required_observation(title, content)
 
     if any(spinner in title for spinner in BUSY_SPINNERS) or re.search(
         r"\bworking\b|\bwaiting\b",
@@ -617,10 +639,10 @@ def classify_snapshot(title: str, content: str) -> Observation:
     # in the scrollback, and treating that as pending would report a finished pane as
     # waiting. The busy branch above still wins outright, since a spinner means Codex
     # is mid-turn and anything below it may be stale.
-    if _approval_is_pending(recent_content):
+    if _approval_is_pending(content):
         return _action_observation(
             ObservationKind.APPROVAL,
-            _approval_material(recent_content),
+            _approval_material(content),
         )
 
     if re.search(r"\bready\b", title, re.IGNORECASE):
@@ -1211,7 +1233,8 @@ def _require_joined_target(expected: PaneRef) -> None:
         raise MonitorError(
             f"joined Codex target changed from {expected.pane_id}/"
             f"{expected.process_group_id} to {current.pane_id}/"
-            f"{current.process_group_id}; inspect with --tail"
+            f"{current.process_group_id}; inspect with --tail",
+            pane_id=current.pane_id,
         )
 
 
@@ -1631,10 +1654,9 @@ def context_left(content: str) -> int | None:
     """Return the percentage of context Codex reports remaining, if it is on screen.
 
     The footer reads `Context N% left` and is truncated at the pane width, so a
-    narrow pane shows `Context 50% …` with the word cut off. The number arrives
-    before the cut in both widths observed on 2026-08-01, and the word is
-    therefore not required. None means the meter could not be read, which is a
-    different answer from a reading that cleared the floor.
+    pane can show `Context 50% …` with the word cut off. At 60 columns and below
+    on 2026-11-02 the whole meter was absent. None means the screen cannot answer;
+    `_read_context` then tries the pane's own session files.
     """
     readings = _CONTEXT_METER.findall(_plain(content))
     return int(readings[-1]) if readings else None
@@ -1708,9 +1730,7 @@ def _not_ready_complaint(pane_id: str, title: str) -> str:
     file instead. Nothing this tool can type answers that widget: Codex's own hint
     on screen says `alt + , to answer`.
     """
-    recent = "\n".join(
-        run_command(("tmux", "capture-pane", "-p", "-t", pane_id)).splitlines()[-12:]
-    )
+    recent = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
     queued = queued_questions(title, recent)
     if queued is None:
         return f"joined Codex pane {pane_id} is not Ready: {title!r}"
@@ -1732,26 +1752,21 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
     """
     title = pane_status(pane_id)
     if re.search(r"\bready\b", title, re.IGNORECASE) is None:
-        raise PaneNotReadyError(title, _not_ready_complaint(pane_id, title))
+        raise PaneNotReadyError(
+            title, _not_ready_complaint(pane_id, title), pane_id=pane_id
+        )
     snapshot = run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
     content = _plain(snapshot)
-    if _approval_is_pending("\n".join(content.splitlines()[-12:])):
+    if _approval_is_pending(content):
         raise MonitorError(
             f"joined Codex pane {pane_id} holds a pending approval, and any keystroke "
-            f"would answer it; clear it with --approve or read it with --tail"
+            f"would answer it; clear it with --approve or read it with --tail",
+            pane_id=pane_id,
         )
     composer = _composer_text(snapshot)
     if composer is None:
-        # Codex sizes its TUI to the pane, so a short pane draws no composer at
-        # all. That is unreadable rather than full, and reporting it as full
-        # sends the reader hunting for typed text that was never there: on
-        # 2026-08-09 a 127x5 pane produced "composer is not empty" and cost an
-        # hour, while a 182x41 pane of the same build drew its composer and
-        # passed. A clearing pane can also report Ready before its composer
-        # redraws. No capture flag recovers a composer that was never drawn.
-        # Height and the window's pane count come back in one call, because the
-        # usual cause is layout pressure rather than a deliberately short pane:
-        # panes get squeezed when a window accumulates agent panes.
+        # An undrawn composer is unreadable rather than full. Geometry or a
+        # redraw can cause it; neither width nor height alone diagnoses the cause.
         geometry = run_command(
             (
                 "tmux",
@@ -1766,49 +1781,47 @@ def _preflight_pane(pane_id: str) -> tuple[str, str]:
         raise PaneComposerUnavailableError(
             f"no composer drawn on joined Codex pane {pane_id} ({height} lines "
             f"tall, sharing its window with {panes} panes), so its contents "
-            f"cannot be read; close a pane or re-run the layout to give it "
-            f"height, or inspect with --tail"
+            f"cannot be read; inspect with --tail or give it more space",
+            pane_id=pane_id,
         )
     if composer:
         raise MonitorError(
             f"joined Codex pane {pane_id} composer holds {composer!r}; "
-            f"inspect with --tail"
+            f"inspect with --tail",
+            pane_id=pane_id,
         )
     return title, snapshot
 
 
-def _check_context_floor(pane_id: str, snapshot: str, *, under_floor: bool) -> None:
+def _check_context_floor(pane_id: str, snapshot: str, *, under_floor: bool) -> str:
     """Refuse to dispatch into a pane with too little context left to hold the answer.
 
-    An unreadable meter refuses too. Passing on it would be the absence-read-as-a-pass
-    this repo keeps paying for, and the meter was on screen at both pane widths
-    measured on 2026-08-01, so an unreadable one means the pane is not rendering the
-    way this code assumes rather than that all is well.
-
-    Width was the wrong variable to have measured. Height is what removes the
-    meter: on 2026-08-09 a 127x5 codex pane captured five lines of status bar
-    holding no `Context` meter at all, while a 182x41 pane of the same build
-    rendered one. That case no longer reaches here, because `_preflight_pane`
-    runs first and refuses a pane too short to draw its composer, but the
-    justification above should not be read as covering a geometry it never
-    tested.
+    Width and height can hide the meter. Prefer it when drawn, otherwise read the
+    held main rollout. ADR 2026-11-02-bbs-fresh-session-passes-context-floor
+    permits a positively identified unwritten session; every other unreadable
+    state still refuses.
     """
     if under_floor:
-        return
-    reading = context_left(snapshot)
+        return ""
+    reading = _read_context(pane_id, snapshot)
     if reading is None:
         raise MonitorError(
             f"could not read the context meter on {pane_id}, so the {
                 CONTEXT_FLOOR_PERCENT
             }% floor cannot be checked; inspect with --tail, or pass --under-floor "
-            f"once a human has ruled"
+            f"once a human has ruled",
+            pane_id=pane_id,
         )
-    if reading < CONTEXT_FLOOR_PERCENT:
+    if reading.percent is None:
+        return "no model call yet"
+    if reading.percent < CONTEXT_FLOOR_PERCENT:
         raise MonitorError(
-            f"context {reading}% left on {pane_id} is below the "
+            f"context {reading.percent}% left on {pane_id} is below the "
             f"{CONTEXT_FLOOR_PERCENT}% floor; run --compact, or --clear and restate "
-            f"the prompt, or pass --under-floor once a human has ruled"
+            f"the prompt, or pass --under-floor once a human has ruled",
+            pane_id=pane_id,
         )
+    return ""
 
 
 _PASTED_PLACEHOLDER = re.compile(r"\[Pasted Content (\d+) chars\]")
@@ -1835,7 +1848,8 @@ def _confirm_paste(pane_id: str, message: str) -> None:
         return
     raise MonitorError(
         f"composer on {pane_id} holds {counted} chars where the message is "
-        f"{len(message)}, so the paste is partial; inspect with --tail"
+        f"{len(message)}, so the paste is partial; inspect with --tail",
+        pane_id=pane_id,
     )
 
 
@@ -1867,9 +1881,9 @@ def send_message(pane_id: str, message: str, *, under_floor: bool = False) -> st
     after a paste, so submission is confirmed rather than assumed.
     """
     if not message:
-        raise MonitorError("refusing to send an empty message")
+        raise MonitorError("refusing to send an empty message", pane_id=pane_id)
     _, snapshot = _preflight_pane(pane_id)
-    _check_context_floor(pane_id, snapshot, under_floor=under_floor)
+    context_note = _check_context_floor(pane_id, snapshot, under_floor=under_floor)
     load_argv: Command = ("tmux", "load-buffer", "-b", "codex-send", "-")
     subprocess.run(  # argv is fixed above; text arrives on stdin.
         load_argv,
@@ -1882,9 +1896,11 @@ def send_message(pane_id: str, message: str, *, under_floor: bool = False) -> st
     for _ in range(SUBMIT_ATTEMPTS):
         run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
         if _submitted(pane_id):
-            return f"submitted to {pane_id}"
+            note = f"; {context_note}" if context_note else ""
+            return f"submitted to {pane_id}{note}"
     raise MonitorError(
-        f"not submitted after {SUBMIT_ATTEMPTS} Enter attempts; inspect {pane_id}"
+        f"not submitted after {SUBMIT_ATTEMPTS} Enter attempts; inspect {pane_id}",
+        pane_id=pane_id,
     )
 
 
@@ -1904,7 +1920,10 @@ def approve_pending() -> str:
     pane_id = joined_pane()
     capture = ("tmux", "capture-pane", "-p", "-t", pane_id)
     content = run_command(capture)
-    choice = approval_choice(content)
+    try:
+        choice = approval_choice(content)
+    except MonitorError as error:
+        raise MonitorError(str(error), pane_id=pane_id) from error
     command = _approval_material(content)
     seen = _bullet_texts(content)
     run_command(("tmux", "send-keys", "-t", pane_id, choice))
@@ -1914,7 +1933,9 @@ def approve_pending() -> str:
             break
     else:
         raise MonitorError(
-            f"key {choice!r} did not clear the dialog on {pane_id}; inspect with --tail"
+            f"key {choice!r} did not clear the dialog on {pane_id}; "
+            f"inspect with --tail",
+            pane_id=pane_id,
         )
     for _ in range(RESPONSE_POLLS):
         reply = _first_new_message(seen, run_command(capture))
@@ -1941,21 +1962,19 @@ def _widget_pane(verb: str) -> tuple[str, int]:
     """
     pane_id = joined_pane()
     title = pane_status(pane_id)
-    recent = "\n".join(
-        _plain(
-            run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id))
-        ).splitlines()[-12:]
-    )
+    recent = _plain(run_command(("tmux", "capture-pane", "-p", "-e", "-t", pane_id)))
     if _approval_is_pending(recent):
         raise MonitorError(
             f"joined Codex pane {pane_id} holds a pending approval, and any keystroke "
-            f"would answer it; clear it with --approve or read it with --tail"
+            f"would answer it; clear it with --approve or read it with --tail",
+            pane_id=pane_id,
         )
     queued = queued_questions(title, recent)
     if queued is None:
         raise MonitorError(
             f"no queued question on joined Codex pane {pane_id} ({title!r}), so "
-            f"{verb} has nothing to act on; inspect with --tail"
+            f"{verb} has nothing to act on; inspect with --tail",
+            pane_id=pane_id,
         )
     return pane_id, queued
 
@@ -2006,22 +2025,27 @@ def answer_queued_question(text: str) -> str:
         # rather than a blind Enter.
         raise MonitorError(
             f"the answer is not on screen on {pane_id} after typing it, so nothing "
-            f"was submitted; inspect with --tail\n{_nonblank_tail(typed, 20)}"
+            f"was submitted; inspect with --tail\n{_nonblank_tail(typed, 20)}",
+            pane_id=pane_id,
         )
     run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
     for _ in range(SUBMIT_POLLS):
         time.sleep(SUBMIT_POLL_SECONDS)
         title = pane_status(pane_id)
         captured = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
-        remaining = queued_questions(title, "\n".join(captured.splitlines()[-12:]))
-        if remaining is None or remaining < before:
+        remaining = queued_questions(title, captured)
+        question_title = re.search(r"action required", title, re.IGNORECASE)
+        if (remaining is None and question_title is None) or (
+            remaining is not None and remaining < before
+        ):
             left = "none" if remaining is None else str(remaining)
             return f"answered on {pane_id}: {before} queued -> {left}"
     stuck = run_command(("tmux", "capture-pane", "-p", "-t", pane_id))
     raise MonitorError(
         f"{before} question(s) still queued on {pane_id} after the answer was "
         f"submitted, so it did not land; inspect with --tail\n"
-        f"{_nonblank_tail(stuck, 20)}"
+        f"{_nonblank_tail(stuck, 20)}",
+        pane_id=pane_id,
     )
 
 
@@ -2050,14 +2074,17 @@ def _confirm_selection(pane_id: str, snapshot: str, command: str) -> None:
     raise MonitorError(
         f"refusing to submit {command} on {pane_id}: composer holds {typed!r} and "
         f"Enter would take {selected or 'nothing recognisable'} out of "
-        f"{offered or 'an empty list'}"
+        f"{offered or 'an empty list'}",
+        pane_id=pane_id,
     )
 
 
-def _type_slash_command(target: PaneRef, command: str) -> str:
+def _type_slash_command(target: PaneRef, command: str) -> tuple[str, int | None]:
     """Submit one verified slash command to the retained Codex target."""
     pane_id = target.pane_id
     _, snapshot = _preflight_pane(pane_id)
+    reading = _read_context(pane_id, snapshot) if command == "/compact" else None
+    before = reading.percent if reading is not None else context_left(snapshot)
     _require_joined_target(target)
     run_command(("tmux", "send-keys", "-t", pane_id, "-l", command))
     time.sleep(SUBMIT_POLL_SECONDS)
@@ -2065,7 +2092,7 @@ def _type_slash_command(target: PaneRef, command: str) -> str:
     _confirm_selection(pane_id, typed, command)
     _require_joined_target(target)
     run_command(("tmux", "send-keys", "-t", pane_id, "Enter"))
-    return snapshot
+    return snapshot, before
 
 
 def _wait_ready(pane_id: str) -> str | None:
@@ -2086,7 +2113,9 @@ def _wait_ready(pane_id: str) -> str | None:
 
 
 _LOCK_FILE = re.compile(rf"/thread-writer-locks/({_UUID_PATTERN})\.lock$")
-_ROLLOUT_FILE = re.compile(rf"/sessions/.+/rollout-[^/]*-({_UUID_PATTERN})\.jsonl$")
+_ROLLOUT_FILE = re.compile(
+    rf"/sessions/.+/rollout-[^/]*-({_UUID_PATTERN})\.jsonl(?: \(deleted\))?$"
+)
 
 
 @dataclass(frozen=True)
@@ -2095,6 +2124,7 @@ class HeldSessions:
 
     ids: frozenset[str]
     rollouts: Mapping[str, Path]
+    lock_paths: Mapping[str, Path]
 
 
 def _process_group(stat: str) -> int | None:
@@ -2107,21 +2137,21 @@ def _process_group(stat: str) -> int | None:
     return int(fields[2]) if len(fields) > 2 and fields[2].isdigit() else None
 
 
-def _open_files(pid_dir: Path) -> list[str]:
-    """Return where one process's open descriptors point, or nothing if it is gone."""
+def _open_files(pid_dir: Path) -> list[str] | None:
+    """Return open descriptor targets, or None when discovery was incomplete."""
     targets: list[str] = []
     try:
         descriptors = list((pid_dir / "fd").iterdir())
     except OSError:
-        # Another user's process, or one that exited while the table was being read:
-        # either way it holds nothing this pane's Codex could be holding.
-        return targets
+        # The caller already matched this process group. Missing descriptors
+        # cannot establish an unwritten session, even if the process just exited.
+        return None
     for descriptor in descriptors:
         try:
             targets.append(str(descriptor.readlink()))
         except OSError:
-            # The descriptor was closed between listing and reading; skip it.
-            continue
+            # A raced descriptor makes this observation incomplete; retry later.
+            return None
     return targets
 
 
@@ -2145,7 +2175,12 @@ def held_sessions(process_group_id: int) -> HeldSessions | None:
         return None
     ids: set[str] = set()
     rollouts: dict[str, Path] = {}
-    for pid_dir in PROC_ROOT.iterdir():
+    locks: dict[str, Path] = {}
+    try:
+        processes = list(PROC_ROOT.iterdir())
+    except OSError:
+        return None
+    for pid_dir in processes:
         if not pid_dir.name.isdigit():
             continue
         try:
@@ -2155,12 +2190,16 @@ def held_sessions(process_group_id: int) -> HeldSessions | None:
             continue
         if _process_group(stat) != process_group_id:
             continue
-        for target in _open_files(pid_dir):
+        files = _open_files(pid_dir)
+        if files is None:
+            return None
+        for target in files:
             if (lock := _LOCK_FILE.search(target)) is not None:
                 ids.add(lock[1])
+                locks[lock[1]] = Path(target)
             elif (rollout := _ROLLOUT_FILE.search(target)) is not None:
                 rollouts[rollout[1]] = Path(target)
-    return HeldSessions(frozenset(ids), rollouts)
+    return HeldSessions(frozenset(ids), rollouts, locks)
 
 
 def _session_list(ids: frozenset[str]) -> str:
@@ -2169,6 +2208,7 @@ def _session_list(ids: frozenset[str]) -> str:
 
 def _probe_session_identity(target: PaneRef) -> str:
     """Read the joined thread UUID from a fresh `/status` invocation."""
+    pane_id = target.pane_id
     _require_joined_target(target)
     _type_slash_command(target, "/status")
     capture: Command = (
@@ -2188,7 +2228,8 @@ def _probe_session_identity(target: PaneRef) -> str:
                 if _wait_ready(target.pane_id) is None:
                     raise MonitorError(
                         f"{target.pane_id} reported its session but did not return "
-                        f"Ready; inspect with --tail"
+                        f"Ready; inspect with --tail",
+                        pane_id=pane_id,
                     )
                 _require_joined_target(target)
                 return current
@@ -2196,7 +2237,8 @@ def _probe_session_identity(target: PaneRef) -> str:
     raise MonitorError(
         _no_panel_complaint(
             target.pane_id, content, "fresh session identity for /status"
-        )
+        ),
+        pane_id=pane_id,
     )
 
 
@@ -2279,7 +2321,15 @@ def _panel_clipped_at_top(content: str) -> bool:
 
 
 def _no_panel_complaint(pane_id: str, content: str, missing: str) -> str:
-    """Say why no fresh panel was read, naming a pane too short to show one."""
+    """Distinguish a wrapped panel from one clipped above its fresh echo."""
+    flattened = " ".join(re.sub(r"(?m)^[\s│|]*", "", _plain(content)).split())
+    if re.search(
+        r"\bWeekly\s+limit:\s*(?:\[[^\]]*\]\s*)?\d{1,3}%\s+left", flattened
+    ) and not any(_WEEKLY_LIMIT.match(line) for line in _plain(content).splitlines()):
+        return (
+            f"{pane_id} is too narrow to read the wrapped /status panel safely; "
+            f"give it more width or inspect with --tail"
+        )
     if not _panel_clipped_at_top(content):
         return f"{pane_id} drew no {missing}; inspect with --tail"
     height = run_command(
@@ -2311,7 +2361,9 @@ def _confirm_quota(pane_id: str) -> str:
             state = "Ready" if _wait_ready(pane_id) is not None else "still working"
             return f"quota on {pane_id}: weekly {left}% left{when}; {state}"
         time.sleep(SUBMIT_POLL_SECONDS)
-    raise MonitorError(_no_panel_complaint(pane_id, content, "status panel"))
+    raise MonitorError(
+        _no_panel_complaint(pane_id, content, "status panel"), pane_id=pane_id
+    )
 
 
 @dataclass(frozen=True)
@@ -2471,6 +2523,127 @@ def _file_quota(target: PaneRef) -> QuotaReading | None:
     return rollout_quota(rollout, time.time()) if rollout is not None else None
 
 
+@dataclass(frozen=True)
+class ContextReading:
+    """A measured percentage, or no model call yet.
+
+    See ADR 2026-11-02-bbs-fresh-session-passes-context-floor.
+    """
+
+    percent: int | None
+
+
+def rollout_context(rollout: Path) -> ContextReading | None:
+    """Read latest context usage, never the cumulative billing token total.
+
+    Codex's TUI subtracts a 12,000-token baseline before rounding remaining
+    context. Checked against the wide meter on 2026-11-02: 107995 / 475000 -> 79%.
+    The rollout format is not stable; malformed or unknown usage refuses.
+    """
+    try:
+        lines = rollout.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return None
+    reading = None
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(record, dict):
+            return None
+        if record.get("type") == "compacted":
+            reading = None
+        payload = record.get("payload")
+        if record.get("type") != "event_msg" or not isinstance(payload, dict):
+            continue
+        if payload.get("type") != "token_count" or payload.get("info") is None:
+            continue
+        reading = None
+        info = payload["info"]
+        if not isinstance(info, dict):
+            continue
+        usage = info.get("last_token_usage")
+        window = info.get("model_context_window")
+        used = usage.get("total_tokens") if isinstance(usage, dict) else None
+        if type(used) is not int or type(window) is not int or used < 0 or window <= 0:
+            continue
+        baseline = 12000
+        if window <= baseline:
+            reading = ContextReading(0)
+        else:
+            effective = window - baseline
+            remaining = max(0, effective - max(0, used - baseline))
+            # Integer half-up rounding matches Rust's nonnegative f64::round,
+            # including ties where Python's round would choose the even integer.
+            reading = ContextReading((200 * remaining + effective) // (2 * effective))
+    return reading
+
+
+def _unwritten_session(held: HeldSessions) -> bool:
+    """Recognize one unwritten lock, including an old main retained after clear."""
+    missing = held.ids - held.rollouts.keys()
+    if len(missing) != 1:
+        return False
+    session = next(iter(missing))
+    lock = held.lock_paths.get(session)
+    old_ids = held.ids - missing
+    if lock is None or (
+        held.rollouts
+        and _main_rollout(
+            HeldSessions(frozenset(old_ids), held.rollouts, held.lock_paths)
+        )
+        is None
+    ):
+        return False
+    sessions = lock.parent.parent / "sessions"
+    try:
+        # Check the lock's own store as well as descriptors: an existing but
+        # unopened rollout must never be mistaken for an unused session.
+        try:
+            sessions.stat()
+        except FileNotFoundError:
+            return lock.is_file()
+        for directory, dirs, files in sessions.walk(on_error=_raise_walk_error):
+            # walk does not follow linked branches. Such a branch could hide the
+            # rollout, so it cannot establish that this session is unwritten.
+            if any(
+                (directory / name).is_symlink() or name.endswith(f"-{session}.jsonl")
+                for name in dirs + files
+            ):
+                return False
+    except OSError:
+        return False
+    else:
+        return True
+
+
+def _raise_walk_error(error: OSError) -> None:
+    raise error
+
+
+def _read_context(pane_id: str, snapshot: str) -> ContextReading | None:
+    """Prefer the meter; otherwise inspect only this pane's held session files."""
+    percent = context_left(snapshot)
+    if percent is not None:
+        return ContextReading(percent)
+    target = joined_target()
+    if target.pane_id != pane_id:
+        raise MonitorError(
+            f"joined Codex target changed while reading {pane_id}", pane_id=pane_id
+        )
+    held = held_sessions(target.process_group_id)
+    reading = None
+    if held is not None:
+        rollout = _main_rollout(held)
+        if rollout is not None:
+            reading = rollout_context(rollout)
+        elif _unwritten_session(held):
+            reading = ContextReading(None)
+    _require_joined_target(target)
+    return reading
+
+
 def _local_reset(epoch: float) -> str:
     moment = datetime.fromtimestamp(epoch).astimezone()
     return f"{moment:%H:%M} on {moment.day} {moment:%b}"
@@ -2513,9 +2686,9 @@ def _settled_meter(pane_id: str) -> int | None:
     """
     capture: Command = ("tmux", "capture-pane", "-p", "-e", "-t", pane_id)
     for _ in range(SUBMIT_POLLS):
-        left = context_left(run_command(capture))
-        if left is not None:
-            return left
+        reading = _read_context(pane_id, run_command(capture))
+        if reading is not None and reading.percent is not None:
+            return reading.percent
         time.sleep(SUBMIT_POLL_SECONDS)
     return None
 
@@ -2558,13 +2731,15 @@ def _confirm_clear(target: PaneRef, previous_id: str) -> str:
     if not ready_at_last_observation:
         raise MonitorError(
             f"{pane_id} did not return Ready after /clear, so its new session "
-            f"could not be checked; inspect with --tail"
+            f"could not be checked; inspect with --tail",
+            pane_id=pane_id,
         )
     if last_composer_error is not None:
         raise last_composer_error
     raise MonitorError(
         f"session {previous_id} is still current on {pane_id}, so /clear did not "
-        f"run; inspect with --tail"
+        f"run; inspect with --tail",
+        pane_id=pane_id,
     )
 
 
@@ -2574,7 +2749,9 @@ def _held_now(target: PaneRef, verb: str) -> frozenset[str]:
     if held is None:
         raise MonitorError(
             f"the process table stopped being readable during {verb} on "
-            f"{target.pane_id}, so its sessions cannot be compared; inspect with --tail"
+            f"{target.pane_id}, so its sessions cannot be compared; "
+            f"inspect with --tail",
+            pane_id=target.pane_id,
         )
     return held.ids
 
@@ -2606,11 +2783,13 @@ def _confirm_clear_held(target: PaneRef, before: frozenset[str]) -> str:
     if new:
         raise MonitorError(
             f"{pane_id} took session {_session_list(new)} but did not return Ready "
-            f"after /clear; inspect with --tail"
+            f"after /clear; inspect with --tail",
+            pane_id=pane_id,
         )
     raise MonitorError(
         f"no new session appeared on {pane_id}, which still holds "
-        f"{_session_list(before)}, so /clear did not run; inspect with --tail"
+        f"{_session_list(before)}, so /clear did not run; inspect with --tail",
+        pane_id=pane_id,
     )
 
 
@@ -2632,16 +2811,19 @@ def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
     marked = False
     for _ in range(SETTLE_POLLS):
         content = _plain(run_command(capture))
+        lines = content.splitlines()
         if any(
-            "context compacted" in text.casefold()
-            for text in _bullet_texts(content) - seen
+            "context compacted" in _message_block(lines, index).casefold()
+            for index in _bullet_indexes(lines)
+            if _BULLET.sub("", lines[index]).strip() not in seen
         ):
             marked = True
             break
         time.sleep(SUBMIT_POLL_SECONDS)
     if not marked:
         raise MonitorError(
-            f"{pane_id} never reported that it compacted; inspect with --tail"
+            f"{pane_id} never reported that it compacted; inspect with --tail",
+            pane_id=pane_id,
         )
 
     settled = _wait_ready(pane_id)
@@ -2649,13 +2831,15 @@ def _confirm_compact(pane_id: str, before: int | None, seen: set[str]) -> str:
     if after is None:
         raise MonitorError(
             f"{pane_id} reports it compacted, but the meter is unreadable, so "
-            f"nothing confirms it; inspect with --tail"
+            f"nothing confirms it; inspect with --tail",
+            pane_id=pane_id,
         )
     if before is not None and after < before:
         raise MonitorError(
             f"{pane_id} reports it compacted while context fell from "
             f"{before}% to {after}% left, which is what a task does rather "
-            f"than a compaction; inspect with --tail"
+            f"than a compaction; inspect with --tail",
+            pane_id=pane_id,
         )
     state = "Ready" if settled is not None else "still working"
     return f"compacted {pane_id}: context {before}% -> {after}% left; {state}"
@@ -2687,15 +2871,16 @@ def run_slash_command(command: str) -> str:
         if command in {"/clear", "/compact"} and held_before is None
         else None
     )
-    snapshot = _type_slash_command(target, command)
-    before = context_left(snapshot)
+    snapshot, before = _type_slash_command(target, command)
     seen = _bullet_texts(_plain(snapshot))
 
     if command == "/clear":
         if held_before is not None:
             return _confirm_clear_held(target, held_before)
         if previous_id is None:
-            raise MonitorError("internal error: /clear has no pre-command session")
+            raise MonitorError(
+                "internal error: /clear has no pre-command session", pane_id=pane_id
+            )
         return _confirm_clear(target, previous_id)
     if command == "/status":
         result = _confirm_quota(pane_id)
@@ -2708,16 +2893,20 @@ def run_slash_command(command: str) -> str:
         if appeared:
             raise MonitorError(
                 f"session {_session_list(appeared)} appeared while compacting "
-                f"{pane_id}, which is what a clear does; inspect with --tail"
+                f"{pane_id}, which is what a clear does; inspect with --tail",
+                pane_id=pane_id,
             )
         return f"{result}; session {_session_list(held_before)} unchanged"
     if previous_id is None:
-        raise MonitorError("internal error: /compact has no pre-command session")
+        raise MonitorError(
+            "internal error: /compact has no pre-command session", pane_id=pane_id
+        )
     current_id = _probe_session_identity(target)
     if current_id != previous_id:
         raise MonitorError(
             f"session changed from {previous_id} to {current_id} while compacting "
-            f"{pane_id}; inspect with --tail"
+            f"{pane_id}; inspect with --tail",
+            pane_id=pane_id,
         )
     return f"{result}; session {current_id} unchanged"
 

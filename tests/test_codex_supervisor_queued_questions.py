@@ -260,6 +260,8 @@ def test_send_refusal_names_the_queued_question_rather_than_the_title(
     typed: list[tuple[str, ...]] = []
 
     def fake_run(argv: tuple[str, ...]) -> str:
+        if argv[-1] == "#{pane_width} #{pane_height}":
+            return "43 32\n"
         if argv[-1] == "#{pane_title}":
             return f"{_QUEUED_TITLE}\n"
         if argv[:2] == ("tmux", "capture-pane"):

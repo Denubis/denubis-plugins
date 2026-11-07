@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-external-agents] 0.24.4
+
+**Fixed:**
+- Phone-width context checks prefer the visible meter and otherwise read latest-call
+  usage from the pane's held main rollout, using Codex's baseline-adjusted percentage.
+  An identified session with no rollout reports `no model call yet` and permits its
+  first dispatch, including while the old session remains held after a clear (ADR 2026-11-02-bbs-fresh-session-passes-context-floor).
+  Unreadable and ambiguous states still refuse.
+- Compaction confirmation can use the same rollout reading when the meter is hidden.
+  Wrapped compaction markers and approval openers are recognized; approval and queued
+  question checks inspect the captured screen rather than only its last twelve rows.
+  An unreadable queued-question count while Action Required remains does not confirm
+  an answer.
+- Pane-operation refusals report actual width and height. The quota screen fallback
+  identifies a wrapped weekly panel as too narrow to read safely; it does not infer a
+  fresh quota from a clipped panel.
+
+**Verification boundary:** dialog behavior is fixture-tested; live phone-width dialogs,
+clear, compact and dispatch still need operator acceptance. No scratch session was used.
+
 ## [denubis-project-notes] 0.3.2
 
 `recording-project-notes` names a new decision record by the date of the ruling, the ruler's initials and a slug of at most five words, instead of taking the next number (ADR 2026-11-07-bbs-adrs-named-by-date-slug).
