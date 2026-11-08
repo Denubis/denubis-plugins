@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-question-zone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Queues the model's questions for the person above the prompt, each checked first by a fresh reader; one key puts the next question into the prompt box to answer there",
   "author": {
     "name": "Brian Ballsun-Stanton",

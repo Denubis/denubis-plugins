@@ -6,14 +6,17 @@ the same traversal finds a known active hook boundary.
 
 A ``hooks.json`` may instead name hooks modules (mods) under ``modules``. Their
 counterparts of these boundaries are a ``prompt.submit`` hook that attaches
-``context`` (per-prompt delivery) and a ``prompt.compose`` hook that adds a
-system-prompt section (always-on delivery). ``_module_hooks`` reads them from the
-TypeScript source; its docstring states the parse and its coverage boundary. The
-mod inventory has its own positive and non-match controls.
+``context`` (per-prompt delivery), a ``prompt.compose`` hook that adds a
+system-prompt section (always-on delivery), and a conversation row the model
+reads, appended with ``$.session.append`` or rewritten by a ``session.append``
+hook. ``_module_hooks`` and ``_module_deliveries`` read them from the TypeScript
+source; their docstrings state the parse and its coverage boundary. The mod
+inventory has its own positive and non-match controls.
 
 Mods keep the settings rule's default: a mod delivery fails. A delivery the human
 has permitted is listed in ``PERMITTED_MOD_DELIVERIES``, keyed by plugin and door
-(``prompt.submit`` for context, ``prompt.compose`` for a section) and valued by
+(``prompt.submit`` for context, ``prompt.compose`` for a section,
+``session.append`` for a row) and valued by
 the authority: the decision record and the original message's raw record. An
 allowance covers every text that door of that plugin delivers. An allowance whose
 delivery is gone fails too, so no exemption outlives its subject.
@@ -236,7 +239,12 @@ _REGISTER = re.compile(
     r"|export\s+(?:async\s+)?function\s+register\s*\(\s*(?P<on_fn>[A-Za-z_$][\w$]*)"
 )
 _CONTEXT_KEY = re.compile(r"(?<![\w$.])context\s*:|[{,]\s*context\s*[,}]")
+_MESSAGE_KEY = re.compile(r"(?<![\w$.])message\s*:|[{,]\s*message\s*[,}]")
 _SECTIONS_KEY = re.compile(r"(?<![\w$.])sections\s*:\s*")
+# A call of the engine's `$.session.append`, under whatever name the module
+# gives `$`: it writes a row into the conversation.
+_APPEND_CALL = re.compile(r"\.\s*session\s*\.\s*append\s*\(")
+APPEND_DOOR = "session.append"
 
 
 def _adds_section(arguments: str) -> bool:
@@ -264,11 +272,14 @@ def _module_hooks(plugin: str, source: str) -> list[ModuleHook]:
     3. A ``prompt.submit`` hook delivers when its arguments write a ``context``
        key (``context:`` or the ``{ ...e, context }`` shorthand). A
        ``prompt.compose`` hook delivers when it writes ``sections:`` with a
-       non-spread element, or with a value that is not an array literal.
+       non-spread element, or with a value that is not an array literal. A
+       ``session.append`` hook delivers when its arguments write a ``message``
+       key: it rewrites a row the model reads.
 
     Coverage boundary: an input or answer a helper outside the hook's own call
     builds is not followed. Step 3 errs towards delivery: a ``context:`` type
-    annotation or a list of sections built elsewhere counts.
+    annotation, a destructured ``{ message }`` or a list of sections built
+    elsewhere counts. ``_module_deliveries`` adds the rows a module appends.
     """
     masked = _mask_non_code(source)
     declaration = _REGISTER.search(masked)
@@ -296,16 +307,38 @@ def _module_hooks(plugin: str, source: str) -> list[ModuleHook]:
             delivers = _CONTEXT_KEY.search(arguments) is not None
         elif event == "prompt.compose":
             delivers = _adds_section(arguments)
+        elif event == APPEND_DOOR:
+            delivers = _MESSAGE_KEY.search(arguments) is not None
         else:
             delivers = False
         hooks.append(ModuleHook(plugin, event, delivers))
     return hooks
 
 
-def _marketplace_module_hooks() -> list[ModuleHook]:
-    """Every hook of every hooks module a marketplace plugin's hooks.json names."""
+def _module_deliveries(plugin: str, source: str) -> set[tuple[str, str]]:
+    """The doors, ``(plugin, door)``, through which a hooks module delivers.
+
+    Its delivering hooks, and ``session.append`` when the module's code calls
+    ``$.session.append`` anywhere: a row appended to the conversation that the
+    model reads. The call is found in the whole module, so a helper outside any
+    hook's own call is seen. Coverage boundary: a call through another
+    spelling (a destructured ``session``, ``session['append']``) is not, and a
+    notice the model never reads (``type: 'system'``) counts as a delivery.
+    """
+    deliveries = {
+        (hook.plugin, hook.event)
+        for hook in _module_hooks(plugin, source)
+        if hook.delivers
+    }
+    if _APPEND_CALL.search(_mask_non_code(source)) is not None:
+        deliveries.add((plugin, APPEND_DOOR))
+    return deliveries
+
+
+def _marketplace_module_sources() -> list[tuple[str, str]]:
+    """``(plugin, source)`` of every hooks module a marketplace plugin names."""
     marketplace = json.loads(MARKETPLACE.read_text(encoding="utf-8"))
-    hooks: list[ModuleHook] = []
+    sources: list[tuple[str, str]] = []
 
     for plugin in marketplace["plugins"]:
         plugin_root = REPO_ROOT / plugin["source"].removeprefix("./")
@@ -315,9 +348,26 @@ def _marketplace_module_hooks() -> list[ModuleHook]:
         modules = json.loads(hooks_path.read_text(encoding="utf-8")).get("modules", [])
         for module in modules:
             source = (hooks_path.parent / module).read_text(encoding="utf-8")
-            hooks.extend(_module_hooks(plugin["name"], source))
+            sources.append((plugin["name"], source))
 
-    return hooks
+    return sources
+
+
+def _marketplace_module_hooks() -> list[ModuleHook]:
+    """Every hook of every hooks module a marketplace plugin's hooks.json names."""
+    return [
+        hook
+        for plugin, source in _marketplace_module_sources()
+        for hook in _module_hooks(plugin, source)
+    ]
+
+
+def _marketplace_module_deliveries() -> set[tuple[str, str]]:
+    """Every ``(plugin, door)`` through which a marketplace mod delivers."""
+    deliveries: set[tuple[str, str]] = set()
+    for plugin, source in _marketplace_module_sources():
+        deliveries |= _module_deliveries(plugin, source)
+    return deliveries
 
 
 QUIET_AGENTS = "denubis-hook-quiet-agents"
@@ -346,59 +396,67 @@ _QUESTION_ZONE_RULING = (
     "(message 4e874a67-67a2-4d13-9481-fa753100772f)"
 )
 
+# The human's rulings of 2026-11-08: "can we just have all the necessary line-cite
+# stuff come along with the message when I hit enter? It's silly that it needs to
+# be done by llm if it can be derived", read as the allowance for question-zone to
+# append each answer's citation as a row the model reads (item 9 of the record);
+# and "we need to make sure we have a buffer for this shit?", read as the
+# allowance to hand each question its check sends back to the model the same way,
+# in place of a prompt of its own. Both readings are the supervisor's.
+_QUESTION_ZONE_CITATION_RULING = (
+    "docs/architecture/decisions/2026-11-08-bbs-questions-go-in-question-zone.md; "
+    "raw records "
+    "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/"
+    "d280d2b3-8069-40c1-8f99-fcd0694017d7.jsonl:8529 "
+    "(message 8a47c801-4a7c-4ec2-bca8-c8af7da515b6) and :10371 "
+    "(message a07592ea-7d4e-4608-aeb2-d5dfd191a006)"
+)
+
 # (plugin, door) -> the authority that permits that mod delivery. An entry needs a
-# human ruling; the door is the event `ModuleHook` reports.
+# human ruling; the door is the event `ModuleHook` reports, or `session.append`
+# for a row the module appends.
 PERMITTED_MOD_DELIVERIES: dict[tuple[str, str], str] = {
     (QUIET_AGENTS, "prompt.compose"): _QUIET_AGENTS_RULING,
     (QUIET_AGENTS, "prompt.submit"): _QUIET_AGENTS_RULING,
     (QUESTION_ZONE, "prompt.compose"): _QUESTION_ZONE_RULING,
+    (QUESTION_ZONE, APPEND_DOOR): _QUESTION_ZONE_CITATION_RULING,
 }
+
+
+def _unlisted_mod_deliveries(deliveries: set[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The deliveries no recorded human allowance covers."""
+    return sorted(deliveries - PERMITTED_MOD_DELIVERIES.keys())
 
 
 def test_module_inventory_reaches_known_mod_deliveries() -> None:
     """Positive control: marketplace traversal reads hooks modules.
 
     quiet-agents attaches context at ``prompt.submit`` and adds a system-prompt
-    section at ``prompt.compose``. A clean result over mods means something only
-    if the same traversal finds these.
+    section at ``prompt.compose``; question-zone appends a row the model reads.
+    A clean result over mods means something only if the same traversal finds
+    these.
     """
-    delivering = {
-        (hook.plugin, hook.event)
-        for hook in _marketplace_module_hooks()
-        if hook.delivers
-    }
-
     assert {
         (QUIET_AGENTS, "prompt.submit"),
         (QUIET_AGENTS, "prompt.compose"),
-    } <= delivering
+        (QUESTION_ZONE, APPEND_DOOR),
+    } <= _marketplace_module_deliveries()
 
 
 def test_no_marketplace_mod_delivers_without_a_recorded_allowance() -> None:
-    """A mod's per-prompt context or always-on section needs a human allowance."""
-    unlisted = sorted(
-        {
-            (hook.plugin, hook.event)
-            for hook in _marketplace_module_hooks()
-            if hook.delivers
-        }
-        - PERMITTED_MOD_DELIVERIES.keys()
-    )
+    """A mod's context, section or row for the model needs a human allowance."""
+    unlisted = _unlisted_mod_deliveries(_marketplace_module_deliveries())
 
     assert not unlisted, (
-        "a mod delivers per-prompt context or an always-on system-prompt section "
-        "with no recorded human allowance; drop the delivery or record the "
-        f"ruling in PERMITTED_MOD_DELIVERIES: {unlisted}"
+        "a mod delivers per-prompt context, an always-on system-prompt section "
+        "or a conversation row with no recorded human allowance; drop the "
+        f"delivery or record the ruling in PERMITTED_MOD_DELIVERIES: {unlisted}"
     )
 
 
 def test_every_mod_allowance_names_a_current_delivery() -> None:
     """An allowance outlives its delivery only as a stale exemption."""
-    delivering = {
-        (hook.plugin, hook.event)
-        for hook in _marketplace_module_hooks()
-        if hook.delivers
-    }
+    delivering = _marketplace_module_deliveries()
 
     assert PERMITTED_MOD_DELIVERIES.keys() <= delivering, sorted(
         PERMITTED_MOD_DELIVERIES.keys() - delivering
@@ -477,6 +535,67 @@ def test_module_parse_classifies_delivery(
     source: str, expected: list[ModuleHook]
 ) -> None:
     assert _module_hooks("fixture", source) == expected
+
+
+_APPENDS_A_ROW = """\
+const note = (text: string) => ({ message: { type: 'user', content: [{ type: 'text', text }] } })
+const tell = async ($: EngineInterface, text: string): Promise<void> => {
+  await $.session.append(note(text))
+}
+export const register: Register = on => {
+  on('turn.complete', async ($, e, next) => {
+    void tell($, 'Remember to run the gates.')
+    return next(e)
+  })
+}
+"""
+
+_REWRITES_A_ROW = """\
+export const register: Register = on => {
+  on('session.append', async ($, e, next) => {
+    const content = [...e.message.content, { type: 'text', text: 'Remember to run the gates.' }]
+    return next({ ...e, message: { ...e.message, content } })
+  })
+}
+"""
+
+_READS_ROWS_ONLY = """\
+export const register: Register = on => {
+  // $.session.append(note) in a comment appends nothing.
+  on('session.append', async ($, e, next) => {
+    const kept = await next(e)
+    $.ui.log(`kept ${kept.uuid}; no $.session.append(row) here`, { to: 'debug' })
+    return kept
+  })
+}
+"""
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (_APPENDS_A_ROW, {("fixture", "session.append")}),
+        (_REWRITES_A_ROW, {("fixture", "session.append")}),
+        (_READS_ROWS_ONLY, set()),
+    ],
+    ids=[
+        "appends-a-row-from-a-helper",
+        "rewrites-a-row-it-is-handed",
+        "reads-rows-and-names-the-call-only-in-text",
+    ],
+)
+def test_module_parse_finds_rows_written_for_the_model(
+    source: str, expected: set[tuple[str, str]]
+) -> None:
+    """A row the model reads, appended or rewritten, is a delivery."""
+    assert _module_deliveries("fixture", source) == expected
+
+
+def test_a_mod_that_delivers_only_through_rows_needs_an_allowance() -> None:
+    """The allowance check fails a mod whose one delivery is an appended row."""
+    assert _unlisted_mod_deliveries(_module_deliveries("fixture", _APPENDS_A_ROW)) == [
+        ("fixture", "session.append")
+    ]
 
 
 def test_module_parse_refuses_a_registrar_it_cannot_follow() -> None:
