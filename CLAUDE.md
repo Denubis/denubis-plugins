@@ -4,16 +4,9 @@ Claude Code plugins for design, implementation, and development workflows.
 
 ## Runtime boundaries
 
-- Application and packaged-tool Python targets 3.14 or newer. Modern 3.14 syntax,
-  including parenthesis-free multi-exception clauses, is intentional. PEP 723
-  `requires-python` declarations must match the syntax a script uses. `ruff format`
-  runs at the 3.14 target and silently rewrites `except (A, B):` into that
-  parenthesis-free form, which is a SyntaxError below 3.14, so a script declaring
-  `>=3.11` (the five `using-bibliography` helpers) and any module it imports must
-  catch one exception per clause unless the file is listed in
-  `[tool.ruff.per-file-target-version]`. Evidence: the `except OSError` comment in
-  `plugins/denubis-academic/skills/using-bibliography/zotero_auth.py`, caught on
-  2026-09-03 when the formatter produced the rewrite.
+- Application and packaged-tool Python targets 3.14 or newer; modern 3.14 syntax is
+  intentional. A script declaring an older PEP 723 floor follows the formatter rule
+  under "Python runtime" in `docs/architecture/constraints.md`.
 - Hook programs under `plugins/*/hooks/*.py` are launched as
   `uv run --script "${CLAUDE_PLUGIN_ROOT}/hooks/<name>.py"` and carry a PEP 723 block
   declaring the repository floor (`requires-python = ">=3.14"`), so uv resolves or

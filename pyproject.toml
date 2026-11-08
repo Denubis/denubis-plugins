@@ -55,8 +55,9 @@ extend-exclude = [".worktrees"]
 
 # A file's target must match its PEP 723 `requires-python`: at py314 the
 # formatter rewrites `except (A, B):` into the parenthesis-free form, which is
-# a SyntaxError below 3.14 (see CLAUDE.md, caught 2026-09-03). Verified on
-# 2026-10-21 that this table governs `ruff format`, not only the linter.
+# a SyntaxError below 3.14 (see docs/architecture/constraints.md, caught
+# 2026-09-03). Verified on 2026-10-21 that this table governs `ruff format`, not
+# only the linter.
 [tool.ruff.per-file-target-version]
 # The supervisor's separately tested hook-relay interpreter floor is Python 3.12.
 "plugins/denubis-external-agents/scripts/codex_supervisor.py" = "py312"
