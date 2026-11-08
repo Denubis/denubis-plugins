@@ -81,6 +81,12 @@ and consequences section. One ADR per decision.
 - [2026-11-07-bbs-codex-notes-use-shared-service — Codex's hook sends its notes through the shared local service, not straight into the supervisor's inbox](2026-11-07-bbs-codex-notes-use-shared-service.md)
   (applies 0039 item 4)
 - [2026-11-07-bbs-new-codex-worker-starts-fresh — A worker made by `new` is a new worker; it does not inherit the old worker's folder, model or effort](2026-11-07-bbs-new-codex-worker-starts-fresh.md)
+- [2026-11-08-bbs-critiques-need-demonstrated-flaws — A critique, or a check someone adds, is acted on only when it shows a flaw that exists now; reviewers are never told what to find](2026-11-08-bbs-critiques-need-demonstrated-flaws.md)
+- [2026-11-08-bbs-proposer-never-verifies — Work is verified by a second, fresh worker before it reaches Brian; the proposer never verifies; Fable and Astra inspect, dispatch and evaluate](2026-11-08-bbs-proposer-never-verifies.md)
+  (supersedes, for verification, the instruction design's retirement of proposer and verifier dispatch)
+- [2026-11-08-bbs-questions-go-in-question-zone — Questions for Brian go in a question zone, a queue he takes one at a time with a key, each with its full context and no jargon; quiet-agents points at it](2026-11-08-bbs-questions-go-in-question-zone.md)
+  (supersedes the quiet-agents nudge text of 2026-10-24)
+- [2026-11-08-bbs-codex-push-needs-say-so — Codex, like Claude, needs Brian's explicit say-so to push, merge into the main branch, or delete a branch](2026-11-08-bbs-codex-push-needs-say-so.md)
 
 ## Status lifecycle
 
