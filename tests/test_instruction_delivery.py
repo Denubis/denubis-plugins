@@ -334,11 +334,24 @@ _QUIET_AGENTS_RULING = (
     "(message 2e705937-f326-469e-b25c-9e95e1441cea)"
 )
 
+QUESTION_ZONE = "denubis-hook-question-zone"
+
+# The human's ruling of 2026-11-08, "um, yes, do add the standing instruction.",
+# answering whether question-zone may add its standing rule to the system prompt.
+_QUESTION_ZONE_RULING = (
+    "docs/architecture/decisions/2026-11-08-bbs-questions-go-in-question-zone.md; "
+    "raw record "
+    "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/"
+    "d280d2b3-8069-40c1-8f99-fcd0694017d7.jsonl:6416 "
+    "(message 4e874a67-67a2-4d13-9481-fa753100772f)"
+)
+
 # (plugin, door) -> the authority that permits that mod delivery. An entry needs a
 # human ruling; the door is the event `ModuleHook` reports.
 PERMITTED_MOD_DELIVERIES: dict[tuple[str, str], str] = {
     (QUIET_AGENTS, "prompt.compose"): _QUIET_AGENTS_RULING,
     (QUIET_AGENTS, "prompt.submit"): _QUIET_AGENTS_RULING,
+    (QUESTION_ZONE, "prompt.compose"): _QUESTION_ZONE_RULING,
 }
 
 

@@ -28,17 +28,17 @@ const reports = atom({ plugin: 'denubis-hook-quiet-agents', key: 'reports' } as 
 })
 
 const NOTICE_PREFIX =
-  '[quiet-agents] An agent went idle. If this adds nothing the human has not been told, reply in one line or none; do not restate pending decisions. If its task is complete and you have no further work for it, stop it with TaskStop in this turn.\n'
+  '[quiet-agents] An agent went idle. If this adds nothing the human has not been told, it gets no reply; do not restate pending decisions. If its task is complete and you have no further work for it, stop it with TaskStop in this turn.\n'
 
 const NOTICE_CONTEXT =
-  "This turn was started by an agent notification, not by the human. If the notification adds nothing the human has not already been told, reply in one line or not at all. Do not restate decisions already pending with the human, do not write 'waiting on you', and do not summarise the agent's work again. If the agent reports its task complete and you have no further work for it, stop it with TaskStop in this turn."
+  "This turn was started by an agent notification, not by the human. If the notification adds nothing the human has not already been told, it gets no reply. Do not restate decisions already pending with the human, do not write 'waiting on you', and do not summarise the agent's work again. If the agent reports its task complete and you have no further work for it, stop it with TaskStop in this turn."
 
 const idleContext = (names: readonly string[]): string =>
   `quiet-agents: these agents went idle since your last turn, their reports already received: ${names.join(', ')}.`
 
 const TIDY_SECTION = {
   id: 'quiet-agents:tidy',
-  text: 'Agent hygiene: when a subagent or teammate reports its task complete and you have no further work for it, stop it with TaskStop in the same turn you acknowledge it. Do not leave a finished agent idle across a turn boundary. A turn started by an agent notification that carries nothing new is answered in one line or none.',
+  text: 'Agent hygiene: when a subagent or teammate reports its task complete and you have no further work for it, stop it with TaskStop in the same turn you acknowledge it. Do not leave a finished agent idle across a turn boundary. A turn started by an agent notification that carries nothing new gets no reply. Treat notifications as inputs to work, not requests for a conversational reply: reconcile reports and tickets, evaluate deliverables, and continue authorized work. Review new findings or questions even inside a completion report or a closed task. An idle worker with outstanding corrections needs follow-up, not a completion assumption; return verified defects to it under the three-failure stop. Once completion is verified and owed corrections are resolved, close owned workers and stop their unneeded monitors through supported controls. Preserve human peer sessions. An interrupt is not proof of closure; report a missing closure capability once if material. Handle duplicate reports silently, cleaning up the owned worker if its work is already verified complete, and continue work in progress without summarizing it; neither calls for an acknowledgment, count, recap, or one-line status update. Answer explicit human status requests directly. Communicate changed results, consequential corrections, or a necessary human decision. Unchanged open questions and already-processed reports are not news: omit reminders, pointer replies, unrelated old tasks, dispatch recaps, and repeated waiting notices. Ask a human-only question once, stop monitors over idle dependent work, and await the answer. When the human asks for orientation or resumes after a substantial break, state the unresolved decisions and their consequences in full without referring to earlier messages, then ask the first question that needs their answer.',
   scope: 'session',
 } as const
 
@@ -146,8 +146,13 @@ const forgetNames = (state: TeammateReports, names: readonly string[]): Teammate
 
 const LEFTOVER: readonly AgentStatus[] = ['idle', 'completed', 'failed']
 
+// An agent a plugin started (`spawnedBy`) is the plugin's to manage, not the
+// model's: question-zone's finished checkers were named in the nudge, and
+// TaskStop on them answered "is not running (status: completed)" (live,
+// 2026-11-08). The nudge and /tidy read this list; the status line counts by
+// status on its own.
 const leftovers = (agents: readonly AgentInfo[]): AgentInfo[] =>
-  agents.filter(agent => LEFTOVER.includes(agent.status))
+  agents.filter(agent => LEFTOVER.includes(agent.status) && agent.spawnedBy === undefined)
 
 // `$.ui.status` keeps one line per plugin, so the idle names and the turn
 // end's counts share it. The engine's own `idle` count is left out: the names
@@ -285,6 +290,16 @@ const putBackPending = async ($: EngineInterface, names: readonly string[]): Pro
   }))
 }
 
+// A mailbox delivery from one of this session's teammates. The harness
+// verifies only what it wrote itself; a teammate in a terminal pane of its own
+// writes the team's inbox file, and its deliveries arrive unverified (every
+// `peer` delivery in agent-notice-log.jsonl, 2026-11-02 to 2026-11-08). So an
+// unverified name counts when `$.agent.list()` names an agent of this session
+// by it. Whatever can write that file can claim a listed name; the most that
+// does is mark the name reported and so hide that agent's next idle notice.
+const isTeammate = async ($: EngineInterface, teammate: string, isVerified: boolean): Promise<boolean> =>
+  isVerified || (await listAgents($)).some(agent => teammateNameOf(agent) === teammate)
+
 const labelOf = (agent: AgentInfo): string => `${agent.name ?? agent.description} (${agent.id})`
 
 const tidy = async ($: EngineInterface): Promise<string> => {
@@ -322,9 +337,11 @@ const tidy = async ($: EngineInterface): Promise<string> => {
     .join('\n')
 }
 
-// The ruled text (2026-10-24), with the names put in.
+// The nudge, with the names put in. Since 2026-11-08 it sends questions for
+// the person to the question zone (denubis-hook-question-zone) in place of
+// the open-questions file.
 const nudgeText = (names: readonly string[]): string =>
-  `quiet-agents: idle or finished agents: ${names.join(', ')}. Stop each with TaskStop. Then work through the pending questions in .notes/project_open-questions.md with the user one at a time, first looking for the answer in .notes, docs/architecture/decisions, and prior chat logs, and asking only where no evidence settles it. Where an agent's work is unfinished, continue it instead.`
+  `quiet-agents: idle or finished agents: ${names.join(', ')}. Stop each with TaskStop, unless its work is unfinished: then continue it instead. Ask the person any question through the question zone's mcp__denubis-hook-question-zone__ask tool, never in chat.`
 
 // The name both sources share. The mailbox stamps `origin.teammate`, the
 // member's name in its team; a listed teammate's `name` is "its name in the
@@ -448,8 +465,9 @@ export const register: Register = on => {
     return result
   })
 
-  // Part 1, primary path: a verified teammate's message to the main
-  // conversation records that it reported (an in-process teammate's report
+  // Part 1, primary path: a teammate's message to the main conversation
+  // (verified, or unverified from a listed agent: isTeammate) records that it
+  // reported (an in-process teammate's report
   // arrives here; an agent's report is also marked at its send, below); its
   // idle notice is consumed while that report stands, and framed with the
   // prefix otherwise. A delivery to a teammate's own loop (`e.agentId` set,
@@ -460,7 +478,11 @@ export const register: Register = on => {
     }
 
     const origin = e.origin
-    if (origin.kind !== 'peer' || !('teammate' in origin) || !origin.isVerified) {
+    if (
+      origin.kind !== 'peer' ||
+      !('teammate' in origin) ||
+      !(await isTeammate($, origin.teammate, origin.isVerified))
+    ) {
       return next(e)
     }
 

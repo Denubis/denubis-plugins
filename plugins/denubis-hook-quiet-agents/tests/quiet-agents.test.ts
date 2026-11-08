@@ -1,14 +1,18 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
-import type { AgentInfo, On, PromptOrigin, PromptSubmitInput, SessionSendInput } from 'claude-code'
+import type {
+  AgentInfo,
+  On,
+  PromptOrigin,
+  PromptSubmitInput,
+  SessionReceiveResult,
+  SessionSendInput,
+} from 'claude-code'
 
-// The texts as the design gives them, written out here so the expectations
-// do not come from the module under test.
-const CONTEXT =
-  "This turn was started by an agent notification, not by the human. If the notification adds nothing the human has not already been told, reply in one line or not at all. Do not restate decisions already pending with the human, do not write 'waiting on you', and do not summarise the agent's work again. If the agent reports its task complete and you have no further work for it, stop it with TaskStop in this turn."
-
-const SECTION_TEXT =
-  'Agent hygiene: when a subagent or teammate reports its task complete and you have no further work for it, stop it with TaskStop in the same turn you acknowledge it. Do not leave a finished agent idle across a turn boundary. A turn started by an agent notification that carries nothing new is answered in one line or none.'
+// The context an agent-started turn gets and the tidy section are prose for
+// the model, so their wording is not checked: each must be present and must
+// name TaskStop, the tool it sends the model to.
+const NAMES_TASKSTOP = expect.stringContaining('TaskStop')
 
 const NOTICE =
   '<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n</task-notification>'
@@ -48,7 +52,7 @@ test('two identical notices: the first passes with the context, the repeat is mu
   )
 
   expect(first.drop).toBeUndefined()
-  expect(entered).toEqual([{ text: NOTICE, context: [CONTEXT] }])
+  expect(entered).toEqual([{ text: NOTICE, context: [NAMES_TASKSTOP] }])
   expect(repeat.drop).toBe(`quiet-agents: repeat notice from ${NOTICE_KEY}, muted`)
 })
 
@@ -61,8 +65,8 @@ test('a changed notice under the same key passes again with the context', async 
 
   expect(second.drop).toBeUndefined()
   expect(entered).toEqual([
-    { text: NOTICE, context: [CONTEXT] },
-    { text: changed, context: [CONTEXT] },
+    { text: NOTICE, context: [NAMES_TASKSTOP] },
+    { text: changed, context: [NAMES_TASKSTOP] },
   ])
 })
 
@@ -71,7 +75,7 @@ test('the context is added after any context a hook above attached', async ($, o
 
   await $.prompt.submit({ ...notice(NOTICE, { kind: 'peer-send-message' }), context: ['earlier'] })
 
-  expect(entered).toEqual([{ text: NOTICE, context: ['earlier', CONTEXT] }])
+  expect(entered).toEqual([{ text: NOTICE, context: ['earlier', NAMES_TASKSTOP] }])
 })
 
 test('a prompt the person typed is untouched, however often it repeats', async ($, on) => {
@@ -96,7 +100,7 @@ test('unclassified is framed only when isMeta', async ($, on) => {
 
   expect(entered).toEqual([
     { text: 'from a socket', context: undefined },
-    { text: 'idle', context: [CONTEXT] },
+    { text: 'idle', context: [NAMES_TASKSTOP] },
   ])
 })
 
@@ -146,18 +150,27 @@ test('the composed system prompt ends with the tidy section', async ($, on) => {
 
   expect(sections).toEqual([
     { id: 'intro', text: 'You are Claude Code.', scope: 'shared' },
-    { id: 'quiet-agents:tidy', text: SECTION_TEXT, scope: 'session' },
+    { id: 'quiet-agents:tidy', text: NAMES_TASKSTOP, scope: 'session' },
   ])
 })
 
 // session.receive and the sends: a teammate's report, its idle notice, and
 // the main conversation's next message to it.
 
-const PREFIX =
-  '[quiet-agents] An agent went idle. If this adds nothing the human has not been told, reply in one line or none; do not restate pending decisions. If its task is complete and you have no further work for it, stop it with TaskStop in this turn.\n'
+// The prefix is prose for the model, so its wording is not checked: the
+// notice is queued whole, after one line in front of it that names TaskStop.
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const prefixed = (notice: string) =>
+  expect.stringMatching(new RegExp(`^[^\\n]*TaskStop[^\\n]*\\n${escapeRegExp(notice)}$`))
 
-const consumedReason = (teammate: string): string =>
-  `quiet-agents: idle notice from ${teammate}; its report was already received`
+// Consumed as SessionReceiveResult defines it: the hook answers
+// `{ consumed: reason }` and the delivery is never queued. The reason is only
+// logged, so its wording is not checked; a non-empty one does not rest on how
+// the engine tests for it.
+const expectConsumed = (result: SessionReceiveResult): void => {
+  expect(result.consumed).toEqual(expect.any(String))
+  expect(result.consumed).not.toBe('')
+}
 
 const idleContext = (names: string): string =>
   `quiet-agents: these agents went idle since your last turn, their reports already received: ${names}.`
@@ -226,7 +239,7 @@ test('a report, then the idle notice: the notice is consumed and the teammate sh
   await $.session.receive(fromTeammate('researcher', REPORT))
   const result = await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(result.consumed).toBe(consumedReason('researcher'))
+  expectConsumed(result)
   expect(queued).toEqual([REPORT])
   expect(statuses).toEqual(['agents idle: researcher'])
 })
@@ -238,7 +251,7 @@ test('a second idle notice with no instruction between is consumed too', async (
   await $.session.receive(fromTeammate('researcher', IDLE))
   const again = await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(again.consumed).toBe(consumedReason('researcher'))
+  expectConsumed(again)
   expect(queued).toEqual([REPORT])
 })
 
@@ -259,7 +272,7 @@ test('an idle notice with no report before it passes with the prefix', async ($,
   const result = await $.session.receive(fromTeammate('researcher', IDLE))
 
   expect(result.consumed).toBeUndefined()
-  expect(queued).toEqual([PREFIX + IDLE])
+  expect(queued).toEqual([prefixed(IDLE)])
   expect(statuses).toEqual([])
 })
 
@@ -272,7 +285,7 @@ test('a report, then a message to the teammate, then its idle notice: prefixed',
 
   expect(sent.isDelivered).toBe(true)
   expect(result.consumed).toBeUndefined()
-  expect(queued).toEqual([REPORT, PREFIX + IDLE])
+  expect(queued).toEqual([REPORT, prefixed(IDLE)])
 })
 
 test('a message to an idle teammate takes it off the status line', async ($, on) => {
@@ -292,7 +305,7 @@ test('a message to another teammate leaves this one’s report standing', async 
   await $.session.send(mainSends('helper', 'Start on the docs.'))
   const result = await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(result.consumed).toBe(consumedReason('researcher'))
+  expectConsumed(result)
 })
 
 test('a message addressed by the teammate’s agent id clears its report', async ($, on) => {
@@ -302,7 +315,7 @@ test('a message addressed by the teammate’s agent id clears its report', async
   await $.session.send(mainSends('a-researcher-1f', 'Now fix the tests.'))
   await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(queued).toEqual([REPORT, PREFIX + IDLE])
+  expect(queued).toEqual([REPORT, prefixed(IDLE)])
 })
 
 test('a SendMessage call with a structured message clears the report', async ($, on) => {
@@ -317,7 +330,7 @@ test('a SendMessage call with a structured message clears the report', async ($,
   })
   await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(queued).toEqual([REPORT, PREFIX + IDLE])
+  expect(queued).toEqual([REPORT, prefixed(IDLE)])
 })
 
 test('a SendMessage call from another agent’s loop leaves the report standing', async ($, on) => {
@@ -328,7 +341,7 @@ test('a SendMessage call from another agent’s loop leaves the report standing'
   await $.tool.call({ tool: 'SendMessage', to: 'researcher', message: 'ping', agentId: 'a-helper' })
   const result = await $.session.receive(fromTeammate('researcher', IDLE))
 
-  expect(result.consumed).toBe(consumedReason('researcher'))
+  expectConsumed(result)
 })
 
 // An agent's own send to the main conversation: its report, marked at the
@@ -364,7 +377,7 @@ test('a subagent’s report sent to main, then its idle notice: the notice is co
   const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
 
   expect(sent.isDelivered).toBe(true)
-  expect(result.consumed).toBe(consumedReason('live-probe'))
+  expectConsumed(result)
   expect(queued).toEqual([])
   expect(statuses).toEqual(['agents idle: live-probe'])
 })
@@ -382,7 +395,7 @@ test('a teammate’s report sent to team-lead is marked under its name in the te
   await $.session.send(agentSends('a-scout-2', 'team-lead', REPORT))
   const result = await $.session.receive(fromTeammate('scout', idleNotice('scout', 'done')))
 
-  expect(result.consumed).toBe(consumedReason('scout'))
+  expectConsumed(result)
 })
 
 test('a send from one agent to another does not mark the sender', async ($, on) => {
@@ -395,7 +408,7 @@ test('a send from one agent to another does not mark the sender', async ($, on) 
   const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
 
   expect(result.consumed).toBeUndefined()
-  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+  expect(queued).toEqual([prefixed(PROBE_IDLE)])
 })
 
 test('a send to main from an agent the list cannot name marks nothing and says so in the debug log', async ($, on) => {
@@ -406,7 +419,7 @@ test('a send to main from an agent the list cannot name marks nothing and says s
   const result = await $.session.receive(fromTeammate('live-probe', PROBE_IDLE))
 
   expect(result.consumed).toBeUndefined()
-  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+  expect(queued).toEqual([prefixed(PROBE_IDLE)])
   expect(lines.map(line => line.to)).toEqual(['debug'])
   expect(lines[0]?.text).toContain('a-gone-9')
 })
@@ -427,7 +440,7 @@ test('a report the engine did not deliver marks nothing', async ($, on) => {
 
   expect(sent.isDelivered).toBe(false)
   expect(result.consumed).toBeUndefined()
-  expect(queued).toEqual([PREFIX + PROBE_IDLE])
+  expect(queued).toEqual([prefixed(PROBE_IDLE)])
 })
 
 test('consumed idle notices are named once, in the next prompt’s context', async ($, on) => {
@@ -478,7 +491,7 @@ test('a muted repeat notice leaves the names for the next prompt', async ($, on)
 
   expect(muted.drop).toBe(`quiet-agents: repeat notice from ${NOTICE_KEY}, muted`)
   expect(entered).toEqual([
-    { text: NOTICE, context: [CONTEXT] },
+    { text: NOTICE, context: [NAMES_TASKSTOP] },
     { text: 'carry on', context: [idleContext('researcher')] },
   ])
 })
@@ -490,7 +503,7 @@ test('an idle notice is matched by the stamped teammate, not the `from` it claim
   await $.session.receive(fromTeammate('researcher', REPORT))
   await $.session.receive(fromTeammate('helper', claimsResearcher))
 
-  expect(queued).toEqual([REPORT, PREFIX + claimsResearcher])
+  expect(queued).toEqual([REPORT, prefixed(claimsResearcher)])
 })
 
 test('a delivery to a teammate’s own loop is untouched and writes no state', async ($, on) => {
@@ -503,22 +516,48 @@ test('a delivery to a teammate’s own loop is untouched and writes no state', a
 
   // The next, to the main conversation, finds no report: it gets the prefix.
   await $.session.receive(fromTeammate('researcher', IDLE))
-  expect(queued).toEqual([REPORT, IDLE, PREFIX + IDLE])
+  expect(queued).toEqual([REPORT, IDLE, prefixed(IDLE)])
   expect(statuses).toEqual([])
 })
 
-test('an unverified teammate is no teammate: untouched, and no state written', async ($, on) => {
-  const { queued, statuses } = engine(on)
-  const writes = stateWrites(on)
-  const unverified = (text: string) =>
-    ({ origin: { kind: 'peer', teammate: 'researcher', isVerified: false }, text }) as const
+// A teammate in a terminal pane of its own, as `$.agent.list()` lists one (its
+// address is its id). Its deliveries are read from the team's inbox file, so
+// they arrive unverified (agent-notice-log.jsonl, 2026-11-08T02:17Z: qz-fixer's
+// report and idle notice).
+const paneTeammate = (name: string): AgentInfo => ({
+  id: `${name}@question-zone`,
+  teammateId: `${name}@question-zone`,
+  name,
+  description: `${name}'s task`,
+  type: 'teammate',
+  status: 'idle',
+})
 
-  await $.session.receive(unverified(REPORT))
-  await $.session.receive(unverified(IDLE))
+const unverified = (teammate: string, text: string) =>
+  ({ origin: { kind: 'peer', teammate, isVerified: false }, text }) as const
+
+test('an unverified teammate this session lists: its report, then its idle notice, and the notice is consumed', async ($, on) => {
+  const { queued, statuses } = engine(on, [paneTeammate('qz-fixer')])
+  const idle = idleNotice('qz-fixer', 'Finding 1 is redone.')
+
+  await $.session.receive(unverified('qz-fixer', REPORT))
+  const result = await $.session.receive(unverified('qz-fixer', idle))
+
+  expectConsumed(result)
+  expect(queued).toEqual([REPORT])
+  expect(statuses).toEqual(['agents idle: qz-fixer'])
+})
+
+test('an unverified name that is none of this session’s agents is left alone: untouched, and no state written', async ($, on) => {
+  const { queued, statuses } = engine(on, [paneTeammate('qz-fixer')])
+  const writes = stateWrites(on)
+
+  await $.session.receive(unverified('researcher', REPORT))
+  await $.session.receive(unverified('researcher', IDLE))
   expect(writes).toEqual([])
 
   await $.session.receive(fromTeammate('researcher', IDLE))
-  expect(queued).toEqual([REPORT, IDLE, PREFIX + IDLE])
+  expect(queued).toEqual([REPORT, IDLE, prefixed(IDLE)])
   expect(statuses).toEqual([])
 })
 
@@ -570,7 +609,7 @@ test('a value stored under the previous shape tag is declined', async ($, on) =>
   await $.session.receive(fromTeammate('researcher', IDLE))
   await $.prompt.submit(typed('carry on'))
 
-  expect(queued).toEqual([PREFIX + IDLE])
+  expect(queued).toEqual([prefixed(IDLE)])
   expect(entered).toEqual([{ text: 'carry on', context: undefined }])
   expect(statuses).toEqual([])
 })
@@ -614,9 +653,14 @@ test('the main loop’s turn end shows the idle names with the done and failed c
   ])
 })
 
-// The turn-end nudge, as the human's ruling of 2026-10-24 words it.
-const nudgeText = (names: string): string =>
-  `quiet-agents: idle or finished agents: ${names}. Stop each with TaskStop. Then work through the pending questions in .notes/project_open-questions.md with the user one at a time, first looking for the answer in .notes, docs/architecture/decisions, and prior chat logs, and asking only where no evidence settles it. Where an agent's work is unfinished, continue it instead.`
+// Which of the agents these tests list a nudge names, in this list's order.
+const AGENT_NAMES = ['builder', 'drafter', 'helper', 'researcher', 'scout', 'tester'] as const
+
+const named = (text: string): string[] => AGENT_NAMES.filter(name => new RegExp(`\\b${name}\\b`).test(text))
+
+// The question zone's tool, as denubis-hook-question-zone registers it: the
+// tool the nudge sends the model to for any question to the person.
+const QUESTION_ZONE_ASK = 'mcp__denubis-hook-question-zone__ask'
 
 // A plugin's prompt, framed under its name: never `asUser`.
 const FROM_PLUGIN = { kind: 'plugin', name: 'denubis-hook-quiet-agents' } as const
@@ -657,9 +701,19 @@ test('the main loop’s turn end nudges once, naming each idle or finished agent
 
   await endTurn($, 't1')
 
-  expect(submitted).toEqual([
-    { text: nudgeText('builder, researcher, scout, tester'), origin: FROM_PLUGIN },
+  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
+    { names: ['builder', 'researcher', 'scout', 'tester'], origin: FROM_PLUGIN },
   ])
+})
+
+test('the nudge sends the model to TaskStop for the agents and to the question zone for questions', async ($, on) => {
+  const { submitted, endTurn } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+
+  await endTurn($, 't1')
+
+  expect(submitted).toHaveLength(1)
+  expect(submitted[0]?.text).toContain('TaskStop')
+  expect(submitted[0]?.text).toContain(QUESTION_ZONE_ASK)
 })
 
 test('the same agents at the next turn end raise no second nudge; one more raises it again', async ($, on) => {
@@ -672,10 +726,33 @@ test('the same agents at the next turn end raise no second nudge; one more raise
   agents.push(agent('a2', 'helper', 'idle'))
   await endTurn($, 't3')
 
-  expect(submitted.map(s => s.text)).toEqual([
-    nudgeText('researcher, scout'),
-    nudgeText('helper, researcher, scout'),
+  expect(submitted.map(s => named(s.text))).toEqual([
+    ['researcher', 'scout'],
+    ['helper', 'researcher', 'scout'],
   ])
+})
+
+// An agent a plugin started, as `$.agent.list()` lists it: `spawnedBy` names
+// the plugin. The model did not start it.
+const pluginAgent = (id: string, status: AgentInfo['status']): AgentInfo => ({
+  id,
+  description: 'Check a question for the person',
+  type: 'denubis-hook-question-zone:checker',
+  status,
+  spawnedBy: 'denubis-hook-question-zone',
+})
+
+test('a finished agent a plugin started is not named in the nudge', async ($, on) => {
+  const agents = [pluginAgent('a-check-1', 'completed')]
+  const { submitted, endTurn } = turnEngine(on, agents)
+
+  await endTurn($, 't1')
+  expect(submitted).toEqual([])
+
+  agents.push(agent('a3', 'scout', 'completed'))
+  await endTurn($, 't2')
+  expect(submitted.map(s => s.text.includes('a-check-1'))).toEqual([false])
+  expect(submitted.map(s => named(s.text))).toEqual([['scout']])
 })
 
 test('a turn end with only working agents submits nothing', async ($, on) => {
@@ -698,7 +775,7 @@ test('a turn end with none to name clears the record, so the same agents back ar
   agents.push(agent('a1', 'researcher', 'idle'))
   await endTurn($, 't3')
 
-  expect(submitted.map(s => s.text)).toEqual([nudgeText('researcher'), nudgeText('researcher')])
+  expect(submitted.map(s => named(s.text))).toEqual([['researcher'], ['researcher']])
 })
 
 test('an idle teammate no longer listed leaves the status line and the next nudge', async ($, on) => {
@@ -712,7 +789,7 @@ test('an idle teammate no longer listed leaves the status line and the next nudg
   agents.splice(0, agents.length, agent('a3', 'scout', 'completed'))
   await endTurn($, 't2')
 
-  expect(submitted.map(s => s.text)).toEqual([nudgeText('researcher'), nudgeText('scout')])
+  expect(submitted.map(s => named(s.text))).toEqual([['researcher'], ['scout']])
   expect(statuses.at(-1)).toBe('agents: 1 done')
 })
 
@@ -727,7 +804,7 @@ test('a subagent’s turn end submits nothing and writes no state', async ($, on
   // The same agents at the main loop's end are named: the subagent's end
   // recorded nothing.
   await endTurn($, 't2')
-  expect(submitted.map(s => s.text)).toEqual([nudgeText('researcher')])
+  expect(submitted.map(s => named(s.text))).toEqual([['researcher']])
 })
 
 test('a turn end whose agent list fails keeps the record, so no second nudge follows', async ($, on) => {
@@ -757,7 +834,7 @@ test('a turn end whose agent list fails keeps the record, so no second nudge fol
   isListing = true
   await endTurn('t3')
 
-  expect(submitted).toEqual([nudgeText('researcher')])
+  expect(submitted.map(named)).toEqual([['researcher']])
 })
 
 test('/tidy stops each idle, done or failed agent and says what was refused', async ($, on) => {
@@ -788,6 +865,28 @@ test('/tidy stops each idle, done or failed agent and says what was refused', as
   expect(text).not.toContain('builder')
 })
 
+test('/tidy leaves a finished agent a plugin started alone', async ($, on) => {
+  const asked: (string | undefined)[] = []
+  on('command.register', () => ({ value: { command: 'tidy' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('agent.list', () => ({ value: [pluginAgent('a-check-1', 'completed'), agent('a3', 'scout', 'completed')] }))
+  on('tool.call', (_, e) => {
+    if (e.tool !== 'TaskStop') return { deny: 'only TaskStop in this test' }
+    asked.push(e.task_id)
+    return { result: { message: 'stopped', task_id: e.task_id ?? '', task_type: 'local_agent' } }
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await $.command.run({
+    command: 'tidy',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  })
+
+  expect(asked).toEqual(['a3'])
+})
+
 test('/tidy with nothing to stop says so and calls no tool', async ($, on) => {
   on('command.register', () => ({ value: { command: 'tidy' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -815,7 +914,9 @@ test('a turn the person interrupted or an error ended raises no nudge; the next 
   expect(submitted).toEqual([])
 
   await endTurn($, 't3')
-  expect(submitted).toEqual([{ text: nudgeText('scout'), origin: FROM_PLUGIN }])
+  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
+    { names: ['scout'], origin: FROM_PLUGIN },
+  ])
 })
 
 test('a refused turn raises no nudge either; each unanswered end still sets the status line', async ($, on) => {
@@ -836,7 +937,9 @@ test('a refused turn raises no nudge either; each unanswered end still sets the 
   expect(statuses).toEqual(['agents: 1 done', 'agents: 1 done', 'agents: 1 done'])
 
   await endTurn($, 't4')
-  expect(submitted).toEqual([{ text: nudgeText('scout'), origin: FROM_PLUGIN }])
+  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
+    { names: ['scout'], origin: FROM_PLUGIN },
+  ])
 })
 
 test('an unanswered turn end still drops a stopped teammate from the status line', async ($, on) => {
@@ -854,5 +957,5 @@ test('an unanswered turn end still drops a stopped teammate from the status line
 
   // The unanswered end recorded no names: the next answered end nudges.
   await endTurn($, 't2')
-  expect(submitted.map(s => s.text)).toEqual([nudgeText('scout')])
+  expect(submitted.map(s => named(s.text))).toEqual([['scout']])
 })

@@ -1,5 +1,37 @@
 # Changelog
 
+## [denubis-hook-question-zone] 0.1.0
+
+A Claude Code mod that takes the model's questions for the person out of the chat. They wait in a queue shown above the prompt, and one key puts the next one into the prompt box to answer there.
+
+**Added:**
+- The `ask` tool takes a context and one question, both non-empty, from the main session only, and returns at once. In the background a subagent that has not seen the conversation, Sonnet at effort `xhigh` with the tools `Read` and `Bash`, checks that the entry stands alone and searches the decision records and the chat logs for an answer already given in the person's own words, first bringing the chat index up to date. A clear entry joins the end of the queue when its check ends. Otherwise one plugin message carries the checker's reply to the model: what was unclear, the existing answer with its source and words, or why the check could not run. Nothing unchecked joins the queue. An entry whose check a plugin reload cut short is checked again as the plugin loads. The checker is never offered to the model.
+- The band above the prompt shows nothing while the queue is empty; otherwise the number of questions waiting and a button on key `1`. The button puts the first entry, quoted with its context, into an empty prompt box, followed by a blank line for the answer. A box holding a draft is left untouched and a toast says why.
+- A prompt the person sends that still contains a taken question's quoted text answers it, and the entry leaves the queue; otherwise the entry goes back to the front. Only the person's own sends count. One entry is taken at a time: taking another returns the one taken before to the front of the queue.
+- The `withdraw` tool removes an entry, checked, waiting or taken, by its question's exact text.
+- A system-prompt section tells the model to ask only through `ask`, never to ask in chat, never to mention waiting questions or say it is waiting, and to put questions from the open-questions file to the person in plain words. It also tells the model to ask only when the answer changes its next action, naming that decision, and only for answers that are missing or conflicting; to put exactly one question in each entry, never a list, options or a compound sentence; and to continue work already authorized while a question waits. It lists the unanswered questions and those being checked.
+
+**Tests:** `plugins/denubis-hook-question-zone/tests/question-zone.test.tsx`, run with `claude plugin test` (24 pass), with a stand-in checker.
+
+**Observed live:** in one `claude -p` session on 2026-11-08 each ask returned at once. The Sonnet checker found the person's existing answer to one question in a decision record (68.7 seconds), and reported that it could not check the other because updating the chat index failed with the graphics card nearly full (39.5 seconds). An earlier version that waited for the check inside the tool call was refused at the hook's ten-second limit.
+
+**Not verified:** a clear entry joining the queue live; the band, button and prompt box in a live session; a check restarted after a live plugin reload.
+
+## [denubis-hook-quiet-agents] 0.1.2
+
+The turn-end nudge sends questions for the person to the question zone instead of the open-questions file.
+
+**Changed:**
+- The nudge asks the model to stop each named idle or finished agent with TaskStop, to continue any whose work is unfinished, and to ask the person any question through `denubis-hook-question-zone`'s `ask` tool, never in chat. It no longer tells the model to work through `.notes/project_open-questions.md`.
+- `plugin.json` lists `denubis-hook-question-zone` under `dependencies`, as the nudge names its `ask` tool. Claude Code's documentation says installing a plugin installs and enables its dependencies, and enabling one fails while a dependency is missing (code.claude.com/docs/en/plugins/install, read 2026-11-08); not observed here.
+- The system-prompt section now also carries the notification and worker rules moved out of the global instructions: notices are inputs to work, not requests for a reply; idle workers owed corrections get follow-up; verified workers are closed; duplicate reports are handled silently; and only changed results, consequential corrections or a needed decision are reported. The section, the context beside an agent-started turn and the prefix on an unreported idle notice now say that a notice carrying nothing new gets no reply, where before they allowed one line.
+
+**Fixed:**
+- An agent a plugin started (`spawnedBy` set) is left out of the nudge and of `/tidy`. On 2026-11-08 the nudge named question-zone's two finished checkers, and TaskStop on each answered "is not running (status: completed)". The status line still counts such an agent among the done and failed, as it counts by status on its own.
+- A teammate in a terminal pane of its own is recognised. Its mailbox deliveries are read from the team's inbox file and arrive unverified, and the plugin left every unverified delivery alone, so the teammate's report was never marked and each idle notice reached the main conversation (agent-notice-log.jsonl, 2026-11-08T02:17Z: a teammate's report and idle notice, both `isVerified: false`). An unverified delivery now counts when its name is one `$.agent.list()` gives an agent of this session. Anything that can write the inbox file can claim such a name; the most that does is hide that agent's next idle notice.
+
+**Tests:** `plugins/denubis-hook-quiet-agents/tests/quiet-agents.test.ts`, run with `claude plugin test` (49 pass). The nudge tests now check which agents a nudge names and that it names TaskStop and the `ask` tool, not its exact wording. Likewise, the idle-notice tests check that the notice is consumed, not the logged reason, and the context, section and prefix tests check that each is present and names TaskStop.
+
 ## [denubis-external-agents] 0.24.4
 
 **Fixed:**
