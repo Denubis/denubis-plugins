@@ -23,7 +23,11 @@ let through.
 The mark is set at two points, and neither takes a name from the message text:
 
 - A message that arrives through the team mailbox is marked on arrival, when the mailbox
-  has verified the sender. The name is the one the mailbox stamps.
+  has verified the sender or the name it carries is one Claude Code lists for an agent of
+  this session. The name is the one the mailbox stamps. A teammate in a terminal pane of
+  its own writes to the team's inbox file, which the mailbox cannot check, so its messages
+  always arrive unverified. Anything that can write that file can claim a listed agent's
+  name; the most that does is hide that agent's next idle notice.
 - A message that an agent of this session sends to the main conversation, addressed
   `main` or `team-lead`, is marked once the send is delivered. The name is the one Claude
   Code lists for that agent. An agent it cannot name is not marked, and the debug log
@@ -39,7 +43,7 @@ report has not arrived, or whose mark was cleared, reaches the model with this l
 front of it:
 
 ```text
-[quiet-agents] An agent went idle. If this adds nothing the human has not been told, reply in one line or none; do not restate pending decisions. If its task is complete and you have no further work for it, stop it with TaskStop in this turn.
+[quiet-agents] An agent went idle. If this adds nothing the human has not been told, it gets no reply; do not restate pending decisions. If its task is complete and you have no further work for it, stop it with TaskStop in this turn.
 ```
 
 **Named once, at the next prompt.** The teammates whose idle notices were taken out are
@@ -49,12 +53,15 @@ that is dropped before it enters leaves the names for the one after.
 **Repeated notices are muted.** An agent notice that arrives as a prompt, such as a
 background task's notification, is dropped when its text matches the last notice under
 the same key, ignoring whitespace. A new or changed notice passes with context telling the
-model that an agent, not the person, started the turn, and to answer in one line or not
-at all when it adds nothing new.
+model that an agent, not the person, started the turn, and that it gets no reply when it
+adds nothing new.
 
 **A hygiene section in the system prompt.** Each system prompt the plugin sees composed
-ends with one short section: stop a finished agent with TaskStop in the same turn you
-acknowledge it, and answer an empty agent notice in one line or none. An in-process
+ends with one section on agents and their notices: stop a finished agent with TaskStop in
+the same turn you acknowledge it, give an agent notice that carries nothing new no reply,
+treat notices as inputs to work rather than requests for a reply, follow up and close
+workers once their work is verified, and tell the person only changed results,
+consequential corrections or a decision they must make. An in-process
 teammate's render of the lead's prompt does not get it.
 
 **The status line.** The plugin's status line names the idle teammates and counts the
@@ -65,18 +72,19 @@ the main conversation. A teammate that is no longer listed, because it was stopp
 off at the next turn end.
 
 **The turn-end nudge.** At the end of a main-conversation turn, the plugin gathers the
-idle teammates and every listed agent that is idle, completed or failed. When that set is
+idle teammates and every listed agent that is idle, completed or failed, leaving out any
+agent a plugin started (such as question-zone's checkers), which is the plugin's to
+manage. When that set is
 not empty and differs from the set it last named, it queues one prompt, sent under the
 plugin's name and not as the person's words, which starts once the session is idle:
 
 ```text
-quiet-agents: idle or finished agents: <names>. Stop each with TaskStop. Then work through the pending questions in .notes/project_open-questions.md with the user one at a time, first looking for the answer in .notes, docs/architecture/decisions, and prior chat logs, and asking only where no evidence settles it. Where an agent's work is unfinished, continue it instead.
+quiet-agents: idle or finished agents: <names>. Stop each with TaskStop, unless its work is unfinished: then continue it instead. Ask the person any question through the question zone's mcp__denubis-hook-question-zone__ask tool, never in chat.
 ```
 
 The same set at the next turn end raises no second nudge. When the set empties, the
-record clears, so the same agents coming back are named again. The text assumes the
-project keeps its open questions in `.notes/project_open-questions.md`, as
-`denubis-project-notes` does.
+record clears, so the same agents coming back are named again. The text assumes
+`denubis-hook-question-zone` is installed, which registers that tool.
 
 **The answer-only guard.** The nudge fires only when the turn ended with an answer. A turn
 the person interrupted, a refusal, or an API error raises no nudge, so a plugin prompt
@@ -85,7 +93,8 @@ status line.
 
 **`/tidy`.** Typing `/tidy` stops every idle, completed or failed agent, one at a time,
 through TaskStop and the usual permission check. It then says which it stopped, which the
-permission check refused, and which failed. Running agents are left alone.
+permission check refused, and which failed. Running agents, and agents a plugin started,
+are left alone.
 
 **Nothing is stopped automatically.** The plugin never calls TaskStop on its own. Agents
 stop only when the person runs `/tidy` or the model calls TaskStop after a nudge, and
@@ -100,6 +109,9 @@ survive a reload of the plugin and start empty in a new session.
   2026-10-25 at 00:32:24Z it fired once after an agent finished, named that agent, and
   was not repeated. Its other behaviour, including the answer-only guard, is established
   by the plugin's tests only.
+- **Recognising a teammate in its own pane by the agent list has not been seen live.** It
+  relies on the documented listing of such teammates by name. The plugin's tests
+  establish the rest.
 - **The mark set at an agent's send has not been seen live.** It ships in 0.1.1 and stays
   unobserved until that release is installed. It relies on the documented `session.send`
   event for a send from an agent's own loop. The plugin's tests establish its behaviour.

@@ -2,7 +2,8 @@
 export type NoticeHashes = Record<string, string>
 
 // What the main conversation has heard from its teammates, each named as the
-// mailbox's verified `origin.teammate` stamps it.
+// mailbox's `origin.teammate` stamps it: verified, or a name this session's
+// agent list holds.
 export type TeammateReports = {
   // Teammate -> true once a non-idle message from it reached the main
   // conversation, or its own send to the main conversation was delivered;
