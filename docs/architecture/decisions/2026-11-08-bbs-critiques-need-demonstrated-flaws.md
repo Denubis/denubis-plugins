@@ -119,6 +119,58 @@ plugin skill or agent carried them on 2026-11-08:
    line 6416 (`user` record `4e874a67-67a2-4d13-9481-fa753100772f`, 02:35:05Z): "codex should
    halt after review findings, yes." His answer does not cover push authority; ADR
    2026-11-08-bbs-codex-push-needs-say-so records that ruling. Resolver: `sed -n '6381p;6416p'`.
+10. Claims are still actively tested. Reading his answer as removing only the imagined
+    counterexample, "imagined" taken from the question's own premise, is the supervisor's. The supervisor's
+    question, put through the question box, asked whether the shortened files should drop "test
+    the strongest plausible counterexample" (`~/.claude/CLAUDE.md:15`, `~/.codex/AGENTS.md:15`).
+    Brian, line 8177 (`user` record `0d4216b0-a6ff-4740-9c75-d5e7676ef085`,
+    2026-11-08T05:40:34Z), with the question pasted above his answer: "um... arrgghhhhhh. The
+    goal here is to actually *test*. If something is bad, why is it bad. If something is good,
+    what can we shatter? But yes, I also don't want this to endlessly popper ad hoc". Resolver:
+    `sed -n '8177p'`.
+11. A model may always push back, including on another model's premise. This general rule is
+    promoted from the Codex supervision skill into both global files; it also stays in the
+    skill. Reading "this is what search-chats is for?" as "evidence a reviewer could not see is
+    found with chat search, not taken to Brian" is the supervisor's. The supervisor's question, through the box,
+    asked whether both global files should carry its proposed rule on answering a reviewer's
+    finding (cite evidence the reviewer could read; otherwise take the finding to Brian; never
+    rebut "I could not follow this"; wanting to disagree is not evidence). Brian, line 8256
+    (`user` record `907c5eb0-3fda-41b7-9cfc-4b676db6b475`, 2026-11-08T05:41:51Z), with the
+    question pasted above his answer: "I mean, this is what search-chats is for? and a model
+    absolutely is allowed to push back on the premise from a different model. that's core to
+    supervising codex and should actually be promoted to global. It is always OK to push back
+    on assumptions or a badly worded request or something that doesn't make sense. The goal is
+    to be clear and to have a coherent vision. Not to create endless complexity. And never to
+    assume". Brian did not approve the proposed rule's other clauses; dropping them is the
+    supervisor's choice. Resolver:
+    `sed -n '8256p'`.
+12. A check that crashed, timed out, or could not read what it was meant to check has produced
+    no result; its silence is never a pass. A check's silence counts only when it is shown to fail when it should, pass when it
+    should, and cover the thing's proper extent. The supervisor's question, through the box,
+    asked whether both global files should say that a check, reviewer or verifier that failed or
+    could not read its inputs counts as not run, never as "found nothing". Brian, line 8664
+    (`user` record `5a0f2997-59ee-4c7c-b41f-d622bc743135`, 2026-11-08T05:57:21Z), with the
+    question pasted above his answer: "absence of evidence is not evidence of absence. But there
+    are ways to demonstrate a grap. So no, this is an important thing. We care about the
+    epistimological boundaries. Do things fail when they should and pass when they should? Do we
+    know the thing is at it's *proper* extent?" The supervisor read "So no" as keeping the
+    clause, and a fresh checker found that reading reversed his literal answer. The
+    supervisor then put the question again through the box. Brian, line 10893 (`user` record
+    `e5e030f4-99a2-4cb5-9577-6d6b213344bd`, 08:57:47Z), with the question pasted above his
+    answer: "that's strange wording?" The supervisor reworded the clause and asked whether
+    both files should carry "A check that crashed, timed out, or could not read what it was
+    meant to check has produced no result; its silence is never a pass". Brian, line 10929
+    (`user` record `e55b1c54-4ea6-476e-959a-2c75f4becc13`, 09:04:26Z), with that question
+    pasted above his answer: "yes, silence is not a pass". Resolver:
+    `sed -n '8664p;10893p;10929p'`.
+13. The proleptic challenge, which tests a design or decision before it binds later work, may
+    anticipate failures; this rule does not bind it. The supervisor's question, through the box,
+    asked whether that skill should keep asking the model to anticipate failures. Brian, line
+    8933 (`user` record `beee8e9b-dd4b-4b0d-ab22-1aa00f1c58f9`, 2026-11-08T06:10:25Z), with the
+    question pasted above his answer: "yes, proleptic gets to anticipate. It's not involved in
+    code review, right?" Searched on 2026-11-08, the skill is routed from the design skills
+    (`starting-a-design-plan`, `design-write`) and named in the instruction-control rubric, and
+    from no code-review skill or agent. Resolver: `sed -n '8933p'`.
 
 ## Consequences
 

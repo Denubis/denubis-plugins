@@ -77,6 +77,33 @@ interactions".
    fucking frustrated. I thought we have a mod for you not to whine about late reports". Reading
    this as a ruling on that case is the supervisor's interpretation. Resolver:
    `sed -n '6263p;6265p'`.
+9. When Brian answers a question from the box, the citation a decision record needs comes
+   with his answer, derived by the plugin rather than by a model. Brian asked this unprompted,
+   just after the box had handed the model a refused question (line 8524) and the model had
+   said it had already rewritten it (line 8527). Brian, line 8529 (`user`
+   record `8a47c801-4a7c-4ec2-bca8-c8af7da515b6`, 2026-11-08T05:52:16Z): "Ah, one thing, given
+   that these are almost certain to be ADRs, can we just have all the necessary line-cite stuff
+   come along with the message when I hit enter? It's silly that it needs to be done by llm if
+   it can be derived". Reading this request as ADR 0051's allowance for the plugin to deliver
+   that citation into the model's context is the supervisor's interpretation. Resolver:
+   `sed -n '8529p'`.
+10. The box's own messages to the model are buffered: they do not each start a turn or show
+    to Brian. Brian pasted the screen of another session running 0.1.0, where every bounced
+    question came back as a visible plugin prompt that started a turn, and the model answered
+    each bounce, pass and duplicate in chat. His words, typed first in that session
+    (`/home/brian/.claude/projects/-media-brian-storage-people-Adela-melica--worktrees-caller-spec/dd679601-099f-4def-ba08-dc45a2984004.jsonl:17626`,
+    `user` record `3281ffd2-ed58-4b06-8845-bb28ffa94ef7`, 2026-11-08T08:29:42Z): "fuuuck this
+    noise. You then complain about complaining". The screen he pasted here, holding them, is
+    line 10352 (`user` record `9fa1ece8-6170-47e7-8f86-e99e6e544a47`, 08:30:15Z). Then,
+    mid-turn, line 10371 (queued `attachment` record `a07592ea-7d4e-4608-aeb2-d5dfd191a006`,
+    08:30:21Z): "we need to make sure we have a buffer for this shit?" Resolver:
+    `sed -n '10352p;10371p'`, and `sed -n '17626p'` on the other session's file. The
+    supervisor's reading, not Brian's wording: a refusal reaches the model as a hidden row; if
+    the model is idle with one unread, the box sends one short message once the checks then
+    running have ended, or after five minutes if one of them hangs; the model rewrites or re-asks a bounced question without saying so in
+    chat; and a check that could not run is told to Brian once, per his line-5682 ruling
+    (record `6ed7a0dc-896a-48b3-a577-d402a0bccba5`). Reading his citation and buffer requests
+    as ADR 0051's allowance for both kinds of hidden row is the supervisor's interpretation.
 
 ## Consequences
 
@@ -105,3 +132,10 @@ The following is the supervisor's design, not Brian's wording:
 - In Claude, the queue replaces the global rule "Resolve that question before raising the next"
   (`~/.claude/CLAUDE.md:154-155`): several questions may wait while Brian takes them one at a
   time. Each entry is still one question. Codex has no queue and keeps the rule.
+- The box's rule against mentioning waiting questions is the supervisor's wording. From version
+  0.1.1, it gives way when Brian asks where things stand or returns after a long absence. His earlier ruling, on
+  2026-10-22 (`ccchat:v1:claude:a87a423d-cd0c-43f2-84da-420125db99a8:uuid:6b05d6dc-1443-4bea-80e8-e139f2d63c1d`,
+  04:38:49Z; raw record
+  `/home/brian/.claude/projects/-home-brian-people-Brian-breeze-narrate/a87a423d-cd0c-43f2-84da-420125db99a8.jsonl:878`),
+  says: "So when I engage after a long absence, then discuss, without referent, the set of open
+  questions and pose the first one to me." The questions themselves stay in the box.
