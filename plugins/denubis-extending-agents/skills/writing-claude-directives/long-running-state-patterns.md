@@ -54,8 +54,7 @@ summarise work that the repository and tests already reveal.
 
 ## Direct work and delegation
 
-Direct implementation is the default. Delegate only an independent, bounded subproblem
-when the task permits it and the separate context or expertise adds value. The main
+Who works directly and who delegates follows the global instruction files. The main
 session keeps responsibility for scope, evidence review, and integration. A delegated
 summary is a lead, not durable state or proof of completion.
 

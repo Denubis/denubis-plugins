@@ -33,7 +33,7 @@ actual merge base or caller-supplied base. For a working tree, inspect `git diff
 `git diff --cached`, and the relevant untracked files explicitly.
 
 State the falsifiable review questions. “Review the code” is not enough. Useful questions
-name a behavior, boundary, failure mode, compatibility contract, or acceptance criterion.
+name a behavior, boundary, compatibility contract, or acceptance criterion.
 
 ## Perform the review
 
@@ -46,13 +46,14 @@ For database changes, include schema, migration, constraint, transaction, and re
 behavior in the questions. A separate database specialist is optional when those risks
 need independent expertise; it is not triggered by filename alone.
 
-Every finding is a lead and contains:
+Every finding is a lead that shows a flaw existing now, not an anticipated future case,
+and contains:
 
 - exact file and line, symbol, command output, or current documentation pointer;
-- the claim that may be false;
-- the concrete consequence if it is false;
-- the observation that supports the concern; and
-- a check that would confirm or falsify it.
+- the claim it shows to be false;
+- the concrete consequence; and
+- its proof; for a code-quality finding, the exact lines and the written rule they break
+  are enough.
 
 Omit generic praise, model self-assessment, and ritual severity labels that do not change
 the action. Severity is useful only when it states impact and urgency.
@@ -69,8 +70,8 @@ the repository's normal test-first procedure and rerun affected checks. If revie
 requested without implementation authority, report the finding without editing. Ask one
 pointed question when a confirmed finding exposes a genuine design or authority choice.
 
-Re-review only when the correction materially changed the surface or the original
-falsifier remains uncertain. Scope the re-review to the changed claim. Do not loop until a
+Re-review only when the correction materially changed the surface or did not clearly
+remove the proven flaw. Scope the re-review to the changed claim. Do not loop until a
 model emits a favorable status.
 
 ## Return

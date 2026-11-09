@@ -1,6 +1,6 @@
 ---
 description: Verify and configure denubis-plugins setup — status line, plugin enablement, version sync, script environment check and repair
-allowed-tools: Read, Edit, Write, Bash, Glob, Grep, AskUserQuestion
+allowed-tools: Read, Edit, Write, Bash, Glob, Grep, mcp__denubis-hook-question-zone__ask
 ---
 
 # denubis-plugins Setup
@@ -182,8 +182,8 @@ Exit 0 means the environment builds from the local uv cache. For each script tha
    - **builds from cache**: non-zero exit, a `Would install` line, and no `Would download` line.
    - **cannot resolve offline**: any other non-zero exit. Keep uv's error.
 3. If every skill script is ready, report that and skip the question.
-4. Otherwise ask the user once with AskUserQuestion. List every script that is not ready, with its plugin, path, `dependencies` and classification. Offer three answers: resolve all of them; resolve only those that build from cache; resolve none.
-5. For each script the user chose, run `uv sync --script "<script>"` without `--offline`. Report a failure with uv's complete stderr, unshortened.
+4. Otherwise ask the user once through the question zone's `ask` tool (`mcp__denubis-hook-question-zone__ask`); if it is missing, follow the fallback in the global instruction files. In the context, list every script that is not ready, with its plugin, path, `dependencies` and classification. Ask one question: which of the listed scripts setup should resolve now.
+5. When the answer arrives, for each script the user chose, run `uv sync --script "<script>"` without `--offline`. Report a failure with uv's complete stderr, unshortened.
 
 Report every skill script the user did not choose as "not resolved: skipped by choice", with its classification. A line saying environments resolved covers only the scripts this step resolved. It says nothing about skipped skill scripts, which can still fail the first time their skill runs.
 

@@ -118,7 +118,8 @@ abstractions or cleanup of untested code.
 
 ## Challenge and acceptance
 
-Before asking for acceptance, resolve technical inconsistencies directly. Invoke
+Before asking for acceptance, resolve technical inconsistencies directly and have the
+design verified as `## Verify and return` describes. Invoke
 `denubis-plan-and-execute:proleptic-challenge` only for a named consequential uncertainty
 that survives the evidence already in the document. Apply evidence-determined corrections
 without burdening the human; present genuine design choices one at a time.
@@ -130,9 +131,12 @@ criteria and phases before asking again.
 
 ## Verify and return
 
-Before handoff, verify that every source resolves, every goal has acceptance coverage,
-every phase has a usable outcome and dependency order, every public interface has a named
-consumer, and no section claims unimplemented state as current architecture.
+Before the design goes to the human, and again before handoff if it changed since, a
+second fresh worker, never the design's author, verifies it. Give that worker a full
+checklist that names what to check and never an expected defect or outcome: every source
+resolves, every goal has acceptance coverage, every phase has a usable outcome and
+dependency order, every public interface has a named consumer, and no section claims
+unimplemented state as current architecture.
 
 Return the absolute design path, status, unresolved blockers, and working directory. Do
 not commit, publish, deploy, or mutate GitHub. Those actions require separate authority and

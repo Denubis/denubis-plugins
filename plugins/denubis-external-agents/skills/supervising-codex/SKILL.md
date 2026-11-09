@@ -9,13 +9,14 @@ user-invocable: true
 ## Overview
 
 Three roles, never merged. **External Codex drafts** via the codex CLI. **The host agent
-supervises**: stages the context, writes the prompt, and verifies the output against the
-repo. **The human rules**: adjudicates decisions and owns every commit. Claude Code,
+supervises**: stages the context, writes the prompt, and evaluates against the repo the
+output a fresh worker has verified. **The human rules**: adjudicates decisions and owns every commit. Claude Code,
 Codex, or Antigravity may host the skill, but the external Codex process remains a
 separate voice. If host and doer use the same model, describe the result as process
 separation, not an independent-model check.
 
-The doer's self-report is never evidence; verify the resulting artifacts and checks.
+The doer's self-report is never evidence; the verification pass checks the resulting
+artifacts and reruns their checks.
 For a task requiring review by a different model, explicitly select different supervisor
 and doer models before dispatch. Ordinary delegation may use the same model in separate
 processes, but cannot be reported as a review by a different model.
@@ -35,9 +36,10 @@ anything substantive are codex tasks. The supervisor may still make a one-off tr
 edit directly, a comment or a docstring line, when a dispatch would cost more than it
 saves.
 
-Supervision artefacts are always the supervisor's to edit: `codex-prompts/`, findings
-documents, and plan documents. Handing codex its own prompt to revise loses the boundary
-the whole arrangement depends on.
+Codex never revises its own prompt in `codex-prompts/`, or the findings and plan
+documents that judge its work: handing it those loses the boundary the whole arrangement
+depends on. Who drafts substantive documents otherwise follows the global instruction
+files.
 
 This is the same concern the weekly quota check answers from the other side. Routing work
 to codex protects the supervisor's budget, and codex has a budget too, so check its
@@ -178,9 +180,14 @@ left as a documented licence to improvise.
      question is appended as a ticket to
      `.notes/project_open-questions.md` so it survives the pane; and anything ruled along
      the way probably belongs in the project's decision records, indexed in its ADR
-     register*. The one-question rule binds the supervisor too: when it is unsure, it
-     asks the human the same way, and it raises Codex's tickets to the human one at a
-     time, marked as a question for them and placed last;
+     register*. The one-question rule binds the supervisor too. When it is unsure, a
+     Claude Code supervisor asks the human through the question zone's
+     `mcp__denubis-hook-question-zone__ask` tool, one question per entry and never in
+     chat, and puts Codex's tickets to the human the same way. A Codex supervisor talking
+     with the human has a Terra model cross-check each question against the
+     decision records and chat logs, then asks it with its own question tool, one at a
+     time. If its question tool is missing, the supervisor follows the fallback in the
+     global instruction files;
    - **the write scope, stated by the prompt itself.** A drafting stage writes one
      document under `codex-prompts/out/`; a code phase writes source, tests, and generated
      data into its own worktree. Neither the skill nor the sending tool may assert one
@@ -211,8 +218,8 @@ left as a documented licence to improvise.
    The host agent does not drive Codex unless the human has explicitly said this session may. When
    it may, `codex_supervisor.py --send` delivers that same ping; the prompt's own output
    contract governs, and the sending mechanics below are not optional.
-3. **The supervisor verifies the output against the repo** before any of it lands in tracked
-   documentation (see *Verification pass*).
+3. **A fresh worker verifies the output, and the supervisor evaluates that result against
+   the repo,** before any of it lands in tracked documentation (see *Verification pass*).
 4. **The human validates.** Rulings from that discussion go into the next prompt, numbered.
 
 ## Codex does not commit
@@ -223,7 +230,7 @@ keypress approvals race the dialogs, so "approved" on screen is not evidence tha
 ran.
 
 Prompts therefore tell codex to **edit and verify only**. The supervisor stages and commits
-from outside the pane, split by concern, after verifying.
+from outside the pane, split by concern, after the verification pass.
 
 **Ground truth for what landed is `git log` and `git status`, never the pane scrollback.**
 A pane showing a successful commit is showing a rendering, and the two come apart exactly
@@ -691,8 +698,9 @@ No other field. In particular:
 
 **An idle pane gets no monitor.** When Codex is parked on something only the human can
 supply — a ruling, an answer to a ticket, a choice the supervisor has put to them — stop
-the monitor (or let it expire and do not re-arm) and end the turn with the question,
-once. Nothing on the pane can change until the answer arrives, and the answer arrives in
+the monitor (or let it expire and do not re-arm), put the question to the human once, the
+way step 1 of the loop says the supervisor asks, and end the turn. Nothing on the pane can
+change until the answer arrives, and the answer arrives in
 the supervisor's own conversation, so a watch over the pane adds nothing but a wake-up
 every thirty minutes in which the supervisor finds itself with nothing to say and says
 it anyway. The question is not restated, the wait is not counted, and "still waiting on
@@ -799,6 +807,10 @@ script exists" and "the script runs" are different claims.
 
 ## Verification pass
 
+A fresh worker, never the Codex that did the work, runs this pass, and the supervisor
+evaluates its result against the repo. Fable and Astra hand that worker a full checklist
+that names what to check, as below, and never an expected defect or outcome.
+
 Read the entire output. Check every load-bearing claim against the thing it claims about,
 not against codex's report of it:
 
@@ -821,7 +833,7 @@ with the fix disclosed to the human. The `codex-prompts/out/` original stays unt
 
 ## Supervisor-asserted context
 
-The pass above runs one direction, the supervisor checking the doer. It must run the other
+The pass above runs one direction, a fresh worker checking the doer. It must run the other
 way too. **Everything the supervisor stages into a prompt is a claim for the doer to doubt
 and for reality to settle**, and a prompt is written so that doubting it is possible.
 
