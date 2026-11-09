@@ -1,5 +1,73 @@
 # Changelog
 
+## [denubis-crash-recovery] 1.2.2
+
+`triage` asks its questions through the question zone, one question at a time and with no option lists (ADR 2026-11-08-bbs-questions-go-in-question-zone).
+
+**Changed:**
+- `skills/triage/SKILL.md`: in Claude, questions go through `mcp__denubis-hook-question-zone__ask`, and if it is missing, through the fallback in the global instruction files; in Codex, through Codex's question tool as its global instruction file directs. This replaces "use the provider's user-input tool, or ask inline if unavailable" in step 2 (manual review) and step 3 (prune).
+- The per-row annotation question becomes one question with the row's details as context: what note, if any, the session should carry. Note text in the answer is recorded; a decline moves to the next row; a request to skip the rest ends the loop. This replaces "Options: `yes` / `no` / `skip all`" and the second prompt for the note text.
+- The prune question becomes one question, "Should triage permanently delete these N concluded sessions?", with the count, the missing transcripts and the permanent, unaudited deletion in its context. Prune runs only on an unambiguous yes; a request to see the list again re-runs the dry-run and asks again; any other answer skips prune. This replaces "Options: `yes` / `no` / `show me again`".
+- `plugin.json` lists `denubis-hook-question-zone` under `dependencies`, as the skill calls its `ask` tool.
+
+**Not verified:** no automated test covers the skill's wording, and triage was not run. The CLI is unchanged.
+
+## [denubis-extending-agents] 2.1.1
+
+`writing-claude-directives` follows the 2026-11-08 rulings on who does the work and where questions to the human go (ADR 2026-11-08-bbs-proposer-never-verifies, ADR 2026-11-08-bbs-questions-go-in-question-zone).
+
+**Changed:**
+- `long-running-state-patterns.md`: who works directly and who delegates follows the global instruction files, replacing "Direct implementation is the default. Delegate only an independent, bounded subproblem…".
+- `SKILL.md`, "Name a Fallback for Harness Tools": the example fallback for a question to the human is "Ask the human only through the question zone's `ask` tool. If it is missing, first have a fresh Sonnet worker confirm the question stands alone and is not answered in the decision records or chat logs, then ask in one short message of its own: exactly one specific, critical, pointed, clear question in plain words", replacing "if unavailable, ask inline". This is the wording of the Claude global instruction draft, and keeps the cross-check that question-zone record item 5 requires before any question reaches the human.
+
+**Not verified:** no automated test covers this guidance, and no skill evaluation was run.
+
+## [denubis-00-getting-started] 1.6.1
+
+`/setup` asks about unresolved script environments through the question zone instead of AskUserQuestion (ADR 2026-11-08-bbs-questions-go-in-question-zone).
+
+**Changed:**
+- `commands/setup.md` step 8d: when skill scripts are not ready, setup asks once through `mcp__denubis-hook-question-zone__ask`, or, if that tool is missing, as is likely during first-time setup, through the fallback in the global instruction files. The context lists each script that is not ready with its plugin, path, `dependencies` and classification, and the one question asks which of them to resolve now; the three fixed answers are gone, as the question zone takes one question and no list of options. Resolution runs when the answer arrives. `allowed-tools` names the `ask` tool in place of `AskUserQuestion`.
+- `plugin.json` lists `denubis-hook-question-zone` under `dependencies`, as the setup command calls its `ask` tool. This follows `denubis-hook-quiet-agents` 0.1.2; a plugin that only quotes the tool, such as `denubis-extending-agents`, does not declare it.
+
+**Not verified:** no automated test covers the command's wording, and `/setup` was not run.
+
+## [denubis-plan-and-execute] 4.2.5
+
+The verification, planning, execution and reviewer instructions follow two rulings of 2026-11-08: a second fresh worker, never the proposer, verifies work before it reaches the human, and a review finding is a flaw shown to exist now (ADR 2026-11-08-bbs-proposer-never-verifies, ADR 2026-11-08-bbs-critiques-need-demonstrated-flaws).
+
+**Changed:**
+- `coding-verify` opens with the distinction it relies on: a worker runs these checks on its own work while it works and before it reports, and before anything reaches the human a second fresh worker, never the proposer, verifies it. The one exception is a trivial change that any session makes itself, as the global instruction files strictly define it (proposer record items 9 and 10). The second fresh worker runs the task-specific second pass and reruns the checks. The skill no longer rules out mandatory delegation, and no longer tells the session that received a delegated report to rerun the check itself.
+- `executing-an-implementation-plan`: whether the main session executes directly or delegates follows the global instruction files, replacing "executes directly by default. Delegation is optional". The executor's own "independent sanity review targeted at plausible mistakes" becomes a second fresh worker's verification, the last step before UAT, given a full checklist that names what to check (requirements, acceptance criteria, gates, sources, the finished surface) and never an expected defect or outcome. A fix or a failed UAT is verified again by a fresh worker before UAT. A review request names no expected defect. The plugin README says the same, replacing "The main session executes directly by default" and "an independent sanity pass".
+- `design-write`: a second fresh worker, never the author, verifies the design against a full checklist before it goes to the human for acceptance, and again before handoff if it changed. `impl-plan-write`: a second fresh worker, never the author, verifies the plan before handoff, replacing "verify directly".
+- `code-reviewer`, `critical-peer-review`, `coherence-reviewer` and `dba-reviewer` agents, the `critical-peer-review` skill, and `requesting-code-review` with its `code-reviewer.md` brief: a finding must show a flaw that exists now, not an anticipated future case, and carry its proof; for a code-quality finding the exact lines and the written rule they break are enough. A falsifier, or a check that could settle, confirm or falsify a finding, no longer qualifies it. `critical-peer-review` keeps a finding as a lead until its source and proof are verified, and `dba-reviewer` names the invariant a lead breaks instead of an "invariant or risk".
+- `requesting-code-review`: a finding states the claim it shows to be false, re-review follows a correction that did not clearly remove the proven flaw, and review questions no longer name a failure mode.
+- The repository's instruction-control review rubric (`docs/review-rubrics/instruction-control.md`, not shipped) changes the same way: defects and reviewer findings carry proof that they exist now, and direct work no longer excludes the second fresh worker's verification, with the one exception of a trivial change that any session makes itself, as the global instruction files strictly define it.
+
+**Not verified:** no automated test covers this guidance, and no skill evaluation was run. Whether the wording changes live behaviour is unproven.
+
+## [denubis-project-notes] 0.3.3
+
+`scanning-project-notes` puts open tickets to the human through the question zone, never in chat (ADR 2026-11-08-bbs-questions-go-in-question-zone).
+
+**Changed:**
+- `scanning-project-notes`: only the session talking with the human asks the human; a supervised worker writes its question as a ticket for its supervisor (ADR 0041 items 3 and 4, ADR 0010). In Claude Code that session puts open tickets to the human through `denubis-hook-question-zone`'s `mcp__denubis-hook-question-zone__ask` tool, one question per entry, replacing the instruction to mark each as a question and place it last. In Codex, which has no question zone, it has a Terra model cross-check each question against the decision records and chat logs, then asks it with its own question tool, one at a time; Codex sessions use only Codex workers (proposer record item 8). If the session's question tool is missing, it follows the fallback in the global instruction files, which keeps the cross-check of question-zone record item 5.
+- `plugin.json` lists `denubis-hook-question-zone` under `dependencies`, as the skill names its `ask` tool. This follows `denubis-hook-quiet-agents` 0.1.2; installing a plugin with a missing dependency was not observed here.
+
+**Not verified:** no automated test covers this guidance, and no skill evaluation was run.
+
+## [denubis-external-agents] 0.24.5
+
+`supervising-codex` has the supervisor put its own questions and Codex's tickets to the human through the question zone, never in chat (ADR 2026-11-08-bbs-questions-go-in-question-zone). The Codex peer-review method stops inventing failure scenarios and proposing tests for findings it has not shown (ADR 2026-11-08-bbs-critiques-need-demonstrated-flaws).
+
+**Changed:**
+- `supervising-codex`: a Claude Code supervisor asks the human, and puts Codex's tickets to them, through `denubis-hook-question-zone`'s `mcp__denubis-hook-question-zone__ask` tool, one question per entry, replacing the instruction to ask in plain text and place each ticket last as a marked question. A Codex supervisor talking with the human has a Terra model cross-check each question against the decision records and chat logs, then asks it with its own question tool, one at a time; Codex sessions use only Codex workers (proposer record item 8). If its question tool is missing, the supervisor follows the fallback in the global instruction files, which keeps the cross-check of question-zone record item 5. When Codex is parked on the human, the supervisor puts the question that way once and ends the turn, instead of ending the turn with the question. The supervised Codex's standing rules and ping are unchanged: it still asks in plain text, never through `request_user_input`, and appends a ticket.
+- `supervising-codex`: a fresh worker, never the Codex that did the work, runs the verification pass, and the supervisor evaluates its result against the repo; Fable and Astra hand that worker a full checklist that names what to check and never an expected defect (ADR 2026-11-08-bbs-proposer-never-verifies items 2 and 6). The pass's checks are unchanged. The overview, the loop's step 3, the commit rule and the supervisor-asserted-context section say the same, replacing "the supervisor verifies the output against the repo". "Supervision artefacts are always the supervisor's to edit" becomes: Codex never revises its own prompt, or the findings and plan documents that judge its work, and the global instruction files decide who drafts substantive documents.
+- `codex-peer-review` `review-method.md`: step 10, which designed a discriminating test for each finding below "demonstrated" grade, and step 11, a mandatory pre-mortem listing three alternative failure scenarios and asking what the next incident would reveal, are removed with their output sections ("Pre-Mortem", "Fastest Next Test"), their checklist lines and the Klein reference. The diagnostic timeout becomes step 10. The ACH matrix adds only competing explanations that the existing evidence supports, and still flags disconfirming evidence the analysis dismissed too quickly (critiques record item 10: claims are still tested; only the imagined counterexample goes). The editing-pass rule keeps its three steps but no longer requires the author to write "I have done a full editing pass" or sends a revision back without that phrase; the reviewer reads the revised document for leftover inconsistencies and reports each with its proof. A Low finding is now prose that breaks a written rule the document follows, with the rule cited under **Evidence**, replacing "Language could be tighter, minor style" and the "brief list" format. The output template no longer has an "Overall Assessment" section ("Ready to present / Needs revision"), a general verdict; the findings and verification sections stay.
+- `plugin.json` lists `denubis-hook-question-zone` under `dependencies`, as the skill names its `ask` tool, following `denubis-hook-quiet-agents` 0.1.2.
+
+**Not verified:** no automated test covers this guidance, and no skill evaluation was run. `codex_supervisor.py` is unchanged.
+
 ## [denubis-hook-carry-on] 0.1.0
 
 Adds a Codex-only continuation reviewer for a main agent that stops before its

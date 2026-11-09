@@ -128,7 +128,7 @@ Do not instruct the model to echo, transcribe, or explain its internal reasoning
 
 ### Name a Fallback for Harness Tools
 
-A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agent`/`Task`, MCP tools) must state the fallback when the tool is absent — "if unavailable, ask inline". Tool rosters vary per session (operator evidence: the `claudew` alias disables specific tools), so a directive that assumes a tool is present misfires wherever it is not. Reference MCP tools by the fully qualified `Server:tool` form so the model can locate them.
+A directive that names a harness tool (`AskUserQuestion`, `EnterPlanMode`, `Agent`/`Task`, MCP tools) must state the fallback when the tool is absent. For a question to the human: "Ask the human only through the question zone's `ask` tool. If it is missing, first have a fresh Sonnet worker confirm the question stands alone and is not answered in the decision records or chat logs, then ask in one short message of its own: exactly one specific, critical, pointed, clear question in plain words." Tool rosters vary per session (operator evidence: the `claudew` alias disables specific tools), so a directive that assumes a tool is present misfires wherever it is not. Reference MCP tools by the fully qualified `Server:tool` form so the model can locate them.
 
 ## Rubric Callback
 

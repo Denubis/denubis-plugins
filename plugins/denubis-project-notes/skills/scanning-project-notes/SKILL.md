@@ -131,10 +131,15 @@ Two writes bypass the proposal gate, because they carry questions and rulings to
 rather than waiting on the human: appending a ticket to
 `.notes/project_open-questions.md` when the work is unclear, and recording a ruling the
 human has already made in the tracked decision register (`docs/decisions/` by default, or
-the project's existing register under `docs/`). `recording-project-notes` owns both formats. Raise open
-tickets to the human one at a time, marked as a question for them and placed last; an
-indifferent answer is not delegation, so think its implications through with the human
-before recording anything.
+the project's existing register under `docs/`). `recording-project-notes` owns both formats. Only
+the session talking with the human asks the human; a supervised worker writes its question
+as a ticket for its supervisor. In Claude Code, that session puts open tickets to the human
+through the question zone's `mcp__denubis-hook-question-zone__ask` tool, one question per
+entry, never in chat. In Codex, which has no question zone, it has a Terra model
+cross-check each question against the decision records and chat logs, then asks it with
+Codex's own question tool, one at a time. If the session's question tool is missing, it
+follows the fallback in the global instruction files. An indifferent answer is not delegation, so think its implications through with
+the human before recording anything.
 
 ## Completion check
 

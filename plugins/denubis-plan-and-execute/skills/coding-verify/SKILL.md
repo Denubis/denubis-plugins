@@ -6,6 +6,11 @@ user-invocable: false
 
 # Verify Before Reporting Completion
 
+A worker runs these checks on its own work while it works and before it reports. That
+does not verify the work for the human: before anything reaches the human, a second fresh
+worker, never the proposer, verifies it. The one exception is a trivial change that any
+session makes itself, as the global instruction files strictly define it.
+
 ## Claim-to-evidence mapping
 
 For each completion claim, identify the exact command or observation capable of proving
@@ -50,7 +55,8 @@ Keep it bounded to the omitted surface that could change the decision.
 
 A fresh context can reduce inherited assumptions, but another model walking the same
 list can miss the same items. Use a task-specific second pass; do not add a generic
-verifier agent or mandatory delegation. Existing model authorization still applies.
+verifier agent. Before the work reaches the human, a second fresh worker runs that pass;
+the proposer never verifies its own work. Existing model authorization still applies.
 
 Saved summaries and handoffs are pointers. Re-derive consequential specifics from their
 sources before relying on them; a resolving path or citation establishes existence, not
@@ -80,8 +86,9 @@ State scope and exclusions. A focused test can establish its behavior but not th
 suite. A linter cannot establish runtime correctness. A successful build cannot establish
 human usability.
 
-A delegated report is not evidence. Inspect the diff or artifact and rerun the check in the
-owning session. A commit or generated findings file proves only that the record exists.
+A delegated report is not evidence. Inspect the diff or artifact. Before the work reaches
+the human, a second fresh worker, never the proposer, reruns the checks. A commit or
+generated findings file proves only that the record exists.
 
 ## Report
 

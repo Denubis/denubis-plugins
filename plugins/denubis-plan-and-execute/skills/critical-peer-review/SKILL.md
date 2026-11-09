@@ -12,7 +12,7 @@ Find claims whose confidence, scope, or conclusion exceeds the evidence. Review 
 artifact, not the person or conversation that produced it. Do not infer anything from the
 human's tone, frustration, wording, or willingness to continue.
 
-Every finding remains a lead until its source and discriminating check are verified.
+Every finding remains a lead until its source and proof are verified.
 
 ## Resolve the review surface
 
@@ -50,13 +50,15 @@ way.
 
 ## Findings
 
-Each surviving finding states:
+Each surviving finding shows a flaw that exists now, not an anticipated future case, and
+states:
 
 - exact disputed claim and source pointer;
 - observed contradiction, unsupported step, or missing evidence;
 - concrete consequence;
 - current evidence boundary;
-- smallest check that could settle it; and
+- its proof; for a code-quality finding, the exact lines and the written rule they break
+  are enough; and
 - corrected wording or action when evidence already determines one.
 
 Discard stylistic preferences, invented alternatives, generic risks, and objections that

@@ -11,7 +11,7 @@
     {
       "name": "denubis-00-getting-started",
       "description": "Getting started guide and onboarding for denubis-plugins",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "source": "./plugins/denubis-00-getting-started",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-      "version": "4.2.4",
+      "version": "4.2.5",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -55,7 +55,7 @@
     {
       "name": "denubis-extending-agents",
       "description": "Authoring and maintaining agent extensions for Claude Code and Codex: plugins, agents, skills, directives, CLAUDE.md and AGENTS.md files, marketplaces, and upstream sync",
-      "version": "2.1.0",
+      "version": "2.1.1",
       "source": "./plugins/denubis-extending-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -169,7 +169,7 @@
     {
       "name": "denubis-crash-recovery",
       "description": "Identify and resume Claude Code sessions that ended abnormally; classifies live/crashed/concluded sessions deterministically and renders ~/llm-resume.md.",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "source": "./plugins/denubis-crash-recovery",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -206,7 +206,7 @@
     {
       "name": "denubis-external-agents",
       "description": "Consult other agent sessions without merging their authority into the caller. Run Codex peer reviews, launch a human-triggered Fable consultation with an explicit tool-surface check, or supervise a Codex pane. Review findings require resolvable provenance. WIP.",
-      "version": "0.24.4",
+      "version": "0.24.5",
       "source": "./plugins/denubis-external-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -224,7 +224,7 @@
     {
       "name": "denubis-project-notes",
       "description": "Task-entry inspection and human-approved, evidence-linked creation or maintenance of project notes and ADRs, with conditional prior-chat recovery.",
-      "version": "0.3.2",
+      "version": "0.3.3",
       "source": "./plugins/denubis-project-notes",
       "author": {
         "name": "Brian Ballsun-Stanton",

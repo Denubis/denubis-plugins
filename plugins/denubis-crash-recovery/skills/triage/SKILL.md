@@ -39,22 +39,24 @@ The full roster (`--all`, and `~/llm-resume.md`) has six session sections in fix
 
 Annotations are user-supplied context that survives prune. They are the only signal that a borderline or ambiguous session is worth keeping past concluded-prune.
 
+Ask the user each question in this skill as one question, one at a time. In Claude, ask through the question zone's `ask` tool (`mcp__denubis-hook-question-zone__ask`); if it is missing, follow the fallback in the global instruction files. In Codex, use Codex's question tool as its global instruction file directs.
+
 Walk the report's actionable sections in this order:
 
-1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first and use the provider's user-input tool with a `[manual review]` prefix in the prompt, or ask inline when that tool is unavailable. (As of classifier v2 `unmatched` is a defensive-only fallback reached by no realistic input — the former sole case, a dead-marker concluded tail, now classifies as `liveness_dead_pid_concluded_tail` in **Needs investigation** with a calm "concluded, then killed — likely nothing to resume" note, and usually needs no annotation.)
+1. **Manual-review tag first** — rows whose classification reason is `unmatched` are rendered with the `Something fucky — let's go look` warning. These are combinations the deterministic classifier does not cover; user judgement is the only signal for what they mean. Iterate these first, with a `[manual review]` prefix in the question's context. (As of classifier v2 `unmatched` is a defensive-only fallback reached by no realistic input — the former sole case, a dead-marker concluded tail, now classifies as `liveness_dead_pid_concluded_tail` in **Needs investigation** with a calm "concluded, then killed — likely nothing to resume" note, and usually needs no annotation.)
 2. **Ambiguous correlation**, then **Needs investigation**, then **Probable system-crash victims** rows. (Iterate in this order — higher-confidence borderlines first, regardless of report render order.)
 
-For each row, ask:
+For each row, give the session's uuid, working directory, last activity, classification and reason as the context, and ask:
 
-> Add a note to `<uuid-short>` (cwd: `<cwd>`)? Options: `yes` / `no` / `skip all`.
+> What note, if any, should session `<uuid-short>` (cwd: `<cwd>`) carry?
 
-On `yes`, prompt for the note text. Then invoke:
+If the answer gives note text, invoke:
 
 ```bash
 uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery note <uuid> "<text>"
 ```
 
-On `skip all`, stop the annotation loop and continue to Step 3.
+If the answer declines, move to the next row. If it asks to skip the rest, stop the annotation loop and continue to Step 3.
 
 `note` against an unknown uuid exits with code 2 — that means the session was pruned or never scanned; report the error and continue.
 
@@ -68,18 +70,18 @@ Prune permanently deletes concluded rows whose JSONLs have vanished from disk. T
    uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery prune --dry-run
    ```
 
-2. If candidates exist, use the provider's user-input tool, or ask inline if unavailable:
+2. If candidates exist, ask one question as Step 2 describes. In the context, say how many concluded sessions would be deleted, that their JSONL transcripts are gone, and that deletion permanently removes their database rows with no audit trail. Ask:
 
-   > Delete N concluded sessions whose JSONLs are gone? This permanently removes their DB rows. Options: `yes` / `no` / `show me again`.
+   > Should triage permanently delete these N concluded sessions?
 
-3. On `yes`, run the destructive call and surface the deletion count:
+3. Only on an unambiguous yes, run the destructive call and surface the deletion count:
 
    ```bash
    uv run --project "$plugin_root/scripts/crash_recovery" crash-recovery prune --confirm
    ```
 
-4. On `no`, print: "Prune skipped. You can re-run later with `crash-recovery prune --confirm`."
-5. On `show me again`, re-run the dry-run.
+4. If the answer asks to see the list again, re-run the dry-run and ask again.
+5. On any other answer, print: "Prune skipped. You can re-run later with `crash-recovery prune --confirm`."
 
 `prune` without `--confirm` exits with code 1 by design.
 

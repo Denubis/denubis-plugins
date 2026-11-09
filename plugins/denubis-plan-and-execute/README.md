@@ -49,10 +49,11 @@ files, or unrelated dirty state require a task-owned worktree. An existing task-
 branch or worktree is suitable. Work on the default branch begins only after a warning and
 human assent.
 
-The main session executes directly by default. Behavior changes use the project-native
-red-green-refactor cycle; operational work uses a real consumer or positive probe.
-Mechanical gates, an independent sanity pass, documentation reconciliation, and complete
-diff/status inspection precede human UAT.
+Whether the main session executes directly or delegates follows the global instruction
+files. Behavior changes use the project-native red-green-refactor cycle; operational work
+uses a real consumer or positive probe. Mechanical gates, documentation reconciliation,
+complete diff/status inspection, and verification by a second fresh worker, never the
+proposer, precede human UAT.
 
 Executing an approved plan authorises private checkpoint commits on its isolated task
 branch without routine prompts. It does not authorise pushing or publication. Fix rounds

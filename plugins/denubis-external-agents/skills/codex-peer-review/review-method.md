@@ -134,7 +134,7 @@ If a finding fails any criterion, downgrade one level. If the analysis's languag
 
 Construct an Analysis of Competing Hypotheses matrix (Heuer, 1999).
 
-- **Rows:** Each hypothesis the analysis considers (plus any it should have considered but didn't)
+- **Rows:** Each hypothesis the analysis considers (plus any competing explanation the existing evidence supports that it did not consider)
 - **Columns:** Each discrete piece of evidence
 - **Cells:** `+` (consistent), `−` (inconsistent), `?` (not diagnostic)
 
@@ -142,7 +142,7 @@ Construct an Analysis of Competing Hypotheses matrix (Heuer, 1999).
 
 **Decision rule:** The hypothesis requiring the fewest contradictions survives. But: a single strong `−` can outweigh many weak `+` marks. State which contradictions are strong.
 
-**Flag:** Any evidence the analysis treats as "supporting H1" that also fits H2 equally well (likelihood ratio ~1:1). Such evidence moves no needle and should not be cited as support.
+**Flag:** Any evidence the analysis treats as "supporting H1" that also fits H2 equally well (likelihood ratio ~1:1). Such evidence moves no needle and should not be cited as support. Also flag disconfirming evidence the analysis dismissed too quickly.
 
 **Reference:** Heuer, R.J. (1999). *Psychology of Intelligence Analysis*. CIA Center for the Study of Intelligence.
 
@@ -168,29 +168,7 @@ Prefer maximally risky statements. The stronger the claim, the more useful the t
 
 For incidents, prefer contributing-factor chains over single "root cause" labels unless the evidence genuinely collapses to one mechanism.
 
-### 10. Design the smallest discriminating test
-
-For each finding below "demonstrated" grade, identify the single test that would buy the most certainty. State:
-
-- Why this hypothesis has explanatory power
-- Prediction if the hypothesis is true
-- Prediction if it is false
-- What result would actually change the grade
-
-### 11. Pre-mortem the conclusion
-
-After completing steps 1-10, assume the analysis's conclusion is **wrong**. Work backward:
-
-- "If this root cause is incorrect, what would the next incident reveal?"
-- List 3 alternative failure scenarios consistent with the available evidence
-- For each alternative: is there *any* evidence in the data that would support it? If yes, the analysis needs hedging or a competing hypothesis section
-- Check: did the analysis dismiss disconfirming evidence too quickly?
-
-This step catches **narrative confidence bias** — where a coherent story feels right but rests on unspoken assumptions. Research shows pre-mortem analysis increases risk identification accuracy by ~30% (Klein, 2007).
-
-**Reference:** Klein, G. (2007). Performing a Project Premortem. *Harvard Business Review*, 85(9), 18-19.
-
-### 12. Diagnostic timeout
+### 10. Diagnostic timeout
 
 Final reflection before writing findings. Answer honestly:
 
@@ -220,9 +198,9 @@ After any High-severity fix, the author must:
 1. Search the entire document for every reference to the changed claim/number/finding
 2. Update all references
 3. Re-read the document from top to bottom for narrative coherence
-4. Confirm "I have done a full editing pass" in their revision notes
 
-**If the revision doesn't include "full editing pass" confirmation, send it back.**
+The reviewer reads the revised document for leftover inconsistencies and reports each one
+with its proof.
 
 ## Severity Levels
 
@@ -230,7 +208,7 @@ After any High-severity fix, the author must:
 |----------|---------|--------|
 | **High** | Evidence grade overclaimed, internal inconsistency, production path not demonstrated, load-bearing assumption unverified, ACH matrix shows favoured hypothesis is not best-supported | Must fix before presenting to human |
 | **Medium** | Missing upgrade path, weak citations, incomplete enumeration, GRADE downgrade not reflected in language, non-diagnostic evidence cited as support | Should fix; flag if not |
-| **Low** | Language could be tighter, minor style | Fix if convenient |
+| **Low** | Prose that breaks a written rule the document follows, with the rule cited | Fix if convenient |
 
 ## Output Format
 
@@ -261,7 +239,7 @@ Document reviewed: [file path]
 [Same format]
 
 ### Low (count: N)
-[Same format, or brief list]
+[Same format, with the written rule each one breaks cited under **Evidence**]
 
 ## Verification
 [What you checked independently — commands run, files read, citations verified]
@@ -271,15 +249,6 @@ Document reviewed: [file path]
 
 ## Weakest Hypothesis
 [Which finding has the least support and why]
-
-## Pre-Mortem
-[Alternative failure scenarios from step 11]
-
-## Fastest Next Test
-[One test that would resolve the most uncertainty]
-
-## Overall Assessment
-[Ready to present / Needs revision — with specific requirements]
 ```
 
 ## What You MUST Do
@@ -291,7 +260,7 @@ Document reviewed: [file path]
 - Verify file:line citations against actual source
 - Apply evidence grades to every finding
 - Trace ripple effects before reporting issues
-- Run the pre-mortem (step 11) and diagnostic timeout (step 12) before finalising
+- Run the diagnostic timeout (step 10) before finalising
 - Be specific and direct — name the overclaim, cite the evidence gap
 - Write findings to disk incrementally (checkpoint after each step)
 
@@ -306,7 +275,7 @@ Document reviewed: [file path]
 - Skip citation verification
 - Report issues without checking for ripple effects
 - Accept universal quantifiers ("all", "every", "only") without universal verification
-- Skip the pre-mortem or diagnostic timeout
+- Skip the diagnostic timeout
 
 **Keep the tone direct. Be specific and critical. Do not soften weak logic.**
 
@@ -315,6 +284,5 @@ Document reviewed: [file path]
 - Heuer, R.J. (1999). *Psychology of Intelligence Analysis*. CIA Center for the Study of Intelligence. [ACH]
 - Guyatt, G.H. et al. (2008). GRADE: an emerging consensus on rating quality of evidence. *BMJ*, 336(7650), 924-926. [Evidence grading]
 - Dewar, J.A. (2002). *Assumption-Based Planning*. RAND Corporation. [Hidden assumptions]
-- Klein, G. (2007). Performing a Project Premortem. *Harvard Business Review*, 85(9), 18-19. [Pre-mortem]
 - Croskerry, P. (2003). The Importance of Cognitive Errors in Diagnosis. *Academic Emergency Medicine*, 10(11), 1174-1185. [Diagnostic timeout]
 - Popper, K.R. (1959). *The Logic of Scientific Discovery*. Hutchinson. [Falsification-first]

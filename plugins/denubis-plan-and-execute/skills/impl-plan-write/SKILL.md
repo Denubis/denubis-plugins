@@ -163,7 +163,9 @@ lifecycle boundaries, not prescribe a commit-count quota.
 
 ## Integrity and handoff
 
-Before handoff, verify directly that:
+Before handoff, a second fresh worker, never the plan's author, verifies the plan. Give
+that worker a full checklist that names what to check and never an expected defect or
+outcome, covering that:
 
 - every file, consumer, skill, command, dependency, and external source resolves;
 - every criterion has one primary evidence owner and no outcome duplicates or drops it;

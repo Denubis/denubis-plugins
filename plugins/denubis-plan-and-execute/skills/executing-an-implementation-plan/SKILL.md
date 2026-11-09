@@ -13,8 +13,10 @@ Turn an approved plan into verified repository state. The plan owns scope and ac
 criteria; project instructions own engineering constraints; observed tests, operational
 results, and final human interaction own completion claims.
 
-The main session executes directly by default. Delegation is optional. Model reports,
-review verdicts, task labels, and commits are not correctness evidence. Session naming is
+Whether the main session executes directly or delegates follows the global instruction
+files. Whoever does the work, a second fresh worker, never the proposer, verifies it
+before it reaches the human (below). Model reports, review verdicts, task labels, and
+commits are not correctness evidence. Session naming is
 an optional convenience, not an execution prerequisite.
 
 This skill is self-contained for ordinary plan execution. Scale investigation, tracking,
@@ -142,30 +144,35 @@ Do not present UAT after an intermediate outcome. Once all outcomes are assemble
    ordering, control, or failure behavior. Do not create architecture ceremony for a
    local behavior whose owner and consumers are already explicit. Update living
    architecture or an accepted ADR only when those artifacts genuinely own the result.
-5. Perform an independent sanity review targeted at plausible mistakes: exercise the
-   finished public surface, relevant failure path, adjacent behavior, and documentation
-   as a consumer would. This is agent verification, not human UAT.
-6. Inspect the complete diff, status, and private log. Separate pre-existing changes and
+5. Inspect the complete diff, status, and private log. Separate pre-existing changes and
    identify untracked or generated files. Confirm documentation describes current truth.
+6. Send the finished work to a second fresh worker, never the proposer, to verify it.
+   Give it a full checklist that names what to check and never an expected defect or
+   outcome: the accepted requirements and acceptance criteria, the gates above, the
+   sources, and the finished public surface, relevant failure path, adjacent behavior,
+   and documentation, exercised as a consumer would. Act on what it reports only when it
+   shows a flaw that exists now. This is agent verification, not human UAT.
 
 Use code or design review when risk or a specific uncertainty makes an independent
-reading informative. Give it a falsifiable claim and bounded surface. Verify every
-finding against current artifacts; never treat a green model verdict as evidence.
+reading informative. Give it a falsifiable claim and bounded surface, never an expected
+defect. Verify every finding against current artifacts; never treat a green model verdict
+as evidence.
 
 Any failure returns to the owning outcome. Rerun the affected focused checks and every
-complete-surface check whose evidence the fix could invalidate.
+complete-surface check whose evidence the fix could invalidate, then have a fresh worker
+verify the changed result before UAT.
 
 ## Human UAT on the finished implication
 
-Only after all implementation, mechanical checks, independent sanity checks, diff/status
-inspection, and documentation reconciliation pass, present the irreducible human
+Only after all implementation, mechanical checks, diff/status inspection, documentation
+reconciliation, and the fresh worker's verification pass, present the irreducible human
 judgment. Name the finished surface, one concrete interaction, the implication being
 judged, and what experience would falsify acceptance. The human touches the finished
 public surface and its implications; they do not merely read a report or repeat a
 unit-test assertion.
 
 If UAT fails, record the exact observation, return to implementation, and repeat relevant
-mechanical and sanity checks before presenting UAT again. Silence, model agreement, or a
+mechanical checks and the fresh worker's verification before presenting UAT again. Silence, model agreement, or a
 commit is not acceptance.
 
 Keep the isolated branch and provisional commits through UAT. The human is judging the

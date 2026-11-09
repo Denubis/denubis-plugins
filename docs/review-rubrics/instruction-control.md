@@ -5,9 +5,10 @@ Use this rubric when reviewing changes to the global or project instructions,
 These are judgment expectations, not automated acceptance criteria.
 
 Open the changed documents and their consumers. Evaluate the scenarios below without
-searching for prescribed wording. For each defect, return the exact source location, the
-scenario that fails, the consequence, and the smallest observation that would confirm or
-falsify it. Do not return an approval token or a general verdict.
+searching for prescribed wording. Return only defects that exist now, not anticipated
+future cases. For each, return the exact source location, the scenario that fails, the
+consequence, and its proof, such as the exact lines and the written rule they break. Do
+not return an approval token or a general verdict.
 
 ## Always-on instructions
 
@@ -54,8 +55,10 @@ falsify it. Do not return an approval token or a general verdict.
 
 ## Execution and debugging
 
-- Direct work is possible without mandatory delegation, repeated model review, context
-  clearing, checkpoint commits, or workflow certificates.
+- Direct work is possible without repeated model review, context clearing, checkpoint
+  commits, or workflow certificates. Before work reaches the human, a second fresh worker
+  verifies it; the proposer never verifies its own work. The one exception is a trivial
+  change that any session makes itself, as the global instruction files strictly define it.
 - Existing user work is preserved. Commit, push, publication, deployment, and destructive
   cleanup remain separate authorities.
 - Completion claims point to fresh observable evidence. Model reports and green review
@@ -83,8 +86,8 @@ falsify it. Do not return an approval token or a general verdict.
 
 - Mutating workers stay within the supplied task, preserve unrelated changes, and do not
   commit, push, publish, deploy, or destructively restore the workspace.
-- Reviewers are read-only. Their findings cite current sources and discriminating checks;
-  no status file or token binds later work.
+- Reviewers are read-only. Their findings cite current sources and carry the proof that
+  each flaw exists now; no status file or token binds later work.
 - Refactoring, architecture, and assumption tools operate only on a named question with a
   consumer. Metrics, smell names, frameworks, and self-critique do not authorise work.
 - Model guidance names only the current roster and current operational differences.
