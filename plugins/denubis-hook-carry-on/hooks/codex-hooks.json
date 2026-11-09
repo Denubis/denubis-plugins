@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Interrupt": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"carry-on: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/carry-on.py\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -87,6 +87,7 @@ and consequences section. One ADR per decision.
 - [2026-11-08-bbs-questions-go-in-question-zone — Questions for Brian go in a question zone, a queue he takes one at a time with a key, each with its full context and no jargon; quiet-agents points at it](2026-11-08-bbs-questions-go-in-question-zone.md)
   (supersedes the quiet-agents nudge text of 2026-10-24)
 - [2026-11-08-bbs-codex-push-needs-say-so — Codex, like Claude, needs Brian's explicit say-so to push, merge into the main branch, or delete a branch](2026-11-08-bbs-codex-push-needs-say-so.md)
+- [2026-11-09-bbs-codex-continuation-review — Terra reviews Codex stops, inactivity and completion of all workers](2026-11-09-bbs-codex-continuation-review.md)
 
 ## Status lifecycle
 

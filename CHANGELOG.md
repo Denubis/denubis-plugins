@@ -1,5 +1,25 @@
 # Changelog
 
+## [denubis-hook-carry-on] 0.1.0
+
+Adds a Codex-only continuation reviewer for a main agent that stops before its
+authorized work is finished.
+
+**Added:**
+- A native Codex plugin and local marketplace entry, with lifecycle hooks and a
+  plugin-owned watcher connected to the existing daemon over its Unix WebSocket.
+- Independent Terra review when the main agent tries to finish, when it is idle
+  with no work running, and when all workers have finished. A separate reviewer
+  session on the existing daemon returns a concrete next action, an identified
+  wait, or a justified stop; continuation targets the original main session.
+- Enrollment, interruption handling, saved review state, diagnostics, and controls
+  for the local watcher. The accepted scope is recorded in
+  [the continuation decision](docs/architecture/decisions/2026-11-09-bbs-codex-continuation-review.md).
+
+**Verification boundary:** repository checks alone do not establish live wake
+delivery or Terra's judgment. Controlled daemon trials and operator UAT are
+required before treating this behavior as accepted in use.
+
 ## [denubis-hook-question-zone] 0.1.1
 
 Questions are no longer refused because too many subagents are running; a question that comes back from its check reaches the model once, as a note the person does not see as typed, and no longer as a prompt of its own; the band counts questions being checked; each answer comes with its citation from the transcript; and the standing rule lets the model set out the open questions when the person asks where things stand or comes back after a long absence.

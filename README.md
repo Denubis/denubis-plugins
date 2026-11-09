@@ -53,6 +53,13 @@ plugins and converts its supported command and agent surfaces. Hook-only plugins
 claimed for Antigravity: its current documented hook interface does not expose an
 equivalent blocking pre-tool contract for the two guards.
 
+Codex also has `denubis-hook-carry-on`, a Codex-only continuation plugin. Its local
+watcher connects to the existing Codex daemon and asks a separate Terra session to
+review attempted stops, inactivity, and completion of all workers. It resumes the
+original main session with a concrete authorized action when work remains. See the
+[plugin's setup and lifecycle controls](plugins/denubis-hook-carry-on/README.md) for
+installation, hook trust, diagnostics, and the live verification boundary.
+
 The provider boundaries and runtime evidence are recorded in the
 [Codex compatibility matrix](docs/audits/2026-08-16-codex-plugin-compatibility-matrix.md).
 
