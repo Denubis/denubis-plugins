@@ -1,5 +1,13 @@
 # Changelog
 
+## [denubis-git-commit] 1.6.0
+
+The durable-record checker remembers human-accepted citation findings in a project-owned exception list, so recurring accepted references do not need another approval.
+
+**Added:**
+- `docs/durable-record-exceptions.json` matches the source Markdown path, finding kind and emitted reference exactly, with a required reason. Accepted findings retain their kind and reference, display the reason and count as advisory and `accepted`, including under `--strict`.
+- The commit skill documents the list's format, standing acceptance and examples for DVC cache references and intentional command arguments. Invalid configuration exits 2; unmatched findings retain their existing behavior.
+
 ## [denubis-basic-agents] 3.0.2
 
 Subagents of this plugin's agent types compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).
