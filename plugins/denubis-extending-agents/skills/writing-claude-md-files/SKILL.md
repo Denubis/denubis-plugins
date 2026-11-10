@@ -42,10 +42,22 @@ project/
 
 Focuses on project-wide WHAT and HOW.
 
+### Establish Intent at Initial Setup
+
+Recover the human owners and collaborators, intended audience, maintenance horizon, and
+quality expectations for code and prose from existing records and instructions. Resolve
+any missing fact that would change scope or authority before writing it as a rule. Record
+the resulting project-specific intent in the top-level file, including authorized
+consolidation/refactoring and decisions reserved to humans. For ongoing collaborative
+work, make expectations for professional code and writing explicit: coherent structure,
+relevant duplication removed, and affected prose revised for its audience. A directory
+name does not grant authority, and the model does not inherit control over project purpose.
+
 ### What to Include
 
 | Section | Purpose |
 |---------|---------|
+| Ownership and Maintenance | Human owners, audience, quality expectations for code and prose, and authorized maintenance scope |
 | Tech Stack | Framework, language, key dependencies |
 | Commands | Build, test, run commands |
 | Project Structure | Directory overview with purposes |
@@ -58,6 +70,12 @@ Focuses on project-wide WHAT and HOW.
 # [Project Name]
 
 Last verified: [DATE - use `date +%Y-%m-%d`]
+
+## Ownership and Maintenance
+- Owners and collaborators: [human owners, contributors, and decision authority]
+- Audience and maintenance horizon: [who uses this; ongoing or short-lived work]
+- Code and prose: [professional quality expectations and authorized consolidation/refactoring]
+- Reserved decisions: [human decisions about purpose, behavior, or publication]
 
 ## Tech Stack
 - Language: TypeScript 5.x
