@@ -131,3 +131,5 @@ found or return the ADR to Proposed until a focused human invocation resolves it
   — what was considered, what was chosen, what consequences followed. ADRs
   may pair with a constraint row that locks the same decision in code; the
   ADR captures the *why* and the constraint row captures the *how to verify*.
+
+- [2026-11-10 — History failure warns instead of blocking questions](2026-11-10-bbs-history-failure-warns.md)

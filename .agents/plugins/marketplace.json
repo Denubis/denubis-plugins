@@ -5,6 +5,12 @@
   },
   "plugins": [
     {
+      "name": "denubis-hook-question-zone",
+      "source": {"source": "local", "path": "./plugins/denubis-hook-question-zone"},
+      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+      "category": "Developer Tools"
+    },
+    {
       "name": "denubis-00-getting-started",
       "source": {"source": "local", "path": "./plugins/denubis-00-getting-started"},
       "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},

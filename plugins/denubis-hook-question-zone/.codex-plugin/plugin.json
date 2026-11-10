@@ -1,0 +1,19 @@
+{
+  "name": "denubis-hook-question-zone",
+  "version": "0.2.2",
+  "description": "Check native Codex questions with a fresh Terra reader before presentation.",
+  "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
+  "repository": "https://github.com/denubis/denubis-plugins",
+  "license": "CC-BY-SA-4.0",
+  "keywords": ["codex", "hooks", "questions", "review"],
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Question Zone",
+    "shortDescription": "Check questions before Codex presents them",
+    "longDescription": "A fresh Terra reader checks one native question for clarity and existing human answers; Codex owns the question UI.",
+    "developerName": "Brian Ballsun-Stanton",
+    "category": "Developer Tools",
+    "capabilities": ["Hooks"],
+    "defaultPrompt": ["Check questions against original human decisions before asking them."]
+  }
+}

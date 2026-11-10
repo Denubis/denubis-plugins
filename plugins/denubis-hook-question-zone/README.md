@@ -4,6 +4,9 @@ A Claude Code mod (a plugin built from a hooks module) that keeps the model's qu
 for the person out of the chat. Each question waits in a queue shown above the prompt,
 and the person answers when ready.
 
+Codex uses a separate adapter in the same package: a fresh Terra reader checks its
+native question calls before Codex presents them. The Claude mod is unchanged.
+
 ## The problem
 
 The model tends to put its one question at the end of a long message, where it is easy to
@@ -38,12 +41,15 @@ seen the conversation makes two checks:
 
 The check runs in the background, because a search takes up to a minute or more and a
 hook may spend only ten seconds of its own time; waiting for a subagent counts against
-that. A clear entry joins the end of the queue when its check ends. Otherwise the question
-comes back. Nothing unchecked joins the queue. The checker's reply reaches the model as a
+that. An entry that passes clarity joins the end of the queue when its check ends. Failed
+history lookup or incomplete coverage adds a visible warning above the prompt and in
+the question copied into the answer box. A clarity rejection or verified prior answer
+still sends the question back. Nothing without a clarity check joins the queue. The checker's reply reaches the model as a
 note from this plugin, a row of the conversation the person does not see as typed, which
 starts no turn. The reply may say what a reader could not understand, or give the
-person's existing answer with where and in what words. Or it may say why the check could
-not run, such as an index that could not be updated, with a reason the person can act on.
+person's existing answer with where and in what words. Or it may say why the clarity checker could not run, with a reason the person can act on.
+History warnings permit asking only; they do not authorize the action or prove that no
+earlier answer exists in unread records.
 
 The model reads a note at its next request. A note can come after a turn's last request,
 or while the session is idle, and then nothing would carry it. So once no turn of the
@@ -169,11 +175,11 @@ one not yet queued goes through `ask`. The `ask` tool's reply carries the same e
 For a question that comes back, the section, the `ask` tool's description and the note
 itself tell the model what to do. If a reader could not follow it, it rewrites it and
 asks again; if the person already answered it, it uses that answer; either way it says
-nothing in chat. If the check could not be made, it tells the person once, in plain
-words, what stopped the check and what they can do, such as stopping the program using
-the graphics card. It does not ask that question again until they say the cause is fixed.
-That follows the person's ruling of 2026-11-08 on a busy graphics card: "it can just tell
-me to turn off the thing consuming gpu. that's an entirely fine pushback".
+nothing in chat. If the clarity checker could not run, it tells the person once, in plain
+words, what stopped that check and what they can do. The question stays held until
+clarity can be checked. History failures and gaps instead appear as warnings on the
+queued question, following the
+[2026-11-10 ruling](../../docs/architecture/decisions/2026-11-10-bbs-history-failure-warns.md).
 The section also says that questions in the project's
 open-questions file (`.notes/project_open-questions.md` in the main checkout) are put to
 the person through `ask` in plain words, never in their ticket wording; the plugin never
@@ -204,10 +210,11 @@ or on `/reload-plugins`.
   never answered took 39.5 seconds and came back saying the check could not be made, and
   naming the program holding the graphics card. A clear entry joining the queue was seen
   later that day, in the person's own use of the box (below).
-- **While the graphics card is busy, every check fails.** Sessions keep writing to the
-  chat logs, so the index is rarely up to date and the checker tries to update it each
-  time. The person has said that telling them to stop the program using the card is a
-  fine answer.
+- **Earlier versions held questions when history refresh failed.** The 0.2.2
+  policy permits otherwise-clear questions with a warning when the graphics card
+  is busy or history cannot be refreshed. A warning does not claim fresh or
+  complete history.
+
 - **Some chat files are not indexed.** On 2026-11-08, 29 files were blocked by a record
   type `cc-search-chats` does not yet read; an index run does not clear them, and the
   checker does not search them.
@@ -273,6 +280,92 @@ of Claude Code 2.1.312 and tested with 2.1.318. `denubis-hook-quiet-agents` 0.1.
 later points the model to this plugin's `ask` tool.
 
 ## Development
+
+### Codex adapter
+
+The Codex manifest selects `hooks/codex-hooks.json`, which intercepts native
+`request_user_input` and `request_user_input_async` calls. It does not load the
+Claude hooks module. Each call must contain one question; native answer options
+are preserved and included in the review. Codex owns the question queue and answer
+UI. The adapter adds no prompt band, standing instruction, or automatic citation
+of the person's later answer.
+
+The hook starts a fresh ephemeral `gpt-6.1-terra` checker at `xhigh`, at the project
+directory. Normal global/project instruction discovery is retained; the proposing
+conversation is not supplied. The checker retrieves decision records and chat
+evidence itself. Configured plugins retain their normal selection, including
+their skills. Hooks, agent delegation, apps, memories and the checker's own
+question tool are disabled; native read/search tools remain available. It may
+only read/search and refresh the configured chat index.
+
+Codex checks clarity in a first turn, before history retrieval in a second turn
+of the same ephemeral thread. A clarity rejection holds the native call. After
+clarity passes, failed or incomplete history permits the question with a visible
+history warning. An already-answered result still needs an original human
+transcript path, line and exact words; the adapter verifies that row before
+reusing the answer. Current Codex response-item evidence requires retained human
+provenance, rather than trusting every user-role row. This verifies attribution
+and the quote; whether those words settle the decision remains Terra's judgment.
+
+The adapter observes completed chat-search commands. Failed history commands,
+missing fresh-search evidence and partial coverage warn after clarity passes.
+History permission interruptions are warnings only when the adapter can identify
+the request as a direct cc-search-chats history command; it never grants that
+approval. Unrelated permission requests, malformed responses, unavailable
+clarity checking and cleanup failures remain denials. A warning does not claim
+unread records were searched or that no prior answer exists, and it never
+authorizes the operation the question asks about.
+
+Requirements: Codex CLI/daemon 0.167.0, `uv`, Python 3.14+, `websockets==16.0`,
+`cc-search-chats`, an accessible configured index/cache, and access to the Terra
+model. The hook connects to the existing daemon reported by
+`codex app-server daemon version`; it does not start another one. It uses existing
+Codex authentication and permission configuration, requests ordinary approval
+when required, and never grants an approval. An unrelated checker approval/elicitation request
+makes the check unavailable; a recognized history-lookup request warns after clarity
+passes. Complete any needed search approval through its normal permission flow. No cache or writable directory is invented.
+
+Checks are synchronous and add latency before the native UI appears. The review
+has a 150-second budget, original-citation lookup five seconds, and cleanup ten
+seconds inside a 180-second hook timeout. Incomplete checks interrupt the checker
+turn; all started checkers are unsubscribed and their connection closed. Cleanup
+failure denies the question and reports the error. Unsubscribing is a request to
+release the ephemeral thread, not proof that every host process has stopped.
+
+Non-history failures handled inside the running Python checker return explicit denial. The
+standard hook launcher reports missing `uv` to stderr and exits one; interpreter
+or dependency startup failures likewise remain host launch failures. These,
+disabled/untrusted hooks, cold startup, process crashes and host-level timeout
+handling remain outside this guarantee; this is a question guard, not a security
+boundary. The hook cannot
+intercept questions written directly in chat. The existing global instructions
+still direct the main session to use the native question tool.
+
+For this repository's configured local marketplace, install with:
+
+```fish
+codex plugin add denubis-hook-question-zone@denubis-plugins --json
+codex plugin list --marketplace denubis-plugins --available --json
+```
+
+Then use `/hooks` in Codex to review and trust Question Zone's new hook. A successful
+install alone does not establish trusted execution; verify the hook is enabled and
+trusted in the session used for acceptance. Re-review changed hooks after updates.
+
+`QUESTION_ZONE_CODEX_SOCKET` can select an existing daemon socket for a controlled
+test. It does not launch a daemon or change permissions. Running the entry point
+directly with a hook payload checks the gate without presenting a question to the
+person. The Python integration tests use that boundary and a fake Unix WebSocket
+daemon; they establish protocol and gate behavior, not model judgment accuracy or
+native installed-hook execution.
+
+```fish
+uv run --frozen pytest -q tests/test_question_zone_codex.py
+uv run --frozen ruff check plugins/denubis-hook-question-zone/hooks/question_zone_codex plugins/denubis-hook-question-zone/hooks/codex-question-zone.py tests/test_question_zone_codex.py
+uv run --frozen ty check --extra-search-path plugins/denubis-hook-question-zone/hooks plugins/denubis-hook-question-zone/hooks/question_zone_codex plugins/denubis-hook-question-zone/hooks/codex-question-zone.py tests/test_question_zone_codex.py
+```
+
+### Claude mod
 
 ```bash
 claude plugin validate plugins/denubis-hook-question-zone

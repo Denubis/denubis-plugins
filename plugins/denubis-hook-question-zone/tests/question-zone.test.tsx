@@ -374,6 +374,23 @@ const band = async ($: Engine): Promise<BandView[]> => {
 
 const ENGINE_BAND: BandView = { isEngine: true, waiting: undefined, checking: undefined, hotkey: undefined }
 
+for (const cause of ['History coverage is partial: six files were not searched.', 'History lookup failed: the index could not refresh.']) {
+  test('a clear question is queued and shown with its history warning: ' + cause, async ($, on) => {
+    const zone = await engine($, on, { checkEnds: () => ({ answer: 'CLEAR_WITH_HISTORY_WARNING: ' + cause }) })
+    await zone.ask(RELEASE)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    const text = (await ui.findAll({ type: 'Text' })).map(found => found.text).join(' ')
+    expect(text).toContain(cause)
+    const button = await ui.find({ type: 'Button' })
+    expect(button).toBeDefined()
+    await ui.press({ key: button?.key ?? '' })
+    await ui.unmount()
+    expect(zone.box.text).toContain(cause)
+    expect(zone.box.text).toContain(RELEASE.question)
+    expect(zone.notes()).toEqual([])
+  })
+}
+
 const waitingBand = (waiting: number, checking?: number): BandView => ({ isEngine: false, waiting, checking, hotkey: '1' })
 
 // Questions being checked and none waiting: the count, and nothing to take.

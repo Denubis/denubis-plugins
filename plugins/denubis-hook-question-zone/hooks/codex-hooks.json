@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^request_user_input(_async)?$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v uv >/dev/null 2>&1 || { echo \"codex-question-zone: uv is required to run this hook; install it from https://docs.astral.sh/uv/getting-started/installation/\" >&2; exit 1; }; uv run --project \"${PLUGIN_ROOT}\" --script --python '>=3.14' --no-project \"${PLUGIN_ROOT}/hooks/codex-question-zone.py\"",
+            "timeout": 180,
+            "statusMessage": "Checking the question against prior decisions"
+          }
+        ]
+      }
+    ]
+  }
+}

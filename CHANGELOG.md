@@ -1,5 +1,51 @@
 # Changelog
 
+## [denubis-hook-question-zone] 0.2.2
+
+Failed history lookup and incomplete coverage now warn instead of holding an
+otherwise-clear question, in both Claude's queue and Codex's native question UI.
+Clarity rejection and verified prior answers still hold questions. A warning
+permits asking only, and makes no claim about unread history or action approval.
+
+Codex validates clarity before starting history retrieval, so failed commands and
+known history-approval interruptions can warn without losing the clarity result.
+Malformed replies, unrelated permission requests, unavailable clarity checking and
+cleanup failures remain denials. Current retained Codex human input records can
+now verify an existing answer; harness-authored user context remains excluded.
+
+
+## [denubis-hook-question-zone] 0.2.1
+
+Codex's checker preserves the user's configured plugin selection, so required
+plugin skills remain discoverable. The 0.2.0 checker disabled plugins and its
+native skill catalog contained only eight entries. Hooks, agent delegation and
+the checker's own question tool remain disabled. This repairs skill discovery;
+it does not resolve incomplete chat indexing or claim the previous checker's
+exact failed skill lookup was recovered.
+
+## [denubis-hook-question-zone] 0.2.0
+
+Codex checks its native questions with a fresh `gpt-6.1-terra` reader at `xhigh`
+before presenting them. Claude keeps its existing mod and question queue.
+
+**New:**
+- A Codex manifest and explicit provider-specific hooks register a synchronous
+  `PreToolUse` gate for `request_user_input` and `request_user_input_async`.
+- The checker retains project/global instructions, retrieves decision/chat evidence,
+  and returns clear, already answered, rewrite, or unavailable. An answered verdict
+  needs an original human transcript row whose exact words the adapter verifies.
+- Failed index/search commands, missing observed fresh chat-search evidence,
+  permission requests, invalid responses, and bounded transport failures deny the
+  question. The adapter does not grant permissions or launch another daemon.
+
+**Limits:** checks add latency; required approvals currently make a check unavailable.
+Native hook trust, disabled hooks, missing `uv`, interpreter/dependency startup
+failures, cold startup, and host timeouts remain outside the adapter's guarantee.
+The standard launcher reports startup errors; only failures handled inside the
+running Python checker produce explicit denial. Automatic answer citations and
+Claude's prompt-band UI are not ported. See the README for activation and
+verification boundaries.
+
 ## [denubis-basic-agents] 3.0.2
 
 Subagents of this plugin's agent types compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).

@@ -31,7 +31,7 @@ const ASK_DESCRIPTION = [
   '- question: exactly one question.',
   'Use no file names, ticket or record numbers, agent names, or labels coined in this conversation, unless you explain each in plain words.',
   '',
-  "The call returns at once, and the entry is checked before it joins the queue: a reader who has not seen this conversation checks that it stands alone, and searches the project's decision records and the chat logs for an answer the person has already given. A clear entry joins the queue when its check ends. Otherwise a note from this plugin, which the person does not see as typed, gives the reason at your next request: what the reader could not understand (rewrite the entry and ask again), the person's existing answer with where and in what words (use it instead of asking), or why the check could not run (tell the person once what stopped it and what they can do, and do not ask that question again until they say the cause is fixed). Say nothing in chat about a question rewritten or dropped this way.",
+  "The call returns at once, and the entry is checked before it joins the queue: a reader who has not seen this conversation checks that it stands alone, and searches the project's decision records and the chat logs for an answer the person has already given. A clear entry joins the queue when its check ends; failed or incomplete history lookup adds a visible warning instead of holding the question. Otherwise a note from this plugin, which the person does not see as typed, gives the reason at your next request: what the reader could not understand (rewrite the entry and ask again), the person's existing answer with where and in what words (use it instead of asking), or why the clarity check could not run (tell the person once what stopped it and what they can do, and do not ask that question again until they say the cause is fixed). Say nothing in chat about a question rewritten or dropped this way.",
 ].join('\n')
 
 const WITHDRAW_DESCRIPTION =
@@ -56,11 +56,11 @@ const CHECKER_PROMPT = [
   '- in the chat logs. First bring their index up to date: if `cc-search-chats index --status --json` reports `index_state.freshness` other than `no_source_changes`, run `cc-search-chats index --json`. A warning that some files were left out, such as an unknown record shape, does not stop the check. Then search with `cc-search-chats search "<words>" --semantic --json`, or `--literal` for exact words. Each result\'s `identity.canonical_locator` is its `ccchat:v1:` locator, and `cc-search-chats context <locator> --json` shows the messages around it. Its JSON carries `schema_version` 5.',
   "Only the person's own words count: a message they typed themselves, or their words quoted in a decision record. A message written by an assistant, a plugin, a tool or an agent does not count. A paraphrase by an assistant or a record is not an answer, and neither is a remark that does not settle this question.",
   'If you find an answer, reply that the person has already answered this, say where (the record\'s path and line, or the `ccchat:v1:` locator), quote their words exactly, and say to use that answer instead of asking.',
-  'If the index cannot be brought up to date or a search cannot run, reply that the check could not be made, with the command, its error, and a plain reason the person can act on: for example that the graphics card is busy and what to stop, or that the index reported `containment_unavailable` (it could not start in a process scope of its own).',
+  'If history lookup fails or has incomplete coverage, continue useful searches in the available sources. If you find no verified prior answer, let the otherwise-clear question proceed: reply CLEAR_WITH_HISTORY_WARNING: followed by a short plain warning naming the failed command or unread coverage. Never claim unread records were searched or that no historical answer exists. This permits asking only; it authorizes no operation.',
   '',
   'Apart from bringing the chat index up to date, use only commands that read and search; change nothing.',
   '',
-  'If the entry stands alone and the searches ran and found no answer, reply with the one word CLEAR and nothing else.',
+  'If the entry stands alone and complete searches found no answer in their stated coverage, reply with the one word CLEAR and nothing else. Only a clarity failure or verified prior answer holds a question; history failure uses CLEAR_WITH_HISTORY_WARNING.',
 ].join('\n')
 
 const RULE = [
@@ -71,7 +71,7 @@ const RULE = [
   `Then describe, in plain words and without referring to earlier messages, each decision still open and what its answer will change. The questions themselves stay in the queue, where the person takes the first one next; one not yet in it goes through ${ASK}.`,
   'An answer arrives as the person\'s message, quoting the question it answers.',
   'A question that comes back from its check arrives as a note from this plugin. If a reader could not follow it, rewrite it and ask again; if the person has already answered it, use that answer. Say nothing in chat about either.',
-  'If its check could not be made, tell the person once, in plain words, what stopped the check and what they can do about it, and do not ask that question again until they say the cause is fixed.',
+  'History failure and incomplete coverage appear as warnings on an otherwise-clear queued question. If the clarity checker itself could not run, tell the person once what stopped it and how to resolve it; keep that question held until clarity can be checked.',
   `Questions in the project's open-questions file (.notes/project_open-questions.md at the main checkout's root) are put to the person through ${ASK}, in plain words, never in their ticket wording; the file stays the lasting list.`,
   'Ask only when the answer changes your next action, and name that decision plainly.',
   'Each entry holds exactly one specific, critical, pointed, clear question: never bundle questions into lists, options, or a compound sentence, and never end with a vague request for feedback.',
@@ -106,7 +106,15 @@ const quote = (text: string): string =>
 // person's next prompt is matched to the entry, so text typed below it, or
 // above it, leaves the match intact; an edit inside the quoted question does
 // not, and the entry goes back to the queue.
-const boxText = (entry: QuestionZoneEntry): string => `${quote(entry.context)}\n>\n${quote(entry.question)}\n\n`
+const boxText = (entry: QuestionZoneEntry): string =>
+  [
+    ...(entry.historyWarning === undefined ? [] : [quote('History warning: ' + entry.historyWarning), '>']),
+    quote(entry.context),
+    '>',
+    quote(entry.question),
+    '',
+    '',
+  ].join('\n')
 
 const isAnsweredBy = (text: string) => (entry: QuestionZoneEntry): boolean => text.includes(quote(entry.question))
 
@@ -144,7 +152,7 @@ const runEnd = (agentId: string): Promise<Frozen<TurnCompleteInput>> =>
     waiters.set(agentId, resolve)
   })
 
-type Verdict = { kind: 'clear' } | { kind: 'refused'; reply: string } | { kind: 'failed'; reason: string }
+type Verdict = { kind: 'clear'; warning?: string } | { kind: 'refused'; reply: string } | { kind: 'failed'; reason: string }
 
 type Start = { kind: 'started'; agentId: string } | { kind: 'failed'; reason: string }
 
@@ -231,6 +239,10 @@ const runCheck = async ($: EngineInterface, entry: QuestionZoneEntry): Promise<V
   const answer = turn.answer.trim()
   if (answer === '') {
     return { kind: 'failed', reason: 'the checker gave no answer' }
+  }
+  const warning = /^CLEAR_WITH_HISTORY_WARNING:\s*(\S[\s\S]*)$/i.exec(answer)?.[1]
+  if (warning !== undefined) {
+    return { kind: 'clear', warning }
   }
   return /^clear\.?$/i.test(answer) ? { kind: 'clear' } : { kind: 'refused', reply: answer }
 }
@@ -341,7 +353,8 @@ const settleCheck = async ($: EngineInterface, entry: QuestionZoneEntry, verdict
       return state
     }
     const checking = state.checking.filter((_, i) => i !== at)
-    return verdict.kind === 'clear' ? { ...state, checking, waiting: [...state.waiting, entry] } : { ...state, checking }
+    const ready = verdict.kind === 'clear' && verdict.warning !== undefined ? { ...entry, historyWarning: verdict.warning } : entry
+    return verdict.kind === 'clear' ? { ...state, checking, waiting: [...state.waiting, ready] } : { ...state, checking }
   })
   if (wasChecking && verdict.kind !== 'clear') {
     const appended = await $.session.append({
@@ -769,6 +782,9 @@ export const register: Register = on => {
             </Box>
           ) : null}
         </Box>
+        {waiting[0]?.historyWarning === undefined ? null : (
+          <Text>{'History warning: ' + waiting[0].historyWarning}</Text>
+        )}
         {waiting.length > 0 ? (
           <Button key="take" onPress={() => take($)} hotkey="1" plain label="Take the next question into the prompt box" />
         ) : null}

@@ -3,6 +3,8 @@
 export type QuestionZoneEntry = {
   context: string
   question: string
+  // Incomplete history permits asking, with this warning shown to the person.
+  historyWarning?: string
 }
 
 // Every question not yet answered.
