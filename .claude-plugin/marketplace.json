@@ -307,6 +307,24 @@
         "prompt",
         "claude-code"
       ]
+    },
+    {
+      "name": "denubis-hook-compact-nag",
+      "description": "Tells the main session and subagents to save their handover state at 40% context, and compacts a session with its own brief once it says it is ready",
+      "version": "0.1.0",
+      "source": "./plugins/denubis-hook-compact-nag",
+      "author": {
+        "name": "Brian Ballsun-Stanton",
+        "github": "denubis"
+      },
+      "license": "CC-BY-SA-4.0",
+      "keywords": [
+        "mods",
+        "compaction",
+        "context",
+        "handover",
+        "claude-code"
+      ]
     }
   ]
 }

@@ -22,11 +22,16 @@ The timestamp is UTC on 2026-11-10.
   - Question: "If the main session passes 50% context without having said it is ready,
     should the mod still compact it at the end of that turn?"
   - Brian, verbatim: "no, but it should fire a more urgent nag each stop after 50%"
+- Line 871 (`attachment` record `4e449354-3185-4a4c-b7fc-defa05861f94`, a
+  `queued_command` with origin `human`, 00:05:24.155Z), sent unprompted while the mod
+  was being built. Brian, verbatim: "(also, if there's now a trivial way of surfacing
+  the heads-up alerts in subagents to main, include that, since we're touching the same
+  surface area, if not, it's fine)"
 
 Exact raw resolver:
 
 ```sh
-sed -n '699p;794p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d4590dde-909a-4cc7-a999-be56c975149c.jsonl
+sed -n '699p;794p;871p' /home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/d4590dde-909a-4cc7-a999-be56c975149c.jsonl
 ```
 
 ## Context
@@ -47,6 +52,8 @@ also compact the main session mid-turn.
 3. The session asks for a compaction when it is ready.
 4. The mod never compacts on a threshold alone. Past 50%, if the main session has not
    said it is ready, the mod gives it a more urgent note at each stop (line 794).
+5. When a subagent is given a note, the main conversation also gets a one-line notice
+   naming that subagent (line 871).
 
 ## Consequences
 
@@ -56,6 +63,10 @@ also compact the main session mid-turn.
 - For the main session, the mod compacts between turns once the session has asked for
   it, and at no other time. Without that request, the only compaction is Claude Code's
   own near the full window.
+- The notes and the notice are rows the model reads (`session.append`). Under ADR
+  0051's instruction-delivery contract, `tests/test_instruction_delivery.py` lists this
+  delivery as permitted, citing lines 699, 794 and 871. Reading those lines as that
+  permission is the implementing session's reading.
 - Whether the urgent note at a stop should also make the session continue straight away,
   as a blocking Stop hook does, was not asked. As built, the note is read at the
   session's next turn.

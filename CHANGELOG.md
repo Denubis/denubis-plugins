@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-hook-compact-nag] 0.1.0
+
+A Claude Code mod that has a session hand over before it compacts: save its state, write the brief for its own compaction summary, then compact when it says it is ready (ADR 2026-11-10-bbs-pre-compaction-worklog-needs-no-approval, ADR 2026-11-10-bbs-compact-nag-leaves-engine-threshold).
+
+**Added:**
+- After each model request the mod measures that conversation's context fill: the request's input, cache and output tokens over the session model's context window. At 40%, and again at each further 5 points, a note tells the session to update its TODO list and plan, write its worklog in the notes directory, record decisions as proposals or tickets where they need approval, and call `ready_to_compact`. A subagent's note goes into its own conversation, and the main conversation gets a one-line notice naming the subagent.
+- `ready_to_compact` (`mcp__denubis-hook-compact-nag__ready_to_compact`) takes `brief` and `saved`. It refuses a missing saved file, or one not changed since the cycle's first note. Once it accepts, the main session compacts when that turn ends, with the brief and a line to re-read the saved files.
+- Past 50% the main session is never compacted unless it is ready: each stop leaves an urgent note instead.
+- Every compaction of a conversation with a saved brief carries it: `/compact` after the person's own text, Claude Code's automatic compaction, and a subagent's. A compaction that goes ahead starts a new cycle.
+- `/compact-nag` lists each conversation's fill and handover state.
+- The mod does not change Claude Code's own compaction threshold.
+
+**Tests:** `plugins/denubis-hook-compact-nag/tests/compact-nag.test.ts`, run with `claude plugin test` (7 pass). Five deliberate breakages of the module (nag threshold, file freshness check, compaction on a threshold, brief injection, the main-conversation notice) each failed at least one test.
+
+**Not verified:** no live session has yet shown a note reaching the model mid-turn, a subagent's note, or the compaction after a ready turn ends.
+
 ## [denubis-crash-recovery] 1.2.2
 
 `triage` asks its questions through the question zone, one question at a time and with no option lists (ADR 2026-11-08-bbs-questions-go-in-question-zone).

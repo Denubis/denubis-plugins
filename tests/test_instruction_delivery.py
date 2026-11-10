@@ -412,6 +412,26 @@ _QUESTION_ZONE_CITATION_RULING = (
     "(message a07592ea-7d4e-4608-aeb2-d5dfd191a006)"
 )
 
+COMPACT_NAG = "denubis-hook-compact-nag"
+
+# The human's rulings of 2026-11-10: "no, it should inject a note that we need to
+# prepare for compact at 40% and let the session call for a compact when it's
+# ready" (:699) and "no, but it should fire a more urgent nag each stop after 50%"
+# (:794), read as the allowance for compact-nag to append its notes to a session
+# as rows the model reads; and "(also, if there's now a trivial way of surfacing
+# the heads-up alerts in subagents to main, include that, ...)" (:871), read as
+# the allowance for the notice it appends to the main conversation when a
+# subagent is noted. The readings are the supervisor's.
+_COMPACT_NAG_RULING = (
+    "docs/architecture/decisions/2026-11-10-bbs-compact-nag-leaves-engine-threshold.md; "
+    "raw records "
+    "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/"
+    "d4590dde-909a-4cc7-a999-be56c975149c.jsonl:699 "
+    "(record 97f87105-e87a-4406-b237-19783a2d694b), :794 "
+    "(record 58780c7e-a3c6-4b43-a6fa-5139428b329a) and :871 "
+    "(record 4e449354-3185-4a4c-b7fc-defa05861f94)"
+)
+
 # (plugin, door) -> the authority that permits that mod delivery. An entry needs a
 # human ruling; the door is the event `ModuleHook` reports, or `session.append`
 # for a row the module appends.
@@ -420,6 +440,7 @@ PERMITTED_MOD_DELIVERIES: dict[tuple[str, str], str] = {
     (QUIET_AGENTS, "prompt.submit"): _QUIET_AGENTS_RULING,
     (QUESTION_ZONE, "prompt.compose"): _QUESTION_ZONE_RULING,
     (QUESTION_ZONE, APPEND_DOOR): _QUESTION_ZONE_CITATION_RULING,
+    (COMPACT_NAG, APPEND_DOOR): _COMPACT_NAG_RULING,
 }
 
 
