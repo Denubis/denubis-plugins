@@ -88,6 +88,8 @@ and consequences section. One ADR per decision.
   (supersedes the quiet-agents nudge text of 2026-10-24)
 - [2026-11-08-bbs-codex-push-needs-say-so — Codex, like Claude, needs Brian's explicit say-so to push, merge into the main branch, or delete a branch](2026-11-08-bbs-codex-push-needs-say-so.md)
 - [2026-11-09-bbs-codex-continuation-review — Terra reviews Codex stops, inactivity and completion of all workers](2026-11-09-bbs-codex-continuation-review.md)
+- [2026-11-10-bbs-pre-compaction-worklog-needs-no-approval — Before it compacts, a session may write or update its own worklog note in the notes directory without asking first](2026-11-10-bbs-pre-compaction-worklog-needs-no-approval.md)
+- [2026-11-10-bbs-compact-nag-leaves-engine-threshold — The compact-nag mod leaves Claude Code's own compaction point alone; it notes the need to prepare at 40%, the session asks for a compaction when it is ready, and past 50% each main-session stop gets an urgent note instead of a forced compaction](2026-11-10-bbs-compact-nag-leaves-engine-threshold.md)
 
 ## Status lifecycle
 
