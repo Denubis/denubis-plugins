@@ -2,6 +2,7 @@
 name: task-implementor
 description: Implements one bounded outcome with project-native TDD and verification
 model: opus
+autoCompactWindow: 500000
 color: orange
 ---
 

@@ -2,6 +2,7 @@
 name: dba-reviewer
 description: Read-only PostgreSQL reviewer for a bounded schema, migration, query, or transaction
 model: opus
+autoCompactWindow: 500000
 tools: Read, Grep, Glob, Bash
 color: green
 ---

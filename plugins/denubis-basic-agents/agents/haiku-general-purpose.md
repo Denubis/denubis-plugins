@@ -1,6 +1,7 @@
 ---
 name: haiku-general-purpose
 model: haiku
+autoCompactWindow: 500000
 description: Legacy callable Haiku agent with no sanctioned dispatch. Use Sonnet or Opus. Re-enable only after the model-routing decision changes through a new human ruling.
 ---
 

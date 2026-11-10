@@ -2,6 +2,7 @@
 name: refactoring-executor
 description: Executes one approved behavior-preserving refactor within an exact file boundary
 model: opus
+autoCompactWindow: 500000
 color: magenta
 ---
 

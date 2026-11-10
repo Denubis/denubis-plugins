@@ -1,6 +1,7 @@
 ---
 name: general-purpose
 model: sonnet
+autoCompactWindow: 500000
 description: Use for general delegated work without domain-specific defaults.
 ---
 

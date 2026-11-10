@@ -2,6 +2,7 @@
 name: task-bug-fixer
 description: Verifies and minimally fixes one bounded review finding or regression
 model: sonnet
+autoCompactWindow: 500000
 color: orange
 ---
 

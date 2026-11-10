@@ -2,6 +2,7 @@
 name: proleptic-challenger
 description: Read-only challenger for one named consequential uncertainty
 model: sonnet
+autoCompactWindow: 500000
 color: yellow
 ---
 

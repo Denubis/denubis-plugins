@@ -2,6 +2,7 @@
 name: critical-peer-review
 description: Read-only falsification reviewer for technical reasoning and its sources
 model: opus
+autoCompactWindow: 500000
 color: red
 ---
 

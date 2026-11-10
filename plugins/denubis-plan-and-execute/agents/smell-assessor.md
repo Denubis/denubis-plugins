@@ -2,6 +2,7 @@
 name: smell-assessor
 description: Read-only assessor for a named refactoring concern and its behavioral coverage
 model: sonnet
+autoCompactWindow: 500000
 color: purple
 ---
 

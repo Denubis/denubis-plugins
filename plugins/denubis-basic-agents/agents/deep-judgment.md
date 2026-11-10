@@ -1,6 +1,7 @@
 ---
 name: deep-judgment
 model: claude-opus-5-5
+autoCompactWindow: 500000
 description: Use for delegated work requiring sustained analysis or consequential qualitative judgment.
 ---
 

@@ -2,6 +2,7 @@
 name: code-reviewer
 description: Read-only falsification reviewer for one exact diff and named requirements
 model: sonnet
+autoCompactWindow: 500000
 color: cyan
 ---
 

@@ -1,5 +1,37 @@
 # Changelog
 
+## [denubis-basic-agents] 3.0.2
+
+Subagents of this plugin's agent types compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).
+
+**Changed:**
+- `academic-researcher`, `deep-judgment`, `general-purpose`, `haiku-general-purpose` and `python-developer` carry `autoCompactWindow: 500000` in their frontmatter. Claude Code gives such a subagent a compaction window of 480000 tokens instead of 980000. The setting only lowers a window, so a model whose window is already 500000 or smaller is unaffected.
+
+**Verified:** in build 2.1.321, a `general-purpose` subagent loaded from a copy of this plugin with the line logged `effectiveWindow=480000`; without a valid value it logged `effectiveWindow=980000`. Invalid values (`50`, `banana`) logged a warning. `claude plugin validate` does not check the field.
+
+**Not verified:** no subagent has been observed reaching the lower window and compacting, so the exact compaction point is unknown. Only a `sonnet` subagent was probed.
+
+## [denubis-extending-agents] 2.1.2
+
+Subagents of `project-claude-librarian` compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).
+
+**Changed:**
+- `project-claude-librarian` carries `autoCompactWindow: 500000` in its frontmatter, as `denubis-basic-agents` 3.0.2 describes.
+
+## [denubis-plan-and-execute] 4.2.6
+
+Subagents of this plugin's agent types compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).
+
+**Changed:**
+- `code-reviewer`, `coherence-reviewer`, `critical-peer-review`, `dba-reviewer`, `proleptic-challenger`, `refactoring-executor`, `smell-assessor`, `task-bug-fixer`, `task-implementor` and `test-analyst` carry `autoCompactWindow: 500000` in their frontmatter, as `denubis-basic-agents` 3.0.2 describes.
+
+## [denubis-research-agents] 1.3.6
+
+Subagents of this plugin's agent types compact at about half their context window (ADR 2026-11-10-bbs-own-agents-compact-at-half).
+
+**Changed:**
+- `codebase-investigator`, `combined-researcher`, `internet-researcher` and `remote-code-researcher` carry `autoCompactWindow: 500000` in their frontmatter, as `denubis-basic-agents` 3.0.2 describes.
+
 ## [denubis-hook-compact-nag] 0.1.0
 
 A Claude Code mod that has a session hand over before it compacts: save its state, write the brief for its own compaction summary, then compact when it says it is ready (ADR 2026-11-10-bbs-pre-compaction-worklog-needs-no-approval, ADR 2026-11-10-bbs-compact-nag-leaves-engine-threshold).

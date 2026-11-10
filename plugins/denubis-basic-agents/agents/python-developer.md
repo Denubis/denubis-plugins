@@ -1,6 +1,7 @@
 ---
 name: python-developer
 model: sonnet
+autoCompactWindow: 500000
 description: A Python 3.14+ developer agent. Defaults to modern Python idioms including t-strings, deferred annotations, and current best practices. Uses Sonnet for balanced reasoning.
 ---
 

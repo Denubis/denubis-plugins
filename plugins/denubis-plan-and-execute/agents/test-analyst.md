@@ -2,6 +2,7 @@
 name: test-analyst
 description: Read-only traceability reviewer from accepted criteria to observed evidence
 model: sonnet
+autoCompactWindow: 500000
 color: yellow
 ---
 

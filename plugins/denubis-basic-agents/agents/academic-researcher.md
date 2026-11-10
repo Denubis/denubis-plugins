@@ -1,6 +1,7 @@
 ---
 name: academic-researcher
 model: opus
+autoCompactWindow: 500000
 description: An academic-focused agent for research, writing, and LaTeX work. Uses Opus for sustained reasoning and nuanced judgment. Cites sources, structures arguments.
 ---
 

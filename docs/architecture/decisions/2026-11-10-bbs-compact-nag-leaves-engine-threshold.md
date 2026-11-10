@@ -40,9 +40,13 @@ Brian asked for a mod that nags a session to compact at 40% of its context and c
 it at 50%, or sooner when the session says it is ready. In build 2.1.321 a mod can
 compact the main session only between turns (`$.session.compact`). It cannot compact a
 subagent on request: a subagent compacts only when Claude Code's own auto-compaction
-fires. The one way to make subagents compact near 50% would have been to lower that
-point through the `autoCompactWindow` setting. That would apply to every loop and would
-also compact the main session mid-turn.
+fires. The question behind line 699 claimed that the only way to make subagents compact
+near 50% was the global `autoCompactWindow` setting, which applies to every loop and
+would also compact the main session mid-turn. That claim was wrong: each agent type's
+definition may carry its own `autoCompactWindow`, which applies only to subagents of
+that type. Brian ruled on that setting for this repository's agent types after being
+told of the error (ADR 2026-11-10-bbs-own-agents-compact-at-half). The ruling at line
+699 is about what the mod itself does, and this record reads it as standing.
 
 ## Decision
 
@@ -58,8 +62,9 @@ also compact the main session mid-turn.
 ## Consequences
 
 - Subagents get the prepare-for-compaction note. If a subagent states it is ready, its
-  brief is used when Claude Code's own compaction fires, but nothing compacts a subagent
-  early.
+  brief is used when Claude Code's own compaction fires. The mod compacts no subagent
+  early. Subagents of this repository's own agent types compact at the lower point
+  their agent files set (ADR 2026-11-10-bbs-own-agents-compact-at-half).
 - For the main session, the mod compacts between turns once the session has asked for
   it, and at no other time. Without that request, the only compaction is Claude Code's
   own near the full window.

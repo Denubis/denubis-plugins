@@ -90,6 +90,7 @@ and consequences section. One ADR per decision.
 - [2026-11-09-bbs-codex-continuation-review — Terra reviews Codex stops, inactivity and completion of all workers](2026-11-09-bbs-codex-continuation-review.md)
 - [2026-11-10-bbs-pre-compaction-worklog-needs-no-approval — Before it compacts, a session may write or update its own worklog note in the notes directory without asking first](2026-11-10-bbs-pre-compaction-worklog-needs-no-approval.md)
 - [2026-11-10-bbs-compact-nag-leaves-engine-threshold — The compact-nag mod leaves Claude Code's own compaction point alone; it notes the need to prepare at 40%, the session asks for a compaction when it is ready, and past 50% each main-session stop gets an urgent note instead of a forced compaction](2026-11-10-bbs-compact-nag-leaves-engine-threshold.md)
+- [2026-11-10-bbs-own-agents-compact-at-half — Subagents of this repository's own agent types compact at about half their context window; every agent file carries `autoCompactWindow: 500000`](2026-11-10-bbs-own-agents-compact-at-half.md)
 
 ## Status lifecycle
 

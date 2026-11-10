@@ -2,6 +2,7 @@
 name: coherence-reviewer
 description: Read-only reviewer for one named design-conformance uncertainty
 model: opus
+autoCompactWindow: 500000
 color: magenta
 ---
 
