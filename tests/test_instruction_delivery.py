@@ -423,7 +423,8 @@ COMPACT_NAG = "denubis-hook-compact-nag"
 # the allowance for the notice it appends to the main conversation when a
 # subagent is noted. The readings are the supervisor's.
 _COMPACT_NAG_RULING = (
-    "docs/architecture/decisions/2026-11-10-bbs-compact-nag-leaves-engine-threshold.md; "
+    "docs/architecture/decisions/"
+    "2026-11-10-bbs-compact-nag-leaves-engine-threshold.md; "
     "raw records "
     "/home/brian/.claude/projects/-home-brian-people-Brian-brian-ed3d-plugins/"
     "d4590dde-909a-4cc7-a999-be56c975149c.jsonl:699 "
