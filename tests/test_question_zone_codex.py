@@ -259,11 +259,37 @@ def daemon(tmp_path: Path, reply: object, *, failure: str = ""):
             assert not thread.is_alive()
 
 
+@pytest.mark.parametrize(
+    ("outcome", "failure"),
+    [("clear", ""), ("clear", "partial"), ("rewrite", "")],
+)
+def test_packaged_output_obeys_native_nonrewrite_contract(
+    tmp_path, outcome, failure
+) -> None:
+    # Codex rust-v0.167.0 hooks/src/engine/output_parser.rs:442-482 rejects
+    # permissionDecision:allow unless updatedInput is present. Its native
+    # pre_tool_use.rs:463-489 test reproduces the same live error.
+    with daemon(tmp_path, verdict(outcome), failure=failure) as (endpoint, _):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    output = result["hookSpecificOutput"]
+    if output.get("permissionDecision") == "allow":
+        assert output.get("updatedInput") is not None, (
+            "PreToolUse hook returned unsupported permissionDecision:allow"
+        )
+    assert "updatedInput" not in output
+    if outcome == "rewrite":
+        assert output["permissionDecision"] == "deny"
+        assert output["permissionDecisionReason"].strip()
+    else:
+        assert "permissionDecision" not in output
+    assert ("systemMessage" in result) == bool(failure)
+
+
 @pytest.mark.parametrize("tool", ["request_user_input", "request_user_input_async"])
 def test_clear_checker_allows_native_tool_and_releases_thread(tmp_path, tool) -> None:
     with daemon(tmp_path, verdict("clear")) as (endpoint, fake):
         result = invoke(question(tmp_path, tool=tool), endpoint=endpoint)
-    assert result["hookSpecificOutput"]["permissionDecision"] == "allow", result
+    assert "permissionDecision" not in result["hookSpecificOutput"], result
     assert any(row["method"] == "thread/unsubscribe" for row in fake.requests)
     start = next(
         row["params"] for row in fake.requests if row["method"] == "thread/start"
@@ -337,7 +363,7 @@ def test_history_failure_warns_after_clarity_passes(tmp_path, failure) -> None:
     with daemon(tmp_path, verdict("clear"), failure=failure) as (endpoint, fake):
         result = invoke(question(tmp_path), endpoint=endpoint)
     output = result["hookSpecificOutput"]
-    assert output["permissionDecision"] == "allow"
+    assert "permissionDecision" not in output
     assert "history" in result["systemMessage"].lower()
     assert any(row["method"] == "thread/unsubscribe" for row in fake.requests)
     assert not any(row.get("id") == 999 for row in fake.requests)
@@ -371,7 +397,7 @@ def test_sync_choice_question_is_checked_with_its_native_options(tmp_path) -> No
     payload["tool_input"]["questions"][0]["options"] = options
     with daemon(tmp_path, verdict("clear")) as (endpoint, fake):
         result = invoke(payload, endpoint=endpoint)
-    assert result["hookSpecificOutput"]["permissionDecision"] == "allow", result
+    assert "permissionDecision" not in result["hookSpecificOutput"], result
     submitted = next(
         row["params"]["input"] for row in fake.requests if row["method"] == "turn/start"
     )
@@ -454,7 +480,7 @@ def test_missing_fresh_history_trace_warns_after_clarity_passes(
 ) -> None:
     with daemon(tmp_path, verdict("clear"), failure=failure) as (endpoint, _):
         result = invoke(question(tmp_path), endpoint=endpoint)
-    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+    assert "permissionDecision" not in result["hookSpecificOutput"]
     assert "history" in result["systemMessage"].lower()
 
 
@@ -464,7 +490,7 @@ def test_partial_history_warns_without_blocking_clear_question(
 ) -> None:
     with daemon(tmp_path, verdict(outcome), failure="partial") as (endpoint, _):
         result = invoke(question(tmp_path), endpoint=endpoint)
-    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+    assert "permissionDecision" not in result["hookSpecificOutput"]
     assert "partial" in result["systemMessage"].lower()
 
 
@@ -477,7 +503,7 @@ def test_unreadable_history_report_warns_after_clarity_passes(tmp_path, kind) ->
         _,
     ):
         result = invoke(question(tmp_path), endpoint=endpoint)
-    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+    assert "permissionDecision" not in result["hookSpecificOutput"]
     assert "history" in result["systemMessage"].lower()
 
 

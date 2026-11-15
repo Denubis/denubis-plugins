@@ -17,6 +17,12 @@ The turn-end nudge names each agent once, so an agent kept on purpose is not nam
 
 **Not verified:** not yet observed live. If Claude Code cannot list its agents when the main conversation sends one a message, that agent stays on the record and its next stop is not named. Taking a dropped nudge's agents off the record writes the session's state after the turn-end hook has returned; the test engine allows that, and a live session has not been seen to. Nor is it known whether a drop can be reported after a later turn end has named one of the same agents again. A nudge Claude Code fails to take, as distinct from one it drops, takes its agents off the record the same way, but has no test, as the test engine cannot make the submission fail. `tsc` reports one error, in the existing structured-SendMessage test, which the 0.1.2 files report too under build 2.1.321's declarations.
 
+## [denubis-hook-question-zone] 0.2.3
+
+Clear Codex question checks now return a native pass-through result without
+`permissionDecision: allow`, which Codex 0.167 rejects unless `updatedInput`
+is supplied. History warnings and explicit denials are preserved.
+
 ## [denubis-hook-question-zone] 0.2.2
 
 Failed history lookup and incomplete coverage now warn instead of holding an

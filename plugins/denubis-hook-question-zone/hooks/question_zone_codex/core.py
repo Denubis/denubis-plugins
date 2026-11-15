@@ -210,9 +210,7 @@ def parse_verdict(text: str) -> Verdict:
 
 def hook_output(verdict: Verdict) -> dict:
     output = {"hookEventName": "PreToolUse"}
-    if verdict.outcome == "clear":
-        output["permissionDecision"] = "allow"
-    else:
+    if verdict.outcome != "clear":
         output["permissionDecision"] = "deny"
         action = {
             "answered": "Use the existing answer instead of asking again.",
