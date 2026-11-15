@@ -1,5 +1,6 @@
 """Exercise the commit plugin's CLI against real, isolated Git repositories."""
 
+import json
 import os
 import subprocess
 import sys
@@ -12,6 +13,7 @@ SCRIPT = (
     / "plugins/denubis-git-commit/scripts/check_durable_records.py"
 )
 DECISION = "docs/architecture/decisions/0001-record.md"
+EXCEPTIONS = "docs/durable-record-exceptions.json"
 
 
 def git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -80,11 +82,251 @@ def findings(
     return parsed
 
 
+def record_exception(
+    repository: Path,
+    *,
+    path: str = DECISION,
+    kind: str = "IGNORED",
+    reference: str = "private/evidence.md",
+    reason: str = "Human accepted this intentional reference.",
+) -> None:
+    write(
+        repository,
+        EXCEPTIONS,
+        json.dumps(
+            {
+                "exceptions": [
+                    {
+                        "path": path,
+                        "kind": kind,
+                        "reference": reference,
+                        "reason": reason,
+                    }
+                ]
+            }
+        ),
+    )
+
+
 def test_ignored_citation_blocks_commit(repository: Path) -> None:
     write(repository, DECISION, "Evidence: `private/evidence.md`.\n")
     result = check(repository)
     assert result.returncode == 1, result.stdout + result.stderr
     assert ("IGNORED", DECISION, 1, "private/evidence.md") in findings(result)
+
+
+@pytest.mark.parametrize("strict", [False, True])
+@pytest.mark.parametrize(
+    ("kind", "reference"),
+    [
+        ("WORKTREE", ".worktrees/shared-cache/register.csv"),
+        ("EXCHANGE", "codex-prompts/example.txt"),
+        ("IGNORED", "private/evidence.md"),
+    ],
+)
+def test_recorded_exception_is_visible_but_does_not_block(
+    repository: Path, strict: bool, kind: str, reference: str
+) -> None:
+    reason = "Human accepted this intentional reference."
+    write(repository, DECISION, f"`{reference}`\n")
+    record_exception(
+        repository,
+        kind=kind,
+        reference=reference,
+        reason=reason,
+    )
+    result = check(repository, *(["--strict"] if strict else []))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"{kind} {DECISION}:1 {reference} [accepted: {reason}]" in result.stdout
+    assert "citations=1 advisory=1" in result.stdout
+    assert "accepted=1" in result.stdout
+
+
+def test_accepted_reference_does_not_hide_other_blockers(repository: Path) -> None:
+    write(repository, "private/other.md", "# Other\n", tracked=False)
+    write(repository, DECISION, "`private/evidence.md`\n`private/other.md`\n")
+    other = "docs/decisions/other.md"
+    write(repository, other, "`private/evidence.md`\n")
+    record_exception(repository)
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"IGNORED {DECISION}:2 private/other.md\n" in result.stdout
+    assert f"IGNORED {other}:1 private/evidence.md\n" in result.stdout
+    assert "citations=3 advisory=1" in result.stdout
+    assert "accepted=1" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("path", "docs/decisions/another.md"),
+        ("kind", "WORKTREE"),
+        ("reference", "private/evidence.md:1"),
+        ("reference", "private/*.md"),
+    ],
+)
+def test_exception_matching_is_exact(repository: Path, field: str, value: str) -> None:
+    write(repository, DECISION, "`private/evidence.md`\n")
+    record_exception(repository, **{field: value})
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {("IGNORED", DECISION, 1, "private/evidence.md")}
+    assert "accepted=0" in result.stdout
+
+
+def test_recorded_exception_survives_line_moves_and_repeated_references(
+    repository: Path,
+) -> None:
+    write(
+        repository,
+        DECISION,
+        "# Decision\n\n`private/evidence.md`\n\n`private/evidence.md`\n",
+    )
+    record_exception(repository)
+    result = check(repository / "src")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"IGNORED {DECISION}:3 private/evidence.md [accepted:" in result.stdout
+    assert f"IGNORED {DECISION}:5 private/evidence.md [accepted:" in result.stdout
+    assert "citations=2 advisory=2" in result.stdout
+    assert "accepted=2" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "configuration",
+    [
+        "{",
+        "[]",
+        "{}",
+        '{"exceptions": {}}',
+        '{"exceptions": [], "unexpected": true}',
+        '{"exceptions": ["private/evidence.md"]}',
+        json.dumps(
+            {
+                "exceptions": [
+                    {
+                        "path": DECISION,
+                        "kind": "IGNORED",
+                        "reference": "private/evidence.md",
+                    }
+                ]
+            }
+        ),
+        *(
+            json.dumps(
+                {
+                    "exceptions": [
+                        {
+                            "path": DECISION,
+                            "kind": "IGNORED",
+                            "reference": "private/evidence.md",
+                            "reason": "Human accepted this reference.",
+                            field: value,
+                        }
+                    ]
+                }
+            )
+            for field, value in [
+                ("kind", "TRANSITIONAL"),
+                ("path", "/docs/record.md"),
+                ("path", "../record.md"),
+                ("path", "./docs/record.md"),
+                ("path", "docs/record.txt"),
+                ("reference", ""),
+                ("reason", "  "),
+                ("reason", 42),
+                ("reason", "Accepted\nby human"),
+                ("reason", "Accepted\n"),
+                ("line", 1),
+            ]
+        ),
+    ],
+)
+def test_invalid_exception_configuration_is_an_error(
+    repository: Path, configuration: str
+) -> None:
+    write(repository, DECISION, "`private/evidence.md`\n")
+    write(repository, EXCEPTIONS, configuration)
+    result = check(repository)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert EXCEPTIONS in result.stderr
+    assert "ERROR" in result.stderr
+    assert "SUMMARY" not in result.stdout
+
+
+def test_empty_exception_list_preserves_blockers(repository: Path) -> None:
+    write(repository, DECISION, "`private/evidence.md`\n")
+    write(repository, EXCEPTIONS, '{"exceptions": []}\n')
+    result = check(repository)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert findings(result) == {("IGNORED", DECISION, 1, "private/evidence.md")}
+
+
+def test_duplicate_exceptions_are_an_error(repository: Path) -> None:
+    write(repository, DECISION, "`private/evidence.md`\n")
+    record_exception(repository)
+    path = repository / EXCEPTIONS
+    configuration = json.loads(path.read_text(encoding="utf-8"))
+    configuration["exceptions"] *= 2
+    path.write_text(json.dumps(configuration), encoding="utf-8")
+    result = check(repository)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert EXCEPTIONS in result.stderr
+    assert "duplicates" in result.stderr
+
+
+def test_dvc_cache_reference_and_command_argument_can_be_accepted(
+    repository: Path,
+) -> None:
+    cached = write(
+        repository, ".worktrees/shared-cache/register.csv", "id,value\n", tracked=False
+    )
+    reference = "data/register.csv"
+    data = repository / "data"
+    data.mkdir()
+    (repository / reference).symlink_to(cached)
+    write(
+        repository,
+        DECISION,
+        f"[DVC register]({reference})\n`uv run export --csv-path {reference}`\n",
+    )
+    before = check(repository)
+    assert before.returncode == 1, before.stdout + before.stderr
+    assert findings(before) == {
+        ("WORKTREE", DECISION, 1, reference),
+        ("WORKTREE", DECISION, 2, reference),
+    }
+    record_exception(
+        repository,
+        kind="WORKTREE",
+        reference=reference,
+        reason=(
+            "Human accepted the DVC register and its command argument; "
+            "the cache resolves under .worktrees."
+        ),
+    )
+    after = check(repository)
+    assert after.returncode == 0, after.stdout + after.stderr
+    assert "citations=2 advisory=2" in after.stdout
+    assert "accepted=2" in after.stdout
+
+
+def test_worktree_uses_its_own_exception_list_for_main_checkout_notes(
+    repository: Path, tmp_path: Path
+) -> None:
+    note = ".notes/reference.md"
+    write(repository, note, "`private/evidence.md`\n")
+    record_exception(repository, path=note)
+    git(repository, "commit", "-m", "fixture")
+    worktree = tmp_path / "linked"
+    git(repository, "worktree", "add", "-b", "task", str(worktree))
+    write(repository, EXCEPTIONS, '{"exceptions": []}\n')
+    accepted = check(worktree, "--all")
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+    assert f"IGNORED {note}:1 private/evidence.md [accepted:" in accepted.stdout
+    write(worktree, EXCEPTIONS, '{"exceptions": []}\n')
+    blocked = check(worktree, "--all")
+    assert blocked.returncode == 1, blocked.stdout + blocked.stderr
+    assert findings(blocked) == {("IGNORED", note, 1, "private/evidence.md")}
 
 
 @pytest.mark.parametrize(
@@ -724,6 +966,7 @@ def test_summary_counts_each_finding_and_strict_cannot_relax_citations(
             "advisory": "0",
             "transitional": "1",
             "open_questions": "1",
+            "accepted": "0",
         }
 
 
@@ -1080,6 +1323,7 @@ def test_absent_only_register_lists_advisory_findings_and_exits_zero(
         "advisory": "2",
         "transitional": "0",
         "open_questions": "0",
+        "accepted": "0",
     }
 
 

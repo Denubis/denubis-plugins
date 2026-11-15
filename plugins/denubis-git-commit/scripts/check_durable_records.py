@@ -81,10 +81,18 @@ Naming a record never selects its siblings.
 One citation rule applies to every selected document. ABSENT is always advisory: it is
 reported with its prefix but never affects the exit status. WORKTREE, EXCHANGE and
 IGNORED block, except on Markdown blockquote lines (first non-space character '>'),
-where every citation kind is advisory and keeps its prefix.
+where every citation kind is advisory and keeps its prefix, or when an exact project
+exception records the human's acceptance. The optional current-checkout file
+docs/durable-record-exceptions.json contains an object with an exceptions array;
+each entry has path (normalized repo-relative Markdown source), kind (WORKTREE,
+EXCHANGE or IGNORED), reference (the emitted token) and reason (a nonempty single-line
+rationale). All four fields are required. Matching uses path, kind and reference
+literally, without line numbers, glob expansion or path resolution. Accepted findings
+keep their prefix, display their reason and count as advisory, even with --strict.
+Invalid configuration is an error. Unmatched entries do not affect other findings.
 The summary counts all citations and separately counts all advisory citations as
-advisory. --strict also blocks wording/ticket findings, but does not promote advisory
-citation findings.
+advisory; accepted counts matched findings. --strict also blocks wording/ticket
+findings, but does not promote advisory citation findings.
 Wording and ticket checks omit fenced code, marked blockquotes, and lazy quoted
 paragraph continuations. Status/progress heading detection is a case-insensitive
 word heuristic (status, progress, answered, resolved, closed, completed, done, parked,
@@ -92,10 +100,11 @@ state of), so those advisory findings require human interpretation.
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -109,6 +118,8 @@ DEFAULT_REGISTERS = (
     "docs/decisions",
     ".notes/decisions",
 )
+EXCEPTIONS_FILE = "docs/durable-record-exceptions.json"
+BLOCKING_CITATIONS = ("WORKTREE", "EXCHANGE", "IGNORED")
 BRANCH_PREFIXES = frozenset(
     {
         "fix",
@@ -163,10 +174,14 @@ class Finding:
     line: int
     reference: str
     advisory: bool = False
+    accepted_reason: str | None = None
 
     def render(self) -> str:
         """Return the CLI's line-oriented format."""
-        return f"{self.kind} {self.path}:{self.line} {self.reference}"
+        rendered = f"{self.kind} {self.path}:{self.line} {self.reference}"
+        if self.accepted_reason is not None:
+            rendered += f" [accepted: {self.accepted_reason}]"
+        return rendered
 
 
 @dataclass(frozen=True)
@@ -320,6 +335,66 @@ def contained_path(root: Path, value: str) -> Path:
     if not path.is_relative_to(root):
         raise ValueError(f"record path is outside repository: {value}")
     return path
+
+
+def exception_entry(entry: object, number: int) -> tuple[tuple[str, str, str], str]:
+    """Validate one exact citation exception and its single-line rationale."""
+    names = ("path", "kind", "reference", "reason")
+    if not isinstance(entry, dict) or set(entry) != set(names):
+        raise ValueError(f"entry {number} must contain exactly {', '.join(names)}")
+    fields: dict[str, str] = {}
+    for name in names:
+        value = entry[name]
+        if (
+            not isinstance(value, str)
+            or not value.strip()
+            or value.splitlines() != [value]
+        ):
+            raise ValueError(
+                f"entry {number} {name} must be a nonempty single-line string"
+            )
+        fields[name] = value
+    path = Path(fields["path"])
+    if (
+        path.is_absolute()
+        or path.as_posix() != fields["path"]
+        or ".." in path.parts
+        or not markdown(path)
+    ):
+        raise ValueError(
+            f"entry {number} path must be a normalized repo-relative Markdown path"
+        )
+    if fields["kind"] not in BLOCKING_CITATIONS:
+        raise ValueError(
+            f"entry {number} kind must be one of {', '.join(BLOCKING_CITATIONS)}"
+        )
+    return (fields["path"], fields["kind"], fields["reference"]), fields["reason"]
+
+
+def citation_exceptions(root: Path) -> dict[tuple[str, str, str], str]:
+    """Read this checkout's project-owned list; invalid configuration fails closed."""
+    path = root / EXCEPTIONS_FILE
+    if not path.exists() and not path.is_symlink():
+        return {}
+    try:
+        configuration = json.loads(
+            contained_path(root, EXCEPTIONS_FILE).read_text(encoding="utf-8")
+        )
+        if (
+            not isinstance(configuration, dict)
+            or set(configuration) != {"exceptions"}
+            or not isinstance(configuration["exceptions"], list)
+        ):
+            raise ValueError("expected an object containing only an exceptions array")
+        exceptions: dict[tuple[str, str, str], str] = {}
+        for number, entry in enumerate(configuration["exceptions"], 1):
+            key, reason = exception_entry(entry, number)
+            if key in exceptions:
+                raise ValueError(f"entry {number} duplicates an earlier exception")
+            exceptions[key] = reason
+        return exceptions
+    except ValueError as error:
+        raise ValueError(f"{EXCEPTIONS_FILE}: {error}") from error
 
 
 def selected_documents(root: Path, main_root: Path, options: Options) -> list[Document]:
@@ -627,9 +702,7 @@ def classify_reference(root: Path, document: Path, reference: str) -> str | None
         or (set(kinds) == {"ABSENT"} and untracked_branch_name(root, path, candidates))
     ):
         return None
-    return next(
-        kind for kind in ("WORKTREE", "EXCHANGE", "IGNORED", "ABSENT") if kind in kinds
-    )
+    return next(kind for kind in (*BLOCKING_CITATIONS, "ABSENT") if kind in kinds)
 
 
 def citation_findings(root: Path, document: Path, text: str) -> list[Finding]:
@@ -773,7 +846,17 @@ def main() -> int:
     options = arguments()
     try:
         root, main_root = repository_roots()
-        found = check_documents(root, main_root, options)
+        exceptions = citation_exceptions(root)
+        found = [
+            replace(finding, advisory=True, accepted_reason=reason)
+            if (
+                reason := exceptions.get(
+                    (finding.path, finding.kind, finding.reference)
+                )
+            )
+            else finding
+            for finding in check_documents(root, main_root, options)
+        ]
     except (OSError, RuntimeError, ValueError) as error:
         print(f"ERROR {error}", file=sys.stderr)
         return 2
@@ -785,10 +868,11 @@ def main() -> int:
     questions = sum(finding.kind == "OPEN_QUESTION" for finding in found)
     citations = len(found) - transitions - questions
     advisory = sum(finding.advisory for finding in found)
+    accepted = sum(finding.accepted_reason is not None for finding in found)
     print(
         f"SUMMARY citations={citations} advisory={advisory} "
         f"transitional={transitions} "
-        f"open_questions={questions}"
+        f"open_questions={questions} accepted={accepted}"
     )
     return int(
         bool(citations > advisory or (options.strict and (transitions or questions)))

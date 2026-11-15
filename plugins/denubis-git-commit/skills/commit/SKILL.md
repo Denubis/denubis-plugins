@@ -58,6 +58,15 @@ except on blockquote lines (first non-space character `>`), where every citation
 advisory and keeps its prefix. The summary counts all
 citations and separately counts all advisory citations as `advisory`. `--strict` also
 blocks wording/ticket findings, but leaves advisory citations advisory.
+Human-accepted citation exceptions live in tracked
+`docs/durable-record-exceptions.json` in the current checkout. Each entry matches the
+source Markdown path, finding kind, and emitted reference exactly, and records the
+reason. Accepted findings stay visible with that reason, count as advisory and
+`accepted`, and do not block, including with `--strict`. Reuse an existing matching
+entry without asking for the same acceptance again. Add an entry only for an actual
+human ruling; the checker finding alone does not authorise an exception. See
+[the format and examples](durable-record-exceptions.md), including DVC cache paths
+and intentional command arguments. Invalid configuration leaves the check incomplete.
 A usage or Git error leaves the check incomplete.
 Justify or fix each transitional-wording and open-questions finding before committing; never silently
 wave one through. Rerun after staging or changing a checked record. Confirm that rulings
