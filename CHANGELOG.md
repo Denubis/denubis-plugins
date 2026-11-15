@@ -1,5 +1,22 @@
 # Changelog
 
+## [denubis-hook-quiet-agents] 0.1.3
+
+The turn-end nudge names each agent once, so an agent kept on purpose is not named again and again (ADR 2026-11-15-bbs-quiet-agents-names-agents-once).
+
+**Changed:**
+- A nudge names only the idle or finished agents that no nudge has named yet. An agent the model did not stop counts as kept: later nudges leave it out, however often it wakes and goes idle on its own and whichever other agents come and go. When the main conversation next sends it a message, its next idle or finished state is named once more. Before, every change to the set of idle or finished agents raised a nudge naming the whole set. In one session on 2026-11-15, a teammate kept to watch background jobs was named in 13 of 21 nudges.
+- The record keeps agent ids, not names, so a new agent under a named agent's name is named. Its shape tag is now `teammate-reports-5`. The first load of this version reads what 0.1.2 stored as empty, so agents already named are named once more.
+- A nudge the engine dropped, or could not take, named no one: its agents leave the record and are named at the next answered turn end.
+- The status line also names every idle agent a nudge has named, so a kept agent stays in view. Before, it named only teammates whose idle notice the plugin had taken out, so an agent idle without a report vanished from view after its one naming. Each turn end now sets the line once, after the nudge's record is written.
+
+**Fixed:**
+- An agent leaving the set no longer raises a nudge. On 2026-11-15 two nudges in five seconds were raised only because another agent had just been stopped, and each named the kept teammate again.
+
+**Tests:** `plugins/denubis-hook-quiet-agents/tests/quiet-agents.test.ts`, run with `claude plugin test` (55 pass). New tests: a newcomer is named alone; an agent leaving raises no nudge; an agent that works and goes idle again on its own is not named again; a message from the main conversation, by name or by agent id, lets an agent be named once more; a message to one named agent leaves the others kept; a named idle agent stays on the status line until the main conversation messages it; a dropped nudge leaves its agents unnamed and off the status line, to be named at the next answered end; and a new agent under a named agent's name is named. The test of a failed agent list now also checks that a teammate's idle name survives it, using a teammate the roster still lists as running, which only the idle names keep on the status line. The status-line test now runs on the stand-in that takes the nudge, and expects the idle agents the first nudge named. The test of the replaced behaviour, in which an empty set cleared the record so the same agents were named again, is removed.
+
+**Not verified:** not yet observed live. If Claude Code cannot list its agents when the main conversation sends one a message, that agent stays on the record and its next stop is not named. Taking a dropped nudge's agents off the record writes the session's state after the turn-end hook has returned; the test engine allows that, and a live session has not been seen to. Nor is it known whether a drop can be reported after a later turn end has named one of the same agents again. A nudge Claude Code fails to take, as distinct from one it drops, takes its agents off the record the same way, but has no test, as the test engine cannot make the submission fail. `tsc` reports one error, in the existing structured-SendMessage test, which the 0.1.2 files report too under build 2.1.321's declarations.
+
 ## [denubis-hook-question-zone] 0.2.2
 
 Failed history lookup and incomplete coverage now warn instead of holding an

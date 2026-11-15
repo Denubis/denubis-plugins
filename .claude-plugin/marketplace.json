@@ -258,8 +258,8 @@
     },
     {
       "name": "denubis-hook-quiet-agents",
-      "description": "Takes a teammate's idle notice once its report arrived, mutes repeated agent notices, frames agent-started turns, shows idle agents, asks the model at a turn's end to stop idle or finished agents, and adds /tidy to stop them",
-      "version": "0.1.2",
+      "description": "Takes a teammate's idle notice once its report arrived, mutes repeated agent notices, frames agent-started turns, shows idle agents, asks the model at a turn's end, once per agent, to stop idle or finished agents, and adds /tidy to stop them",
+      "version": "0.1.3",
       "source": "./plugins/denubis-hook-quiet-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",

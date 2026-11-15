@@ -64,27 +64,40 @@ workers once their work is verified, and tell the person only changed results,
 consequential corrections or a decision they must make. An in-process
 teammate's render of the lead's prompt does not get it.
 
-**The status line.** The plugin's status line names the idle teammates and counts the
-finished and failed agents, for example `agents idle: helper, scout; 1 done, 1 failed`,
-or `agents: 1 done` when no teammate is idle. It updates when an idle notice is taken out,
-when a message to an idle teammate takes it off the list, and at the end of each turn of
-the main conversation. A teammate that is no longer listed, because it was stopped, drops
-off at the next turn end.
+**The status line.** The plugin's status line names the idle teammates whose idle notice
+it took out, and every idle agent a turn-end nudge has named, and counts the finished and
+failed agents, for example `agents idle: helper, scout; 1 done, 1 failed`, or
+`agents: 1 done` when none is idle. So an agent the model keeps stays in view
+([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-quiet-agents-names-agents-once.md)).
+It updates when an idle notice is taken out, when a message from the main conversation
+takes an agent off the list, when a nudge that did not go in leaves its agents unnamed,
+and at the end of each turn of the main conversation. An agent that is no longer listed,
+because it was stopped, drops off at the next turn end.
 
 **The turn-end nudge.** At the end of a main-conversation turn, the plugin gathers the
 idle teammates and every listed agent that is idle, completed or failed, leaving out any
 agent a plugin started (such as question-zone's checkers), which is the plugin's to
-manage. When that set is
-not empty and differs from the set it last named, it queues one prompt, sent under the
-plugin's name and not as the person's words, which starts once the session is idle:
+manage. When that set holds agents no nudge has named yet, it queues one prompt naming
+just those, sent under the plugin's name and not as the person's words, which starts once
+the session is idle:
 
 ```text
 quiet-agents: idle or finished agents: <names>. Stop each with TaskStop, unless its work is unfinished: then continue it instead. Ask the person any question through the question zone's mcp__denubis-hook-question-zone__ask tool, never in chat.
 ```
 
-The same set at the next turn end raises no second nudge. When the set empties, the
-record clears, so the same agents coming back are named again. The text assumes
-`denubis-hook-question-zone` is installed, which registers that tool.
+**Each agent is named once.** An agent the model was told about and did not stop is
+treated as kept, and later nudges leave it out. Its waking and going idle again on its
+own does not bring it back, and neither do other agents joining or leaving the set; an
+agent leaving raises no nudge at all. When the main conversation next sends that agent a
+message, it has new work, so its next idle or finished state is named once more. If Claude
+Code cannot list its agents at that moment, the message is not matched to the agent, and
+its next stop is not named. A nudge that Claude Code dropped, or could not take, told the
+model nothing, so its agents are named at the next answered turn end. The record holds
+agent ids, not names, so a new agent that takes a named agent's name is named. A kept
+agent stays on the status line, named while idle and counted once done or failed, and
+`/tidy` still stops it
+([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-quiet-agents-names-agents-once.md)).
+The text assumes `denubis-hook-question-zone` is installed, which registers that tool.
 
 **The answer-only guard.** The nudge fires only when the turn ended with an answer. A turn
 the person interrupted, a refusal, or an API error raises no nudge, so a plugin prompt
@@ -100,15 +113,23 @@ are left alone.
 stop only when the person runs `/tidy` or the model calls TaskStop after a nudge, and
 each stop goes through the permission check as usual.
 
-The report marks, the idle list and the last nudged set live in the session's state. They
-survive a reload of the plugin and start empty in a new session.
+The report marks, the idle list and the ids of the agents already named live in the
+session's state. They survive a reload of the plugin and start empty in a new session.
+The first load of 0.1.3 reads what 0.1.2 stored as empty, so a teammate whose report was
+already marked may have one more idle notice let through, and agents already named are
+named once more.
 
 ## Not yet verified
 
-- **The nudge has been observed live twice.** On 2026-10-24 at 22:59:30Z and on
-  2026-10-25 at 00:32:24Z it fired once after an agent finished, named that agent, and
-  was not repeated. Its other behaviour, including the answer-only guard, is established
-  by the plugin's tests only.
+- **The nudge of 0.1.2 and earlier has been observed live many times**: 105 nudges across
+  14 sessions by 2026-11-15, counted from session transcripts. Those transcripts showed the
+  repeated naming 0.1.3 removes. The answer-only guard has not been checked against them
+  and is established by the plugin's tests only.
+- **Naming each agent once, and keeping a named idle agent on the status line, have not
+  been seen live.** They ship in 0.1.3, and the plugin's tests establish them. The documentation says a teammate in a terminal pane of its own
+  goes by its address as its id, and that a respawn under the same name keeps that
+  address. If both hold, such a teammate respawned after it was named is not named again
+  until the main conversation sends it a message.
 - **Recognising a teammate in its own pane by the agent list has not been seen live.** It
   relies on the documented listing of such teammates by name. The plugin's tests
   establish the rest.

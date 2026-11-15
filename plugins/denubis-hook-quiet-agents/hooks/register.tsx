@@ -18,13 +18,15 @@ const lastNotice = atom({ plugin: 'denubis-hook-quiet-agents', key: 'lastNotice'
   shape: 'fnv1a32-first-line-1',
 })
 
-// Which teammates have reported, which went idle after reporting, and the
-// names the last turn end found. The tag `teammate-reports-2` held
-// `{ [teammate]: { lastReportAt } }` for the withdrawn time window, and
-// `teammate-reports-3` had no `nudged`; this tag reads either as the initial.
-const NO_TEAMMATES: TeammateReports = { reported: {}, idle: [], pending: [], nudged: [] }
+// Which teammates have reported, which went idle after reporting, and which
+// agents a nudge has named. The tag `teammate-reports-2` held
+// `{ [teammate]: { lastReportAt } }` for the withdrawn time window,
+// `teammate-reports-3` had no `nudged`, and `teammate-reports-4` kept the
+// last turn end's names in `nudged`; this tag reads any of them as the
+// initial.
+const NO_TEAMMATES: TeammateReports = { reported: {}, idle: [], pending: [], nudgedIds: [] }
 const reports = atom({ plugin: 'denubis-hook-quiet-agents', key: 'reports' } as const, NO_TEAMMATES, {
-  shape: 'teammate-reports-4',
+  shape: 'teammate-reports-5',
 })
 
 const NOTICE_PREFIX =
@@ -134,14 +136,20 @@ const markIdle = (state: TeammateReports, teammate: string): TeammateReports => 
   pending: withName(state.pending, teammate),
 })
 
-// The main conversation sent one of `names` a message: its report no longer
-// answers for what it does next, and it is no longer idle.
-const forgetNames = (state: TeammateReports, names: readonly string[]): TeammateReports => ({
+// A message's recipient: the teammate names it may stand for, and the ids of
+// the listed agents it reaches.
+type Recipients = { names: readonly string[]; ids: readonly string[] }
+
+// The main conversation sent the recipient a message: its report no longer
+// answers for what it does next, it is no longer idle, and a nudge may name
+// it again once it next stops.
+const forgetRecipients = (state: TeammateReports, { names, ids }: Recipients): TeammateReports => ({
   ...state,
   reported: Object.fromEntries(
     Object.entries(state.reported).filter(([name]) => !names.includes(name)),
   ),
   idle: state.idle.filter(name => !names.includes(name)),
+  nudgedIds: state.nudgedIds.filter(id => !ids.includes(id)),
 })
 
 const LEFTOVER: readonly AgentStatus[] = ['idle', 'completed', 'failed']
@@ -149,15 +157,28 @@ const LEFTOVER: readonly AgentStatus[] = ['idle', 'completed', 'failed']
 // An agent a plugin started (`spawnedBy`) is the plugin's to manage, not the
 // model's: question-zone's finished checkers were named in the nudge, and
 // TaskStop on them answered "is not running (status: completed)" (live,
-// 2026-11-08). The nudge and /tidy read this list; the status line counts by
-// status on its own.
-const leftovers = (agents: readonly AgentInfo[]): AgentInfo[] =>
-  agents.filter(agent => LEFTOVER.includes(agent.status) && agent.spawnedBy === undefined)
+// 2026-11-08). The nudge and /tidy go by it; the status line counts by status
+// on its own.
+const isLeftover = (agent: AgentInfo): boolean =>
+  LEFTOVER.includes(agent.status) && agent.spawnedBy === undefined
+
+const leftovers = (agents: readonly AgentInfo[]): AgentInfo[] => agents.filter(isLeftover)
+
+// The name both sources share. The mailbox stamps `origin.teammate`, the
+// member's name in its team; a listed teammate's `name` is "its name in the
+// team" and its `teammateId` is `<name>@<team>`. An agent with no name goes
+// by its id: TaskStop takes a teammate or a named agent by name, any by id.
+const nameOf = (agent: AgentInfo): string =>
+  agent.name ?? agent.teammateId?.split('@')[0] ?? agent.id
 
 // `$.ui.status` keeps one line per plugin, so the idle names and the turn
-// end's counts share it. The engine's own `idle` count is left out: the names
-// stand for it.
-const statusLine = (idle: readonly string[], agents: readonly AgentInfo[]): string | undefined => {
+// end's counts share it. The idle names are the teammates whose idle notice
+// was consumed, and every listed idle agent a nudge has named, so an agent
+// the model keeps stays in view (ruled 2026-11-15). The engine's own `idle`
+// count is left out: the names stand for it.
+const statusLine = (state: TeammateReports, agents: readonly AgentInfo[]): string | undefined => {
+  const kept = agents.filter(agent => agent.status === 'idle' && state.nudgedIds.includes(agent.id))
+  const idle = [...new Set([...state.idle, ...kept.map(nameOf)])].sort()
   const counts: [number, string][] = [
     [agents.filter(a => a.status === 'completed').length, 'done'],
     [agents.filter(a => a.status === 'failed').length, 'failed'],
@@ -176,8 +197,9 @@ const statusLine = (idle: readonly string[], agents: readonly AgentInfo[]): stri
 const describeError = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 
-// An empty list when the engine cannot answer: the counts drop out of the
-// status line and a recipient is matched by its name alone.
+// An empty list when the engine cannot answer: the counts and the kept
+// agents' names drop out of the status line, and a recipient is matched by
+// its name alone, so it reaches no id and stays on the nudge's record.
 const listAgents = async ($: EngineInterface): Promise<readonly AgentInfo[]> => {
   try {
     return await $.agent.list()
@@ -188,10 +210,10 @@ const listAgents = async ($: EngineInterface): Promise<readonly AgentInfo[]> => 
 }
 
 // Never fails the hook that calls it: a consumed notice stays consumed.
-const showStatus = async ($: EngineInterface, idle: readonly string[]): Promise<void> => {
+const showStatus = async ($: EngineInterface, state: TeammateReports): Promise<void> => {
   const agents = await listAgents($)
   try {
-    $.ui.status(statusLine(idle, agents))
+    $.ui.status(statusLine(state, agents))
   } catch (error) {
     $.ui.log(`quiet-agents: could not set the status line: ${describeError(error)}`, { to: 'debug' })
   }
@@ -201,33 +223,43 @@ const showStatus = async ($: EngineInterface, idle: readonly string[]): Promise<
 // \" [ref]\" only when a listing or an error shows one), a teammate name,
 // \"main\", or a background agent's agentId". The teammate names it may stand
 // for: as written, without a ref, and the name of the agent whose `id` or
-// `teammateId` (`<name>@<team>`) it is. A name cleared in error only lets that
-// teammate's next idle notice through, prefixed.
+// `teammateId` (`<name>@<team>`) it is. The agents it reaches: each listed
+// one whose id or `teammateId` it is, or that goes by one of those names. A
+// name or id cleared in error only lets that agent's next idle notice
+// through, prefixed, or its next stop be named. A list the engine cannot give
+// reaches no id, so that agent's next stop is not named.
 const REF_SUFFIX = /\s+\[[^\]]*\]$/
 
-const recipientNames = async ($: EngineInterface, to: string): Promise<string[]> => {
+const recipients = async ($: EngineInterface, to: string): Promise<Recipients> => {
   const names = new Set([to, to.replace(REF_SUFFIX, '')])
-  for (const agent of await listAgents($)) {
+  const agents = await listAgents($)
+  for (const agent of agents) {
     if (agent.name !== undefined && (agent.id === to || agent.teammateId === to)) {
       names.add(agent.name)
     }
   }
-  return [...names]
+  const ids = agents
+    .filter(agent => agent.id === to || agent.teammateId === to || names.has(nameOf(agent)))
+    .map(agent => agent.id)
+  return { names: [...names], ids }
 }
 
 // Run before the send goes on, so a reply that lands before the send resolves
 // is not wiped.
 const forget = async ($: EngineInterface, to: string): Promise<void> => {
-  const names = await recipientNames($, to)
+  const recipient = await recipients($, to)
   const before = await read($, reports)
-  const wasIdle = before.idle.some(name => names.includes(name))
-  if (!wasIdle && !names.some(name => isReported(before, name))) {
+  // Either one is on the status line by name.
+  const wasShown =
+    before.idle.some(name => recipient.names.includes(name)) ||
+    before.nudgedIds.some(id => recipient.ids.includes(id))
+  if (!wasShown && !recipient.names.some(name => isReported(before, name))) {
     return
   }
 
-  const after = await update($, reports, state => forgetNames(state, names))
-  if (wasIdle) {
-    await showStatus($, after.idle)
+  const after = await update($, reports, state => forgetRecipients(state, recipient))
+  if (wasShown) {
+    await showStatus($, after)
   }
 }
 
@@ -343,27 +375,25 @@ const tidy = async ($: EngineInterface): Promise<string> => {
 const nudgeText = (names: readonly string[]): string =>
   `quiet-agents: idle or finished agents: ${names.join(', ')}. Stop each with TaskStop, unless its work is unfinished: then continue it instead. Ask the person any question through the question zone's mcp__denubis-hook-question-zone__ask tool, never in chat.`
 
-// The name both sources share. The mailbox stamps `origin.teammate`, the
-// member's name in its team; a listed teammate's `name` is "its name in the
-// team" and its `teammateId` is `<name>@<team>`. An agent with no name goes
-// by its id: TaskStop takes a teammate or a named agent by name, any by id.
-const nameOf = (agent: AgentInfo): string =>
-  agent.name ?? agent.teammateId?.split('@')[0] ?? agent.id
-
 const sameNames = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((name, i) => name === b[i])
 
 // One turn end's step over the reports, pure so `update` can run it again on
 // a miss. Idle names no listed agent answers to are dropped (stopped and
-// gone); what is left joins every idle, done or failed listed agent, one
-// name each, sorted. Those names are recorded; `nudge` is set when they are
-// some and differ from the last recorded. An end without an answer only
-// drops: it records no names and nudges nothing (ruled 2026-10-24), so the
-// next answered end still compares against what was last nudged.
+// gone). The agents to name are the listed ones that are idle, done or
+// failed, or that a remaining idle name stands for. Those no nudge has named
+// yet are named, one name each, sorted, and their ids recorded (ruled
+// 2026-11-15). An id stays recorded until the main conversation sends that
+// agent a message (`forget`), so an agent the model keeps is named once,
+// however often it wakes and stops on its own and others come and go. An id
+// is not dropped when its agent leaves the list: a new agent under the same
+// name has an id of its own. An end without an answer only drops idle names:
+// it names and records nothing (ruled 2026-10-24).
+type Nudge = { names: readonly string[]; ids: readonly string[] }
+
 type TurnEndStep = {
   state: TeammateReports
-  nudge: readonly string[] | undefined
-  isPruned: boolean
+  nudge: Nudge | undefined
   isChanged: boolean
 }
 
@@ -375,60 +405,83 @@ const turnEndStep = (
   const listed = new Set(agents.map(nameOf))
   const idle = state.idle.filter(name => listed.has(name))
   const isPruned = !sameNames(idle, state.idle)
-  if (!isAnswered) {
-    return { state: { ...state, idle }, nudge: undefined, isPruned, isChanged: isPruned }
+  const unnamed = isAnswered
+    ? agents.filter(
+        agent =>
+          (isLeftover(agent) || idle.includes(nameOf(agent))) && !state.nudgedIds.includes(agent.id),
+      )
+    : []
+  if (unnamed.length === 0) {
+    return { state: { ...state, idle }, nudge: undefined, isChanged: isPruned }
   }
-  const names = [...new Set([...idle, ...leftovers(agents).map(nameOf)])].sort()
-  const isNew = !sameNames(names, state.nudged)
   return {
-    state: { ...state, idle, nudged: names },
-    nudge: isNew && names.length > 0 ? names : undefined,
-    isPruned,
-    isChanged: isPruned || isNew,
+    state: { ...state, idle, nudgedIds: [...state.nudgedIds, ...unnamed.map(agent => agent.id)] },
+    nudge: { names: [...new Set(unnamed.map(nameOf))].sort(), ids: unnamed.map(agent => agent.id) },
+    isChanged: true,
   }
+}
+
+// A nudge that did not enter told the model nothing: its agents' ids leave
+// the record, and the status line, so the next answered turn end names them.
+// Like a dropped notice, it is not remembered.
+const unrecordNudge = async ($: EngineInterface, nudge: Nudge, why: string): Promise<void> => {
+  $.ui.log(`quiet-agents: ${why}; its agents are named at the next answered turn end`, { to: 'debug' })
+  let after: TeammateReports
+  try {
+    after = await update($, reports, state => ({
+      ...state,
+      nudgedIds: state.nudgedIds.filter(id => !nudge.ids.includes(id)),
+    }))
+  } catch (error) {
+    $.ui.log(`quiet-agents: could not take the nudge's agents off the record: ${describeError(error)}`, {
+      to: 'debug',
+    })
+    return
+  }
+  await showStatus($, after)
 }
 
 // Not awaited: the call resolves only as the nudge's own turn starts, once
 // the session is idle, and this turn is still ending.
-const submitNudge = ($: EngineInterface, names: readonly string[]): void => {
-  void $.prompt.submit({ text: nudgeText(names) }).then(
-    result => {
-      if (result.drop !== undefined) {
-        $.ui.log(`quiet-agents: the nudge was dropped: ${result.drop}`, { to: 'debug' })
-      }
-    },
-    (error: unknown) => {
-      $.ui.log(`quiet-agents: could not submit the nudge: ${describeError(error)}`, { to: 'debug' })
-    },
+const submitNudge = ($: EngineInterface, nudge: Nudge): void => {
+  void $.prompt.submit({ text: nudgeText(nudge.names) }).then(
+    result =>
+      result.drop === undefined ? undefined : unrecordNudge($, nudge, `the nudge was dropped: ${result.drop}`),
+    (error: unknown) => unrecordNudge($, nudge, `could not submit the nudge: ${describeError(error)}`),
   )
 }
 
 // Never stops an agent: the nudge asks the model, whose TaskStop asks
 // permission as usual. A list the engine could not give changes nothing, as
-// an empty one would drop every idle name and clear the record.
-const nudgeAtTurnEnd = async ($: EngineInterface, isAnswered: boolean): Promise<void> => {
+// an empty one would drop every idle name.
+const recordTurnEnd = async ($: EngineInterface, isAnswered: boolean): Promise<Nudge | undefined> => {
   let agents: readonly AgentInfo[]
   try {
     agents = await $.agent.list()
   } catch (error) {
     $.ui.log(`quiet-agents: could not list agents, so no nudge: ${describeError(error)}`, { to: 'debug' })
-    return
+    return undefined
   }
 
   let step = turnEndStep(await read($, reports), agents, isAnswered)
   if (!step.isChanged) {
-    return
+    return undefined
   }
 
-  const after = await update($, reports, state => {
+  await update($, reports, state => {
     step = turnEndStep(state, agents, isAnswered)
     return step.state
   })
-  if (step.isPruned) {
-    await showStatus($, after.idle)
-  }
-  if (step.nudge !== undefined) {
-    submitNudge($, step.nudge)
+  return step.nudge
+}
+
+// The status line is set once, from what this end recorded, before the nudge
+// goes in, so a dropped nudge's own update of it comes last.
+const nudgeAtTurnEnd = async ($: EngineInterface, isAnswered: boolean): Promise<void> => {
+  const nudge = await recordTurnEnd($, isAnswered)
+  await showStatus($, await read($, reports))
+  if (nudge !== undefined) {
+    submitNudge($, nudge)
   }
 }
 
@@ -508,7 +561,7 @@ export const register: Register = on => {
       return next(prefixed)
     }
 
-    await showStatus($, after.idle)
+    await showStatus($, after)
     return { consumed: `quiet-agents: idle notice from ${teammate}; its report was already received` }
   })
 
@@ -554,7 +607,7 @@ export const register: Register = on => {
     }
   })
 
-  // Part 3: visibility, then the nudge about idle or finished agents. Nothing
+  // Part 3: the nudge about idle or finished agents, and visibility. Nothing
   // here stops an agent unasked.
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
@@ -562,11 +615,10 @@ export const register: Register = on => {
       return result
     }
 
-    await showStatus($, (await read($, reports)).idle)
     // Ruled 2026-10-24: the nudge fires only when the model answered. A turn
     // the person interrupted or an API error ended would otherwise queue a
     // plugin prompt ahead of what the person meant to type next. Any end
-    // still drops a stopped teammate's name from the status line.
+    // still drops a stopped teammate's name from the status line, and sets it.
     await nudgeAtTurnEnd($, e.reason === 'answer')
     return result
   })

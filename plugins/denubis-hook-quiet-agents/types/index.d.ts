@@ -17,11 +17,12 @@ export type TeammateReports = {
   // named once in that prompt's context, then cleared. In arrival order, no
   // repeats.
   pending: readonly string[]
-  // The names found at the last main-loop turn end: idle teammates and every
-  // idle, done or failed listed agent. Sorted, no repeats. A turn end nudges
-  // the model only when its names differ from these; an empty set clears
-  // them, so the same agents appearing again are named again.
-  nudged: readonly string[]
+  // The ids of the agents a main-loop turn end's nudge has named, in the
+  // order named, no repeats. A turn end names only agents not in this list,
+  // and the status line names each listed idle agent in it. An id leaves it
+  // when the main conversation next sends that agent a message, so its next
+  // stop is named again, or when the nudge that named it did not go in.
+  nudgedIds: readonly string[]
 }
 
 declare module 'claude-code' {
