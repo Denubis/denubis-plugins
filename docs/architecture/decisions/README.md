@@ -92,6 +92,7 @@ and consequences section. One ADR per decision.
 - [2026-11-10-bbs-compact-nag-leaves-engine-threshold — The compact-nag mod leaves Claude Code's own compaction point alone; it notes the need to prepare at 40%, the session asks for a compaction when it is ready, and past 50% each main-session stop gets an urgent note instead of a forced compaction](2026-11-10-bbs-compact-nag-leaves-engine-threshold.md)
 - [2026-11-10-bbs-own-agents-compact-at-half — Subagents of this repository's own agent types compact at about half their context window; every agent file carries `autoCompactWindow: 500000`](2026-11-10-bbs-own-agents-compact-at-half.md)
 - [2026-11-15-bbs-quiet-agents-names-agents-once — quiet-agents' turn-end nudge names each agent once, and again only after the main conversation sends it new work](2026-11-15-bbs-quiet-agents-names-agents-once.md)
+- [2026-11-16-bbs-compact-nag-resumes-after-its-compaction — After its own compaction of the main session, compact-nag starts the next turn, quoting the session's brief and its handover reply](2026-11-16-bbs-compact-nag-resumes-after-its-compaction.md)
 
 ## Status lifecycle
 

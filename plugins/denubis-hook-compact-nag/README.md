@@ -31,6 +31,14 @@ which. When it accepts, the main session compacts as soon as that turn ends. The
 instructions are the brief, followed by a line telling the session to re-read the saved
 files first.
 
+**After that compaction** the mod submits a prompt, so the session carries on without
+waiting for the person. The prompt tells it to re-read its saved files and take the
+next step they name, or to say what it needs and stop if that step waits on the person.
+It quotes the session's brief and its reply at the end of the turn in which it said it
+was ready, even if the compaction ran a turn or more later. No prompt follows a
+compaction that was refused, or one the session did not ask for (`/compact`, Claude
+Code's own).
+
 **Past 50%** the main session is still never compacted unless it said it is ready. Each
 of its stops leaves an urgent note instead, which the session reads at its next turn.
 
@@ -56,6 +64,9 @@ The mod does not change Claude Code's own compaction threshold
 - [ADR 2026-11-10-bbs-compact-nag-leaves-engine-threshold](../../docs/architecture/decisions/2026-11-10-bbs-compact-nag-leaves-engine-threshold.md):
   no change to Claude Code's threshold, compaction only when the session is ready, and an
   urgent note at each stop past 50%.
+- [ADR 2026-11-16-bbs-compact-nag-resumes-after-its-compaction](../../docs/architecture/decisions/2026-11-16-bbs-compact-nag-resumes-after-its-compaction.md):
+  after its own compaction the mod starts the next turn, quoting the session's brief and
+  its handover reply.
 
 ## Limits
 

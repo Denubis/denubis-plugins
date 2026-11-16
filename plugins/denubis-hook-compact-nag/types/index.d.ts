@@ -17,6 +17,8 @@ export type CompactNagLoop = {
   saved?: string[]
   /** The session called ready_to_compact and was accepted. */
   isReady?: boolean
+  /** The final reply of the turn in which the session said it is ready. */
+  handoverReply?: string
 }
 
 declare module 'claude-code' {
