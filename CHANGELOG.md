@@ -43,6 +43,19 @@ The end-of-turn reminder no longer starts a turn of its own: it rides on the nex
 
 **Not verified:** the reminder riding beside the next prompt was observed live on 2026-11-15: the turn end started no turn, and the reminder came once as context beside the person's next prompt. The corrected mute was seen once in a live retest the same day: by a test session's report, which the person pasted in, a muted agent's answer came through, and the line in front of it no longer told the model to stop the agent; that retest did not show a muted agent left out of the reminder. Nothing else here has been observed live: not the ride on an agent's delivery or how that leading line reads to the model, not leaving the reminder's agents off the idle line, not keeping the reminder off a delivery whose idle notice already prompts a stop of that agent, and not leaving out a `waiting` agent. Which background work puts an agent in `waiting` rests on the type documentation. A teammate in a terminal pane of its own is listed only as `running` or `idle`, so this change cannot see its shells or monitors.
 
+## [denubis-hook-compact-nag] 0.1.1
+
+Once the mod's own compaction of the main session is done, the session carries on without waiting for the person (ADR 2026-11-16-bbs-compact-nag-resumes-after-its-compaction).
+
+**Added:**
+- After a compaction the session asked for with `ready_to_compact` goes ahead, the mod submits a prompt that starts the next turn. It tells the session to re-read the handover files it saved, take the next step they name or, if that step waits on the person, say what it needs and stop. It quotes the brief the session wrote for itself and its reply at the end of the turn in which it said it was ready, even when the compaction runs a turn or more later. Before, the session sat idle after compacting until the person typed: on 2026-11-15 one session compacted at 05:37:44 and waited until the person wrote "um... ok?" 21 seconds later.
+- No prompt follows a compaction that was refused or skipped, nor one the session did not ask for (`/compact`, Claude Code's own threshold).
+- The handover record keeps that reply, so its shape tag is now `loops-2`. The first load of this version reads what 0.1.0 stored as empty: a session part-way through a handover is nagged again.
+
+**Tests:** `plugins/denubis-hook-compact-nag/tests/compact-nag.test.ts`, run with `claude plugin test` (12 pass). New tests: the prompt follows the mod's compaction and carries the handover reply, the brief and the handover file; a compaction refused once and run after a later turn still quotes the handover reply, not the later one; a compaction refused because a turn is running sends none; a compaction a plugin vetoes sends none; a `/compact` followed by a turn end sends none. Each of the last three failed when the module was deliberately broken in that case: sending the prompt after a refusal, sending it after a veto, and not resetting the handover record after `/compact`.
+
+**Not verified:** not yet observed live. The prompt is sent only when the mod's own compaction goes ahead. In the past week's sessions it was often refused because a turn was still running (the open finding in the compact-nag worklog); the mod tries again at each later turn end, so by then the session may have done more work than the handover files and reply it is pointed back to describe. If the person types while the compaction runs, their prompt and the resume prompt are both queued, in an order not tested.
+
 ## [denubis-hook-quiet-agents] 0.1.3
 
 The turn-end nudge names each agent once, so an agent kept on purpose is not named again and again (ADR 2026-11-15-bbs-quiet-agents-names-agents-once).

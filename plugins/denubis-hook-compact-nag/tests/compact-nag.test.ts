@@ -18,12 +18,17 @@ const textOf = (row: SessionAppendInput) => {
 }
 
 // Stands for the engine beneath the mod: a context window of 1000 tokens, a
-// clock that moves only when told, files with the mtimes `files` holds, and a
-// record of every compaction that reached the bottom.
+// clock that moves only when told, files with the mtimes `files` holds, a
+// record of every compaction that reached the bottom and of every prompt the
+// mod submitted. While `refusal.isTurnRunning` is set, a compaction is refused
+// as Claude Code refuses one while a turn runs; while `refusal.skip` is set, it
+// is vetoed as a plugin's hook vetoes one.
 const engine = async ($: Engine, on: On, files: Record<string, number> = {}) => {
   const clock = mock.clock(on, { now: 1_000 })
   const session = mock.session(on)
   const compactions: { instructions: string | undefined; agentId: string | undefined }[] = []
+  const prompts: string[] = []
+  const refusal: { isTurnRunning: boolean; skip?: string } = { isTurnRunning: false }
   let tokens = 0
 
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -45,8 +50,14 @@ const engine = async ($: Engine, on: On, files: Record<string, number> = {}) => 
   })
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('session.compact', (_, e) => {
+    if (refusal.isTurnRunning) throw new Error('$.session.compact: a turn is running; the conversation compacts between turns')
+    if (refusal.skip !== undefined) return { skip: refusal.skip }
     compactions.push({ instructions: e.instructions, agentId: e.agentId })
     return { messages: [{ role: 'user' as const, text: 'Summary.', toolUses: [] }] }
+  })
+  on('prompt.submit', (_, e) => {
+    prompts.push(e.text)
+    return { text: e.text, origin: e.origin }
   })
   on('fs.stat', (_, e) => {
     // The engine hands the path on made absolute under the working directory.
@@ -74,16 +85,16 @@ const engine = async ($: Engine, on: On, files: Record<string, number> = {}) => 
       // drained: only the result matters here
     }
   }
-  // The main loop's turn ends; time passes for anything scheduled after it.
-  const stop = async () => {
-    await $.turn.complete({ turnId: 't', answer: '', reason: 'answer', isAborted: false, durationMs: 1 })
+  // The main loop's turn ends with `answer`; time passes for anything scheduled after it.
+  const stop = async (answer = '') => {
+    await $.turn.complete({ turnId: 't', answer, reason: 'answer', isAborted: false, durationMs: 1 })
     await clock.advance(1_000)
   }
   const notes = (agentId?: string) => session.appended().filter(row => row.agentId === agentId).map(textOf)
   const ready = (saved: string[], brief = 'Keep the parser plan and the failing test name.') =>
     $.tool.call({ tool: TOOL, brief, saved })
 
-  return { clock, compactions, notes, ready, request, stop }
+  return { clock, compactions, notes, prompts, ready, refusal, request, stop }
 }
 
 test('a session is told to prepare for compaction once it passes 40%, again 5 points later, not in between', async ($, on) => {
@@ -149,6 +160,82 @@ test('a handover file unchanged since the note is refused; once changed, the ses
   expect(world.compactions).toHaveLength(1)
   expect(world.compactions[0]?.instructions).toContain('Keep the parser plan.')
   expect(world.compactions[0]?.instructions).toContain(WORKLOG)
+})
+
+test('once its own compaction is done, the session gets a turn quoting its handover reply and its brief, and naming its handover files', async ($, on) => {
+  const files: Record<string, number> = {}
+  const world = await engine($, on, files)
+  await world.request(42)
+  files[WORKLOG] = world.clock.now() + 1
+  await world.ready([WORKLOG], 'Keep the parser plan.')
+
+  await world.stop('Stopped for compaction. Next: rerun the parser tests, then fix the tokenizer.')
+
+  expect(world.compactions).toHaveLength(1)
+  expect(world.prompts).toHaveLength(1)
+  expect(world.prompts[0]).toContain('Stopped for compaction. Next: rerun the parser tests, then fix the tokenizer.')
+  expect(world.prompts[0]).toContain('Keep the parser plan.')
+  expect(world.prompts[0]).toContain(WORKLOG)
+})
+
+test('a compaction that runs a turn late still quotes the reply the session handed over with, not the later one', async ($, on) => {
+  const files: Record<string, number> = {}
+  const world = await engine($, on, files)
+  await world.request(42)
+  files[WORKLOG] = world.clock.now() + 1
+  await world.ready([WORKLOG])
+  world.refusal.isTurnRunning = true
+  await world.stop('Handed over. Next: fix the tokenizer.')
+  world.refusal.isTurnRunning = false
+
+  await world.stop('Answered the teammate about the fixtures.')
+
+  expect(world.compactions).toHaveLength(1)
+  expect(world.prompts).toHaveLength(1)
+  expect(world.prompts[0]).toContain('Handed over. Next: fix the tokenizer.')
+  expect(world.prompts[0]).not.toContain('Answered the teammate about the fixtures.')
+})
+
+test('a compaction refused because a turn is running gives the session no turn', async ($, on) => {
+  const files: Record<string, number> = {}
+  const world = await engine($, on, files)
+  await world.request(42)
+  files[WORKLOG] = world.clock.now() + 1
+  await world.ready([WORKLOG])
+  world.refusal.isTurnRunning = true
+
+  await world.stop()
+
+  expect(world.compactions).toHaveLength(0)
+  expect(world.prompts).toHaveLength(0)
+})
+
+test('a compaction the session did not ask for gives it no turn', async ($, on) => {
+  const files: Record<string, number> = {}
+  const world = await engine($, on, files)
+  await world.request(42)
+  files[WORKLOG] = world.clock.now() + 1
+  await world.ready([WORKLOG])
+
+  await $.session.compact({ trigger: 'manual', messages: TRANSCRIPT })
+  await world.stop('The first reply after /compact.')
+
+  expect(world.compactions).toHaveLength(1)
+  expect(world.prompts).toHaveLength(0)
+})
+
+test('a compaction a plugin vetoes gives the session no turn', async ($, on) => {
+  const files: Record<string, number> = {}
+  const world = await engine($, on, files)
+  await world.request(42)
+  files[WORKLOG] = world.clock.now() + 1
+  await world.ready([WORKLOG])
+  world.refusal.skip = 'vetoed'
+
+  await world.stop()
+
+  expect(world.compactions).toHaveLength(0)
+  expect(world.prompts).toHaveLength(0)
 })
 
 test('a missing handover file is refused', async ($, on) => {

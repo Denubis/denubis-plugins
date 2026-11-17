@@ -21,7 +21,7 @@ const TOOL = 'mcp__denubis-hook-compact-nag__ready_to_compact'
 const loops = atom(
   { plugin: 'denubis-hook-compact-nag', key: 'loops' } as const,
   {} as Record<string, CompactNagLoop>,
-  { shape: 'loops-1' },
+  { shape: 'loops-2' },
 )
 
 const keyOf = (agentId: string | undefined) => agentId ?? MAIN
@@ -78,6 +78,20 @@ const instructionsFor = (loop: CompactNagLoop | undefined, typed?: string) => {
   return text === '' ? undefined : text
 }
 
+// The turn the mod gives the main session once its own compaction is done:
+// back to its handover files, its own brief and the reply it handed over
+// with, without waiting for the person.
+const resumeNote = (loop: CompactNagLoop | undefined) =>
+  [
+    '[compact-nag] This session has just been compacted at its own request. Carry on from your handover.',
+    loop?.saved?.length ? `Re-read these files first: ${loop.saved.join(', ')}.` : undefined,
+    'Then take the next step they name. If that step waits on the person, say what it needs and stop.',
+    loop?.brief ? `The brief you wrote for this compaction:\n\n${loop.brief}` : undefined,
+    loop?.handoverReply?.trim() ? `Your reply when you handed over:\n\n${loop.handoverReply.trim()}` : undefined,
+  ]
+    .filter(line => line !== undefined)
+    .join('\n')
+
 const tokensOf = (usage: ModelUsage) =>
   usage.input_tokens +
   usage.cache_read_input_tokens +
@@ -119,7 +133,8 @@ async function resetLoop($: EngineInterface, key: string) {
 }
 
 async function compactMain($: EngineInterface) {
-  const instructions = instructionsFor((await read($, loops))[MAIN])
+  const loop = (await read($, loops))[MAIN]
+  const instructions = instructionsFor(loop)
   try {
     const result = await $.session.compact(instructions === undefined ? {} : { instructions })
     if (result.skip !== undefined) {
@@ -132,7 +147,15 @@ async function compactMain($: EngineInterface) {
     // Rejects while a turn runs (a prompt queued during the last one); the
     // record stays as it is, so the next turn's end tries again.
     $.ui.log(`compact-nag: compaction deferred: ${String(error)}`)
+    return
   }
+  // Not awaited: it resolves only as its own turn starts, once the session is idle.
+  void $.prompt.submit({ text: resumeNote(loop) }).then(
+    result => {
+      if (result.drop !== undefined) $.ui.log(`compact-nag: the resume prompt was dropped: ${result.drop}`)
+    },
+    (error: unknown) => $.ui.log(`compact-nag: could not send the resume prompt: ${String(error)}`),
+  )
 }
 
 const stringList = (value: unknown) =>
@@ -229,6 +252,14 @@ export const register: Register = on => {
     if (e.agentId !== undefined || e.isAborted) return done
     const loop = (await read($, loops))[MAIN]
     if (loop?.isReady === true) {
+      // The first stop after the session said it is ready ends its handover
+      // turn: keep that reply for the resume prompt, however late the
+      // compaction runs.
+      if (loop.handoverReply === undefined)
+        await update($, loops, all => {
+          const current = all[MAIN]
+          return current === undefined ? all : { ...all, [MAIN]: { ...current, handoverReply: e.answer } }
+        })
       $.clock.after(500, () => void compactMain($))
       return done
     }
