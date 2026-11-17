@@ -72,9 +72,12 @@ names the exact file and the human-authorised environment permits it.
 
 Run the documented baseline checks from the new worktree. If they fail, compare with the
 base checkout only through safe read-only evidence; do not start feature fixes inside the
-setup task.
+setup task. An agent worktree a plan creates from the task branch's tip, whose check
+results are already recorded for that same tree, runs the setup's install steps and only
+the narrowest check that shows its environment works; it relies on that recorded baseline.
 
 Report the exact worktree path, task branch, intended integration branch, base object ID,
 setup actions, and baseline results.
-Leave the caller able to change into that path. Do not commit setup files, remove another
-worktree, or imply future cleanup authority.
+Leave the caller able to change into that path. Do not commit setup files or remove another
+worktree. Creating a worktree grants no authority to remove it: removal follows the
+plan's cleanup step or the delivery workflow.

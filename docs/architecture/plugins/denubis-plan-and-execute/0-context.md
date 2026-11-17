@@ -23,19 +23,25 @@ invocation without duplicating the method.
 - Design resolves intent and material trade-offs into an accepted project artifact.
 - Implementation planning groups work by independently understandable, usable or
   verifiable outcomes rather than chronological phases. Stable plan content, unresolved
-  tasks, and completed work/evidence have separate durable files.
+  tasks, and completed work/evidence have separate durable files. The plan's execution
+  layout runs at the same time only work that shares no file, gives each concurrent
+  implementer a worktree from the task branch and each piece a checker that did not write
+  it, orders the joins into the task branch, and removes each worktree after its join.
 - Execution uses project-native TDD or positive operational probes, creates recoverable
   private checkpoints in task-owned isolation, and assembles the complete surface. Its
   workspace rubric requires a worktree for concurrent or overlapping work and human
-  assent before beginning on the default branch. The top-level executor owns this
-  ordinary lifecycle directly and loads another procedure only for a concrete unresolved
-  condition.
+  assent before beginning on the default branch. The top-level executor follows the
+  plan's execution layout, owns this ordinary lifecycle directly, and loads another
+  procedure only for a concrete unresolved condition.
 - Verification completes mechanical gates, independent sanity checks, boundary
   reconciliation, documentation, and diff/status inspection before human UAT.
 - UAT asks the human to interact with an irreducible implication of the finished surface.
-- Post-UAT normalization folds fixes and superseded checkpoints into coherent outcomes
-  while preserving the accepted tree. Selected delivery then integrates and optionally
-  publishes the intended branch before removing only task-owned isolation.
+- Normalization keeps the task branch to a few coherent commits without a human prompt:
+  agents' checkpoints are squashed as their branches join, and fixes and superseded
+  checkpoints, including those after UAT, fold into coherent outcomes, each rewrite
+  preserving the tree it starts from. Delivery the human selects after UAT then integrates
+  and optionally publishes the intended branch, removing the task worktree and branch only
+  as the human names.
 - Architecture maintenance maps current implementation and updates its existing semantic
   owner directly; there is no second architecture-writer skill or compulsory template set.
 
@@ -77,11 +83,19 @@ uv; no separate Byobu reporter repository or quota API polling is required.
 
 - Project files, Git state, tests, builds, and runtime observations establish technical
   results; task labels, commits, and model verdicts do not.
-- An approved execution request permits private checkpoints only on its task-owned branch.
-  A skill/plugin `commit, marketplace, push` or `ship` request selects complete default-
-  branch delivery after accepted UAT; it does not select the current feature branch.
-  Other publication, deployment, inherited-history rewriting, and destructive cleanup
-  remain separate actions.
+- An approved execution request permits, without prompts, private checkpoints only on its
+  task-owned branch and the agent branches its plan names, the joins and the squashes that
+  keep the task branch to a few coherent commits, removal of the agent worktrees its plan
+  creates, and safe deletion of those agent branches once joined. It never permits the
+  final merge into the intended integration branch: the human authorises that after
+  discussing the finished work and accepting UAT, which also permits its commit, and,
+  short of a delivery request below, starts it by running the merge command, which the
+  session hands over rather than runs.
+  The task worktree and branch are removed only as the human names then. A skill/plugin
+  `commit, marketplace, push` or `ship` request is such an authorisation and selects
+  complete default-branch delivery; it does not select the current feature branch. Other
+  worktree cleanup, other branch deletion, history rewriting outside the private feature
+  series, destructive discard, publication, and deployment remain separate actions.
 - Human UAT happens after complete mechanical and sanity evidence. A failed observation
   returns to implementation and invalidates affected evidence.
 - Investigation, tracking, secondary checks, and progress reporting have a current

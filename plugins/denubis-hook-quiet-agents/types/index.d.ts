@@ -17,19 +17,37 @@ export type TeammateReports = {
   // named once in that prompt's context, then cleared. In arrival order, no
   // repeats.
   pending: readonly string[]
-  // The ids of the agents a main-loop turn end's nudge has named, in the
-  // order named, no repeats. A turn end names only agents not in this list,
-  // and the status line names each listed idle agent in it. An id leaves it
-  // when the main conversation next sends that agent a message, so its next
-  // stop is named again, or when the nudge that named it did not go in.
+  // The ids of the agents a main-loop turn end has named for the reminder,
+  // in the order named, no repeats. A turn end names only agents not in this
+  // list, and the status line names each listed idle agent in it. An id
+  // leaves it when the main conversation next sends that agent a message, so
+  // its next stop is named again.
   nudgedIds: readonly string[]
 }
+
+// The ids of the agents the person muted with `/quiet-agents mute`, in the
+// order muted, no repeats. An id leaves it at `/quiet-agents unmute`, or once
+// its agent is stopped: at a main-loop turn end whose agent list lists it as
+// `killed` or no longer holds it.
+export type MutedAgents = readonly string[]
+
+// An agent a turn end named, by its id and the name the reminder gives it.
+export type NoteEntry = { id: string; name: string }
+
+// The agents a main-loop turn end named that the reminder has not yet named
+// to the model, in the order named, no repeated id. An entry leaves when the
+// reminder names it on a message that went in, or at a main-loop turn end
+// whose agent list no longer holds its id or whose record (`nudgedIds`) no
+// longer does.
+export type ReminderNote = readonly NoteEntry[]
 
 declare module 'claude-code' {
   interface PluginState {
     'denubis-hook-quiet-agents': {
       lastNotice: Shaped<NoticeHashes>
       reports: Shaped<TeammateReports>
+      muted: Shaped<MutedAgents>
+      note: Shaped<ReminderNote>
     }
   }
 }

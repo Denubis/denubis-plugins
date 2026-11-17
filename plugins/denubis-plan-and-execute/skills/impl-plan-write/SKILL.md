@@ -68,7 +68,8 @@ real consumer outside the outcome that owns it. Do not create empty or “not ap
 paperwork.
 
 The plan begins with the design path, working root, current repository evidence, scope,
-and acceptance criteria. For each outcome include:
+acceptance criteria, and the execution layout described under “Execution by several
+agents”. For each outcome include:
 
 ```markdown
 ## Outcome: <completed state>
@@ -127,6 +128,70 @@ workspace, but not expected answers or scoring criteria. The evaluator inspects 
 actions or consequences and includes a permitted or positive-control path so “nothing
 happened” cannot pass by default.
 
+## Execution by several agents
+
+Plan how agents will execute the outcomes, so independent work runs at the same time and
+every piece is checked by an agent that did not write it. Parallelism is not a target:
+when the design is one coupled outcome, the layout says that one implementer works in the
+task checkout and nothing more.
+
+- **Concurrency.** Work runs at the same time only when it edits no common file, counting
+  tests, generated files, lockfiles, migrations, and release or changelog metadata, and
+  each piece has its own check that can fail. Give every shared file one owner, normally
+  the coordinating session when it joins the work. Work that depends on another piece, or
+  changes an interface another piece consumes, waits until that piece has joined. Keep
+  coupled work with one implementer.
+- **Isolation.** Each concurrent implementer works in its own worktree on its own branch,
+  which the coordinating session creates from the task branch's current tip through
+  `denubis-plan-and-execute:using-git-worktrees`. It runs the documented setup's install
+  steps and only the narrowest check that shows its environment works, relying on the
+  task branch's recorded baseline for that same tree rather than rerunning the expensive
+  suite. Do not use a runtime's own agent worktrees, such as Claude Code's
+  `isolation: "worktree"`, unless the plan records a compelling reason the skill's
+  worktree cannot serve; that one starts from the remote default branch unless
+  `worktree.baseRef` is `"head"`, not from the task branch. An agent-team teammate shares
+  the lead's checkout, so it never writes alongside another implementer.
+- **Checking.** Each implemented piece has a named checker that did not write it and does
+  not share its context. The checker reads the piece's diff and the implementer's recorded
+  check results, runs only the narrowest check that could falsify a claim it doubts, and
+  judges the piece against its acceptance criteria; it does not edit. Its findings go back
+  to the implementer.
+- **Joining.** The coordinating session joins verified branches into the task branch one
+  at a time, in dependency order. Before a branch joins, it squashes the branch's
+  checkpoints into the few coherent commits of the outcome it serves, so the join keeps
+  those commits and `git branch -d` still finds the branch merged. After each join it
+  reruns, on the combined tree, the checks the join could affect, and tells implementers
+  still working what has landed. A
+  conflict goes back to the implementer whose branch conflicts, to rebase onto the new
+  tip.
+- **Test runs.** Say which agent runs which tests, when, and what each run proves. An
+  expensive suite runs once for a given state of the code; other agents rely on that
+  recorded result and run only the narrowest check that could falsify a doubt.
+- **Cleanup.** List every worktree and branch the plan creates. Once a piece has joined
+  and its combined checks pass, the coordinating session removes its worktree from
+  outside it with `git worktree remove`, after confirming the worktree's status is clean
+  and its branch has no commit the task branch lacks. It then deletes that branch with
+  `git branch -d`, which refuses a branch not fully merged. It confirms each removal with
+  `git worktree list` and `git branch --list`, and records it in the worklog. The task
+  worktree and task branch stay until the human, authorising the final merge, names their
+  removal (below).
+
+Name each agent by role, with the model and effort the instruction files set for that
+role. Lay the plan out as one table of the work and a few lines of rules:
+
+```markdown
+## Execution
+
+| Work | Implementer and worktree | Starts after | Checker |
+|---|---|---|---|
+| <outcome or piece> | <role>; `<worktree path>` on `<branch>` from the task branch | <piece, or start> | <role, not the implementer> |
+
+- Shared files and their owner: <file> — <owner>
+- Join order and combined checks: <order>; <command and what it proves>
+- Test runs: <agent> runs <scope> <when>, proving <claim>
+- Cleanup: <each worktree and branch>, removed after its join passes; `git worktree list`
+```
+
 ## Boundary changes
 
 Add a boundary-flow section only when the work changes what crosses a boundary between an
@@ -149,17 +214,37 @@ overlapping files, or unrelated dirty state require a task-owned worktree. An ex
 task-owned branch or worktree is suitable. If execution would begin on the default branch,
 warn and obtain human assent before the first edit there.
 
-When the human invokes execution of the approved plan, that instruction authorises local
-private checkpoint commits on the isolated task branch. Checkpoints may be frequent and
-require no routine prompt. They do not authorise pushing, publication, deployment, or
-rewriting inherited or published history.
+The human's approval of a plan, and their instruction to execute it, authorise without
+further prompts (ruled 2026-11-15):
 
-Fix rounds and superseded checkpoints fold into their owning outcome only after the human
-accepts finished-work UAT. Normalization must preserve the exact accepted tree, then rerun
-the relevant diff audit and verification. A subsequent direct-delivery request integrates
-that tree into the intended branch, pushes that branch when authorised, verifies the
-remote ref, and cleans the task-owned branch or worktree. A plan should state these
-lifecycle boundaries, not prescribe a commit-count quota.
+- local private checkpoint commits on the isolated task branch and in the agent
+  worktrees, on the agent branches the plan names;
+- the joins of those branches into the task branch, and the commits and squashes there
+  that keep it to a few coherent commits, before integration testing, because the
+  combined tree cannot be tested without merging, nor merged without committing; and
+- the removal of the agent worktrees, and the safe deletion (`git branch -d`) of each
+  agent branch the plan's cleanup step names, once it has joined.
+
+Checkpoints may be frequent and require no routine prompt. None of this authorises the
+final merge of the task branch into the intended integration branch: it is never
+automatic, and happens only when the human authorises it at that point, after discussing
+the finished work and accepting its UAT. Unless the human types a delivery request such
+as `ship` or `commit, marketplace, push`, which orders the session to run the whole
+delivery, merge included (ruled 2026-11-17), the human starts the merge by running
+`/denubis-plan-and-execute:merge-to-main`; the session hands the human that command and
+does not run the merge itself (ruled 2026-11-15). That authorisation also permits the
+merge's commit; the task worktree and task branch are removed only as the human names
+then. Nor
+does plan approval authorise pushing, publication, deployment, or rewriting inherited or
+published history.
+
+Fix rounds and superseded checkpoints fold into their owning outcome on the task branch
+as they land, and any fix round after UAT folds the same way. Each rewrite must preserve
+the exact tree it starts from, then rerun the relevant diff audit and verification before
+the final merge. A subsequent direct-delivery request integrates the accepted tree into
+the intended branch, pushes it, verifies the remote ref, and cleans the task branch. A
+plan should state these lifecycle boundaries and aim for a few coherent commits on the
+task branch, not prescribe a commit-count quota.
 
 ## Integrity and handoff
 
@@ -171,10 +256,13 @@ outcome, covering that:
 - every criterion has one primary evidence owner and no outcome duplicates or drops it;
 - every outcome leaves a runnable, testable state;
 - dependencies precede their consumers without chronology-only splits;
+- work scheduled at the same time shares no file, every shared file has one owner, and
+  each implemented piece has a checker other than its implementer;
+- every worktree and branch the plan creates has a removal step after its join;
 - open decisions are resolved or named as blockers;
 - UAT is complete-surface judgment after mechanical and sanity checks; and
-- no publication, deployment, credential use, or final history rewrite exceeds granted
-  authority.
+- no final merge, publication, deployment, credential use, or final history rewrite
+  exceeds granted authority.
 
 Report the exact plan, todo, and worklog paths plus the working root. When no blocker
 remains, provide:

@@ -1,4 +1,4 @@
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type {
   AgentInfo,
@@ -266,6 +266,21 @@ test('the status line names every idle teammate, sorted', async ($, on) => {
   expect(statuses).toEqual(['agents idle: scout', 'agents idle: helper, scout'])
 })
 
+// `waiting` is "on background work it owns, on a plan's approval or, in a
+// background subagent, on an Agent call alone" (AgentStatus), so its idle
+// notice does not make it idle, whatever it waits on. Here a shell or a
+// monitor it started is still running.
+test('an agent waiting on its own background work is not shown idle, though its idle notice was consumed', async ($, on) => {
+  const { queued, statuses } = engine(on, [agent('a1', 'shepherd', 'waiting')])
+
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+  const result = await $.session.receive(fromTeammate('shepherd', idleNotice('shepherd', 'Watching the jobs.')))
+
+  expectConsumed(result)
+  expect(queued).toEqual([REPORT])
+  expect(statuses).toEqual([undefined])
+})
+
 test('an idle notice with no report before it passes with the prefix', async ($, on) => {
   const { queued, statuses } = engine(on)
 
@@ -460,6 +475,19 @@ test('consumed idle notices are named once, in the next prompt’s context', asy
   ])
 })
 
+test('the next prompt does not name as idle an agent now waiting on its own background work', async ($, on) => {
+  engine(on, [agent('a1', 'shepherd', 'waiting'), agent('a2', 'helper', 'idle')])
+  const entered = engineTakesPrompts(on)
+
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+  await $.session.receive(fromTeammate('shepherd', idleNotice('shepherd', 'Watching the jobs.')))
+  await $.session.receive(fromTeammate('helper', REPORT))
+  await $.session.receive(fromTeammate('helper', idleNotice('helper', 'done')))
+  await $.prompt.submit(typed('carry on'))
+
+  expect(entered).toEqual([{ text: 'carry on', context: [idleContext('helper')] }])
+})
+
 test('a prompt that did not enter leaves the names for the next one', async ($, on) => {
   engine(on)
   const entered: Entered[] = []
@@ -631,40 +659,54 @@ const TURN_END = {
   reason: 'answer',
 } as const
 
-// Which of the agents these tests list a nudge names, in this list's order.
-const AGENT_NAMES = ['builder', 'drafter', 'helper', 'researcher', 'scout', 'tester'] as const
+// Which of the agents these tests list a reminder names, in this list's order.
+const AGENT_NAMES = ['builder', 'drafter', 'helper', 'researcher', 'scout', 'shepherd', 'tester'] as const
 
 const named = (text: string): string[] => AGENT_NAMES.filter(name => new RegExp(`\\b${name}\\b`).test(text))
 
 // The question zone's tool, as denubis-hook-question-zone registers it: the
-// tool the nudge sends the model to for any question to the person.
+// tool the reminder sends the model to for any question to the person.
 const QUESTION_ZONE_ASK = 'mcp__denubis-hook-question-zone__ask'
 
-// A plugin's prompt, framed under its name: never `asUser`.
-const FROM_PLUGIN = { kind: 'plugin', name: 'denubis-hook-quiet-agents' } as const
+// The reminder is prose for the model, so its wording is not checked: it is
+// the block that sends the model to TaskStop for the agents and to the
+// question zone for any question.
+const isReminder = (text: string): boolean => text.includes('TaskStop') && text.includes(QUESTION_ZONE_ASK)
+
+type Reminder = { text: string; rodeOn: string }
 
 // Stands for the engine at a turn's end: lists the agents given (the test
-// changes the array between turns), ends each turn, and records each prompt
-// that reached it, or drops it while `drops.reason` is set. The module does
-// not await its submit, so each turn end settles the event loop before the
-// test looks.
+// changes the array between turns), ends each turn, then takes the next
+// message, a prompt the person types, which a waiting reminder rides on. It
+// records every prompt that entered, and each reminder in a prompt's context
+// beside the prompt it rode on; while `drops.reason` is set it drops each
+// prompt.
+const NEXT = 'next'
+
 const turnEngine = (on: On, agents: AgentInfo[]) => {
-  const { statuses } = engine(on, agents)
-  const submitted: { text: string; origin: PromptOrigin }[] = []
+  const { queued, statuses } = engine(on, agents)
+  const prompts: { text: string; origin: PromptOrigin }[] = []
+  const reminders: Reminder[] = []
   const drops: { reason: string | undefined } = { reason: undefined }
   on('prompt.submit', (_, e) => {
     if (drops.reason !== undefined) return { drop: drops.reason }
-    submitted.push({ text: e.text, origin: e.origin })
+    prompts.push({ text: e.text, origin: e.origin })
+    reminders.push(...(e.context ?? []).filter(isReminder).map(text => ({ text, rodeOn: e.text })))
     return { text: e.text, context: e.context, origin: e.origin }
   })
   on('ui.log', () => ({ value: undefined }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  const clock = mock.clock(on)
   const endTurn = async ($: Engine, turnId: string, agentId?: string): Promise<void> => {
     await $.turn.complete({ ...TURN_END, turnId, ...(agentId === undefined ? {} : { agentId }) })
-    await clock.settle()
+    await $.prompt.submit(typed(NEXT))
   }
-  return { statuses, submitted, endTurn, clock, drops }
+  return { queued, statuses, prompts, reminders, endTurn, drops }
+}
+
+// A delivery's leading line and the delivery as it arrived.
+const leadingLine = (text: string | undefined): { line: string; rest: string } => {
+  const [line = '', ...rest] = (text ?? '').split('\n')
+  return { line, rest: rest.join('\n') }
 }
 
 test('the main loop’s turn end shows the idle names with the done and failed counts', async ($, on) => {
@@ -691,8 +733,8 @@ test('the main loop’s turn end shows the idle names with the done and failed c
   ])
 })
 
-test('the main loop’s turn end nudges once, naming each idle or finished agent once', async ($, on) => {
-  const { submitted, endTurn } = turnEngine(on, [
+test('the main loop’s turn end names each idle or finished agent once, in a reminder on the next prompt', async ($, on) => {
+  const { prompts, reminders, endTurn } = turnEngine(on, [
     { ...agent('a1', 'researcher', 'idle'), teammateId: 'researcher@quiet' },
     agent('a3', 'scout', 'completed'),
     agent('a4', 'tester', 'failed'),
@@ -707,49 +749,230 @@ test('the main loop’s turn end nudges once, naming each idle or finished agent
 
   await endTurn($, 't1')
 
-  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
-    { names: ['builder', 'researcher', 'scout', 'tester'], origin: FROM_PLUGIN },
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['builder', 'researcher', 'scout', 'tester'], rodeOn: NEXT },
+  ])
+  // The person's prompt alone entered, as typed.
+  expect(prompts).toEqual([{ text: NEXT, origin: { kind: 'composer' } }])
+})
+
+test('a turn end submits no prompt; the reminder rides once, on the next prompt', async ($, on) => {
+  const { prompts, reminders } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+
+  await $.turn.complete(TURN_END)
+  await $.prompt.submit(typed('carry on'))
+  await $.prompt.submit(typed('and then?'))
+
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: 'carry on' },
+  ])
+  // The person's two prompts alone entered: none of the plugin's own.
+  expect(prompts.map(p => p.text)).toEqual(['carry on', 'and then?'])
+})
+
+// Ruled 2026-11-15: no agent is named twice in one message.
+test('an agent the riding reminder names is left out of the same prompt’s idle line; one idle since is still in it', async ($, on) => {
+  engine(on, [agent('a1', 'researcher', 'idle'), agent('a2', 'helper', 'running')])
+  const entered = engineTakesPrompts(on)
+  on('ui.log', () => ({ value: undefined }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+
+  // researcher's idle notice is taken out, then an answered turn end names it.
+  await $.session.receive(fromTeammate('researcher', REPORT))
+  await $.session.receive(fromTeammate('researcher', IDLE))
+  await $.session.receive(fromTeammate('helper', REPORT))
+  await $.turn.complete(TURN_END)
+  // helper's idle notice is taken out after that turn end, so the reminder
+  // does not name it, and a taken-out notice carries no reminder.
+  await $.session.receive(fromTeammate('helper', idleNotice('helper', 'done')))
+  await $.prompt.submit(typed('carry on'))
+
+  const context = entered.flatMap(prompt => prompt.context ?? [])
+  expect(context.filter(isReminder).map(named)).toEqual([['researcher']])
+  expect(context.filter(line => !isReminder(line))).toEqual([idleContext('helper')])
+})
+
+test('an agent the reminder named on a delivery is left out of the next prompt’s idle line', async ($, on) => {
+  const { queued } = engine(on, [agent('a1', 'researcher', 'idle'), agent('a2', 'helper', 'running')])
+  const entered = engineTakesPrompts(on)
+  on('ui.log', () => ({ value: undefined }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+
+  // researcher's idle notice is taken out, then an answered turn end names it.
+  await $.session.receive(fromTeammate('researcher', REPORT))
+  await $.session.receive(fromTeammate('researcher', IDLE))
+  await $.turn.complete(TURN_END)
+  // The reminder rides on helper's report, then helper's idle notice is taken out.
+  await $.session.receive(fromTeammate('helper', REPORT))
+  await $.session.receive(fromTeammate('helper', idleNotice('helper', 'done')))
+  await $.prompt.submit(typed('carry on'))
+
+  const { line, rest } = leadingLine(queued.at(-1))
+  expect(isReminder(line)).toBe(true)
+  expect(named(line)).toEqual(['researcher'])
+  expect(rest).toBe(REPORT)
+  expect(entered).toEqual([{ text: 'carry on', context: [idleContext('helper')] }])
+})
+
+test('the reminder rides once, as a leading line, on the next delivery to the main conversation', async ($, on) => {
+  const { queued, reminders } = turnEngine(on, [
+    agent('a3', 'scout', 'completed'),
+    agent('a1', 'researcher', 'running'),
+  ])
+
+  await $.turn.complete(TURN_END)
+  await $.session.receive(fromTeammate('researcher', REPORT))
+  await $.prompt.submit(typed('carry on'))
+
+  expect(queued).toHaveLength(1)
+  const { line, rest } = leadingLine(queued[0])
+  expect(isReminder(line)).toBe(true)
+  expect(named(line)).toEqual(['scout'])
+  expect(rest).toBe(REPORT)
+  expect(reminders).toEqual([])
+})
+
+// Ruled 2026-11-15: "we shouldn't have double-reminders". An idle notice the
+// plugin queues with its prompt to stop that agent does not also carry the
+// reminder's prompt to stop it; the reminder still rides for the others it
+// names, and waits for the next message for that agent.
+test('an idle notice that prompts a stop of its agent carries no reminder naming that agent; the others ride on it', async ($, on) => {
+  const { queued, reminders } = turnEngine(on, [
+    agent('a1', 'researcher', 'idle'),
+    agent('a3', 'scout', 'completed'),
+  ])
+  const firstAnswer = idleNotice('researcher', 'pong')
+  const secondAnswer = idleNotice('researcher', 'pong again')
+
+  // researcher answers by ending its turn, with no report sent, so its idle
+  // notice is queued with the prefix; an answered turn end then names it and
+  // scout. researcher wakes on its own and goes idle again.
+  await $.session.receive(fromTeammate('researcher', firstAnswer))
+  await $.turn.complete(TURN_END)
+  await $.session.receive(fromTeammate('researcher', secondAnswer))
+  await $.prompt.submit(typed('carry on'))
+
+  expect(queued).toHaveLength(2)
+  const { line, rest } = leadingLine(queued[1])
+  expect(isReminder(line)).toBe(true)
+  expect(named(line)).toEqual(['scout'])
+  expect(rest).toEqual(prefixed(secondAnswer))
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['researcher'], rodeOn: 'carry on' },
   ])
 })
 
-test('the nudge sends the model to TaskStop for the agents and to the question zone for questions', async ($, on) => {
-  const { submitted, endTurn } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+test('a delivery not from an agent is queued as it came; the waiting reminder rides on the next prompt', async ($, on) => {
+  const { queued, reminders } = turnEngine(on, [agent('a3', 'scout', 'completed')])
 
-  await endTurn($, 't1')
+  await $.turn.complete(TURN_END)
+  // The person's own words, from a Remote Control client and from Slack.
+  await $.session.receive({ origin: { kind: 'bridge' }, text: 'How is it going?' })
+  await $.session.receive({ origin: { kind: 'slack-ping' }, text: 'Any news?' })
+  await $.prompt.submit(typed('carry on'))
 
-  expect(submitted).toHaveLength(1)
-  expect(submitted[0]?.text).toContain('TaskStop')
-  expect(submitted[0]?.text).toContain(QUESTION_ZONE_ASK)
+  expect(queued).toEqual(['How is it going?', 'Any news?'])
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: 'carry on' },
+  ])
+})
+
+test('a delivery taken out carries no reminder; the next message does', async ($, on) => {
+  const { queued, reminders } = turnEngine(on, [
+    agent('a3', 'scout', 'completed'),
+    agent('a1', 'researcher', 'running'),
+  ])
+  await $.session.receive(fromTeammate('researcher', REPORT))
+
+  await $.turn.complete(TURN_END)
+  // Its report already received, researcher's idle notice is taken out.
+  const result = await $.session.receive(fromTeammate('researcher', IDLE))
+  await $.prompt.submit(typed('carry on'))
+
+  expectConsumed(result)
+  expect(queued).toEqual([REPORT])
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: 'carry on' },
+  ])
+})
+
+test('a delivery taken out beneath the plugin leaves the reminder for the next message', async ($, on) => {
+  // The engine's stand-ins written out: turnEngine's queues every delivery.
+  on('agent.list', () => ({ value: [agent('a3', 'scout', 'completed'), agent('a1', 'researcher', 'running')] }))
+  on('session.receive', () => ({ consumed: 'taken out beneath' }))
+  on('ui.status', () => ({ value: undefined }))
+  on('turn.complete', (_, e) => ({ text: e.answer }))
+  const reminders: Reminder[] = []
+  on('prompt.submit', (_, e) => {
+    reminders.push(...(e.context ?? []).filter(isReminder).map(text => ({ text, rodeOn: e.text })))
+    return { text: e.text, context: e.context, origin: e.origin }
+  })
+
+  await $.turn.complete(TURN_END)
+  const result = await $.session.receive(fromTeammate('researcher', REPORT))
+  await $.prompt.submit(typed('carry on'))
+
+  expectConsumed(result)
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: 'carry on' },
+  ])
+})
+
+test('an agent the main conversation messages before the reminder rides is left out of it', async ($, on) => {
+  const { reminders } = turnEngine(on, [agent('a1', 'researcher', 'idle'), agent('a3', 'scout', 'completed')])
+
+  await $.turn.complete(TURN_END)
+  await $.session.send(mainSends('researcher', 'Now fix the tests.'))
+  await $.prompt.submit(typed('carry on'))
+
+  expect(reminders.map(r => named(r.text))).toEqual([['scout']])
+})
+
+test('an agent working again when the next message comes waits in the reminder until it stops again', async ($, on) => {
+  const agents = [agent('a1', 'shepherd', 'idle')]
+  const { reminders } = turnEngine(on, agents)
+
+  await $.turn.complete(TURN_END)
+  // Woken by its own background work before the person typed.
+  agents.splice(0, agents.length, agent('a1', 'shepherd', 'running'))
+  await $.prompt.submit(typed('carry on'))
+  expect(reminders).toEqual([])
+
+  agents.splice(0, agents.length, agent('a1', 'shepherd', 'idle'))
+  await $.prompt.submit(typed('and then?'))
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['shepherd'], rodeOn: 'and then?' },
+  ])
 })
 
 test('an agent already named is not named again; a newcomer is named alone', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle'), agent('a3', 'scout', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
-  // The nudge's own turn ends with the same agents still listed.
+  // The next turn ends with the same agents still listed.
   await endTurn($, 't2')
   agents.push(agent('a2', 'helper', 'idle'))
   await endTurn($, 't3')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher', 'scout'], ['helper']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher', 'scout'], ['helper']])
 })
 
-test('an agent leaving those already named raises no nudge', async ($, on) => {
+test('an agent leaving those already named raises no reminder', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle'), agent('a3', 'scout', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
   // scout stopped, and dropped from the list.
   agents.splice(1, 1)
   await endTurn($, 't2')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher', 'scout']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher', 'scout']])
 })
 
 test('an agent that works and goes idle again on its own is not named again', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
   // Woken by its own background work, with no message from the main
@@ -759,12 +982,12 @@ test('an agent that works and goes idle again on its own is not named again', as
   agents.splice(0, agents.length, agent('a1', 'researcher', 'idle'))
   await endTurn($, 't3')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher']])
 })
 
 test('a message from the main conversation lets an agent be named once more when it next stops', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle'), agent('a3', 'scout', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
   // One addressed by its name, one by its agent id.
@@ -776,7 +999,7 @@ test('a message from the main conversation lets an agent be named once more when
   await endTurn($, 't3')
   await endTurn($, 't4')
 
-  expect(submitted.map(s => named(s.text))).toEqual([
+  expect(reminders.map(r => named(r.text))).toEqual([
     ['researcher', 'scout'],
     ['researcher', 'scout'],
   ])
@@ -784,7 +1007,7 @@ test('a message from the main conversation lets an agent be named once more when
 
 test('a message to one named agent leaves the others kept', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle'), agent('a3', 'scout', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
   await $.session.send(mainSends('researcher', 'Now fix the tests.'))
@@ -793,7 +1016,7 @@ test('a message to one named agent leaves the others kept', async ($, on) => {
   agents.splice(0, 1, agent('a1', 'researcher', 'idle'))
   await endTurn($, 't3')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher', 'scout'], ['researcher']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher', 'scout'], ['researcher']])
 })
 
 test('a named idle agent stays on the status line by name until the main conversation messages it', async ($, on) => {
@@ -809,28 +1032,47 @@ test('a named idle agent stays on the status line by name until the main convers
   expect(statuses.at(-1)).toBe('agents: 1 done')
 })
 
-test('a nudge the engine dropped named no one, so the next answered end names them', async ($, on) => {
-  const { statuses, submitted, endTurn, drops } = turnEngine(on, [agent('a1', 'researcher', 'idle')])
+test('a prompt that did not enter leaves the reminder for the next one', async ($, on) => {
+  const { statuses, reminders, endTurn, drops } = turnEngine(on, [agent('a1', 'researcher', 'idle')])
 
   drops.reason = 'a Stop stands'
   await endTurn($, 't1')
-  expect(submitted).toEqual([])
-  expect(statuses.at(-1)).toBeUndefined()
+  expect(reminders).toEqual([])
+  expect(statuses.at(-1)).toBe('agents idle: researcher')
 
   drops.reason = undefined
-  await endTurn($, 't2')
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher']])
+  await $.prompt.submit(typed('carry on'))
+  await $.prompt.submit(typed('and then?'))
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['researcher'], rodeOn: 'carry on' },
+  ])
+})
+
+test('a reminder still waiting outlasts the next turn end, and rides once', async ($, on) => {
+  const { reminders, drops } = turnEngine(on, [agent('a1', 'researcher', 'idle')])
+
+  await $.turn.complete({ ...TURN_END, turnId: 't1' })
+  drops.reason = 'a Stop stands'
+  await $.prompt.submit(typed('carry on'))
+  await $.turn.complete({ ...TURN_END, turnId: 't2' })
+  drops.reason = undefined
+  await $.prompt.submit(typed('and then?'))
+  await $.prompt.submit(typed('anything else?'))
+
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['researcher'], rodeOn: 'and then?' },
+  ])
 })
 
 test('a new agent under the name of one already named is named', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
   agents.splice(0, agents.length, agent('a7', 'researcher', 'idle'))
   await endTurn($, 't2')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher'], ['researcher']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher'], ['researcher']])
 })
 
 // An agent a plugin started, as `$.agent.list()` lists it: `spawnedBy` names
@@ -843,30 +1085,48 @@ const pluginAgent = (id: string, status: AgentInfo['status']): AgentInfo => ({
   spawnedBy: 'denubis-hook-question-zone',
 })
 
-test('a finished agent a plugin started is not named in the nudge', async ($, on) => {
+test('a finished agent a plugin started is not named in the reminder', async ($, on) => {
   const agents = [pluginAgent('a-check-1', 'completed')]
-  const { submitted, endTurn } = turnEngine(on, agents)
+  const { reminders, endTurn } = turnEngine(on, agents)
 
   await endTurn($, 't1')
-  expect(submitted).toEqual([])
+  expect(reminders).toEqual([])
 
   agents.push(agent('a3', 'scout', 'completed'))
   await endTurn($, 't2')
-  expect(submitted.map(s => s.text.includes('a-check-1'))).toEqual([false])
-  expect(submitted.map(s => named(s.text))).toEqual([['scout']])
+  expect(reminders.map(r => r.text.includes('a-check-1'))).toEqual([false])
+  expect(reminders.map(r => named(r.text))).toEqual([['scout']])
 })
 
-test('a turn end with only working agents submits nothing', async ($, on) => {
-  const { submitted, endTurn } = turnEngine(on, [agent('a5', 'builder', 'running')])
+test('a turn end with only working agents names no one', async ($, on) => {
+  const { reminders, endTurn } = turnEngine(on, [agent('a5', 'builder', 'running')])
 
   await endTurn($, 't1')
 
-  expect(submitted).toEqual([])
+  expect(reminders).toEqual([])
 })
 
-test('an idle teammate no longer listed leaves the status line and the next nudge', async ($, on) => {
+test('an agent waiting on its own background work is not named, and is named once when it is idle', async ($, on) => {
+  const agents = [agent('a1', 'shepherd', 'waiting')]
+  const { statuses, reminders, endTurn } = turnEngine(on, agents)
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+  await $.session.receive(fromTeammate('shepherd', idleNotice('shepherd', 'Watching the jobs.')))
+
+  await endTurn($, 't1')
+  expect(reminders).toEqual([])
+  expect(statuses.at(-1)).toBeUndefined()
+
+  // Its shell or monitor ended and it has nothing left to wait on.
+  agents.splice(0, agents.length, agent('a1', 'shepherd', 'idle'))
+  await endTurn($, 't2')
+  await endTurn($, 't3')
+  expect(reminders.map(r => named(r.text))).toEqual([['shepherd']])
+  expect(statuses.at(-1)).toBe('agents idle: shepherd')
+})
+
+test('an idle teammate no longer listed leaves the status line and the next reminder', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle')]
-  const { statuses, submitted, endTurn } = turnEngine(on, agents)
+  const { statuses, reminders, endTurn } = turnEngine(on, agents)
   await $.session.receive(fromTeammate('researcher', REPORT))
   await $.session.receive(fromTeammate('researcher', IDLE))
 
@@ -875,25 +1135,25 @@ test('an idle teammate no longer listed leaves the status line and the next nudg
   agents.splice(0, agents.length, agent('a3', 'scout', 'completed'))
   await endTurn($, 't2')
 
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher'], ['scout']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher'], ['scout']])
   expect(statuses.at(-1)).toBe('agents: 1 done')
 })
 
-test('a subagent’s turn end submits nothing and writes no state', async ($, on) => {
-  const { submitted, endTurn } = turnEngine(on, [agent('a1', 'researcher', 'idle')])
+test('a subagent’s turn end names no one and writes no state', async ($, on) => {
+  const { reminders, endTurn } = turnEngine(on, [agent('a1', 'researcher', 'idle')])
   const writes = stateWrites(on)
 
   await endTurn($, 't1', 'a5')
-  expect(submitted).toEqual([])
+  expect(reminders).toEqual([])
   expect(writes).toEqual([])
 
   // The same agents at the main loop's end are named: the subagent's end
   // recorded nothing.
   await endTurn($, 't2')
-  expect(submitted.map(s => named(s.text))).toEqual([['researcher']])
+  expect(reminders.map(r => named(r.text))).toEqual([['researcher']])
 })
 
-test('a turn end whose agent list fails keeps the idle names and the record, so no second nudge follows', async ($, on) => {
+test('a turn end whose agent list fails keeps the idle names and the record, so no second reminder follows', async ($, on) => {
   // The engine's stand-ins written out: turnEngine's list cannot fail.
   // builder is idle by its consumed notice alone, its roster word still
   // `running`, so only the idle names can keep it on the status line.
@@ -909,16 +1169,15 @@ test('a turn end whose agent list fails keeps the idle names and the record, so 
     return { value: undefined }
   })
   on('ui.log', () => ({ value: undefined }))
-  const submitted: string[] = []
+  const reminders: string[] = []
   on('prompt.submit', (_, e) => {
-    submitted.push(e.text)
+    reminders.push(...(e.context ?? []).filter(isReminder))
     return { text: e.text, context: e.context, origin: e.origin }
   })
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  const clock = mock.clock(on)
   const endTurn = async (turnId: string): Promise<void> => {
     await $.turn.complete({ ...TURN_END, turnId })
-    await clock.settle()
+    await $.prompt.submit(typed(NEXT))
   }
   await $.session.receive(fromTeammate('builder', REPORT))
   await $.session.receive(fromTeammate('builder', idleNotice('builder', 'done')))
@@ -929,7 +1188,7 @@ test('a turn end whose agent list fails keeps the idle names and the record, so 
   isListing = true
   await endTurn('t3')
 
-  expect(submitted.map(named)).toEqual([['builder']])
+  expect(reminders.map(named)).toEqual([['builder']])
   expect(statuses.at(-1)).toBe('agents idle: builder')
 })
 
@@ -1000,23 +1259,229 @@ test('/tidy with nothing to stop says so and calls no tool', async ($, on) => {
   expect(text).toBe('quiet-agents: no idle, completed or failed agents to stop.')
 })
 
-test('a turn the person interrupted or an error ended raises no nudge; the next answered turn does', async ($, on) => {
-  const { submitted, endTurn, clock } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+// The person's `/quiet-agents` command, as typed at the prompt.
+const COMMAND_RUN = {
+  origin: { kind: 'composer' },
+  presentation: { isFullscreen: false, columns: 80 },
+} as const
 
-  await $.turn.complete({ ...TURN_END, turnId: 't1', reason: 'aborted', isAborted: true })
-  await clock.settle()
-  await $.turn.complete({ ...TURN_END, turnId: 't2', reason: 'error' })
-  await clock.settle()
-  expect(submitted).toEqual([])
+const quietAgentsCommand = (on: On): void => {
+  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+}
 
+const quietAgents = async ($: Engine, args: string): Promise<string> => {
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const { text } = await $.command.run({ command: 'quiet-agents', args, ...COMMAND_RUN })
+  return text ?? ''
+}
+
+test('a muted agent’s idle notice after its report is taken out, as an unmuted one’s is, and the status line shows it muted', async ($, on) => {
+  const { queued, statuses } = engine(on, [agent('a1', 'shepherd', 'idle')])
+  quietAgentsCommand(on)
+
+  const text = await quietAgents($, 'mute shepherd')
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+  const result = await $.session.receive(fromTeammate('shepherd', idleNotice('shepherd', 'Watching the jobs.')))
+
+  expect(text).toContain('shepherd')
+  expectConsumed(result)
+  expect(queued).toEqual([REPORT])
+  expect(statuses.at(-1)).toBe('agents muted: shepherd')
+})
+
+// Ruled 2026-11-15: a mute silences only the naming of the agent, never a
+// delivery. An agent that answers by ending its turn sends no report; its
+// answer is only in the idle notice's `result`.
+test('a muted agent that answers by ending its turn, with no report sent, has its idle notice queued whole behind one line', async ($, on) => {
+  const { queued } = engine(on, [agent('a1', 'shepherd', 'idle')])
+  quietAgentsCommand(on)
+  const answer = idleNotice('shepherd', 'pong')
+
+  await quietAgents($, 'mute shepherd')
+  const result = await $.session.receive(fromTeammate('shepherd', answer))
+
+  expect(result.consumed).toBeUndefined()
+  expect(queued).toHaveLength(1)
+  expect(leadingLine(queued[0]).rest).toBe(answer)
+})
+
+// The person, 2026-11-15: "we just don't want the nag. we're musting *this
+// nag*". Reading "this nag" as every prompt to stop the agent is the
+// assistant's: so a muted agent's queued notice gives the model no prompt to
+// stop it; an unmuted agent's still does.
+test('a muted agent’s queued idle notice carries no instruction to stop it; an unmuted one’s does', async ($, on) => {
+  const { queued } = engine(on, [agent('a1', 'shepherd', 'idle'), agent('a2', 'researcher', 'idle')])
+  quietAgentsCommand(on)
+  const mutedAnswer = idleNotice('shepherd', 'pong')
+  const answer = idleNotice('researcher', 'pong')
+
+  await quietAgents($, 'mute shepherd')
+  await $.session.receive(fromTeammate('shepherd', mutedAnswer))
+  await $.session.receive(fromTeammate('researcher', answer))
+
+  expect(queued).toHaveLength(2)
+  const muted = leadingLine(queued[0])
+  expect(muted.rest).toBe(mutedAnswer)
+  expect(muted.line.includes('TaskStop')).toBe(false)
+  expect(queued[1]).toEqual(prefixed(answer))
+})
+
+test('a muted agent’s own messages still come through', async ($, on) => {
+  const { queued } = engine(on, [agent('a1', 'shepherd', 'idle')])
+  quietAgentsCommand(on)
+
+  await quietAgents($, 'mute shepherd')
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+
+  expect(queued).toEqual([REPORT])
+})
+
+test('the next prompt’s idle line leaves out a muted agent', async ($, on) => {
+  engine(on, [agent('a1', 'shepherd', 'idle')])
+  quietAgentsCommand(on)
+  const entered = engineTakesPrompts(on)
+
+  await $.session.receive(fromTeammate('shepherd', REPORT))
+  await $.session.receive(fromTeammate('shepherd', idleNotice('shepherd', 'Watching the jobs.')))
+  await quietAgents($, 'mute shepherd')
+  await $.prompt.submit(typed('carry on'))
+
+  expect(entered).toEqual([{ text: 'carry on', context: undefined }])
+})
+
+test('a muted agent is left out of the reminder, and is named once after it is unmuted', async ($, on) => {
+  const agents = [agent('a1', 'shepherd', 'idle'), agent('a3', 'scout', 'completed')]
+  const { statuses, reminders, endTurn } = turnEngine(on, agents)
+  quietAgentsCommand(on)
+
+  await quietAgents($, 'mute shepherd')
+  await endTurn($, 't1')
+  expect(reminders.map(r => named(r.text))).toEqual([['scout']])
+  expect(statuses.at(-1)).toBe('agents muted: shepherd; 1 done')
+
+  await quietAgents($, 'unmute shepherd')
+  await endTurn($, 't2')
   await endTurn($, 't3')
-  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
-    { names: ['scout'], origin: FROM_PLUGIN },
+  expect(reminders.map(r => named(r.text))).toEqual([['scout'], ['shepherd']])
+  expect(statuses.at(-1)).toBe('agents idle: shepherd; 1 done')
+})
+
+test('an agent muted while its reminder waits is left out of it until it is unmuted', async ($, on) => {
+  const { reminders } = turnEngine(on, [agent('a1', 'shepherd', 'idle'), agent('a3', 'scout', 'completed')])
+  quietAgentsCommand(on)
+
+  await $.turn.complete(TURN_END)
+  await quietAgents($, 'mute shepherd')
+  await $.prompt.submit(typed('carry on'))
+  expect(reminders.map(r => named(r.text))).toEqual([['scout']])
+
+  await quietAgents($, 'unmute shepherd')
+  await $.prompt.submit(typed('and then?'))
+  await $.prompt.submit(typed('anything else?'))
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: 'carry on' },
+    { names: ['shepherd'], rodeOn: 'and then?' },
   ])
 })
 
-test('a refused turn raises no nudge either; each unanswered end still sets the status line', async ($, on) => {
-  const { statuses, submitted, endTurn, clock } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+test('a mute is tied to the agent, not its name, and ends once the agent leaves the list', async ($, on) => {
+  const agents = [agent('a1', 'shepherd', 'idle')]
+  const { reminders, endTurn } = turnEngine(on, agents)
+  quietAgentsCommand(on)
+
+  await quietAgents($, 'mute shepherd')
+  await endTurn($, 't1')
+  // Stopped and dropped from the list, then a new agent under its name.
+  agents.splice(0, agents.length)
+  await endTurn($, 't2')
+  agents.push(agent('a7', 'shepherd', 'idle'))
+  await endTurn($, 't3')
+  // The first agent resumed under its own id: its mute ended when it left.
+  agents.splice(0, agents.length, agent('a1', 'shepherd', 'idle'))
+  await endTurn($, 't4')
+
+  expect(reminders.map(r => named(r.text))).toEqual([['shepherd'], ['shepherd']])
+})
+
+test('a mute ends when the agent is stopped, so the agent resumed under its id is named and not shown muted', async ($, on) => {
+  const agents = [agent('a1', 'shepherd', 'idle'), agent('a3', 'scout', 'completed')]
+  const { statuses, reminders, endTurn } = turnEngine(on, agents)
+  quietAgentsCommand(on)
+
+  await quietAgents($, 'mute shepherd')
+  await endTurn($, 't1')
+  // Stopped: still listed, as `killed`.
+  agents.splice(0, 1, agent('a1', 'shepherd', 'killed'))
+  await endTurn($, 't2')
+  // Resumed under its own id, and idle again.
+  agents.splice(0, 1, agent('a1', 'shepherd', 'idle'))
+  await endTurn($, 't3')
+
+  expect(reminders.map(r => named(r.text))).toEqual([['scout'], ['shepherd']])
+  expect(statuses.at(-1)).toBe('agents idle: shepherd; 1 done')
+})
+
+test('muting a name no agent has mutes nothing; mute alone lists the muted agents', async ($, on) => {
+  const { statuses } = engine(on, [agent('a1', 'shepherd', 'idle'), agent('a2', 'helper', 'idle')])
+  quietAgentsCommand(on)
+
+  const unknown = await quietAgents($, 'mute nobody')
+  const before = await quietAgents($, 'mute')
+  await quietAgents($, 'mute shepherd')
+  const after = await quietAgents($, 'mute')
+
+  expect(unknown).toContain('nobody')
+  expect(statuses).toEqual(['agents muted: shepherd'])
+  expect(before).not.toContain('shepherd')
+  expect(after).toContain('shepherd')
+  expect(after).not.toContain('helper')
+})
+
+test('the command without a known subcommand names its subcommands and changes nothing', async ($, on) => {
+  const { statuses } = engine(on, [agent('a1', 'shepherd', 'idle')])
+  quietAgentsCommand(on)
+
+  const text = await quietAgents($, 'shush shepherd')
+
+  expect(text).toContain('mute')
+  expect(text).toContain('unmute')
+  expect(statuses).toEqual([])
+})
+
+test('/tidy leaves a muted agent alone', async ($, on) => {
+  const asked: (string | undefined)[] = []
+  quietAgentsCommand(on)
+  on('agent.list', () => ({ value: AGENTS }))
+  on('ui.status', () => ({ value: undefined }))
+  on('tool.call', (_, e) => {
+    if (e.tool !== 'TaskStop') return { deny: 'only TaskStop in this test' }
+    asked.push(e.task_id)
+    return { result: { message: 'stopped', task_id: e.task_id ?? '', task_type: 'local_agent' } }
+  })
+
+  await quietAgents($, 'mute researcher')
+  await $.command.run({ command: 'tidy', args: '', ...COMMAND_RUN })
+
+  expect(asked).toEqual(['a2', 'a3', 'a4'])
+})
+
+test('a turn the person interrupted or an error ended names no one; the next answered turn does', async ($, on) => {
+  const { reminders, endTurn } = turnEngine(on, [agent('a3', 'scout', 'completed')])
+
+  await $.turn.complete({ ...TURN_END, turnId: 't1', reason: 'aborted', isAborted: true })
+  await $.turn.complete({ ...TURN_END, turnId: 't2', reason: 'error' })
+  await $.prompt.submit(typed(NEXT))
+  expect(reminders).toEqual([])
+
+  await endTurn($, 't3')
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: NEXT },
+  ])
+})
+
+test('a refused turn names no one either; each unanswered end still sets the status line', async ($, on) => {
+  const { statuses, reminders, endTurn } = turnEngine(on, [agent('a3', 'scout', 'completed')])
 
   await $.turn.complete({
     ...TURN_END,
@@ -1024,34 +1489,32 @@ test('a refused turn raises no nudge either; each unanswered end still sets the 
     reason: 'refusal',
     refusal: { category: null, explanation: null },
   })
-  await clock.settle()
   await $.turn.complete({ ...TURN_END, turnId: 't2', reason: 'aborted', isAborted: true })
-  await clock.settle()
   await $.turn.complete({ ...TURN_END, turnId: 't3', reason: 'error' })
-  await clock.settle()
-  expect(submitted).toEqual([])
+  await $.prompt.submit(typed(NEXT))
+  expect(reminders).toEqual([])
   expect(statuses).toEqual(['agents: 1 done', 'agents: 1 done', 'agents: 1 done'])
 
   await endTurn($, 't4')
-  expect(submitted.map(s => ({ names: named(s.text), origin: s.origin }))).toEqual([
-    { names: ['scout'], origin: FROM_PLUGIN },
+  expect(reminders.map(r => ({ names: named(r.text), rodeOn: r.rodeOn }))).toEqual([
+    { names: ['scout'], rodeOn: NEXT },
   ])
 })
 
 test('an unanswered turn end still drops a stopped teammate from the status line', async ($, on) => {
   const agents = [agent('a1', 'researcher', 'idle')]
-  const { statuses, submitted, endTurn, clock } = turnEngine(on, agents)
+  const { statuses, reminders, endTurn } = turnEngine(on, agents)
   await $.session.receive(fromTeammate('researcher', REPORT))
   await $.session.receive(fromTeammate('researcher', IDLE))
   // Stopped, and dropped from the list; a finished subagent is listed.
   agents.splice(0, agents.length, agent('a3', 'scout', 'completed'))
 
   await $.turn.complete({ ...TURN_END, turnId: 't1', reason: 'aborted', isAborted: true })
-  await clock.settle()
   expect(statuses.at(-1)).toBe('agents: 1 done')
-  expect(submitted).toEqual([])
+  await $.prompt.submit(typed(NEXT))
+  expect(reminders).toEqual([])
 
-  // The unanswered end recorded no names: the next answered end nudges.
+  // The unanswered end recorded no names: the next answered end names it.
   await endTurn($, 't2')
-  expect(submitted.map(s => named(s.text))).toEqual([['scout']])
+  expect(reminders.map(r => named(r.text))).toEqual([['scout']])
 })

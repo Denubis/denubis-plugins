@@ -25,6 +25,8 @@ The method fails this case if the observed plan:
 - decomposes the single outcome into chronology-only phases that are not independently
   usable;
 - creates mandatory empty/non-applicable flow or UAT paperwork with no consumer;
+- splits the single coupled outcome across several concurrent implementers, or adds
+  per-agent worktrees, merge order, or concurrency scheduling it has no use for;
 - separates the interface from its tests or first real consumer;
 - asks the human to choose an ordinary implementation detail fixed by the design and
   fixture; or
@@ -32,4 +34,3 @@ The method fails this case if the observed plan:
 
 Different filenames or prose are not failures when the plan preserves the outcome and
 evidence boundaries.
-

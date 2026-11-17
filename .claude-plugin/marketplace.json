@@ -22,7 +22,7 @@
     {
       "name": "denubis-plan-and-execute",
       "description": "Design, implementation, debugging, verification, architecture, and Git lifecycle procedures for Claude Code.",
-      "version": "4.2.6",
+      "version": "4.3.0",
       "source": "./plugins/denubis-plan-and-execute",
       "author": {
         "name": "Brian Ballsun-Stanton",
@@ -258,8 +258,8 @@
     },
     {
       "name": "denubis-hook-quiet-agents",
-      "description": "Takes a teammate's idle notice once its report arrived, mutes repeated agent notices, frames agent-started turns, shows idle agents, asks the model at a turn's end, once per agent, to stop idle or finished agents, and adds /tidy to stop them",
-      "version": "0.1.3",
+      "description": "Takes a teammate's idle notice once its report arrived, mutes repeated agent notices, frames agent-started turns, shows idle agents, reminds the model on the next message, once per agent, to stop idle or finished agents, adds /tidy to stop them, and /quiet-agents mute to silence an agent you keep",
+      "version": "0.1.4",
       "source": "./plugins/denubis-hook-quiet-agents",
       "author": {
         "name": "Brian Ballsun-Stanton",

@@ -48,7 +48,23 @@ front of it:
 
 **Named once, at the next prompt.** The teammates whose idle notices were taken out are
 named once, as context beside the next prompt that enters the conversation. A prompt
-that is dropped before it enters leaves the names for the one after.
+that is dropped before it enters leaves the names for the one after. An agent the
+end-of-turn reminder names, beside a prompt or on a delivery from an agent, is not named
+on this line as well, beside that prompt or a later one, and the line is left out when no
+name is left
+([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-reminder-rides-next-message.md)).
+An idle notice of that agent taken out later is named as usual. A message that does not
+go in leaves both for the one after.
+
+**An agent Claude Code lists as `waiting` is not idle.** Claude Code's types document
+`waiting` as "on background work it owns, on a plan's approval or, in a background
+subagent, on an Agent call alone"; a shell or a monitor the agent started and that is
+still running is one such case. Every `waiting` agent, whatever it waits on, is left off
+the status line's idle names, out of the next prompt's names, and out of the end-of-turn
+reminder, even when its idle notice was taken out.
+Once Claude Code lists it as idle, it is treated like any other idle agent. Any status
+other than `waiting` leaves a taken-out idle notice standing, because the roster can
+still say `running` when the notice arrives.
 
 **Repeated notices are muted.** An agent notice that arrives as a prompt, such as a
 background task's notification, is dropped when its text matches the last notice under
@@ -65,56 +81,96 @@ consequential corrections or a decision they must make. An in-process
 teammate's render of the lead's prompt does not get it.
 
 **The status line.** The plugin's status line names the idle teammates whose idle notice
-it took out, and every idle agent a turn-end nudge has named, and counts the finished and
-failed agents, for example `agents idle: helper, scout; 1 done, 1 failed`, or
+it took out, less any listed as `waiting`, and every idle agent a turn end has named for
+the reminder, and counts the finished and failed agents, for example `agents idle: helper, scout; 1 done, 1 failed`, or
 `agents: 1 done` when none is idle. So an agent the model keeps stays in view
 ([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-quiet-agents-names-agents-once.md)).
 It updates when an idle notice is taken out, when a message from the main conversation
-takes an agent off the list, when a nudge that did not go in leaves its agents unnamed,
-and at the end of each turn of the main conversation. An agent that is no longer listed,
+takes an agent off the list, and at the end of each turn of the main conversation. An agent that is no longer listed,
 because it was stopped, drops off at the next turn end.
 
-**The turn-end nudge.** At the end of a main-conversation turn, the plugin gathers the
-idle teammates and every listed agent that is idle, completed or failed, leaving out any
-agent a plugin started (such as question-zone's checkers), which is the plugin's to
-manage. When that set holds agents no nudge has named yet, it queues one prompt naming
-just those, sent under the plugin's name and not as the person's words, which starts once
-the session is idle:
+**The end-of-turn reminder.** At the end of a main-conversation turn, the plugin
+gathers the idle teammates and every listed agent that is idle, completed or failed,
+leaving out any agent a plugin started (such as question-zone's checkers), which is the
+plugin's to manage, any agent listed as `waiting`, and any muted agent. The agents in that
+set that no turn end has named yet wait for the next message to the main conversation; the
+plugin starts no turn of its own
+([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-reminder-rides-next-message.md)).
+The reminder rides on that message, as context beside the next prompt that enters, or as a
+leading line on the next delivery from an agent that is queued, such as a teammate's
+report. Any other delivery, such as your own message from a Remote Control client or
+Slack, is queued as it came, so no plugin text is written into your words, and the
+reminder waits:
 
 ```text
 quiet-agents: idle or finished agents: <names>. Stop each with TaskStop, unless its work is unfinished: then continue it instead. Ask the person any question through the question zone's mcp__denubis-hook-question-zone__ask tool, never in chat.
 ```
 
+A message that does not go in, a prompt that is dropped or a delivery that is taken out,
+leaves the reminder for the one after. An agent it names is not named again on the line
+of agents that went idle (above). An idle notice queued with its own prompt to stop that
+agent carries no reminder naming that agent: the reminder leading it names only the
+others due, and that agent waits in it for the next message. As it rides, it names only the agents still listed,
+still idle or finished by the rule a turn end uses, not muted, and not messaged by the
+main conversation since. So an agent listed as `waiting` by then, a muted one, and one no
+longer listed as idle, completed or failed wait in the reminder until they stop again or
+are unmuted. The rule has one limit: an agent whose idle notice the plugin took out still
+counts as idle while it is listed as `running`, because the roster can lag the notice, so
+one that woke on its own after that notice is still named. A finished agent is not
+prompted for a stop until something else wakes the session.
+
+A teammate in a terminal pane of its own is listed as `running` or `idle` by what it last
+wrote in its team's roster, never `waiting`, so the plugin cannot tell that its own shells
+or monitors still run.
+
 **Each agent is named once.** An agent the model was told about and did not stop is
-treated as kept, and later nudges leave it out. Its waking and going idle again on its
+treated as kept, and later reminders leave it out. Its waking and going idle again on its
 own does not bring it back, and neither do other agents joining or leaving the set; an
-agent leaving raises no nudge at all. When the main conversation next sends that agent a
+agent leaving adds nothing to the reminder. When the main conversation next sends that agent a
 message, it has new work, so its next idle or finished state is named once more. If Claude
 Code cannot list its agents at that moment, the message is not matched to the agent, and
-its next stop is not named. A nudge that Claude Code dropped, or could not take, told the
-model nothing, so its agents are named at the next answered turn end. The record holds
+its next stop is not named. The record holds
 agent ids, not names, so a new agent that takes a named agent's name is named. A kept
 agent stays on the status line, named while idle and counted once done or failed, and
 `/tidy` still stops it
 ([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-quiet-agents-names-agents-once.md)).
 The text assumes `denubis-hook-question-zone` is installed, which registers that tool.
 
-**The answer-only guard.** The nudge fires only when the turn ended with an answer. A turn
-the person interrupted, a refusal, or an API error raises no nudge, so a plugin prompt
-never jumps ahead of what the person meant to type next. Those turn ends still update the
-status line.
+**The answer-only guard.** Only a turn that ended with an answer names agents for the
+reminder. A turn the person interrupted, a refusal, or an API error names no one. Those
+turn ends still update the status line.
+
+**`/quiet-agents mute`.** For an agent you keep that runs, goes idle and runs again on its
+own, type `/quiet-agents mute <agent>`, by its name or id. Until you type
+`/quiet-agents unmute <agent>`, or the agent is stopped (at the next turn end Claude Code
+lists it as `killed` or no longer lists it), the plugin leaves it out of the next
+prompt's idle names and the end-of-turn reminder, names it as `muted` on the status line
+(for example `agents idle: helper; muted: shepherd`), and leaves it out of `/tidy`. A mute
+silences only this naming. It changes nothing about which deliveries are queued or taken
+out: the agent's messages and idle notices are handled as an unmuted agent's are. So an
+idle notice with no report before it, which carries the answer of an agent that replied by
+ending its turn, still reaches the model with the prefix, less its last sentence: for a
+muted agent the plugin gives the model no prompt to stop it. That reading of the ruling is
+the assistant's. An agent notice that arrives as a prompt names no agent the plugin can
+match, so its context keeps that sentence even for a muted agent. `/quiet-agents mute`
+alone lists the muted agents. The mute goes by
+the agent's id, so a new agent under the same name is not muted, and neither is a stopped
+agent later resumed under its id. Only you can mute: the
+model has no tool for it
+([ruled 2026-11-15](../../docs/architecture/decisions/2026-11-15-bbs-person-mutes-kept-agents.md)).
+The command runs at once, even while a turn is in flight.
 
 **`/tidy`.** Typing `/tidy` stops every idle, completed or failed agent, one at a time,
 through TaskStop and the usual permission check. It then says which it stopped, which the
-permission check refused, and which failed. Running agents, and agents a plugin started,
-are left alone.
+permission check refused, and which failed. Running agents, muted agents, and agents a
+plugin started are left alone.
 
 **Nothing is stopped automatically.** The plugin never calls TaskStop on its own. Agents
-stop only when the person runs `/tidy` or the model calls TaskStop after a nudge, and
+stop only when the person runs `/tidy` or the model calls TaskStop after a reminder, and
 each stop goes through the permission check as usual.
 
-The report marks, the idle list and the ids of the agents already named live in the
-session's state. They survive a reload of the plugin and start empty in a new session.
+The report marks, the idle list, the ids of the agents already named, the agents the
+reminder still waits to name, and the muted agents' ids live in the session's state. They survive a reload of the plugin and start empty in a new session.
 The first load of 0.1.3 reads what 0.1.2 stored as empty, so a teammate whose report was
 already marked may have one more idle notice let through, and agents already named are
 named once more.
@@ -130,6 +186,24 @@ named once more.
   goes by its address as its id, and that a respawn under the same name keeps that
   address. If both hold, such a teammate respawned after it was named is not named again
   until the main conversation sends it a message.
+- **The reminder riding on the next prompt was seen live on 2026-11-15.** The turn end
+  started no turn, and the reminder came once, as context beside the person's next prompt.
+  That prompt also named the same agent on the line of agents that went idle, which 0.1.4
+  now leaves out; that change has not been seen live. The reminder riding on a delivery
+  from an agent has not been seen live, and neither has how a leading line on a
+  teammate's delivery reads to the model; the plugin's tests establish the ride.
+- **`/quiet-agents mute` was used live on 2026-11-15, and lost answers.** A muted agent
+  that replied by ending its turn had each answer only in its idle notice, which the mute
+  took out. 0.1.4 now leaves deliveries alone. A live retest the same day saw the
+  correction once: by a test session's report, which the person pasted in, a muted
+  agent's answer came through, and the line in front of it no longer told the model to
+  stop the agent. That retest did not show a muted agent left out of the reminder. The
+  plugin's tests establish the rest.
+- **Leaving out a `waiting` agent has not been seen live.** It ships in 0.1.4 and relies
+  on the documented `waiting` status ("on background work it owns, on a plan's approval
+  or, in a background subagent, on an Agent call alone"). Which of these puts an agent
+  there in practice, a background subagent's shell or monitor or a teammate's, has not
+  been observed. The plugin's tests establish the rest.
 - **Recognising a teammate in its own pane by the agent list has not been seen live.** It
   relies on the documented listing of such teammates by name. The plugin's tests
   establish the rest.

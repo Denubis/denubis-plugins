@@ -57,8 +57,17 @@ Inspect the artifacts directly:
 6. Every source pointer and command resolves. Negative findings state their search scope
    and a positive control.
 7. Workspace handling records the intended integration branch and applies the isolation
-   rubric. Commit handling may authorise private checkpoints, while post-UAT normalization,
-   integration, publication, and cleanup retain their later boundaries.
+   rubric. Commit handling may authorise private checkpoints, the joins, and the squashes
+   that keep the task branch to a few coherent commits, while the final merge, which the
+   human starts by running the merge command unless they type a delivery request,
+   publication, and task-branch cleanup retain
+   their later boundaries.
+8. The execution layout lets work run at the same time only when it shares no file, gives
+   every shared file one owner, holds dependent work until what it depends on has joined,
+   puts each concurrent implementer in its own worktree from the task branch, names a
+   checker other than the implementer for each piece, orders the joins with a combined
+   re-check, and removes every worktree it creates once its work has joined. A single
+   coupled outcome names one implementer and nothing more.
 
 Repair implementation-detail defects and rerun affected checks. Ask the human only when
 repair requires a genuine design, scope, authority, or external-state decision.

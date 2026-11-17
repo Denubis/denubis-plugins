@@ -92,6 +92,10 @@ and consequences section. One ADR per decision.
 - [2026-11-10-bbs-compact-nag-leaves-engine-threshold — The compact-nag mod leaves Claude Code's own compaction point alone; it notes the need to prepare at 40%, the session asks for a compaction when it is ready, and past 50% each main-session stop gets an urgent note instead of a forced compaction](2026-11-10-bbs-compact-nag-leaves-engine-threshold.md)
 - [2026-11-10-bbs-own-agents-compact-at-half — Subagents of this repository's own agent types compact at about half their context window; every agent file carries `autoCompactWindow: 500000`](2026-11-10-bbs-own-agents-compact-at-half.md)
 - [2026-11-15-bbs-quiet-agents-names-agents-once — quiet-agents' turn-end nudge names each agent once, and again only after the main conversation sends it new work](2026-11-15-bbs-quiet-agents-names-agents-once.md)
+- [2026-11-15-bbs-waiting-agents-are-not-idle — quiet-agents treats an agent Claude Code lists as waiting on its own background work as not idle](2026-11-15-bbs-waiting-agents-are-not-idle.md)
+- [2026-11-15-bbs-person-mutes-kept-agents — the person mutes a kept agent with `/quiet-agents mute`, which silences only the naming of it (reminder, idle line, status-line idle names, `/tidy`) until unmuted or stopped, and leaves its deliveries as they are](2026-11-15-bbs-person-mutes-kept-agents.md)
+- [2026-11-15-bbs-reminder-rides-next-message — the quiet-agents reminder starts no turn of its own; it rides on the next prompt as context or on the next delivery from an agent as a leading line](2026-11-15-bbs-reminder-rides-next-message.md)
+- [2026-11-15-bbs-plans-run-agents-in-worktrees — implementation plans run independent work with several agents in skill-made worktrees, each piece checked by another agent, squashed into a few coherent commits and joined without asking, and clean up each worktree and agent branch after its join; the final merge into the integration branch waits for the human's authorisation](2026-11-15-bbs-plans-run-agents-in-worktrees.md)
 
 ## Status lifecycle
 
@@ -134,3 +138,4 @@ found or return the ADR to Proposed until a focused human invocation resolves it
   ADR captures the *why* and the constraint row captures the *how to verify*.
 
 - [2026-11-10 — History failure warns instead of blocking questions](2026-11-10-bbs-history-failure-warns.md)
+- [2026-11-18 — Approving a plan's execution is the explicit request for local checkpoint commits on that plan's work branch](2026-11-18-bbs-plan-approval-requests-checkpoint-commits.md)

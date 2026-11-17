@@ -14,8 +14,9 @@ criteria; project instructions own engineering constraints; observed tests, oper
 results, and final human interaction own completion claims.
 
 Whether the main session executes directly or delegates follows the global instruction
-files. Whoever does the work, a second fresh worker, never the proposer, verifies it
-before it reaches the human (below). Model reports, review verdicts, task labels, and
+files; the plan's execution layout says how the work divides between agents. Whoever does
+the work, a second fresh worker, never the proposer, verifies it before it reaches the
+human (below). Model reports, review verdicts, task labels, and
 commits are not correctness evidence. Session naming is
 an optional convenience, not an execution prerequisite.
 
@@ -62,17 +63,23 @@ Choose the workspace before mutation:
   explicit assent before the first edit there; and
 - after that assent, stay on the default branch rather than creating a ceremonial branch.
 
-Use `denubis-plan-and-execute:using-git-worktrees` only when the rubric selects isolation
-and no suitable task-owned worktree exists. Record the intended integration branch before
-checkpointing. If the base, ownership, or isolation cannot be resolved safely, ask one
-pointed question before mutation.
+Create the task worktree through `denubis-plan-and-execute:using-git-worktrees` only when
+the rubric selects isolation and no suitable task-owned worktree exists; the agent
+worktrees the layout names are created through it unless the plan records why not
+(below). Record the intended
+integration branch before checkpointing. If the base, ownership, or isolation cannot be
+resolved safely, ask one pointed question before mutation.
 
-“Execute this approved plan” authorises local private checkpoint commits on the isolated
-task branch for work owned by the plan, unless the human or project explicitly prohibits
-them.
-It does not authorise pushing, publishing, deploying, mutating unrelated external state,
-or rewriting inherited or published history. Never checkpoint directly on the protected
-base branch.
+“Execute this approved plan” authorises, without further prompts, local private checkpoint
+commits on the isolated task branch and in the agent worktrees the plan names, the joins
+and agent-branch cleanup the plan's layout names, and the commits and squashes on the task
+branch that keep it to a few coherent commits (ruled 2026-11-15), unless the human or
+project explicitly prohibits them. These come before integration testing, because the
+combined tree cannot be tested without merging, nor merged without committing.
+It does not authorise the final merge into the intended integration branch, which waits
+for the human's authorisation at that point (below), pushing, publishing, deploying,
+deleting the task branch, mutating unrelated external state, or rewriting inherited or
+published history. Never checkpoint directly on the protected base branch.
 
 If a path, criterion, prerequisite, or authority source does not resolve, repair settled
 implementation detail. Stop only when the missing fact changes design, scope, authority,
@@ -80,9 +87,34 @@ or external state.
 
 ## Execute coherent outcomes
 
-Read enough of the whole plan to understand dependencies and final implications, then
-load one outcome's implementation detail at a time. Track durable state only when it
-materially improves recovery. Track outcomes and blockers, not chat turns.
+Read enough of the whole plan to understand dependencies and final implications. Each
+implementer loads only its own outcome's implementation detail. Track durable state only
+when it materially improves recovery. Track outcomes and blockers, not chat turns.
+
+Follow the plan's execution layout:
+
+- Start together the work the layout lets run at the same time. Create each concurrent
+  implementer's worktree and branch from the task branch's current tip through
+  `denubis-plan-and-execute:using-git-worktrees`, not with a runtime's own agent
+  worktrees unless the plan records why, and give the implementer its outcome, its
+  worktree path, the files it owns, and the checks it runs. The new worktree runs the
+  setup's install steps and only the narrowest check that shows its environment works; it
+  relies on the task branch's recorded baseline for that same tree rather than rerunning
+  the expensive suite.
+- Send each finished piece to its named checker before it joins. Return the checker's
+  demonstrated findings to the implementer.
+- Join verified branches into the task branch one at a time in the layout's order, without
+  asking. Before a branch joins, squash its checkpoints into the few coherent commits of
+  the outcome it serves, so the join keeps those commits and `git branch -d` still finds
+  the branch merged. After each join, run the combined checks the layout names, and tell
+  implementers still working what has landed. Return a conflict to the implementer whose
+  branch conflicts.
+- Once a join's combined checks pass, carry out its cleanup step: confirm the worktree is
+  clean and its branch has no commit the task branch lacks, remove the worktree from
+  outside it, delete the branch with `git branch -d`, and confirm with `git worktree list`
+  and `git branch --list`. Record the removal in `worklog.md`.
+
+A plan without a layout runs as one implementer in the task checkout.
 
 For each outcome:
 
@@ -111,7 +143,8 @@ compatibility layers or narrate superseded behavior in living documentation.
 Create a private checkpoint whenever it materially protects recoverable work or makes an
 outcome inspectable. Stage only files owned by this execution. Checkpoints may be frequent
 and do not require routine human prompts. Fix rounds, review responses, and superseded
-checkpoints remain provisional; they will fold into the outcome after UAT. Do not publish
+checkpoints remain provisional; they fold into the outcome they serve on the task branch
+without a human prompt (see “Normalize the task branch”). Do not publish
 an internal checkpoint ref or present its commit list as the delivered result.
 
 After each completed task or outcome, update the durable owners: remove completed work
@@ -146,6 +179,8 @@ Do not present UAT after an intermediate outcome. Once all outcomes are assemble
    architecture or an accepted ADR only when those artifacts genuinely own the result.
 5. Inspect the complete diff, status, and private log. Separate pre-existing changes and
    identify untracked or generated files. Confirm documentation describes current truth.
+   Confirm with `git worktree list` that no worktree the plan created remains besides
+   the task's own.
 6. Send the finished work to a second fresh worker, never the proposer, to verify it.
    Give it a full checklist that names what to check and never an expected defect or
    outcome: the accepted requirements and acceptance criteria, the gates above, the
@@ -175,31 +210,41 @@ If UAT fails, record the exact observation, return to implementation, and repeat
 mechanical checks and the fresh worker's verification before presenting UAT again. Silence, model agreement, or a
 commit is not acceptance.
 
-Keep the isolated branch and provisional commits through UAT. The human is judging the
-finished implication, not accepting an integration target or a checkpoint series.
+Keep the isolated task branch unmerged through UAT. The human is judging the finished
+implication, not accepting an integration target or a checkpoint series.
 
-## Normalize after accepted UAT
+## Normalize the task branch
 
-Final history normalization happens only after explicit human acceptance of all required
-finished-work UAT. Before rewriting, record the accepted tree identifier and current
-private series. Fold superseded checkpoints, fix rounds, and review-response commits into
-the coherent outcome they serve. Keep a checkpoint only if it matured into an
-independently understandable and reversible outcome. There is no commit-count target.
+Keep the task branch to a few coherent commits without asking the human (ruled
+2026-11-15): squash agents' checkpoints as their branches join (above), before the
+combined checks, and after accepted UAT fold any fix rounds it caused. Before rewriting,
+record the current tree identifier and private series. Fold superseded checkpoints, fix
+rounds, and review-response commits into the coherent outcome they serve. Keep a
+checkpoint only if it matured into an independently understandable and reversible
+outcome. There is no commit-count target.
 
 Do not rewrite inherited or published history. If the branch was published, stop and ask
 for the appropriate integration strategy instead of force-rewriting it.
 
 After normalization:
 
-1. Confirm the rewritten series produces exactly the accepted tree.
+1. Confirm the rewritten series produces exactly the tree it started from; after UAT, the
+   accepted tree.
 2. Reinspect each outcome diff and the aggregate diff from the intended base.
 3. Rerun the checks needed to establish that the rewritten checkout still matches the
-   accepted behavior.
+   verified behavior; after UAT, the accepted behavior.
 4. Confirm status contains no unexplained owned changes.
 
-Only then invoke `denubis-plan-and-execute:finishing-a-development-branch` for the
-already-authorised integration route, or ask one pointed integration question. For skill
-or plugin development, `commit, marketplace, push` and `ship` are direct-delivery routes:
+Only then invoke `denubis-plan-and-execute:finishing-a-development-branch`. The final merge
+into the intended integration branch is never automatic and the plan's approval does not
+grant it: it happens only when the human authorises it at that point, after discussing the
+finished work, and that authorisation also permits the merge's commit. Unless the human
+types one of the direct-delivery routes below, the human starts it by running
+`/denubis-plan-and-execute:merge-to-main`; hand the human that command and do not run the
+merge yourself (ruled 2026-11-15). The task worktree and branch are removed
+only as the human names then. Ask one pointed question when no
+route was given. For skill or plugin development, `commit, marketplace, push` and `ship`
+are direct-delivery routes:
 finish release metadata, integrate into the intended default branch, push and verify that
 branch, then clean the task-owned branch or worktree. They never mean “push whichever
 branch is currently checked out.” Report
@@ -210,4 +255,4 @@ If context becomes genuinely depleted, update `todo.md` with unresolved work and
 `worklog.md` with completed work, last positive evidence, provisional commits, and UAT
 state. Return only a pointer-style resume instruction naming the absolute working root,
 plan, todo, and worklog paths plus this skill invocation. Do not restate their contents in
-the resume text. On resume, re-resolve paths, status, and evidence.
+the resume text. On resume, re-resolve paths, status, worktrees, and evidence.

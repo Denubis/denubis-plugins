@@ -34,6 +34,15 @@ current.
   and base. The branch remains until the PR lifecycle finishes.
 - A requested local merge invokes `denubis-plan-and-execute:merge-to-main` without push or
   cleanup authority unless those actions were also named.
+- An approved plan's final merge into the intended integration branch is never automatic
+  and the plan's approval does not grant it (ruled 2026-11-15). It is a requested local
+  merge only once the human authorises it at that point, after discussing the finished
+  work and accepting its UAT, and that authorisation also permits the merge's commit.
+  Unless the human types a direct-delivery request (next item), the human starts it by
+  running `/denubis-plan-and-execute:merge-to-main`: hand the human that command, with the
+  exact task branch, and do not run the merge yourself (ruled 2026-11-15). Like any
+  requested local merge, it removes the task worktree or deletes the task branch only if
+  the human names that too, since deleting a branch needs the human's say-so.
 - For skill or plugin development, `commit, marketplace, push`, `release`, or `ship`
   authorises direct delivery when project policy permits it: finish the version and
   marketplace metadata, integrate the accepted tree into the intended default branch,
@@ -55,5 +64,6 @@ remote ref only when the human's cleanup request includes it. Re-list worktrees 
 and remote refs afterward.
 
 Do not discard commits, force-push, clean unrelated or untracked files, delete another
-branch or worktree, publish a checkpoint ref, or deploy. A failed cleanup check blocks
+branch or worktree except as an approved plan's cleanup step names, publish a checkpoint
+ref, or deploy. A failed cleanup check blocks
 cleanup; it does not weaken the evidence requirement.

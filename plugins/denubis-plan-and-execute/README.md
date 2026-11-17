@@ -36,7 +36,10 @@ when implementation changes the system.
 
 Planning creates one directory with `plan.md`, `todo.md`, and `worklog.md`. The plan owns
 stable outcomes, the todo owns unresolved work, and the worklog owns completed work and
-evidence. It splits outcome files only when independently resumable loading makes that
+evidence. The plan's execution layout says which work runs at the same time (only work
+that shares no file), which agent implements each piece in which worktree, which other
+agent checks it, the order in which the pieces join the task branch, which agent runs
+which tests, and when each worktree is removed. It splits outcome files only when independently resumable loading makes that
 useful. Boundary-flow, verification, and UAT appendices exist only when they have a real
 cross-outcome consumer.
 
@@ -50,16 +53,23 @@ branch or worktree is suitable. Work on the default branch begins only after a w
 human assent.
 
 Whether the main session executes directly or delegates follows the global instruction
-files. Behavior changes use the project-native red-green-refactor cycle; operational work
+files, and the plan's execution layout says how the work divides. Concurrent implementers
+work in worktrees created from the task branch; each piece is checked by an agent that
+did not write it before it joins, and its worktree is removed once the join's combined
+checks pass. Behavior changes use the project-native red-green-refactor cycle; operational work
 uses a real consumer or positive probe. Mechanical gates, documentation reconciliation,
 complete diff/status inspection, and verification by a second fresh worker, never the
 proposer, precede human UAT.
 
-Executing an approved plan authorises private checkpoint commits on its isolated task
-branch without routine prompts. It does not authorise pushing or publication. Fix rounds
-and superseded checkpoints fold into coherent outcomes only after the human accepts UAT on
-the finished implication. Normalization must preserve the exact accepted tree and is
-reverified before integration. A selected delivery route integrates the accepted tree,
+Executing an approved plan authorises, without routine prompts, private checkpoint commits
+on its isolated task branch and agent branches, the joins, and the commits and squashes
+that keep the task branch to a few coherent commits. These come before integration
+testing, because the combined tree cannot be tested without merging, nor merged without
+committing. Fix rounds and superseded checkpoints fold into coherent outcomes, including
+any fix round after UAT. Each rewrite preserves the exact tree it starts from and is
+reverified before integration. Executing a plan does not authorise the final merge,
+pushing or publication. A delivery route the human selects after discussing the finished
+work and accepting UAT integrates the accepted tree,
 pushes the intended branch when authorised, verifies the remote ref, and removes only the
 task-owned branch or worktree. Skill-development requests such as `commit, marketplace,
 push` mean that complete delivery, not publication of the current feature ref.
@@ -80,8 +90,17 @@ and working root rather than copying their contents.
 - merge-to-main: perform and verify one local integration.
 - exec-session-naming: optional tmux-window naming.
 
-Worktree cleanup, history rewriting outside the private feature series, destructive
-discard, publication, and deployment retain separate authority.
+An approved plan's cleanup step covers removing the agent worktrees it creates and safely
+deleting the agent branches it names once they have joined. The final merge into the
+intended integration branch is never automatic and the plan's approval does not cover it:
+the human authorises it after discussing the finished work and accepting its UAT, and
+that authorisation also permits its commit. Unless the human types a delivery request
+such as `commit, marketplace, push` or `ship`, which has the session run the whole
+delivery, the human starts the merge by running `/denubis-plan-and-execute:merge-to-main`;
+the session hands over that command and does not run the merge itself. The task worktree and branch are removed only as the human
+names then. Other
+worktree cleanup, other branch deletion, history rewriting outside the private feature
+series, destructive discard, publication, and deployment retain separate authority.
 
 ## Agents and project guidance
 
