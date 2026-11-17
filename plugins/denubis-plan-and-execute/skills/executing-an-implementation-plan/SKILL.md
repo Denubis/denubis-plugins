@@ -243,8 +243,8 @@ types one of the direct-delivery routes below, the human starts it by running
 `/denubis-plan-and-execute:merge-to-main`; hand the human that command and do not run the
 merge yourself (ruled 2026-11-15). The task worktree and branch are removed
 only as the human names then. Ask one pointed question when no
-route was given. For skill or plugin development, `commit, marketplace, push` and `ship`
-are direct-delivery routes:
+route was given. For skill or plugin development, `commit, marketplace, push`, `release`,
+and `ship` are direct-delivery routes:
 finish release metadata, integrate into the intended default branch, push and verify that
 branch, then clean the task-owned branch or worktree. They never mean “push whichever
 branch is currently checked out.” Report
