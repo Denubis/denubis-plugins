@@ -36,8 +36,14 @@ seen the conversation makes two checks:
    (`docs/architecture/decisions/` and `docs/decisions/` in the main checkout) and the
    chat logs (`cc-search-chats`). Only the person's own words count: a message they typed,
    or their words quoted in a record, never a paraphrase. Before searching the chats it
-   brings their index up to date, running `cc-search-chats index --json` whenever
-   `cc-search-chats index --status --json` reports changes not yet indexed.
+   runs `cc-search-chats index --status --json`. If that reports an index made less
+   than five minutes ago (`index_state.age_ms` below 300000), it searches the index as
+   it is. Otherwise it brings the index up to date, running
+   `cc-search-chats index --json` whenever the status reports changes not yet indexed.
+   Live sessions keep writing, so without that pause nearly every check would rebuild
+   the index, which loads the embedding model onto the graphics card. Searching a
+   recent index this way adds no history warning. A missing or non-integer age counts
+   as old.
 
 The check runs in the background, because a search takes up to a minute or more and a
 hook may spend only ten seconds of its own time; waiting for a subagent counts against
@@ -215,6 +221,15 @@ or on `/reload-plugins`.
   is busy or history cannot be refreshed. A warning does not claim fresh or
   complete history.
 
+- **The five-minute pause before re-indexing has not been seen live.** The Codex
+  adapter's tests show it accepting a search of a recent index without a refresh or a
+  warning, and still warning for an older or undated one with changes not yet indexed
+  that was not refreshed. The
+  Claude checker follows the pause only as written instruction, with no code checking
+  its commands. In one reading trial on 2026-11-18, a Sonnet reader given the new
+  instruction said it would skip the refresh for a one-minute-old index and refresh
+  for a six-minute-old or undated one; given the old instruction, it refreshed all
+  three. Terra's reading of the Codex instruction has not been tried.
 - **Some chat files are not indexed.** On 2026-11-08, 29 files were blocked by a record
   type `cc-search-chats` does not yet read; an index run does not clear them, and the
   checker does not search them.
@@ -309,6 +324,8 @@ and the quote; whether those words settle the decision remains Terra's judgment.
 
 The adapter observes completed chat-search commands. Failed history commands,
 missing fresh-search evidence and partial coverage warn after clarity passes.
+A search is fresh when the status before it reports no source changes or an
+index less than five minutes old, or when an index run precedes it.
 History permission interruptions are warnings only when the adapter can identify
 the request as a direct cc-search-chats history command; it never grants that
 approval. Unrelated permission requests, malformed responses, unavailable

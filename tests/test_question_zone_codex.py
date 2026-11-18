@@ -80,10 +80,44 @@ def command_report(command: str, **payload) -> str:
     )
 
 
+SEARCH = (
+    "cc-search-chats search 'meeting day' --literal --json",
+    command_report("search", results=[]),
+    0,
+)
+REFRESH = (
+    "cc-search-chats index --json",
+    command_report("index", refresh={"state": "complete"}),
+    0,
+)
+
+# The person's ruling of 2026-11-18 ("yes please", to skipping the chat index
+# refresh when the index is less than five minutes old), in the milliseconds
+# `index_state.age_ms` reports.
+FIVE_MINUTES_MS = 5 * 60 * 1000
+
+
+def status(**index_state: object) -> tuple[str, object, int]:
+    """A status report whose index has native changes not yet indexed."""
+    return (
+        "cc-search-chats index --status --json",
+        command_report(
+            "index", index_state={"freshness": "refresh_pending", **index_state}
+        ),
+        0,
+    )
+
+
+History = list[tuple[str, object, int]]
+
+
 class Daemon:
-    def __init__(self, reply: object, *, failure: str = ""):
+    def __init__(
+        self, reply: object, *, failure: str = "", history: History | None = None
+    ):
         self.reply = reply
         self.failure = failure
+        self.history = history
         self.requests: list[dict] = []
         self.turn_count = 0
         self.turn_id = ""
@@ -135,20 +169,18 @@ class Daemon:
                 )
             )
             return
-        commands: list[tuple[str, object, int]] = [
+        commands: History = [
             (
                 "cc-search-chats index --status --json",
                 command_report("index", index_state={"freshness": "no_source_changes"}),
                 0,
             ),
-            (
-                "cc-search-chats search 'meeting day' --literal --json",
-                command_report("search", results=[]),
-                0,
-            ),
+            SEARCH,
         ]
         if clarity:
             commands = []
+        elif self.history is not None:
+            commands = self.history
         elif self.failure == "partial":
             commands[0] = (
                 "cc-search-chats index --status --json",
@@ -245,8 +277,10 @@ class Daemon:
 
 
 @contextmanager
-def daemon(tmp_path: Path, reply: object, *, failure: str = ""):
-    fake = Daemon(reply, failure=failure)
+def daemon(
+    tmp_path: Path, reply: object, *, failure: str = "", history: History | None = None
+):
+    fake = Daemon(reply, failure=failure, history=history)
     path = str(tmp_path / "daemon.sock")
     with unix_serve(fake.handle, path) as server:
         thread = threading.Thread(target=server.serve_forever)
@@ -479,6 +513,76 @@ def test_missing_fresh_history_trace_warns_after_clarity_passes(
     tmp_path, failure
 ) -> None:
     with daemon(tmp_path, verdict("clear"), failure=failure) as (endpoint, _):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    assert "permissionDecision" not in result["hookSpecificOutput"]
+    assert "history" in result["systemMessage"].lower()
+
+
+@pytest.mark.parametrize("age_ms", [0, FIVE_MINUTES_MS // 2, FIVE_MINUTES_MS - 1])
+def test_index_under_five_minutes_old_is_searched_unrefreshed_without_warning(
+    tmp_path, age_ms
+) -> None:
+    with daemon(
+        tmp_path, verdict("clear"), history=[status(age_ms=age_ms), SEARCH]
+    ) as (endpoint, _):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    assert "permissionDecision" not in result["hookSpecificOutput"], result
+    assert "systemMessage" not in result, result
+
+
+def test_unrefreshed_recent_index_still_warns_of_partial_coverage(tmp_path) -> None:
+    partial = (
+        "cc-search-chats index --status --json",
+        command_report(
+            "index",
+            coverage={"completeness": "partial", "blocked_files": 6},
+            index_state={"freshness": "refresh_pending", "age_ms": 1},
+        ),
+        0,
+    )
+    with daemon(tmp_path, verdict("clear"), history=[partial, SEARCH]) as (
+        endpoint,
+        _,
+    ):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    assert "permissionDecision" not in result["hookSpecificOutput"]
+    assert "partial" in result["systemMessage"].lower()
+
+
+@pytest.mark.parametrize("age_ms", [FIVE_MINUTES_MS, 10 * FIVE_MINUTES_MS])
+def test_index_five_minutes_old_with_changes_passes_once_refreshed(
+    tmp_path, age_ms
+) -> None:
+    with daemon(
+        tmp_path, verdict("clear"), history=[status(age_ms=age_ms), REFRESH, SEARCH]
+    ) as (endpoint, _):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    assert "permissionDecision" not in result["hookSpecificOutput"]
+    assert "systemMessage" not in result, result
+
+
+@pytest.mark.parametrize("age_ms", [FIVE_MINUTES_MS, 10 * FIVE_MINUTES_MS])
+def test_index_five_minutes_old_with_changes_searched_unrefreshed_warns(
+    tmp_path, age_ms
+) -> None:
+    with daemon(
+        tmp_path, verdict("clear"), history=[status(age_ms=age_ms), SEARCH]
+    ) as (endpoint, _):
+        result = invoke(question(tmp_path), endpoint=endpoint)
+    assert "permissionDecision" not in result["hookSpecificOutput"]
+    assert "history" in result["systemMessage"].lower()
+
+
+@pytest.mark.parametrize(
+    "age",
+    [{}, {"age_ms": None}, {"age_ms": "60000"}, {"age_ms": True}],
+    ids=["missing", "null", "text", "boolean"],
+)
+def test_unknown_index_age_is_not_treated_as_recent(tmp_path, age) -> None:
+    with daemon(tmp_path, verdict("clear"), history=[status(**age), SEARCH]) as (
+        endpoint,
+        _,
+    ):
         result = invoke(question(tmp_path), endpoint=endpoint)
     assert "permissionDecision" not in result["hookSpecificOutput"]
     assert "history" in result["systemMessage"].lower()

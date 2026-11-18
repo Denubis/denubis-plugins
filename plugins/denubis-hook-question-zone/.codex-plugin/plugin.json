@@ -1,6 +1,6 @@
 {
   "name": "denubis-hook-question-zone",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Check native Codex questions with a fresh Terra reader before presentation.",
   "author": {"name": "Brian Ballsun-Stanton", "url": "https://github.com/denubis"},
   "repository": "https://github.com/denubis/denubis-plugins",

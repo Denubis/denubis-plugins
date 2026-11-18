@@ -140,3 +140,4 @@ found or return the ADR to Proposed until a focused human invocation resolves it
 
 - [2026-11-10 — History failure warns instead of blocking questions](2026-11-10-bbs-history-failure-warns.md)
 - [2026-11-18 — Approving a plan's execution is the explicit request for local checkpoint commits on that plan's work branch](2026-11-18-bbs-plan-approval-requests-checkpoint-commits.md)
+- [2026-11-18 — The question check does not re-index a chat index under five minutes old](2026-11-18-bbs-question-check-index-debounce.md)

@@ -37,6 +37,11 @@ const ASK_DESCRIPTION = [
 const WITHDRAW_DESCRIPTION =
   "Removes a question from the queue above the person's prompt when you no longer need its answer. Give the question exactly as you asked it; the system prompt lists the questions still waiting."
 
+// The person's ruling of 2026-11-18: the chat index is not brought up to date
+// while it is less than five minutes old, because live sessions keep writing
+// and each refresh loads the embedding model onto the graphics card.
+const INDEX_DEBOUNCE_MS = 5 * 60_000
+
 // The checker's system prompt. It sees the entry and nothing of the
 // conversation the entry came from. Its reply reaches the model unchanged
 // unless it is CLEAR, so each refusal says what the model should do.
@@ -53,7 +58,8 @@ const CHECKER_PROMPT = [
   '',
   'Second, has the person already answered it? Search for an answer in their own words:',
   "- in the project's decision records: `git rev-parse --path-format=absolute --git-common-dir` names the main checkout's git folder, whose parent is the main checkout; search its `docs/architecture/decisions/` and `docs/decisions/` with `rg`. A project with neither has no records to search;",
-  '- in the chat logs. First bring their index up to date: if `cc-search-chats index --status --json` reports `index_state.freshness` other than `no_source_changes`, run `cc-search-chats index --json`. A warning that some files were left out, such as an unknown record shape, does not stop the check. Then search with `cc-search-chats search "<words>" --semantic --json`, or `--literal` for exact words. Each result\'s `identity.canonical_locator` is its `ccchat:v1:` locator, and `cc-search-chats context <locator> --json` shows the messages around it. Its JSON carries `schema_version` 5.',
+  `- in the chat logs. First run \`cc-search-chats index --status --json\`. If its \`index_state.age_ms\` is an integer below ${INDEX_DEBOUNCE_MS}, the index is under ${INDEX_DEBOUNCE_MS / 60_000} minutes old: do not run \`cc-search-chats index\`, and search the index as it is. Otherwise, if it reports \`index_state.freshness\` other than \`no_source_changes\`, bring the index up to date with \`cc-search-chats index --json\`. Searching an index under ${INDEX_DEBOUNCE_MS / 60_000} minutes old without bringing it up to date is not a failed lookup or incomplete coverage, and needs no warning.` +
+    ' A warning that some files were left out, such as an unknown record shape, does not stop the check. Then search with `cc-search-chats search "<words>" --semantic --json`, or `--literal` for exact words. Each result\'s `identity.canonical_locator` is its `ccchat:v1:` locator, and `cc-search-chats context <locator> --json` shows the messages around it. Its JSON carries `schema_version` 5.',
   "Only the person's own words count: a message they typed themselves, or their words quoted in a decision record. A message written by an assistant, a plugin, a tool or an agent does not count. A paraphrase by an assistant or a record is not an answer, and neither is a remark that does not settle this question.",
   'If you find an answer, reply that the person has already answered this, say where (the record\'s path and line, or the `ccchat:v1:` locator), quote their words exactly, and say to use that answer instead of asking.',
   'If history lookup fails or has incomplete coverage, continue useful searches in the available sources. If you find no verified prior answer, let the otherwise-clear question proceed: reply CLEAR_WITH_HISTORY_WARNING: followed by a short plain warning naming the failed command or unread coverage. Never claim unread records were searched or that no historical answer exists. This permits asking only; it authorizes no operation.',

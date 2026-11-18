@@ -1,5 +1,17 @@
 # Changelog
 
+## [denubis-hook-question-zone] 0.2.4
+
+A question's history check no longer rebuilds the chat index when the index is less than five minutes old (the person's ruling of 2026-11-18). Live sessions keep writing: on 2026-11-18, six minutes after an index was made, `cc-search-chats index --status --json` already reported 37 files not yet indexed. So nearly every question started an index run, which loads the embedding model onto the graphics card while other sessions' semantic searches need it.
+
+**Changed:**
+- Both checkers, Claude's Sonnet subagent and Codex's Terra reader, first run `cc-search-chats index --status --json`. If its `index_state.age_ms` is an integer below 300000, they search the index as it is. Otherwise they run `cc-search-chats index --json` when the status reports changes not yet indexed, as before. A missing, null or non-integer age counts as old. Searching a recent index this way adds no history warning; failed commands and partial coverage still warn.
+- The Codex adapter counts a search as fresh when the status before it reports an index less than five minutes old, as it already did for no source changes or a preceding index run. An older or undated index with changes not yet indexed, searched without a refresh, still warns.
+
+**Tests:** `tests/test_question_zone_codex.py`, run with `uv run --frozen pytest` (57 pass). New tests, through the packaged hook and the fake Codex daemon: an index aged 0 ms, 150000 ms or 299999 ms is searched without a refresh and gives no warning; a recent index with partial coverage still warns of partial coverage; an index aged 300000 ms or more with pending changes passes once refreshed, and warns when searched without a refresh; an age that is missing, null, text or `true` is not treated as recent. The four recent-index cases failed against 0.2.3 with "chat search ran without a fresh or refreshed index". The age guards passed against 0.2.3, which they keep; each failed against a deliberately broken check (`<=` at the boundary, `true` accepted, a missing or null age read as zero, the age ignored). The Claude mod's tests (`claude plugin test`, 41 pass) are unchanged: a stand-in answers for its checker, so they do not exercise its instruction.
+
+**Not verified:** not yet observed live. The Claude checker follows the pause only as written instruction; no code checks the commands it runs. In one reading trial each, a Sonnet reader given the 0.2.3 instruction said it would refresh a one-minute-old index with pending changes, and given the new one said it would skip that refresh and still refresh a six-minute-old or undated index. Terra's reading of the Codex instruction has not been tried.
+
 ## [denubis-plan-and-execute] 4.3.0
 
 Implementation plans say how several agents execute and check the work, each in a worktree the plan cleans up (ADR 2026-11-15-bbs-plans-run-agents-in-worktrees).
