@@ -11,6 +11,14 @@ const NAG_AT = 40
 const RENAG_EVERY = 5
 const URGENT_AT = 50
 
+// How long after its own compaction the mod waits before resuming the
+// session. A message already waiting when a compaction ends (a supervisor's,
+// say) takes the first turn: of 69 first turns that were not the resume after
+// the mod's own compactions in this machine's transcripts of 15 to 23 November
+// 2026, 46 began within 0.8 seconds (at most 0.755), one after 6.9, and 22
+// after 10 or more. Once one has, a resume is no longer true and is not sent.
+const RESUME_AFTER_MS = 2_000
+
 const MAIN = 'main'
 const TOOL_NAME = 'ready_to_compact'
 // Spelled whole: the tool.call matcher must be a literal the engine can read.
@@ -23,6 +31,13 @@ const loops = atom(
   {} as Record<string, CompactNagLoop>,
   { shape: 'loops-2' },
 )
+
+// Main-loop turns begun since this module loaded: a resume goes out only if
+// none began between the compaction's return and the resume. A turn begun
+// before that return is not seen (whether a waiting message's can is unproven;
+// see ADR 2026-11-24-bbs-compact-nag-compaction-is-not-a-pause). A reload
+// starts the count over, and ends the wait for a resume with it.
+let mainTurnsBegun = 0
 
 const keyOf = (agentId: string | undefined) => agentId ?? MAIN
 
@@ -135,18 +150,30 @@ async function resetLoop($: EngineInterface, key: string) {
 async function compactMain($: EngineInterface) {
   const loop = (await read($, loops))[MAIN]
   const instructions = instructionsFor(loop)
+  let turnsAtCompaction: number
   try {
     const result = await $.session.compact(instructions === undefined ? {} : { instructions })
     if (result.skip !== undefined) {
       $.ui.log(`compact-nag: compaction skipped: ${result.skip}`)
       return
     }
+    turnsAtCompaction = mainTurnsBegun
     await resetLoop($, MAIN)
     $.ui.status(undefined)
   } catch (error) {
     // Rejects while a turn runs (a prompt queued during the last one); the
     // record stays as it is, so the next turn's end tries again.
     $.ui.log(`compact-nag: compaction deferred: ${String(error)}`)
+    return
+  }
+  $.clock.after(RESUME_AFTER_MS, () => resume($, loop, turnsAtCompaction))
+}
+
+// The turn the mod gives the main session after its own compaction, sent only
+// while it is true: no other turn has begun since the compaction.
+function resume($: EngineInterface, loop: CompactNagLoop | undefined, turnsAtCompaction: number) {
+  if (mainTurnsBegun !== turnsAtCompaction) {
+    $.ui.log('compact-nag: no resume prompt: another turn began after the compaction')
     return
   }
   // Not awaited: it resolves only as its own turn starts, once the session is idle.
@@ -199,6 +226,11 @@ export const register: Register = on => {
     return started
   })
 
+  on('turn.start', (_, e, next) => {
+    if (e.agentId === undefined) mainTurnsBegun += 1
+    return next(e)
+  })
+
   on('turn.step', async function* ($, e, next) {
     const result = yield* next(e)
     if (result.usage !== null) {
@@ -239,7 +271,7 @@ export const register: Register = on => {
     return {
       result:
         key === MAIN
-          ? 'Accepted. This session compacts with your brief when this turn ends. Finish your reply now; start no new work.'
+          ? 'Accepted. This session compacts with your brief when this turn ends, then carries on by itself. Finish your reply now; start no new work. End the reply by saying that you are being compacted at your own request and will carry on by yourself, so nobody needs to nudge you.'
           : 'Accepted. Your brief is kept for when Claude Code compacts you. Finish and report back if you can.',
     }
   })

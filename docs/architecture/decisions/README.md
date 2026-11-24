@@ -97,6 +97,8 @@ and consequences section. One ADR per decision.
 - [2026-11-15-bbs-reminder-rides-next-message — the quiet-agents reminder starts no turn of its own; it rides on the next prompt as context or on the next delivery from an agent as a leading line](2026-11-15-bbs-reminder-rides-next-message.md)
 - [2026-11-15-bbs-plans-run-agents-in-worktrees — implementation plans run independent work with several agents in skill-made worktrees, each piece checked by another agent, squashed into a few coherent commits and joined without asking, and clean up each worktree and agent branch after its join; the final merge into the integration branch waits for the human's authorisation](2026-11-15-bbs-plans-run-agents-in-worktrees.md)
 - [2026-11-16-bbs-compact-nag-resumes-after-its-compaction — After its own compaction of the main session, compact-nag starts the next turn, quoting the session's brief and its handover reply](2026-11-16-bbs-compact-nag-resumes-after-its-compaction.md)
+- [2026-11-24-bbs-compact-nag-compaction-is-not-a-pause — A session compact-nag compacts says in its handover reply that it will carry on by itself, and no resume prompt is sent once another turn has begun](2026-11-24-bbs-compact-nag-compaction-is-not-a-pause.md)
+  (proposed; amends 2026-11-16-bbs-compact-nag-resumes-after-its-compaction)
 
 ## Status lifecycle
 

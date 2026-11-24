@@ -3,7 +3,9 @@
 **Status:** Accepted (2026-11-16). Records a human request and a human ruling on the
 `compact-nag` mod. Applied in `denubis-hook-compact-nag` 0.1.1. ADR
 2026-11-10-bbs-compact-nag-leaves-engine-threshold still holds: the mod compacts the
-main session only once it says it is ready.
+main session only once it says it is ready. Amended 2026-11-24 (proposed) by ADR
+2026-11-24-bbs-compact-nag-compaction-is-not-a-pause: the prompt goes out 2 seconds after
+the compaction and only if no turn has begun since.
 
 ## Authority evidence
 
