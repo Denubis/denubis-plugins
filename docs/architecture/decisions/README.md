@@ -101,6 +101,8 @@ and consequences section. One ADR per decision.
   (amends items 5 and 6 of 2026-11-08-bbs-questions-go-in-question-zone)
 - [2026-11-24-bbs-codex-question-search-runs-after-showing — Codex shows a question with no check before it; the search for an earlier answer runs afterwards in the background, and the searcher is told to skip go-aheads](2026-11-24-bbs-codex-question-search-runs-after-showing.md)
   (amends, for Codex, item 5 of 2026-11-23-bbs-question-search-runs-after-queueing and item 6 of 2026-11-08-bbs-questions-go-in-question-zone)
+- [2026-11-24-bbs-compact-nag-compaction-is-not-a-pause — A session compact-nag compacts says in its handover reply that it will carry on by itself, and no resume prompt is sent once another turn has begun](2026-11-24-bbs-compact-nag-compaction-is-not-a-pause.md)
+  (proposed; amends 2026-11-16-bbs-compact-nag-resumes-after-its-compaction)
 
 ## Status lifecycle
 

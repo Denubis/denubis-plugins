@@ -311,7 +311,7 @@
     {
       "name": "denubis-hook-compact-nag",
       "description": "Tells the main session and subagents to save their handover state at 40% context, and compacts a session with its own brief once it says it is ready",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": "./plugins/denubis-hook-compact-nag",
       "author": {
         "name": "Brian Ballsun-Stanton",
