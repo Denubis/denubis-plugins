@@ -15,13 +15,22 @@ escalate to dots.mocr (GPU OCR), which the cascade starts and stops itself.
 See renderer.py for thresholds.
 
 Usage:
-    python render.py <pdf_path> <out_dir>
-    python render.py <pdf_path> <out_dir> --allow-mocr
-    python render.py <pdf_path> <out_dir> --force-ocr [--allow-mocr]
+    uv run render.py <pdf_path> <out_dir>
+    uv run render.py <pdf_path> <out_dir> --allow-mocr
+    uv run render.py <pdf_path> <out_dir> --force-ocr [--allow-mocr]
 
-Requires pymupdf4llm (AGPL-3). docling (Apache-2.0) loads only when the fallback
-fires; dots.mocr (configured via [mocr] in config.toml) only with --allow-mocr.
+uv builds the environment declared below. pymupdf4llm (AGPL-3) loads first;
+docling and EasyOCR (Apache-2.0) load only when the fallback fires; dots.mocr
+(configured via [mocr] in config.toml) only with --allow-mocr.
 """
+
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["pymupdf4llm", "docling", "easyocr"]
+# [tool.ty.environment]
+# python-version = "3.14"
+# root = ["."]  # resolve the sibling renderer module, as uv run does
+# ///
 
 import argparse
 import sys
@@ -47,7 +56,7 @@ def load_mocr_cfg() -> dict | None:
     if isinstance(m, dict) and m.get("repo"):
         return {
             "repo": Path(m["repo"]).expanduser(),
-            "port": int(m.get("port", 8000)),
+            "port": int(m["port"]) if "port" in m else None,
             "startup_timeout": float(m.get("startup_timeout", 300)),
         }
     return None

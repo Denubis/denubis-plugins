@@ -11,11 +11,17 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
+import pytest
+
+_REPO = Path(__file__).resolve().parent.parent
 _RESOLVE = (
-    Path(__file__).resolve().parent.parent
+    _REPO
     / "plugins"
     / "denubis-academic"
     / "skills"
@@ -189,20 +195,133 @@ def test_collection_names_maps_known_and_passes_through_unknown():
     assert names == ["Bayesian / Methods", "UNKNOWN1"]
 
 
-# --- _render_cmd (render.py has no PEP 723 header → deps go on the CLI) -------
+# --- _render_cmd: render.py runs as a uv script in the environment it declares --
+
+# The PEP 723 reference regular expression, and its comment-stripping rule.
+_PEP_723_BLOCK = re.compile(
+    r"(?m)^# /// (?P<type>[a-zA-Z0-9-]+)$\s(?P<content>(^#(| .*)$\s)+)^# ///$"
+)
+_REQUIREMENT_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
 
 
-def test_render_cmd_passes_heavy_deps_to_render_py():
-    cmd = resolve._render_cmd(Path("/tmp/x.pdf"), Path("/tmp/out"))
-    # render.py has NO PEP 723 header, so its deps MUST be on the command line;
-    # plain `uv run render.py` would die on ModuleNotFoundError.
-    assert "--with" in cmd
-    for dep in ("pymupdf4llm", "docling", "easyocr"):
-        assert dep in cmd
-    assert "python" in cmd
-    assert str(resolve.RENDER_SCRIPT) in cmd
-    assert "/tmp/x.pdf" in cmd and "/tmp/out" in cmd
-    assert "--allow-mocr" not in cmd
+def _script_metadata(path: Path) -> dict:
+    blocks = [
+        block
+        for block in _PEP_723_BLOCK.finditer(path.read_text(encoding="utf-8"))
+        if block["type"] == "script"
+    ]
+    assert len(blocks) == 1, f"{path.name}: expected one PEP 723 script block"
+    content = "".join(
+        line[2:] if line.startswith("# ") else line[1:]
+        for line in blocks[0]["content"].splitlines(keepends=True)
+    )
+    return tomllib.loads(content)
+
+
+def _distribution(requirement: str) -> str:
+    name = _REQUIREMENT_NAME.match(requirement.strip())
+    assert name, f"not a PEP 508 requirement: {requirement!r}"
+    return re.sub(r"[-_.]+", "-", name.group()).lower()
+
+
+def test_render_py_declares_the_environment_its_cascade_loads():
+    # Plain `uv run render.py` builds the environment render.py declares; with no
+    # declaration the first tier dies on ModuleNotFoundError. One distribution per
+    # tier: pymupdf4llm (text layer), docling (layout fallback), and easyocr, the
+    # OCR engine docling is pinned to (its absence crashed ingest.py's OCR tier in
+    # bibliography 0.2.1).
+    metadata = _script_metadata(resolve.RENDER_SCRIPT)
+    project = tomllib.loads((_REPO / "pyproject.toml").read_text(encoding="utf-8"))
+    assert metadata["requires-python"] == project["project"]["requires-python"]
+    declared = {_distribution(dep) for dep in metadata["dependencies"]}
+    assert {"pymupdf4llm", "docling", "easyocr"} <= declared
+
+
+def test_script_metadata_reader_rejects_a_script_without_a_block(tmp_path):
+    script = tmp_path / "bare.py"
+    script.write_text("print('no metadata')\n", encoding="utf-8")
+    with pytest.raises(AssertionError, match="PEP 723 script block"):
+        _script_metadata(script)
+
+
+_TEXT_LINES = (
+    "The render cascade reads this sentence from the text layer.",
+    "A second line keeps the page well above the near-empty gate.",
+)
+
+
+def _text_layer_pdf(path: Path, lines: tuple[str, ...]) -> None:
+    """Write a one-page PDF whose only content is `lines` in its text layer."""
+    text = ["BT", "/F1 12 Tf", "72 720 Td"]
+    for index, line in enumerate(lines):
+        text += ["0 -16 Td"] if index else []
+        text.append(f"({line}) Tj")
+    stream = "\n".join([*text, "ET"]).encode("latin-1")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length %d >>\nstream\n%b\nendstream" % (len(stream), stream),
+    ]
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(pdf))
+        pdf += b"%d 0 obj\n%b\nendobj\n" % (number, body)
+    xref = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    pdf += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objects) + 1,
+        xref,
+    )
+    path.write_bytes(bytes(pdf))
+
+
+def test_render_via_subprocess_renders_in_render_pys_environment_from_any_directory(
+    tmp_path, monkeypatch, capfd
+):
+    # resolve.py renders by running render.py through uv, and render.py's own
+    # declaration supplies the cascade whatever directory the caller is in. The
+    # caller here is a uv project whose dependency cannot be installed, so a
+    # command that ran render.py in the caller's project environment fails.
+    _script_metadata(resolve.RENDER_SCRIPT)  # an undeclared render.py fails here
+    probe = subprocess.run(
+        [
+            "uv",
+            "sync",
+            "--script",
+            str(resolve.RENDER_SCRIPT),
+            "--offline",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probe.returncode != 0:
+        pytest.skip(f"render.py's environment cannot be built offline: {probe.stderr}")
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    (caller / "pyproject.toml").write_text(
+        '[project]\nname = "caller"\nversion = "0"\nrequires-python = ">=3.14"\n'
+        'dependencies = ["denubis-absent-distribution-for-render-test"]\n',
+        encoding="utf-8",
+    )
+    pdf = tmp_path / "paper.pdf"
+    _text_layer_pdf(pdf, _TEXT_LINES)
+    out = tmp_path / "out"
+    monkeypatch.chdir(caller)
+    monkeypatch.setenv("UV_OFFLINE", "1")  # the configured cache, never a download
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")  # no GPU if the cascade escalates
+
+    status = resolve.render_via_subprocess(pdf, out)
+
+    printed = capfd.readouterr()
+    assert status == "rendered", printed.out + printed.err
+    assert _TEXT_LINES[0] in (out / "pages" / "001.md").read_text(encoding="utf-8")
 
 
 def test_render_cmd_appends_allow_mocr():

@@ -509,7 +509,24 @@ class NeedsMocr(Exception):
 # by the deploy's own fish wrappers. We call those wrappers by path rather than
 # reimplementing the vLLM command, so the deploy keeps owning its model path and
 # flags. Heavy/slow/expensive, so this tier is confirm-gated (allow_mocr) and the
-# server is started once per run and stopped on exit.
+# server is started once per run and stopped on exit. Both wrappers take the
+# server's port as `--port N`: a pinned [mocr].port, or else a free local port
+# the operating system picks for this run. A run stops only what it started: the
+# wrapper runs in its own process group, which holds fish, uv, vLLM and vLLM's
+# engine workers, and the run signals that group and waits until it is empty.
+
+# Seconds a started server gets to exit after SIGTERM, then after SIGKILL.
+_STOP_GRACE_S = 30.0
+_KILL_GRACE_S = 10.0
+
+
+def _free_local_port() -> int:
+    """A TCP port nothing is listening on at 127.0.0.1, chosen by the OS."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def _free_gpu(_progress: Progress) -> None:
@@ -528,19 +545,23 @@ def _free_gpu(_progress: Progress) -> None:
 
 class _MocrSession:
     """A live (or lazily-started) dots.mocr server. `.render(pdf)` returns
-    (pages, source_md_path). Starts vLLM on first use, reusing an
-    already-running server; the owning context manager stops it on exit only
-    if this session started it."""
+    (pages, source_md_path). Starts vLLM on first use: on the pinned `port`,
+    reusing a server already running there, or with no pin on a free local
+    port picked at start-up. The owning context manager stops it on exit only
+    if this session started it, and then stops its whole process group."""
 
     def __init__(
-        self, repo: Path, port: int, startup_timeout: float, progress: Progress
+        self,
+        repo: Path,
+        port: int | None,
+        startup_timeout: float,
+        progress: Progress,
     ):
         self.repo = Path(repo).expanduser()
         self.port = port
         self.startup_timeout = startup_timeout
         self.progress = progress
-        self._started_by_us = False
-        self._proc = None
+        self._proc = None  # the wrapper this session started, if any
 
     def _server_up(self) -> bool:
         import subprocess
@@ -559,7 +580,9 @@ class _MocrSession:
         import subprocess
         import time
 
-        if self._server_up():
+        if self.port is None:
+            self.port = _free_local_port()
+        elif self._server_up():
             self.progress(f"  reusing vLLM already running on :{self.port}")
             return
         serve = self.repo / "dots-serve.fish"
@@ -567,26 +590,37 @@ class _MocrSession:
             raise RuntimeError(
                 f"mocr: {serve} not found — check [mocr].repo in config.toml"
             )
+        # A server this session started that no longer answers is stopped
+        # before another takes its place, so no started group goes untracked.
+        self.stop()
         _free_gpu(self.progress)
-        self.progress("  starting vLLM (dots.mocr); model load takes minutes...")
+        self.progress(
+            f"  starting vLLM (dots.mocr) on :{self.port}; model load takes minutes..."
+        )
         self._proc = subprocess.Popen(
-            ["fish", str(serve)],
+            ["fish", str(serve), "--port", str(self.port)],
             cwd=str(self.repo),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            start_new_session=True,
         )
-        self._started_by_us = True
         start = time.monotonic()
-        while not self._server_up():
-            if self._proc.poll() is not None:
-                raise RuntimeError(
-                    "mocr: vLLM server exited during startup (check GPU/VRAM)"
-                )
-            if time.monotonic() - start > self.startup_timeout:
-                raise RuntimeError(
-                    f"mocr: server not ready within {self.startup_timeout:.0f}s"
-                )
-            time.sleep(3)
+        try:
+            while not self._server_up():
+                if self._proc.poll() is not None:
+                    raise RuntimeError(
+                        "mocr: vLLM server exited during startup (check GPU/VRAM)"
+                    )
+                if time.monotonic() - start > self.startup_timeout:
+                    raise RuntimeError(
+                        f"mocr: server not ready within {self.startup_timeout:.0f}s"
+                    )
+                time.sleep(3)
+        except BaseException:
+            # A failed or interrupted start stops what it started before
+            # raising: the caller may go on to another document and start again.
+            self.stop()
+            raise
         self.progress(f"  vLLM ready on :{self.port}")
 
     def render(self, pdf: Path) -> tuple[list[str], str | None]:
@@ -597,7 +631,14 @@ class _MocrSession:
         outdir = Path(tempfile.mkdtemp(prefix="mocr-"))
         self.progress(f"  OCR via dots.mocr: {pdf.name}")
         subprocess.run(
-            ["fish", str(self.repo / "dots-ocr.fish"), str(pdf), str(outdir)],
+            [
+                "fish",
+                str(self.repo / "dots-ocr.fish"),
+                str(pdf),
+                str(outdir),
+                "--port",
+                str(self.port),
+            ],
             cwd=str(self.repo),
             check=True,
         )
@@ -621,28 +662,59 @@ class _MocrSession:
         text = combined[0].read_text(encoding="utf-8", errors="replace")
         return fold_mocr_markdown(text), str(combined[0])
 
-    def stop(self) -> None:
-        import subprocess
+    def _group_gone(self, group: int, within_s: float) -> bool:
+        import os
+        import time
 
-        if not self._started_by_us:
+        end = time.monotonic() + within_s
+        while True:
+            self._proc.poll()  # reap the wrapper: a zombie still counts as a member
+            try:
+                os.killpg(group, 0)
+            except ProcessLookupError:
+                return True
+            if time.monotonic() >= end:
+                return False
+            time.sleep(0.1)
+
+    def stop(self) -> None:
+        """Stop the server this session started, and nothing else: signal its
+        process group and return once the group is empty."""
+        import os
+        import signal
+
+        if self._proc is None:
             return
-        stopper = self.repo / "dots-stop.fish"
-        if stopper.is_file():
-            self.progress("  stopping vLLM (freeing VRAM)...")
-            subprocess.run(["fish", str(stopper)], cwd=str(self.repo), check=False)
+        self.progress("  stopping vLLM (freeing VRAM)...")
+        group = self._proc.pid  # start_new_session made the wrapper its leader
+        for sig, within_s in (
+            (signal.SIGTERM, _STOP_GRACE_S),
+            (signal.SIGKILL, _KILL_GRACE_S),
+        ):
+            try:
+                os.killpg(group, sig)
+            except ProcessLookupError:
+                gone = True  # the group had already gone: nothing is left to stop
+            else:
+                gone = self._group_gone(group, within_s)
+            if gone:
+                self._proc = None
+                return
+        raise RuntimeError(f"mocr: vLLM process group {group} survived SIGKILL")
 
 
 @contextmanager
 def mocr_server(
     repo: str | Path,
     *,
-    port: int = 8000,
+    port: int | None = None,
     startup_timeout: float = 300,
     progress: Progress = print,
 ):
     """Yield a lazily-started dots.mocr session. vLLM boots on first `.render()`
-    (reusing a server already on `port`), and is stopped on exit only if this
-    context started it — so an error or Ctrl-C still frees VRAM."""
+    on a free local port, or on a pinned `port` (reusing a server already
+    there), and is stopped on exit only if this context started it — so an
+    error or Ctrl-C still frees VRAM."""
     session = _MocrSession(Path(repo), port, startup_timeout, progress)
     try:
         yield session

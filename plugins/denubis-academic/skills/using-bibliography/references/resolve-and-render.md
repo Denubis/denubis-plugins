@@ -83,8 +83,7 @@ Normal resolution auto-renders. For a known attachment path, the standalone
 entry point is:
 
 ```bash
-uv run --with pymupdf4llm --with docling --with easyocr \
-  "$BIB/render.py" "<absolute-attachment-path>" \
+uv run "$BIB/render.py" "<absolute-attachment-path>" \
   "<zettelkasten-root>/papers/<citekey>"
 ```
 
@@ -111,9 +110,20 @@ The optional tier requires:
 ```toml
 [mocr]
 repo = "~/path/to/dots.mocr"
-# port = 8000
+# port = 8123
 # startup_timeout = 300
 ```
+
+With no `port`, each run asks the operating system for a free local port,
+starts the server there, OCRs against it, and stops it on exit; a server left
+running by another run is not reused. Set `port` to pin one: the run reuses a
+server already answering there and leaves it running, or else starts one on
+that port. The repository's `dots-ocr.fish` always receives the port as
+`--port N`, and so does its `dots-serve.fish` whenever the run starts a server.
+A run stops only a server it started: it launches `dots-serve.fish` in its own
+process group and, on exit, signals that group and waits until every process in
+it has gone. A start that fails or times out is stopped the same way before its
+error is reported.
 
 ### Forced OCR
 
@@ -170,10 +180,10 @@ page before it is `verified`) applies whatever it says.
 ## Dependencies
 
 `resolve.py` declares Python 3.14+ and its lightweight dependencies through PEP
-723. `ingest.py` declares Python 3.11+ plus the rendering stack; use Python 3.14+
-for one consistent installation. `render.py` is invoked with explicit `uv
---with` dependencies above. Pandoc is an external executable for non-PDF,
-non-HTML attachments.
+723. `render.py` declares Python 3.14+ plus the rendering stack, and `resolve.py`
+renders by running it; `ingest.py` declares Python 3.11+ plus the same stack;
+use Python 3.14+ for one consistent installation. Pandoc is an external
+executable for non-PDF, non-HTML attachments.
 
 The first Docling/OCR run can be large and may download model data. Use the
 configured uv and model caches exactly as provided; never redirect them to a

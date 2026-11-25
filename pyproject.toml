@@ -65,7 +65,8 @@ extend-exclude = [".worktrees"]
 "plugins/denubis-external-agents/skills/supervising-codex/hooks/install-codex-hooks.py" = "py39"
 "plugins/denubis-external-agents/scripts/update_codex_profile.py" = "py310"
 # The nine `>=3.11` bibliography scripts and every module they import.
-# resolve.py and register_export.py declare `>=3.14` and stay at the default.
+# resolve.py, register_export.py and render.py declare `>=3.14` and stay at the
+# default.
 "plugins/denubis-academic/skills/using-bibliography/annotate.py" = "py311"
 "plugins/denubis-academic/skills/using-bibliography/bbt.py" = "py311"
 "plugins/denubis-academic/skills/using-bibliography/collection.py" = "py311"

@@ -76,7 +76,7 @@ def load_config() -> dict:
     if isinstance(mocr, dict) and mocr.get("repo"):
         result["mocr"] = {
             "repo": Path(mocr["repo"]).expanduser(),
-            "port": int(mocr.get("port", 8000)),
+            "port": int(mocr["port"]) if "port" in mocr else None,
             "startup_timeout": float(mocr.get("startup_timeout", 300)),
         }
     return result

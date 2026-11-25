@@ -789,25 +789,10 @@ def _render_cmd(
 ) -> list[str]:
     """Build the uv command that renders via render.py.
 
-    render.py has NO PEP 723 header — it requires its render deps passed on the
-    command line (SKILL.md: `uv run --with pymupdf4llm --with docling --with
-    easyocr python render.py ...`). Plain `uv run render.py` would die on
-    ModuleNotFoundError, so the --with flags are not optional.
+    render.py declares its render dependencies in its own PEP 723 header, so
+    `uv run render.py` builds that environment whatever the caller's directory.
     """
-    cmd = [
-        "uv",
-        "run",
-        "--with",
-        "pymupdf4llm",
-        "--with",
-        "docling",
-        "--with",
-        "easyocr",
-        "python",
-        str(RENDER_SCRIPT),
-        str(pdf),
-        str(out_dir),
-    ]
+    cmd = ["uv", "run", str(RENDER_SCRIPT), str(pdf), str(out_dir)]
     if allow_mocr:
         cmd.append("--allow-mocr")
     if force_ocr:

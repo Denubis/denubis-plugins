@@ -115,6 +115,32 @@ def test_manifest_state():
     assert find_prose_change_assertions(source, filename="test_manifest.py") == []
 
 
+def test_detector_allows_assertions_on_tmp_path_markdown_output() -> None:
+    source = '''
+def test_rendered_markdown(tmp_path):
+    out = tmp_path / "out"
+    assert "rendered line" in (out / "pages" / "001.md").read_text()
+'''
+
+    assert find_prose_change_assertions(source, filename="test_render.py") == []
+
+
+def test_detector_still_flags_repo_markdown_in_tmp_path_test() -> None:
+    source = '''
+from pathlib import Path
+
+SKILL = Path("plugin") / "SKILL.md"
+
+def test_rule_is_present(tmp_path):
+    _ = tmp_path / "out"
+    assert "required wording" in SKILL.read_text()
+'''
+
+    violations = find_prose_change_assertions(source, filename="test_rule.py")
+
+    assert [violation.line for violation in violations] == [8]
+
+
 def test_python_tests_have_no_detectable_markdown_wording_assertions() -> None:
     """Apply the positively controlled lint within its stated Python-test scope."""
     paths = sorted(ROOT.glob("tests/test_*.py"))

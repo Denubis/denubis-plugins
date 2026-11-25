@@ -20,6 +20,11 @@ _RAW_STRING_METHODS = {
 _CONTENT_PROBE_METHODS = {"count", "endswith", "find", "index", "startswith"}
 _REGEX_PROBE_METHODS = {"fullmatch", "match", "search"}
 _WORDING_COMPARE_OPERATORS = (ast.Eq, ast.NotEq, ast.In, ast.NotIn)
+_TEMP_PATH_FIXTURES = frozenset(
+    {"tmp_path", "tmpdir", "tmp_path_factory", "tmpdir_factory"}
+)
+_TEMP_PATH_METHODS = frozenset({"glob", "joinpath", "mktemp", "resolve", "rglob"})
+_TEMP_PATH_CONSTRUCTORS = frozenset({"TemporaryDirectory", "mkdtemp"})
 
 
 @dataclass(frozen=True)
@@ -54,11 +59,127 @@ def _is_markdown_literal(node: ast.AST) -> bool:
     )
 
 
+def _function_parameter_names(
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> set[str]:
+    args = function.args
+    parameters = [*args.posonlyargs, *args.args, *args.kwonlyargs]
+    return {parameter.arg for parameter in parameters}
+
+
+def _is_temp_path_call(
+    call: ast.Call,
+    *,
+    temp_path_names: set[str],
+) -> bool:
+    function = call.func
+    if isinstance(function, ast.Name):
+        if function.id in _TEMP_PATH_CONSTRUCTORS:
+            return True
+        return (
+            function.id == "Path"
+            and bool(call.args)
+            and _is_temp_path_expression(
+                call.args[0],
+                temp_path_names=temp_path_names,
+            )
+        )
+    if isinstance(function, ast.Attribute):
+        if function.attr in _TEMP_PATH_CONSTRUCTORS:
+            return True
+        return function.attr in _TEMP_PATH_METHODS and _is_temp_path_expression(
+            function.value,
+            temp_path_names=temp_path_names,
+        )
+    return False
+
+
+def _is_temp_path_expression(
+    expression: ast.expr,
+    *,
+    temp_path_names: set[str],
+) -> bool:
+    if isinstance(expression, ast.Name):
+        return expression.id in temp_path_names
+    if isinstance(expression, ast.BinOp) and isinstance(expression.op, ast.Div):
+        return _is_temp_path_expression(
+            expression.left,
+            temp_path_names=temp_path_names,
+        )
+    if isinstance(expression, ast.JoinedStr):
+        return any(
+            isinstance(value, ast.FormattedValue)
+            and _is_temp_path_expression(
+                value.value,
+                temp_path_names=temp_path_names,
+            )
+            for value in expression.values
+        )
+    if isinstance(expression, ast.Call):
+        return _is_temp_path_call(expression, temp_path_names=temp_path_names)
+    return False
+
+
+def _temp_with_names(
+    node: ast.With | ast.AsyncWith,
+    *,
+    temp_path_names: set[str],
+) -> set[str]:
+    names: set[str] = set()
+    for item in node.items:
+        if item.optional_vars is not None and _is_temp_path_expression(
+            item.context_expr,
+            temp_path_names=temp_path_names,
+        ):
+            names.update(_assigned_names([item.optional_vars]))
+    return names
+
+
+def _temp_assigned_names(
+    node: ast.AST,
+    *,
+    temp_path_names: set[str],
+) -> set[str]:
+    if isinstance(node, (ast.Assign, ast.AnnAssign)):
+        if node.value is None or not _is_temp_path_expression(
+            node.value,
+            temp_path_names=temp_path_names,
+        ):
+            return set()
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        return _assigned_names(targets)
+    if isinstance(node, (ast.For, ast.AsyncFor)):
+        if _is_temp_path_expression(node.iter, temp_path_names=temp_path_names):
+            return _assigned_names([node.target])
+        return set()
+    if isinstance(node, (ast.With, ast.AsyncWith)):
+        return _temp_with_names(node, temp_path_names=temp_path_names)
+    return set()
+
+
+def _temp_path_names_in_function(
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> set[str]:
+    names = _function_parameter_names(function) & _TEMP_PATH_FIXTURES
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(function):
+            assigned = _temp_assigned_names(node, temp_path_names=names)
+            if assigned and not assigned <= names:
+                names.update(assigned)
+                changed = True
+    return names
+
+
 def _is_document_path_expression(
     expression: ast.expr,
     *,
     document_path_names: set[str],
+    temp_path_names: set[str],
 ) -> bool:
+    if _is_temp_path_expression(expression, temp_path_names=temp_path_names):
+        return False
     if _is_markdown_literal(expression):
         result = True
     elif isinstance(expression, ast.Name):
@@ -67,9 +188,11 @@ def _is_document_path_expression(
         result = _is_document_path_expression(
             expression.left,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
         ) or _is_document_path_expression(
             expression.right,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
         )
     elif isinstance(expression, ast.JoinedStr):
         result = any(_is_markdown_literal(value) for value in expression.values)
@@ -86,6 +209,7 @@ def _is_document_path_expression(
             _is_document_path_expression(
                 argument,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
             )
             for argument in expression.args
         )
@@ -118,6 +242,7 @@ def _module_document_path_names(module: ast.Module) -> set[str]:
             if value is None or not _is_document_path_expression(
                 value,
                 document_path_names=names,
+                temp_path_names=set(),
             ):
                 continue
             targets = (
@@ -136,6 +261,7 @@ def _document_path_names_in_function(
     function: ast.FunctionDef | ast.AsyncFunctionDef,
     *,
     module_document_paths: set[str],
+    temp_path_names: set[str],
 ) -> set[str]:
     names = set(module_document_paths)
     changed = True
@@ -147,6 +273,7 @@ def _document_path_names_in_function(
                 if value is None or not _is_document_path_expression(
                     value,
                     document_path_names=names,
+                    temp_path_names=temp_path_names,
                 ):
                     continue
                 targets = (
@@ -157,6 +284,7 @@ def _document_path_names_in_function(
                 if not _is_document_path_expression(
                     node.iter,
                     document_path_names=names,
+                    temp_path_names=temp_path_names,
                 ):
                     continue
                 assigned = _assigned_names([node.target])
@@ -172,6 +300,7 @@ def _is_raw_text_expression(
     expression: ast.expr,
     *,
     document_path_names: set[str],
+    temp_path_names: set[str],
     raw_names: set[str],
     raw_functions: set[str],
 ) -> bool:
@@ -183,6 +312,7 @@ def _is_raw_text_expression(
             result = _is_document_path_expression(
                 function.value,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
             )
         elif (
             isinstance(function, ast.Attribute)
@@ -191,12 +321,14 @@ def _is_raw_text_expression(
             result = _is_raw_text_expression(
                 function.value,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_names=raw_names,
                 raw_functions=raw_functions,
             ) or any(
                 _is_raw_text_expression(
                     argument,
                     document_path_names=document_path_names,
+                    temp_path_names=temp_path_names,
                     raw_names=raw_names,
                     raw_functions=raw_functions,
                 )
@@ -208,11 +340,13 @@ def _is_raw_text_expression(
         result = _is_raw_text_expression(
             expression.left,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         ) or _is_raw_text_expression(
             expression.right,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         )
@@ -220,6 +354,7 @@ def _is_raw_text_expression(
         result = _is_raw_text_expression(
             expression.value,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         )
@@ -227,11 +362,13 @@ def _is_raw_text_expression(
         result = _is_raw_text_expression(
             expression.body,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         ) or _is_raw_text_expression(
             expression.orelse,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         )
@@ -244,6 +381,7 @@ def _raw_names_in_function(
     function: ast.FunctionDef | ast.AsyncFunctionDef,
     *,
     document_path_names: set[str],
+    temp_path_names: set[str],
     raw_functions: set[str],
 ) -> set[str]:
     raw_names: set[str] = set()
@@ -260,6 +398,7 @@ def _raw_names_in_function(
             if value is None or not _is_raw_text_expression(
                 value,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_names=raw_names,
                 raw_functions=raw_functions,
             ):
@@ -291,13 +430,16 @@ def _raw_returning_functions(
     while changed:
         changed = False
         for function in functions:
+            temp_path_names = _temp_path_names_in_function(function)
             document_path_names = _document_path_names_in_function(
                 function,
                 module_document_paths=module_document_paths,
+                temp_path_names=temp_path_names,
             )
             raw_names = _raw_names_in_function(
                 function,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_functions=raw_functions,
             )
             returns_raw = any(
@@ -305,6 +447,7 @@ def _raw_returning_functions(
                 and _is_raw_text_expression(
                     node.value,
                     document_path_names=document_path_names,
+                    temp_path_names=temp_path_names,
                     raw_names=raw_names,
                     raw_functions=raw_functions,
                 )
@@ -321,6 +464,7 @@ def _uses_content_probe(
     expression: ast.expr,
     *,
     document_path_names: set[str],
+    temp_path_names: set[str],
     raw_names: set[str],
     raw_functions: set[str],
 ) -> bool:
@@ -332,6 +476,7 @@ def _uses_content_probe(
         if node.func.attr in _CONTENT_PROBE_METHODS and _is_raw_text_expression(
             node.func.value,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_names=raw_names,
             raw_functions=raw_functions,
         ):
@@ -340,6 +485,7 @@ def _uses_content_probe(
             _is_raw_text_expression(
                 argument,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_names=raw_names,
                 raw_functions=raw_functions,
             )
@@ -353,12 +499,14 @@ def _is_wording_assertion(
     assertion: ast.Assert,
     *,
     document_path_names: set[str],
+    temp_path_names: set[str],
     raw_names: set[str],
     raw_functions: set[str],
 ) -> bool:
     if _uses_content_probe(
         assertion.test,
         document_path_names=document_path_names,
+        temp_path_names=temp_path_names,
         raw_names=raw_names,
         raw_functions=raw_functions,
     ):
@@ -374,6 +522,7 @@ def _is_wording_assertion(
             _is_raw_text_expression(
                 operand,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_names=raw_names,
                 raw_functions=raw_functions,
             )
@@ -402,13 +551,16 @@ def find_prose_change_assertions(source: str, *, filename: str) -> list[Violatio
     for function in ast.walk(module):
         if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
+        temp_path_names = _temp_path_names_in_function(function)
         document_path_names = _document_path_names_in_function(
             function,
             module_document_paths=module_document_paths,
+            temp_path_names=temp_path_names,
         )
         raw_names = _raw_names_in_function(
             function,
             document_path_names=document_path_names,
+            temp_path_names=temp_path_names,
             raw_functions=raw_functions,
         )
         violations.extend(
@@ -418,6 +570,7 @@ def find_prose_change_assertions(source: str, *, filename: str) -> list[Violatio
             and _is_wording_assertion(
                 assertion,
                 document_path_names=document_path_names,
+                temp_path_names=temp_path_names,
                 raw_names=raw_names,
                 raw_functions=raw_functions,
             )
