@@ -1,7 +1,6 @@
 """Bounded JSON-RPC connection to the already-running local Codex daemon."""
 
 import json
-import shlex
 import time
 from collections import deque
 from typing import Any
@@ -9,21 +8,7 @@ from typing import Any
 from websockets.exceptions import WebSocketException
 from websockets.sync.client import unix_connect
 
-from .core import HistoryUnavailable, Unavailable
-
-
-def is_history_command(command: object) -> bool:
-    if not isinstance(command, str):
-        return False
-    try:
-        words = shlex.split(command)
-    except ValueError:
-        return False
-    return (
-        len(words) >= 2
-        and words[0].rsplit("/", 1)[-1] == "cc-search-chats"
-        and words[1] in ("index", "search", "context")
-    )
+from .core import Unavailable
 
 
 class Proxy:
@@ -82,17 +67,10 @@ class Proxy:
             return
         if "id" in message:
             command = params.get("command")
-            if message.get(
-                "method"
-            ) == "item/commandExecution/requestApproval" and is_history_command(
-                command
-            ):
-                raise HistoryUnavailable(
-                    "History lookup needs approval: " + str(command)
-                )
+            asked = f" for {command}" if isinstance(command, str) and command else ""
             raise Unavailable(
-                "The checker needs permission or user input. The adapter cannot grant "
-                "it; run the blocked search with normal approval before retrying."
+                f"The searcher asked for permission or user input{asked}, which the "
+                "adapter never grants; run that search with normal approval."
             )
         if message.get("method") in {"item/completed", "turn/completed"}:
             self.events.append(message)

@@ -1,1 +1,1 @@
-"""Codex's question gate; the native client owns presentation."""
+"""Codex's search for an earlier answer once a question is shown."""

@@ -3,17 +3,23 @@
 export type QuestionZoneEntry = {
   context: string
   question: string
-  // Incomplete history permits asking, with this warning shown to the person.
+  // A failed or incomplete search for an earlier answer permits asking, with
+  // this warning shown to the person.
   historyWarning?: string
+  // A search for an answer the person already gave is running, or waiting to
+  // start, for this queued entry, which has not been taken into the prompt
+  // box. The search's end acts on the entry only while this holds; taking the
+  // entry clears it for good.
+  isSearching?: boolean
 }
 
 // Every question not yet answered.
 export type QuestionZoneQueue = {
-  // Entries being checked, in the order asked; each leaves when its check
-  // ends: for the end of `waiting` if the check passed, else for good.
+  // Entries being read for clarity, in the order asked; each leaves when its
+  // read ends: for the end of `waiting` if it passed, else for good.
   checking: readonly QuestionZoneEntry[]
-  // The queue, in the order checks passed; the head is the next the band
-  // hands over.
+  // The queue, in the order reads passed; the head is the next the band
+  // hands over. A search may still run for an entry here.
   waiting: readonly QuestionZoneEntry[]
   // Entries the band put into the prompt box that the person has not yet
   // sent, in the order taken. The person's next prompt settles them: an entry

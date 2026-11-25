@@ -97,6 +97,10 @@ and consequences section. One ADR per decision.
 - [2026-11-15-bbs-reminder-rides-next-message — the quiet-agents reminder starts no turn of its own; it rides on the next prompt as context or on the next delivery from an agent as a leading line](2026-11-15-bbs-reminder-rides-next-message.md)
 - [2026-11-15-bbs-plans-run-agents-in-worktrees — implementation plans run independent work with several agents in skill-made worktrees, each piece checked by another agent, squashed into a few coherent commits and joined without asking, and clean up each worktree and agent branch after its join; the final merge into the integration branch waits for the human's authorisation](2026-11-15-bbs-plans-run-agents-in-worktrees.md)
 - [2026-11-16-bbs-compact-nag-resumes-after-its-compaction — After its own compaction of the main session, compact-nag starts the next turn, quoting the session's brief and its handover reply](2026-11-16-bbs-compact-nag-resumes-after-its-compaction.md)
+- [2026-11-23-bbs-question-search-runs-after-queueing — A question joins the queue after its clarity read; the search for an earlier answer runs afterwards, never for a go-ahead, and not in Codex](2026-11-23-bbs-question-search-runs-after-queueing.md)
+  (amends items 5 and 6 of 2026-11-08-bbs-questions-go-in-question-zone)
+- [2026-11-24-bbs-codex-question-search-runs-after-showing — Codex shows a question with no check before it; the search for an earlier answer runs afterwards in the background, and the searcher is told to skip go-aheads](2026-11-24-bbs-codex-question-search-runs-after-showing.md)
+  (amends, for Codex, item 5 of 2026-11-23-bbs-question-search-runs-after-queueing and item 6 of 2026-11-08-bbs-questions-go-in-question-zone)
 
 ## Status lifecycle
 

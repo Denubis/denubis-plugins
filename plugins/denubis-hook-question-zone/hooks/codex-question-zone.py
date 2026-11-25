@@ -6,7 +6,7 @@
 # python-version = "3.14"
 # ///
 
-"""Check a native Codex question before its presentation."""
+"""Search for an earlier answer to a native Codex question once it is shown."""
 
 from question_zone_codex.runtime import main
 

@@ -17,6 +17,10 @@ const SURFACES = ['terminal', 'desktop'] as const
 
 type Entry = { context: string; question: string }
 
+// An entry as an earlier load of the plugin kept it in the session's state:
+// a queued one may still be waiting for its search for an earlier answer.
+type Stored = Entry & { isSearching?: boolean }
+
 const RELEASE: Entry = {
   context:
     'The new version of the plugin is built and every test passes. Releasing it today gets the fix to people before the weekend; waiting a day leaves time for one more check by hand.',
@@ -28,11 +32,26 @@ const NAMING: Entry = {
   question: 'Is question-zone the name you want?',
 }
 
-// How one check ends: the checker's answer, its run ending some other way,
-// the engine refusing to start it, or the spawn call itself failing.
+// How one run ends: the agent's answer, its run ending some other way, the
+// engine refusing to start it, or the spawn call itself failing.
 type CheckEnd = { answer: string } | { ended: 'error' | 'aborted' } | { refused: string } | { fails: true }
 
-type Spawned = { prompt: string; subagentType: string }
+// A run the plugin started: the clarity reader's, or a search for an earlier
+// answer, told apart by whether the agent type it registered can run commands.
+type Spawned = { prompt: string; subagentType: string; isSearch: boolean }
+
+// The reader passes the entry, and the search finds no earlier answer.
+const ALL_CLEAR = ({ isSearch }: Spawned): CheckEnd => ({ answer: isSearch ? 'NOT_ANSWERED' : 'CLEAR' })
+
+// The reader passes every entry; `search` says what each search finds.
+const searchFinds =
+  (search: (prompt: string) => string) =>
+  (spawn: Spawned): CheckEnd => ({ answer: spawn.isSearch ? search(spawn.prompt) : 'CLEAR' })
+
+// Every search finds nothing; `read` says what the reader replies.
+const readerSays =
+  (read: (prompt: string) => string) =>
+  (spawn: Spawned): CheckEnd => ({ answer: spawn.isSearch ? 'NOT_ANSWERED' : read(spawn.prompt) })
 
 // The engine's refusal of a spawn while the session runs as many subagents as
 // it allows, in the words of Claude Code 2.1.312 and 2.1.318; on 2026-11-08 it
@@ -46,13 +65,17 @@ const atSubagentLimit = (cap: number): string =>
 type Slots = { cap: number; others: number; freed: 'before the end' | 'after the end' }
 
 type EngineOptions = {
-  checkEnds?: (prompt: string) => CheckEnd
+  checkEnds?: (spawn: Spawned) => CheckEnd
   draft?: string
-  // Hold each checker's run until the test ends it with `endNextCheck`.
+  // Hold each run until the test ends it, with `endNextCheck` for the
+  // reader's and `endNextSearch` for a search's.
   isHolding?: boolean
+  // End the oldest held search while the plugin reads, or fills, the prompt
+  // box, and let what follows it run before the box answers.
+  endSearchDuring?: 'prompt.read' | 'prompt.fill'
   // The queue the session's state holds as the plugin loads: what an earlier
   // load of this version kept there, read through a reload.
-  stored?: { checking: readonly Entry[]; waiting: readonly Entry[]; taken: readonly Entry[] }
+  stored?: { checking: readonly Entry[]; waiting: readonly Stored[]; taken: readonly Entry[] }
   // Refuse a spawn past this many running subagents, as the engine does.
   slots?: Slots
   // The transcript file's path, as the engine reports it at the session's
@@ -81,23 +104,25 @@ const grepOver = (lines: readonly string[], argv: readonly string[]) => {
 }
 
 // Stands for the engine beneath the plugin. It starts the session, registers
-// the plugin's tools and agent types, starts the checker and ends its run as
-// `checkEnds` says (after the spawn has answered, as a real run ends after it
-// started), keeps a prompt box, lets every prompt in, records the plugin's
-// own prompts, and composes a system prompt of one section. With `slots`, it
-// refuses a spawn while the session runs its limit of subagents; `spawned`
-// holds only the spawns it let past that limit. A checker that answers hands
-// its report back to the main conversation, as a session in auto mode does;
-// `delivered` holds every prompt that reached the model other than the
-// person's own. It keeps the transcript file in memory (`lines`) and answers
-// `grep` over it, and records the rows the plugin appends (`notes`).
+// the plugin's tools and agent types, starts each agent the plugin asks for
+// and ends its run as `checkEnds` says (after the spawn has answered, as a
+// real run ends after it started), keeps a prompt box, lets every prompt in,
+// records the plugin's own prompts, and composes a system prompt of one
+// section. With `slots`, it refuses a spawn while the session runs its limit
+// of subagents; `spawned` holds only the spawns it let past that limit. An
+// agent that answers hands its report back to the main conversation, as a
+// session in auto mode does; `delivered` holds every prompt that reached the
+// model other than the person's own. It keeps the transcript file in memory
+// (`lines`) and answers `grep` over it, and records the rows the plugin
+// appends (`notes`).
 const engine = async (
   $: Engine,
   on: On,
   {
-    checkEnds = () => ({ answer: 'CLEAR' }),
+    checkEnds = ALL_CLEAR,
     draft = '',
     isHolding = false,
+    endSearchDuring,
     stored,
     slots,
     transcript,
@@ -112,7 +137,7 @@ const engine = async (
     { id: 'a-worker', description: 'Unrelated work', type: 'general-purpose', status: 'running' },
   ]
   const lines: string[] = []
-  const held: (() => Promise<unknown>)[] = []
+  const held: { isSearch: boolean; endRun: () => Promise<unknown> }[] = []
   const box = { text: draft, cursor: draft.length }
   const clock = mock.clock(on)
   const session = mock.session(on)
@@ -135,8 +160,10 @@ const engine = async (
       return { deny: atSubagentLimit(slots.cap) }
     }
     const subagentType = 'subagent_type' in e && typeof e.subagent_type === 'string' ? e.subagent_type : e.subagentType
-    spawned.push({ prompt: e.prompt, subagentType })
-    const end = checkEnds(e.prompt)
+    const isSearch = agents.find(agent => agent.agent === subagentType)?.tools?.includes('Bash') === true
+    const spawn: Spawned = { prompt: e.prompt, subagentType, isSearch }
+    spawned.push(spawn)
+    const end = checkEnds(spawn)
     if ('refused' in end) {
       return { deny: end.refused }
     }
@@ -168,7 +195,7 @@ const engine = async (
       }
     }
     if (isHolding) {
-      held.push(endRun)
+      held.push({ isSearch, endRun })
     } else {
       void Promise.resolve().then(endRun)
     }
@@ -185,12 +212,34 @@ const engine = async (
     return { value: undefined }
   })
   on('ui.log', () => ({ value: undefined }))
-  on('prompt.read', () => ({ value: { ...box } }))
-  on('prompt.fill', (_, e) => {
+  // When a held search ends inside a box call; a test may change it between
+  // takes.
+  const during = { endSearch: endSearchDuring }
+  const endSearchNow = async (call: 'prompt.read' | 'prompt.fill'): Promise<void> => {
+    const at = during.endSearch === call ? held.findIndex(run => run.isSearch) : -1
+    if (at >= 0) {
+      const [run] = held.splice(at, 1)
+      await run?.endRun()
+      await clock.settle()
+    }
+  }
+  on('prompt.read', async () => {
+    const value = { ...box }
+    await endSearchNow('prompt.read')
+    return { value }
+  })
+  // Whether the box refuses to be filled, as when another plugin holds it.
+  const fill = { isRefused: false }
+  on('prompt.fill', async (_, e) => {
+    if (fill.isRefused) {
+      await endSearchNow('prompt.fill')
+      return { isFilled: false }
+    }
     const kept = e.mode === 'replace' ? '' : box.text
     const at = e.mode === 'insert' ? box.cursor : kept.length
     box.text = kept.slice(0, at) + e.text + kept.slice(at)
     box.cursor = e.cursor ?? at + e.text.length
+    await endSearchNow('prompt.fill')
     return { isFilled: true }
   })
   // The main conversation's turns: one starts, makes requests (`turn.step`,
@@ -285,13 +334,16 @@ const engine = async (
     return result
   }
 
-  // A held checker's run ends, and what follows it settles.
-  const endNextCheck = async (): Promise<void> => {
-    const endRun = held.shift()
-    expect(endRun).toBeDefined()
-    await endRun?.()
+  // The oldest held run of one kind ends, and what follows it settles.
+  const endNext = async (isSearch: boolean): Promise<void> => {
+    const at = held.findIndex(run => run.isSearch === isSearch)
+    expect(at).toBeGreaterThanOrEqual(0)
+    const [run] = held.splice(at, 1)
+    await run?.endRun()
     await clock.settle()
   }
+  const endNextCheck = (): Promise<void> => endNext(false)
+  const endNextSearch = (): Promise<void> => endNext(true)
 
   // Time passes, and what comes due on the way runs.
   const pass = (ms: number): Promise<void> => clock.advance(ms)
@@ -319,7 +371,29 @@ const engine = async (
     },
   }
 
-  return { agents, spawned, toasts, messages, delivered, lines, box, ask, endNextCheck, pass, notes, turn }
+  // The runs started for searches, and for clarity reads.
+  const searches = (): Spawned[] => spawned.filter(spawn => spawn.isSearch)
+  const reads = (): Spawned[] => spawned.filter(spawn => !spawn.isSearch)
+
+  return {
+    agents,
+    spawned,
+    searches,
+    reads,
+    toasts,
+    messages,
+    delivered,
+    lines,
+    box,
+    fill,
+    during,
+    ask,
+    endNextCheck,
+    endNextSearch,
+    pass,
+    notes,
+    turn,
+  }
 }
 
 const withdraw = ($: Engine, question: string, agentId?: string) =>
@@ -374,18 +448,48 @@ const band = async ($: Engine): Promise<BandView[]> => {
 
 const ENGINE_BAND: BandView = { isEngine: true, waiting: undefined, checking: undefined, hotkey: undefined }
 
-for (const cause of ['History coverage is partial: six files were not searched.', 'History lookup failed: the index could not refresh.']) {
-  test('a clear question is queued and shown with its history warning: ' + cause, async ($, on) => {
-    const zone = await engine($, on, { checkEnds: () => ({ answer: 'CLEAR_WITH_HISTORY_WARNING: ' + cause }) })
+// What the band shows besides its counts and the engine's own drawing: the
+// warning on the head question.
+const bandWarnings = async ($: Engine): Promise<string[]> => {
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  const texts = (await ui.findAll({ type: 'Text' })).map(found => found.text)
+  await ui.unmount()
+  return texts.filter(
+    text => text !== 'engine' && countBefore(text, /wait/) === undefined && countBefore(text, /check/) === undefined,
+  )
+}
+
+// A search for an earlier answer that does not finish cleanly, and the words
+// its warning should carry where the cause gives any.
+const SEARCH_FAILURES: { why: string; end: CheckEnd; shows?: string }[] = [
+  {
+    why: 'its coverage was partial',
+    end: { answer: 'HISTORY_WARNING: History coverage is partial: six files were not searched.' },
+    shows: 'six files were not searched',
+  },
+  {
+    why: 'its lookup failed',
+    end: { answer: 'HISTORY_WARNING: History lookup failed: the index could not refresh.' },
+    shows: 'the index could not refresh',
+  },
+  { why: 'the engine refused to start it', end: { refused: 'past a host limit' }, shows: 'past a host limit' },
+  { why: 'its run ended in an error', end: { ended: 'error' } },
+  { why: 'its reply could not be read', end: { answer: 'The person has probably not answered this.' } },
+]
+
+for (const { why, end, shows } of SEARCH_FAILURES) {
+  test(`a search that cannot finish leaves the question in the queue with a visible warning (${why})`, async ($, on) => {
+    const zone = await engine($, on, { checkEnds: spawn => (spawn.isSearch ? end : { answer: 'CLEAR' }) })
     await zone.ask(RELEASE)
-    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    const text = (await ui.findAll({ type: 'Text' })).map(found => found.text).join(' ')
-    expect(text).toContain(cause)
-    const button = await ui.find({ type: 'Button' })
-    expect(button).toBeDefined()
-    await ui.press({ key: button?.key ?? '' })
-    await ui.unmount()
-    expect(zone.box.text).toContain(cause)
+
+    expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
+    const warnings = await bandWarnings($)
+    expect(warnings).toHaveLength(1)
+    if (shows !== undefined) {
+      expect(warnings[0]).toContain(shows)
+    }
+    await take($)
+    expect(zone.box.text).toContain(warnings[0] ?? 'no warning')
     expect(zone.box.text).toContain(RELEASE.question)
     expect(zone.notes()).toEqual([])
   })
@@ -479,16 +583,19 @@ test('asks join the end of the queue: the first asked is the first taken', async
   expect(zone.box.text).not.toContain(NAMING.question)
 })
 
-test('the checker is a registered Sonnet agent that can only read and search; its objection reaches the model once, as a hidden note', async ($, on) => {
+test('the clarity reader is a registered Sonnet agent with no tools, and the search one that can only read and search; an objection reaches the model once, as a hidden note, and starts no search', async ($, on) => {
   const objection = 'The entry says "the L5d split" without saying what that is. Rewrite it.'
-  const zone = await engine($, on, { checkEnds: () => ({ answer: objection }) })
+  const zone = await engine($, on, { checkEnds: readerSays(() => objection) })
 
   await zone.ask(RELEASE)
 
-  expect(zone.agents).toEqual([{ agent: expect.any(String), model: 'sonnet', tools: expect.any(Array) }])
-  expect([...(zone.agents[0]?.tools ?? [])].sort()).toEqual(['Bash', 'Read'])
+  expect(zone.agents).toHaveLength(2)
+  expect(zone.agents.map(agent => agent.model)).toEqual(['sonnet', 'sonnet'])
+  const tools = zone.agents.map(agent => [...(agent.tools ?? ['every tool'])].sort().join(' '))
+  expect(tools.sort()).toEqual(['', 'Bash Read'])
+  const reader = zone.agents.find(agent => agent.tools?.length === 0)
   expect(zone.spawned).toHaveLength(1)
-  expect(zone.spawned[0]?.subagentType).toBe(zone.agents[0]?.agent)
+  expect(zone.spawned[0]?.subagentType).toBe(reader?.agent)
   expect(zone.spawned[0]?.prompt).toContain(RELEASE.context)
   expect(zone.spawned[0]?.prompt).toContain(RELEASE.question)
   expect(saying(zone.notes(), objection)).toHaveLength(1)
@@ -497,11 +604,46 @@ test('the checker is a registered Sonnet agent that can only read and search; it
   expect(listed(await pluginSections($), [RELEASE])).toEqual([])
 })
 
-test('an answer the person already gave comes back with its source and words; a question never answered is queued', async ($, on) => {
-  const found =
-    'The person already answered this at docs/decisions/2026-11-01-release-day.md:14: "Ship it today, the weekend fix matters more." Use that answer instead of asking.'
+test('a clear entry joins the queue as soon as its clarity read ends, while the search for an earlier answer still runs', async ($, on) => {
+  const zone = await engine($, on, { isHolding: true })
+  await zone.ask(RELEASE)
+  expect(await band($)).toEqual([checkingBand(1), checkingBand(1)])
+
+  await zone.endNextCheck()
+
+  expect(zone.searches()).toHaveLength(1)
+  expect(zone.searches()[0]?.prompt).toContain(RELEASE.question)
+  expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
+  expect(listed(await pluginSections($), [RELEASE])).toEqual([RELEASE.question])
+
+  // A search that finds nothing leaves the queued question as it is.
+  await zone.endNextSearch()
+  expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
+  expect(await bandWarnings($)).toEqual([])
+  expect(zone.notes()).toEqual([])
+  expect(zone.messages).toEqual([])
+})
+
+test('a go-ahead the reader names joins the queue and starts no search', async ($, on) => {
   const zone = await engine($, on, {
-    checkEnds: prompt => ({ answer: prompt.includes(RELEASE.question) ? found : 'CLEAR' }),
+    checkEnds: readerSays(prompt => (prompt.includes(SHIP.question) ? 'CLEAR GO-AHEAD' : 'CLEAR')),
+  })
+
+  await zone.ask(SHIP)
+  await zone.ask(NAMING)
+
+  expect(zone.reads()).toHaveLength(2)
+  expect(zone.searches().map(spawn => spawn.prompt.includes(NAMING.question))).toEqual([true])
+  expect(await band($)).toEqual([waitingBand(2), waitingBand(2)])
+  expect(zone.notes()).toEqual([])
+})
+
+const FOUND =
+  'ANSWERED: docs/decisions/2026-11-01-release-day.md:14: "Ship it today, the weekend fix matters more."'
+
+test('a search that finds an answer the person already gave takes the waiting question out of the queue and gives the model their words and where', async ($, on) => {
+  const zone = await engine($, on, {
+    checkEnds: searchFinds(prompt => (prompt.includes(RELEASE.question) ? FOUND : 'NOT_ANSWERED')),
   })
 
   await zone.ask(RELEASE)
@@ -509,22 +651,250 @@ test('an answer the person already gave comes back with its source and words; a 
 
   const said = saying(zone.notes(), 'docs/decisions/2026-11-01-release-day.md:14')
   expect(said).toHaveLength(1)
+  expect(said[0]).toContain(RELEASE.question)
   expect(said[0]).toContain('"Ship it today, the weekend fix matters more."')
+  expect(zone.notes()).toHaveLength(1)
   expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
   expect(listed(await pluginSections($), [RELEASE, NAMING])).toEqual([NAMING.question])
 })
 
-test('a check that cannot run reaches the model as one note each, read in the turn that asked, and nothing is queued', async ($, on) => {
-  const indexBusy =
-    'The check could not be made: `cc-search-chats index --json` failed because the graphics card is busy. Stopping the program using it lets the index run.'
+// What the person or the model does to a queued question while its search
+// runs: each takes it out of the search's reach. `isListed` says whether the
+// system prompt still lists it afterwards.
+type Box = { text: string; cursor: number }
+
+const BEFORE_THE_SEARCH_ENDS: { what: string; act: ($: Engine, box: Box) => Promise<void>; isListed: boolean }[] = [
+  {
+    what: 'the person took it into the prompt box',
+    act: async $ => {
+      await take($)
+    },
+    isListed: true,
+  },
+  {
+    what: 'the person took it and sent something else, which put it back in the queue',
+    act: async ($, box) => {
+      await take($)
+      clear(box)
+      await send($, box, 'Something else first.')
+    },
+    isListed: true,
+  },
+  {
+    what: 'the person answered it',
+    act: async ($, box) => {
+      await take($)
+      await send($, box, 'Yes, today.')
+    },
+    isListed: false,
+  },
+  {
+    what: 'the model withdrew it',
+    act: async $ => {
+      expect((await withdraw($, RELEASE.question)).deny).toBeUndefined()
+    },
+    isListed: false,
+  },
+]
+
+for (const { what, act, isListed } of BEFORE_THE_SEARCH_ENDS) {
+  test(`an earlier answer found after ${what} changes nothing and says nothing`, async ($, on) => {
+    const zone = await engine($, on, { isHolding: true, checkEnds: searchFinds(() => FOUND) })
+    await zone.ask(RELEASE)
+    await zone.endNextCheck()
+    await act($, zone.box)
+    const before = await band($)
+
+    await zone.endNextSearch()
+    await zone.pass(10 * MINUTE)
+
+    expect(zone.notes()).toEqual([])
+    expect(zone.messages).toEqual([])
+    expect(await band($)).toEqual(before)
+    expect(listed(await pluginSections($), [RELEASE])).toEqual(isListed ? [RELEASE.question] : [])
+  })
+}
+
+// A search that ends while the person presses the button: before the
+// question is claimed for the box, the search takes it out and the box stays
+// empty; once claimed, the box keeps it and the search says nothing. Never
+// both: a question in the box the model was told had left the queue.
+const DURING_TAKE = [
+  { during: 'prompt.read', isInBox: false },
+  { during: 'prompt.fill', isInBox: true },
+] as const
+
+for (const { during, isInBox } of DURING_TAKE) {
+  test(`an earlier answer found while the person takes the question (${during}) either takes it out or leaves it in the box, never both`, async ($, on) => {
+    const zone = await engine($, on, { isHolding: true, endSearchDuring: during, checkEnds: searchFinds(() => FOUND) })
+    await zone.ask(RELEASE)
+    await zone.endNextCheck()
+
+    await take($)
+    await zone.pass(MINUTE)
+
+    expect(zone.box.text.includes(RELEASE.question)).toBe(isInBox)
+    expect(zone.notes()).toHaveLength(isInBox ? 0 : 1)
+    expect(listed(await pluginSections($), [RELEASE])).toEqual(isInBox ? [RELEASE.question] : [])
+  })
+}
+
+test('a take the box refuses changes nothing: the question stays next, its search still acts on it, and a question taken before stays taken', async ($, on) => {
+  const zone = await engine($, on, { isHolding: true, checkEnds: searchFinds(() => FOUND) })
+  await zone.ask(RELEASE)
+  await zone.ask(NAMING)
+  await zone.endNextCheck()
+  await zone.endNextCheck()
+  await take($)
+  expect(zone.box.text).toContain(RELEASE.question)
+  // RELEASE's search ends with it taken; NAMING's search starts.
+  await zone.endNextSearch()
+
+  // The person clears the box and presses for the next question, which the
+  // box refuses.
+  zone.box.text = ''
+  zone.fill.isRefused = true
+  await take($)
+  expect(zone.box.text).toBe('')
+
+  await zone.endNextSearch()
+  expect(zone.notes()).toHaveLength(1)
+  expect(saying(zone.notes(), NAMING.question)).toHaveLength(1)
+  // RELEASE is still the taken one, so nothing waits.
+  expect(await band($)).toEqual([ENGINE_BAND, ENGINE_BAND])
+})
+
+// A search that ends while the box refuses a take acts on the question once
+// it is back, as it would have had the person never pressed.
+const ENDED_DURING_REFUSED_TAKE = [
+  { what: 'finds an earlier answer', answer: FOUND, isListed: false, notes: 1, warnings: 0 },
+  {
+    what: 'cannot finish',
+    answer: 'HISTORY_WARNING: History lookup failed: the index could not refresh.',
+    isListed: true,
+    notes: 0,
+    warnings: 1,
+  },
+] as const
+
+for (const { what, answer, isListed, notes, warnings } of ENDED_DURING_REFUSED_TAKE) {
+  test(`a search that ${what} while the box refuses a take acts on the question once it is back`, async ($, on) => {
+    const zone = await engine($, on, { isHolding: true, endSearchDuring: 'prompt.fill', checkEnds: searchFinds(() => answer) })
+    await zone.ask(RELEASE)
+    await zone.endNextCheck()
+
+    zone.fill.isRefused = true
+    await take($)
+    await zone.pass(MINUTE)
+
+    expect(zone.box.text).toBe('')
+    expect(saying(zone.notes(), RELEASE.question)).toHaveLength(notes)
+    expect(listed(await pluginSections($), [RELEASE])).toEqual(isListed ? [RELEASE.question] : [])
+    expect(saying(await bandWarnings($), 'the index could not refresh')).toHaveLength(warnings)
+  })
+}
+
+test('a search whose turn comes while the box refuses its question still runs once the question is back', async ($, on) => {
+  const zone = await engine($, on, {
+    isHolding: true,
+    checkEnds: searchFinds(prompt => (prompt.includes(NAMING.question) ? FOUND : 'NOT_ANSWERED')),
+  })
+  await zone.ask(RELEASE)
+  await zone.ask(NAMING)
+  await zone.endNextCheck()
+  await zone.endNextCheck()
+  await take($)
+  expect(zone.box.text).toContain(RELEASE.question)
+
+  // NAMING's search waits behind RELEASE's, which ends while the box refuses
+  // NAMING.
+  zone.box.text = ''
+  zone.fill.isRefused = true
+  zone.during.endSearch = 'prompt.fill'
+  await take($)
+  await zone.pass(MINUTE)
+  expect(zone.box.text).toBe('')
+  expect(saying(zone.searches().map(spawn => spawn.prompt), NAMING.question)).toHaveLength(1)
+
+  zone.during.endSearch = undefined
+  await zone.endNextSearch()
+  expect(saying(zone.notes(), NAMING.question)).toHaveLength(1)
+  expect(await band($)).toEqual([ENGINE_BAND, ENGINE_BAND])
+})
+
+test('an earlier answer found while the session is idle reaches the model through one wake prompt', async ($, on) => {
+  const zone = await engine($, on, { isHolding: true, checkEnds: searchFinds(() => FOUND) })
+  await zone.turn.start()
+  await zone.ask(RELEASE)
+  await zone.turn.request()
+  await zone.turn.end()
+
+  await zone.endNextCheck()
+  expect(zone.messages).toEqual([])
+  await zone.endNextSearch()
+  await zone.pass(10 * MINUTE)
+
+  expect(saying(zone.notes(), RELEASE.question)).toHaveLength(1)
+  expect(zone.messages).toHaveLength(1)
+  expect(saying(zone.messages.map(message => message.text), 'Ship it today')).toEqual([])
+})
+
+test('earlier answers found a minute apart while the session is idle send one wake prompt, once the last search ends', async ($, on) => {
+  const zone = await engine($, on, { isHolding: true, checkEnds: searchFinds(() => FOUND) })
+  await zone.turn.start()
+  await zone.ask(RELEASE)
+  await zone.ask(NAMING)
+  await zone.turn.request()
+  await zone.turn.end()
+  await zone.endNextCheck()
+  await zone.endNextCheck()
+
+  await zone.endNextSearch()
+  await zone.pass(MINUTE)
+  expect(zone.notes()).toHaveLength(1)
+  expect(zone.messages).toEqual([])
+
+  await zone.endNextSearch()
+  await zone.pass(10 * MINUTE)
+  expect(zone.notes()).toHaveLength(2)
+  expect(zone.messages).toHaveLength(1)
+})
+
+test('a search that hangs holds the wake prompt for an earlier answer back five minutes at most', async ($, on) => {
+  const zone = await engine($, on, {
+    isHolding: true,
+    checkEnds: searchFinds(prompt => (prompt.includes(RELEASE.question) ? FOUND : 'NOT_ANSWERED')),
+  })
+  await zone.turn.start()
+  await zone.ask(RELEASE)
+  await zone.ask(NAMING)
+  await zone.turn.request()
+  await zone.turn.end()
+  await zone.endNextCheck()
+  await zone.endNextCheck()
+
+  // The first search finds an answer; the second starts and never ends.
+  await zone.endNextSearch()
+  expect(zone.searches()).toHaveLength(2)
+  await zone.pass(4 * MINUTE)
+  expect(zone.messages).toEqual([])
+  await zone.pass(2 * MINUTE)
+
+  expect(zone.messages).toHaveLength(1)
+  expect(saying(zone.notes(), RELEASE.question)).toHaveLength(1)
+})
+
+test('a clarity check that cannot run reaches the model as one note each, read in the turn that asked, and nothing is queued', async ($, on) => {
+  const cannotRead =
+    'The check could not be made: the entry arrived with its question cut off. Ask it again in full.'
   const ends: CheckEnd[] = [
     { refused: 'past a host limit' },
     { ended: 'error' },
     { ended: 'aborted' },
-    { answer: indexBusy },
+    { answer: cannotRead },
     { fails: true },
   ]
-  const zone = await engine($, on, { checkEnds: () => ends.shift() ?? { answer: 'CLEAR' } })
+  const zone = await engine($, on, { checkEnds: spawn => ends.shift() ?? ALL_CLEAR(spawn) })
 
   await zone.turn.start()
   for (let i = 0; i < 5; i += 1) {
@@ -537,7 +907,8 @@ test('a check that cannot run reaches the model as one note each, read in the tu
   const said = saying(zone.notes(), RELEASE.question)
   expect(said).toHaveLength(5)
   expect(said[0]).toContain('past a host limit')
-  expect(said[3]).toContain(indexBusy)
+  expect(said[3]).toContain(cannotRead)
+  expect(zone.searches()).toEqual([])
   expect(zone.messages).toEqual([])
   expect(await band($)).toEqual([ENGINE_BAND, ENGINE_BAND])
   expect(listed(await pluginSections($), [RELEASE])).toEqual([])
@@ -554,48 +925,90 @@ const numbered = (n: number): Entry => ({
 const MINUTE = 60_000
 
 for (const freed of ['before the end', 'after the end'] as const) {
-  test(`questions asked while every subagent slot is taken wait, and each is checked in the order asked once a slot comes free (slot given back ${freed} of the run)`, async ($, on) => {
+  test(`questions asked while every subagent slot is taken wait, each is read in the order asked once a slot comes free, and no search takes a slot a clarity read is waiting for (slot given back ${freed} of the run)`, async ($, on) => {
     const asked = [1, 2, 3, 4, 5, 6, 7].map(numbered)
     const questions = (entries: readonly Entry[]): string[] => entries.map(entry => entry.question)
     const zone = await engine($, on, { isHolding: true, slots: { cap: 5, others: 1, freed } })
-    const checked = (): string[] =>
-      zone.spawned.map(spawn => asked.find(entry => spawn.prompt.includes(entry.question))?.question ?? spawn.prompt)
+    const which = (spawns: readonly Spawned[]): string[] =>
+      spawns.map(spawn => asked.find(entry => spawn.prompt.includes(entry.question))?.question ?? spawn.prompt)
+    const read = (): string[] => which(zone.reads())
+    const searched = (): string[] => which(zone.searches())
 
     for (const entry of asked.slice(0, 6)) {
       expect((await zone.ask(entry)).deny).toBeUndefined()
     }
 
     expect(zone.messages).toEqual([])
-    expect(checked()).toEqual(questions(asked.slice(0, 4)))
+    expect(read()).toEqual(questions(asked.slice(0, 4)))
     expect(listed(await pluginSections($), asked)).toEqual(questions(asked.slice(0, 6)))
     expect(await band($)).toEqual([checkingBand(6), checkingBand(6)])
 
     await zone.pass(30 * MINUTE)
     expect(zone.messages).toEqual([])
-    expect(checked()).toEqual(questions(asked.slice(0, 4)))
+    expect(read()).toEqual(questions(asked.slice(0, 4)))
 
     // A slot comes free, and a seventh question is asked straight away: the
-    // fifth, asked earlier, takes the slot.
+    // fifth, asked earlier, takes the slot, and the first, now queued, waits
+    // for its search.
     await zone.endNextCheck()
     expect((await zone.ask(numbered(7))).deny).toBeUndefined()
     await zone.pass(MINUTE)
-    expect(checked()).toEqual(questions(asked.slice(0, 5)))
+    expect(read()).toEqual(questions(asked.slice(0, 5)))
+    expect(searched()).toEqual([])
+    expect(await band($)).toEqual([waitingBand(1, 6), waitingBand(1, 6)])
 
     await zone.endNextCheck()
     await zone.pass(MINUTE)
-    expect(checked()).toEqual(questions(asked.slice(0, 6)))
+    expect(read()).toEqual(questions(asked.slice(0, 6)))
 
     await zone.endNextCheck()
     await zone.pass(MINUTE)
-    expect(checked()).toEqual(questions(asked))
+    expect(read()).toEqual(questions(asked))
+    expect(searched()).toEqual([])
 
+    // With no read left waiting, the searches run one at a time, in the order
+    // their questions joined the queue; here the reads end in the order asked.
     for (let i = 0; i < 4; i += 1) {
       await zone.endNextCheck()
+      await zone.pass(MINUTE)
+    }
+    expect(searched()).toEqual(questions(asked.slice(0, 1)))
+    for (let i = 1; i < 7; i += 1) {
+      await zone.endNextSearch()
+      await zone.pass(MINUTE)
+      expect(searched()).toEqual(questions(asked.slice(0, i + 1)))
     }
     expect(zone.messages).toEqual([])
     expect(await band($)).toEqual([waitingBand(7), waitingBand(7)])
   })
 }
+
+test('at most one search runs at a time, so a question asked while earlier ones wait for their searches is read at once', async ($, on) => {
+  const asked = [1, 2, 3, 4, 5].map(numbered)
+  const late = numbered(6)
+  const zone = await engine($, on, { isHolding: true, slots: { cap: 5, others: 0, freed: 'before the end' } })
+  const which = (spawns: readonly Spawned[]): string[] =>
+    spawns.map(spawn => [...asked, late].find(entry => spawn.prompt.includes(entry.question))?.question ?? spawn.prompt)
+
+  for (const entry of asked) {
+    expect((await zone.ask(entry)).deny).toBeUndefined()
+  }
+  for (let i = 0; i < asked.length; i += 1) {
+    await zone.endNextCheck()
+    await zone.pass(MINUTE)
+  }
+  expect(which(zone.searches())).toEqual([asked[0]?.question])
+
+  await zone.ask(late)
+  await zone.pass(MINUTE)
+  expect(which(zone.reads())).toEqual([...asked, late].map(entry => entry.question))
+
+  for (let i = 1; i < asked.length; i += 1) {
+    await zone.endNextSearch()
+    await zone.pass(MINUTE)
+  }
+  expect(which(zone.searches())).toEqual(asked.map(entry => entry.question))
+})
 
 test('an ask from a subagent is refused before any check', async ($, on) => {
   const zone = await engine($, on)
@@ -618,19 +1031,22 @@ test('an ask whose context or question is empty is refused before any check', as
   expect(zone.spawned).toEqual([])
 })
 
-test('the checker is never offered to the model', async ($, on) => {
+test('neither the reader nor the search is ever offered to the model', async ($, on) => {
   const zone = await engine($, on)
-  const checker = zone.agents[0]?.agent ?? ''
+  expect(zone.agents).toHaveLength(2)
 
-  const offer = await $.agent.offer({
-    agent: checker,
-    description: 'checks a question',
-    source: 'plugin',
-    provider: { plugin: PLUGIN, tier: 'user' },
-  })
+  const offered: boolean[] = []
+  for (const { agent } of zone.agents) {
+    const offer = await $.agent.offer({
+      agent,
+      description: 'checks a question',
+      source: 'plugin',
+      provider: { plugin: PLUGIN, tier: 'user' },
+    })
+    offered.push(offer.isOffered)
+  }
 
-  expect(checker).not.toBe('')
-  expect(offer.isOffered).toBe(false)
+  expect(offered).toEqual([false, false])
 })
 
 test('the band shows nothing while the queue is empty, then the count and a button on key 1', async ($, on) => {
@@ -839,11 +1255,11 @@ test('entries a reload left being checked are checked again as the plugin loads,
   const zone = await engine($, on, {
     isHolding: true,
     stored: { checking: [RELEASE, NAMING], waiting: [], taken: [] },
-    checkEnds: prompt => ({ answer: prompt.includes(NAMING.question) ? objection : 'CLEAR' }),
+    checkEnds: readerSays(prompt => (prompt.includes(NAMING.question) ? objection : 'CLEAR')),
   })
 
   expect(listed(await pluginSections($), [RELEASE, NAMING])).toEqual([RELEASE.question, NAMING.question])
-  expect(zone.spawned).toHaveLength(2)
+  expect(zone.reads()).toHaveLength(2)
   expect(await band($)).toEqual([checkingBand(2), checkingBand(2)])
 
   await zone.endNextCheck()
@@ -851,6 +1267,19 @@ test('entries a reload left being checked are checked again as the plugin loads,
   expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
   expect(listed(await pluginSections($), [RELEASE, NAMING])).toEqual([RELEASE.question])
   expect(saying(zone.notes(), objection)).toHaveLength(1)
+})
+
+test('a queued question whose search a reload cut off is searched again as the plugin loads, and one already searched is not', async ($, on) => {
+  const zone = await engine($, on, {
+    stored: { checking: [], waiting: [{ ...RELEASE, isSearching: true }, { ...NAMING, isSearching: false }], taken: [] },
+    checkEnds: searchFinds(prompt => (prompt.includes(RELEASE.question) ? FOUND : 'NOT_ANSWERED')),
+  })
+
+  expect(zone.reads()).toEqual([])
+  expect(zone.searches().map(spawn => spawn.prompt.includes(RELEASE.question))).toEqual([true])
+  expect(saying(zone.notes(), 'Ship it today')).toHaveLength(1)
+  expect(listed(await pluginSections($), [RELEASE, NAMING])).toEqual([NAMING.question])
+  expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
 })
 
 test('the system prompt ends with a session section that sends the model to the ask tool and lists every unanswered question, a taken one included', async ($, on) => {
@@ -875,7 +1304,7 @@ test('a teammate’s render of the lead’s prompt gets no question-zone section
   expect(await pluginSections($, ['teammate'])).toEqual([])
 })
 
-test('the band counts the questions being checked beside those waiting, so work in progress never looks like an empty box', async ($, on) => {
+test('the band counts the questions being read beside those waiting, so work in progress never looks like an empty box; a question whose search runs counts as waiting', async ($, on) => {
   const zone = await engine($, on, { isHolding: true })
 
   await zone.ask(NAMING)
@@ -885,17 +1314,20 @@ test('the band counts the questions being checked beside those waiting, so work 
   await zone.ask(RELEASE)
   expect(await band($)).toEqual([waitingBand(1, 1), waitingBand(1, 1)])
 
+  // One search runs and the other waits for it; both questions wait.
   await zone.endNextCheck()
+  expect(zone.searches()).toHaveLength(1)
   expect(await band($)).toEqual([waitingBand(2), waitingBand(2)])
 })
 
-test('a checker’s own report never reaches the model: a clear check sends it nothing, and a refusal reaches it once, as the plugin’s note', async ($, on) => {
+test('a checker’s own report never reaches the model: a clear read and a search that finds nothing send it nothing, and a refusal reaches it once, as the plugin’s note', async ($, on) => {
   const objection = 'The entry says "the L5d split" without saying what that is. Rewrite it.'
   const zone = await engine($, on, {
-    checkEnds: prompt => ({ answer: prompt.includes(NAMING.question) ? objection : 'CLEAR' }),
+    checkEnds: readerSays(prompt => (prompt.includes(NAMING.question) ? objection : 'CLEAR')),
   })
 
   await zone.ask(RELEASE)
+  expect(zone.searches()).toHaveLength(1)
   expect(zone.delivered).toEqual([])
   expect(zone.notes()).toEqual([])
 
@@ -1049,7 +1481,28 @@ test('a question withdrawn while it waits for a subagent slot never starts a che
   await zone.endNextCheck()
   await zone.pass(MINUTE)
 
-  expect(zone.spawned.map(spawn => spawn.prompt.includes(RELEASE.question))).toEqual([false])
+  expect(zone.spawned.filter(spawn => spawn.prompt.includes(RELEASE.question))).toEqual([])
+  expect(zone.messages).toEqual([])
+  expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
+})
+
+test('a queued question withdrawn while its search waits for a subagent slot never starts that search', async ($, on) => {
+  const zone = await engine($, on, { isHolding: true, slots: { cap: 2, others: 1, freed: 'after the end' } })
+  await zone.ask(NAMING)
+  await zone.ask(RELEASE)
+
+  // The one slot goes to the read waiting for it, and the search for the
+  // question just queued waits.
+  await zone.endNextCheck()
+  await zone.pass(MINUTE)
+  expect(zone.reads().map(spawn => spawn.prompt.includes(RELEASE.question))).toEqual([false, true])
+  expect(zone.searches()).toEqual([])
+
+  expect((await withdraw($, NAMING.question)).deny).toBeUndefined()
+  await zone.endNextCheck()
+  await zone.pass(MINUTE)
+
+  expect(zone.searches().map(spawn => spawn.prompt.includes(RELEASE.question))).toEqual([true])
   expect(zone.messages).toEqual([])
   expect(await band($)).toEqual([waitingBand(1), waitingBand(1)])
 })
@@ -1086,10 +1539,10 @@ test('a refusal that settles after the turn’s last request reaches the model t
   expect(saying(zone.messages.map(message => message.text), OBJECTION)).toEqual([])
 })
 
-test('refusals while the session is idle give one wake prompt, once the last running check ends', async ($, on) => {
+test('refusals while the session is idle give one wake prompt, once the last running read and search end', async ($, on) => {
   const zone = await engine($, on, {
     isHolding: true,
-    checkEnds: prompt => ({ answer: prompt.includes(SHIP.question) ? 'CLEAR' : OBJECTION }),
+    checkEnds: readerSays(prompt => (prompt.includes(SHIP.question) ? 'CLEAR' : OBJECTION)),
   })
   await zone.turn.start()
   await zone.ask(RELEASE)
@@ -1102,6 +1555,8 @@ test('refusals while the session is idle give one wake prompt, once the last run
   await zone.endNextCheck()
   expect(zone.messages).toEqual([])
   await zone.endNextCheck()
+  expect(zone.messages).toEqual([])
+  await zone.endNextSearch()
   expect(zone.messages).toHaveLength(1)
   await zone.pass(10 * MINUTE)
 

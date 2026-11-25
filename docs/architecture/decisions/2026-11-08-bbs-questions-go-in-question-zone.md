@@ -3,7 +3,12 @@
 **Status:** Accepted (2026-11-08). Supersedes the quiet-agents nudge text marked "The ruled
 text (2026-10-24)" at `plugins/denubis-hook-quiet-agents/hooks/register.tsx:325`, and
 `denubis-hook-quiet-agents` README line 73. The box is built for Claude Code. The
-cross-check before asking (items 5 and 6) binds Claude and Codex.
+cross-check before asking (items 5 and 6) binds Claude and Codex. Items 5 and 6 amended
+2026-11-23 by [2026-11-23-bbs-question-search-runs-after-queueing](2026-11-23-bbs-question-search-runs-after-queueing.md):
+a question joins the queue after its clarity read, the search runs afterwards and never
+for a go-ahead, and Codex checks clarity only. For Codex, amended again 2026-11-24 by
+[2026-11-24-bbs-codex-question-search-runs-after-showing](2026-11-24-bbs-codex-question-search-runs-after-showing.md):
+no check before a question is shown, and the search runs afterwards in the background.
 
 ## Authority evidence
 
