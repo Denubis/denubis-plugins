@@ -9,8 +9,8 @@ from pathlib import Path
 from workflow_statusline import cache
 
 
-def maybe_rename(name: str) -> None:
-    """Rename tmux window to 'Cl:<name>' if name changed and no lock file."""
+def maybe_rename(name: str, *, prefix: str = "Cl") -> None:
+    """Rename tmux window to '<prefix>:<name>' if name changed and no lock file."""
     if (
         os.environ.get("TMUX_AGENT_ATTENTION_RUN_ID")
         and os.environ.get("TMUX_AGENT_ATTENTION_OWNS_WINDOW_TITLE") == "1"
@@ -31,13 +31,14 @@ def maybe_rename(name: str) -> None:
         return
 
     cache_file = f"/tmp/claude-statusline-tmux-{pane_id}"
+    cache_value = name if prefix == "Cl" else f"{prefix}:{name}"
     cached_name = cache.read_if_fresh(cache_file, max_age=86400)
-    if cached_name == name:
+    if cached_name == cache_value:
         return
 
     subprocess.run(
-        ["tmux", "rename-window", "-t", tmux_pane, f"Cl:{name}"],
+        ["tmux", "rename-window", "-t", tmux_pane, f"{prefix}:{name}"],
         check=False,
         capture_output=True,
     )
-    cache.write(cache_file, name)
+    cache.write(cache_file, cache_value)

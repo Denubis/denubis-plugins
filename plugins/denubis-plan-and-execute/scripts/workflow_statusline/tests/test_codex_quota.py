@@ -185,7 +185,7 @@ class CodexQuotaTests(unittest.TestCase):
 
         self.assertEqual(
             quota.render_quota(14.0, 7.0, reset, now=reset - 2 * 86_400),
-            "#[fg=red]14 7 Tue#[default]",
+            "#[bg=#26282e,fg=#ff8585]14\u00a77 Tu#[default]",
         )
 
     def test_renders_usage_under_pace_in_green(self) -> None:
@@ -194,13 +194,21 @@ class CodexQuotaTests(unittest.TestCase):
 
         self.assertEqual(
             quota.render_quota(6.0, 7.0, reset, now=reset - 2 * 86_400),
-            "#[fg=green]6 7 Tue#[default]",
+            "#[bg=#26282e,fg=#86efac]6\u00a77 Tu#[default]",
         )
 
-    def test_reset_switches_from_weekday_to_local_time_at_24_hours(self) -> None:
+    def test_reset_switches_weekday_to_hour_at_24h_and_minutes_in_last_hour(
+        self,
+    ) -> None:
         quota = codex_quota
         reset = time.mktime((2026, 9, 17, 14, 30, 0, 0, 0, -1))
-        for remaining, label in ((86_401, "Thu"), (86_400, "14:30"), (3_600, "14:30")):
+        for remaining, label in (
+            (86_401, "Th"),
+            (86_400, "14h"),
+            (3_601, "14h"),
+            (3_600, "14:30"),
+            (60, "14:30"),
+        ):
             with self.subTest(remaining=remaining):
                 self.assertEqual(
                     quota.status_text(
@@ -302,16 +310,26 @@ class CodexQuotaTests(unittest.TestCase):
                 )
             self.assertEqual(quota.latest_quota(home), (25.0, 10_080, 1_789_860_845))
 
-    def test_does_not_display_an_expired_snapshot(self) -> None:
+    def test_does_not_display_an_expired_or_invalid_snapshot(self) -> None:
         quota = codex_quota
-        self.assertEqual(
-            quota.status_text(
-                Path("/not/read"),
-                now=200.0,
-                snapshot=(14.0, 10_080, 199),
-            ),
-            "",
-        )
+        for snapshot in (
+            (14.0, 10_080, 199),
+            (14.0, 10_080, 200),
+            (float("nan"), 10_080, 500),
+            (-1.0, 10_080, 500),
+            (101.0, 10_080, 500),
+            (14.0, 10_080, 10**20),
+            (14.0, 10_080, 10**400),
+        ):
+            with self.subTest(snapshot=snapshot):
+                self.assertEqual(
+                    quota.status_text(
+                        Path("/not/read"),
+                        now=200.0,
+                        snapshot=snapshot,
+                    ),
+                    "",
+                )
 
 
 if __name__ == "__main__":

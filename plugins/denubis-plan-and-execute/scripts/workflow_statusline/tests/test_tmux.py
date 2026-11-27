@@ -78,6 +78,24 @@ class TestMaybeRename:
             tmux.maybe_rename("testrepo")
             mock_sub.run.assert_not_called()
 
+    def test_renames_window_with_custom_prefix(self, tmux_env):
+        """Antigravity passes prefix='Ag' to rename tmux window to 'Ag:<name>'."""
+        pane_id, cache_file, _lock_file = tmux_env
+        with mock.patch("workflow_statusline.tmux.subprocess") as mock_sub:
+            tmux.maybe_rename("testrepo", prefix="Ag")
+            mock_sub.run.assert_called_once_with(
+                ["tmux", "rename-window", "-t", f"%{pane_id}", "Ag:testrepo"],
+                check=False,
+                capture_output=True,
+            )
+            assert Path(cache_file).read_text() == "Ag:testrepo"
+            # Repeating with the same prefix hits the cache.
+            tmux.maybe_rename("testrepo", prefix="Ag")
+            assert mock_sub.run.call_count == 1
+            # Switching back to Claude's default prefix triggers a rename.
+            tmux.maybe_rename("testrepo")
+            assert mock_sub.run.call_count == 2
+
     def test_noop_when_tmux_not_set(self, monkeypatch):
         """AC4.4: TMUX not in env -> no subprocess call, no exception."""
         monkeypatch.delenv("TMUX", raising=False)

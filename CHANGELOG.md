@@ -1,5 +1,21 @@
 # Changelog
 
+## [denubis-plan-and-execute] 4.4.0
+
+Added Antigravity CLI (`agy`) support to `workflow-statusline` and a matching `byobu-agy-quota` weekly quota pill, gave all three Byobu quota cells distinct dark brand-tinted pill backgrounds with high-contrast pace foregrounds, switched Codex's separator to `§`, and shortened reset labels.
+
+**Changed:**
+- `workflow-statusline` now detects Antigravity CLI stdin payloads (`product: "antigravity"` or `quota` without `rate_limits`), extracts `quota.gemini-5h` and `quota.gemini-weekly` (ignoring `3p-*`, disabled, non-finite, out-of-range, or naive-ISO buckets with fallback to `reset_in_seconds`), persists Antigravity rate samples and quota snapshots under `$XDG_CACHE_HOME/agy-statusline/`, handles Antigravity's `cost.total_usd`, nullable/non-dict fields, and absent `total_duration_ms`, and renames tmux windows with `Ag:<location>` (preserving `Cl:<location>` for Claude Code).
+- Added `byobu-agy-quota` (`workflow_statusline.agy_quota`) and the executable 30-second Byobu launcher `byobu/30_agy_quota`.
+- Consolidated shared Byobu pill rendering, active-hours pace calculation, reset formatting, and finite/timestamp-range snapshot validation into `workflow_statusline.quota_cell`; snapshot readers now derive their paths directly from `cache.quota_snapshot_path`.
+- All three Byobu cells render as compact dark brand-tinted tmux pills with high-contrast under-pace green (`#86efac`) and at/over-pace red (`#ff8585`) foregrounds: Claude uses `*` on `#421e0f` terracotta, Codex uses `§` on `#26282e` graphite, and Antigravity uses `Ʌ` on `#0e3147` cerulean.
+- Reset labels now show two-letter local weekdays (`Mo`–`Su`), switch to the 24-hour reset hour (`14h`) within 24 hours, and show `HH:MM` (`14:30`) only in the final hour.
+- Reconciled `plugins/denubis-plan-and-execute/docs/workflow-status-line.md`, `scripts/workflow_statusline/README.md`, `plugins/denubis-plan-and-execute/README.md`, and `docs/architecture/plugins/denubis-plan-and-execute/0-context.md` with the implemented `>=3.14` package, `--frozen` uv commands, and brand pills.
+
+**Tests:** `plugins/denubis-plan-and-execute/scripts/workflow_statusline/tests` and `tests/test_marketplace_sync.py` under `uv run --frozen --all-packages pytest`. Covers Antigravity payload rendering, isolated `agy-statusline` snapshot/rate persistence, `3p-weekly`/disabled/invalid/non-finite/naive-ISO negative controls, shared brand-pill formatting, exact `used == pace` and `resets_at == now` boundaries, two-letter weekday / hour / final-hour reset transitions, and direct execution (`[str(launcher)]`) of symlinked `30_{claude,codex,agy}_quota` launchers.
+
+**Not verified:** visual appearance of the dark brand pills and `§`/`Ʌ` glyphs inside a live Byobu/Ghostty status bar (left to interactive inspection after symlinking `30_agy_quota` and configuring `agy`'s `statusLine`).
+
 ## [denubis-hook-question-zone] 0.3.0
 
 A question now reaches the person as soon as a fresh reader finds it clear, in Claude about as fast as a clarity rejection used to come back, and the search for an answer they already gave runs afterwards, while the question waits (ADR 2026-11-23-bbs-question-search-runs-after-queueing, amending items 5 and 6 of 2026-11-08-bbs-questions-go-in-question-zone). In Codex nothing checks a question before it is shown, and the search runs in the background afterwards (ADR 2026-11-24-bbs-codex-question-search-runs-after-showing). The supervisor's survey of 444 Claude questions from 2026-11-08 to 2026-11-23, as the question put to the person reported it, found that the clarity read takes about 11 seconds while the search makes the whole check take about four minutes, and that in 98 of 125 "already answered" bounces the person had answered in chat while the check ran. The survey's table was temporary and is not kept.

@@ -31,7 +31,18 @@ class ClaudeQuotaTests(unittest.TestCase):
         self.assertEqual(snapshot, (1000.5, 34.0, 90000.0))
 
     def test_rejects_malformed_lines(self) -> None:
-        for text in ("", "garbage", "1|2", "a|b|c", "1000|-5|90000", "1000|101|90000"):
+        for text in (
+            "",
+            "garbage",
+            "1|2",
+            "a|b|c",
+            "1000|-5|90000",
+            "1000|101|90000",
+            "1000|nan|90000",
+            "1000|50|inf",
+            "inf|50|90000",
+            "1000|50|1e20",
+        ):
             with self.subTest(text=text):
                 self.assertIsNone(self.module.parse_snapshot(text))
 
@@ -81,7 +92,7 @@ class ClaudeQuotaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write_snapshot(Path(tmp), f"{now - 60}|34|{resets_at}\n")
             rendered = self.module.status_text(path, now=now)
-        self.assertEqual(rendered, "#[fg=red]34*29 Tue#[default]")
+        self.assertEqual(rendered, "#[bg=#421e0f,fg=#ff8585]34*29 Tu#[default]")
 
     def test_under_pace_renders_green(self) -> None:
         import tempfile
@@ -91,18 +102,22 @@ class ClaudeQuotaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write_snapshot(Path(tmp), f"{now - 60}|5|{resets_at}\n")
             rendered = self.module.status_text(path, now=now)
-        self.assertEqual(rendered, "#[fg=green]5*29 Tue#[default]")
+        self.assertEqual(rendered, "#[bg=#421e0f,fg=#86efac]5*29 Tu#[default]")
 
-    def test_reset_switches_from_weekday_to_local_time_at_24_hours(self) -> None:
+    def test_reset_switches_weekday_to_hour_at_24h_and_minutes_in_last_hour(
+        self,
+    ) -> None:
         import tempfile
 
         reset = datetime(2026, 9, 17, 14, 30).timestamp()
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write_snapshot(Path(tmp), f"{reset - 100_000}|34|{reset}\n")
             for remaining, label in (
-                (86_401, "Thu"),
-                (86_400, "14:30"),
+                (86_401, "Th"),
+                (86_400, "14h"),
+                (3_601, "14h"),
                 (3_600, "14:30"),
+                (60, "14:30"),
             ):
                 with self.subTest(remaining=remaining):
                     rendered = self.module.status_text(path, now=reset - remaining)

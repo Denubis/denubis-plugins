@@ -5,23 +5,41 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import os
 import sqlite3
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from workflow_statusline.ratelimit import elapsed_active_fraction
+from workflow_statusline.quota_cell import (
+    CODEX_BG,
+    CODEX_SEP,
+    SEVEN_DAY_MINUTES,
+    is_valid_timestamp,
+    pace_percent,
+    render_pill,
+    reset_label,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+__all__ = [
+    "QuotaSnapshot",
+    "latest_quota",
+    "main",
+    "pace_percent",
+    "quota_from_event",
+    "quota_from_rollout",
+    "render_quota",
+    "reset_label",
+    "reversed_lines",
+    "status_text",
+]
 
 type QuotaSnapshot = tuple[float, int, int]
 
-_SEVEN_DAY_MINUTES = 7 * 24 * 60
-_ACTIVE_START_HOUR = 7
-_ACTIVE_END_HOUR = 22
 _RECENT_THREAD_COUNT = 16
 _REVERSE_READ_BLOCK_BYTES = 64 * 1024
 
@@ -51,43 +69,31 @@ def quota_from_event(event: object) -> QuotaSnapshot | None:
         if (
             isinstance(used, (int, float))
             and not isinstance(used, bool)
+            and math.isfinite(used)
             and isinstance(minutes, int)
             and not isinstance(minutes, bool)
             and isinstance(resets_at, int)
             and not isinstance(resets_at, bool)
             and 0 <= used <= 100
-            and minutes == _SEVEN_DAY_MINUTES
-            and resets_at > 0
+            and minutes == SEVEN_DAY_MINUTES
+            and is_valid_timestamp(resets_at)
         ):
             return float(used), minutes, resets_at
     return None
 
 
-def pace_percent(*, now: float, resets_at: float, window_minutes: int) -> float:
-    """Return the active-hours-scaled target percentage for this instant."""
-    fraction = elapsed_active_fraction(
-        now,
-        resets_at,
-        window_minutes * 60.0,
-        active_start_hour=_ACTIVE_START_HOUR,
-        active_end_hour=_ACTIVE_END_HOUR,
-    )
-    return fraction * 100.0
-
-
-def reset_label(resets_at: float, *, now: float) -> str:
-    """Show the local reset weekday, or clock time in the final 24 hours."""
-    reset = datetime.datetime.fromtimestamp(resets_at)
-    return reset.strftime("%H:%M" if resets_at - now <= 86_400 else "%a")
-
-
 def render_quota(
     used_percent: float, pace: float, resets_at: float, *, now: float | None = None
 ) -> str:
-    """Render used percentage, pace target, and reset as a compact tmux cell."""
-    colour = "green" if used_percent < pace else "red"
-    reset = reset_label(resets_at, now=time.time() if now is None else now)
-    return f"#[fg={colour}]{round(used_percent)} {round(pace)} {reset}#[default]"
+    """Render used percentage, pace target, and reset as a Codex brand pill."""
+    return render_pill(
+        used_percent,
+        pace,
+        resets_at,
+        now=time.time() if now is None else now,
+        separator=CODEX_SEP,
+        background=CODEX_BG,
+    )
 
 
 def reversed_lines(path: Path) -> Iterator[str]:
@@ -202,14 +208,20 @@ def status_text(
     if current is None:
         return ""
     used, window_minutes, resets_at = current
-    if resets_at <= current_time:
+    if (
+        not (math.isfinite(used) and 0 <= used <= 100 and is_valid_timestamp(resets_at))
+        or resets_at <= current_time
+    ):
         return ""
-    pace = pace_percent(
-        now=current_time,
-        resets_at=resets_at,
-        window_minutes=window_minutes,
-    )
-    return render_quota(used, pace, resets_at, now=current_time)
+    try:
+        pace = pace_percent(
+            now=current_time,
+            resets_at=resets_at,
+            window_minutes=window_minutes,
+        )
+        return render_quota(used, pace, resets_at, now=current_time)
+    except OverflowError, OSError, ValueError:
+        return ""
 
 
 def main() -> None:

@@ -8,8 +8,11 @@ import os
 import time
 from pathlib import Path
 
+DEFAULT_NAMESPACE = "claude-statusline"
+AGY_NAMESPACE = "agy-statusline"
 
-def rate_cache_path(window_key: str) -> str:
+
+def rate_cache_path(window_key: str, *, namespace: str = DEFAULT_NAMESPACE) -> str:
     """Return the per-user cache file path for a rate-limit window.
 
     Uses $XDG_CACHE_HOME if set, else $HOME/.cache. Shared across sessions
@@ -17,18 +20,18 @@ def rate_cache_path(window_key: str) -> str:
     """
     xdg = os.environ.get("XDG_CACHE_HOME")
     base = xdg or str(Path(os.environ.get("HOME", "/tmp")) / ".cache")
-    return str(Path(base) / "claude-statusline" / f"rate-{window_key}")
+    return str(Path(base) / namespace / f"rate-{window_key}")
 
 
-def quota_snapshot_path(window_key: str) -> str:
+def quota_snapshot_path(window_key: str, *, namespace: str = DEFAULT_NAMESPACE) -> str:
     """Return the per-user snapshot file path for a rate-limit window.
 
-    Sits beside the rate-sample buffers. The packaged claude_quota command
-    reads this snapshot to render the Byobu cell.
+    Sits beside the rate-sample buffers. The packaged Byobu quota commands
+    read this snapshot to render their toolbar cells.
     """
     xdg = os.environ.get("XDG_CACHE_HOME")
     base = xdg or str(Path(os.environ.get("HOME", "/tmp")) / ".cache")
-    return str(Path(base) / "claude-statusline" / f"quota-{window_key}")
+    return str(Path(base) / namespace / f"quota-{window_key}")
 
 
 def write_quota_snapshot(

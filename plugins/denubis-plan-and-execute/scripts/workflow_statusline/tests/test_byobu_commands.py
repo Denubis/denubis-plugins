@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize("provider", ["claude", "codex"])
+@pytest.mark.parametrize("provider", ["claude", "codex", "agy"])
 def test_installed_quota_command_reads_its_provider_data(
     provider, tmp_path, monkeypatch, capsys
 ):
@@ -34,7 +34,13 @@ def test_installed_quota_command_reads_its_provider_data(
         cache = tmp_path / "claude-statusline"
         cache.mkdir()
         (cache / "quota-seven_day").write_text(f"{now}|20|{reset}\n")
-        expected = "#[fg=green]20*71 Thu#[default]\n"
+        expected = "#[bg=#421e0f,fg=#86efac]20*71 Th#[default]\n"
+    elif provider == "agy":
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        cache = tmp_path / "agy-statusline"
+        cache.mkdir()
+        (cache / "quota-seven_day").write_text(f"{now}|20|{reset}\n")
+        expected = "#[bg=#0e3147,fg=#86efac]20\u024571 Th#[default]\n"
     else:
         monkeypatch.setenv("CODEX_HOME", str(tmp_path))
         rollout = tmp_path / "rollout.jsonl"
@@ -63,13 +69,13 @@ def test_installed_quota_command_reads_its_provider_data(
                 "CREATE TABLE threads (rollout_path TEXT, updated_at_ms INTEGER)"
             )
             connection.execute("INSERT INTO threads VALUES (?, ?)", (str(rollout), 1))
-        expected = "#[fg=green]20 71 Thu#[default]\n"
+        expected = "#[bg=#26282e,fg=#86efac]20\u00a771 Th#[default]\n"
 
     entries[command].load()()
     assert capsys.readouterr().out == expected
 
 
-@pytest.mark.parametrize("provider", ["claude", "codex"])
+@pytest.mark.parametrize("provider", ["claude", "codex", "agy"])
 def test_symlinked_byobu_launcher_selects_its_own_package(provider, tmp_path):
     project = Path(__file__).parents[1]
     bindir = tmp_path / "bin with spaces"
@@ -81,7 +87,7 @@ def test_symlinked_byobu_launcher_selects_its_own_package(provider, tmp_path):
     launcher.symlink_to(project / "byobu" / launcher.name)
 
     result = subprocess.run(
-        ["sh", str(launcher)],
+        [str(launcher)],
         env={**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}"},
         cwd=tmp_path,
         capture_output=True,

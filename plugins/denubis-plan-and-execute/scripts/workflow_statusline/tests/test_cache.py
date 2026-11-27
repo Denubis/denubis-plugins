@@ -344,6 +344,17 @@ class TestQuotaSnapshot:
         content = Path(snapshot_file).read_text()
         assert content == "2000.0|12.0|5000.0\n"
 
+    def test_respects_custom_namespace(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        rate_path = cache.rate_cache_path("seven_day", namespace=cache.AGY_NAMESPACE)
+        snap_path = cache.quota_snapshot_path(
+            "seven_day", namespace=cache.AGY_NAMESPACE
+        )
+        assert rate_path == str(tmp_path / "agy-statusline" / "rate-seven_day")
+        assert snap_path == str(tmp_path / "agy-statusline" / "quota-seven_day")
+
     def test_write_creates_parent_directories(self, tmp_path: Path) -> None:
         snapshot_file = str(tmp_path / "deep" / "nested" / "quota-seven_day")
         cache.write_quota_snapshot(

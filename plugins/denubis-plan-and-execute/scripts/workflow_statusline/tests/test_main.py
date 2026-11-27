@@ -258,7 +258,7 @@ class TestLine2PaceDisplay:
             mock.patch("workflow_statusline.__main__.cache") as mock_cache,
         ):
             mock_time.time.return_value = now_ts
-            mock_cache.rate_cache_path.side_effect = lambda k: f"/tmp/t-{k}"
+            mock_cache.rate_cache_path.side_effect = lambda k, **_kw: f"/tmp/t-{k}"
             main()
         line2 = _strip_ansi(buf.getvalue().splitlines()[1])
         # 1 day (15 active h) / 7 days (105 active h) = 14.3% → rounds to 14%
@@ -286,7 +286,7 @@ class TestLine2PaceDisplay:
             mock.patch("workflow_statusline.__main__.cache") as mock_cache,
         ):
             mock_time.time.return_value = now_ts
-            mock_cache.rate_cache_path.side_effect = lambda k: f"/tmp/t-{k}"
+            mock_cache.rate_cache_path.side_effect = lambda k, **_kw: f"/tmp/t-{k}"
             main()
         line2 = buf.getvalue().splitlines()[1]
         # 1 day elapsed → pace ≈ 14%. Must contain RED before "7d:".
@@ -321,7 +321,7 @@ class TestLine2ForecastCells:
             mock.patch("workflow_statusline.__main__.cache") as mock_cache,
         ):
             mock_time.time.return_value = now_ts
-            mock_cache.rate_cache_path.side_effect = lambda k: f"/tmp/t-{k}"
+            mock_cache.rate_cache_path.side_effect = lambda k, **_kw: f"/tmp/t-{k}"
             mock_cache.read_rate_samples.return_value = samples
             main()
         return _strip_ansi(buf.getvalue().splitlines()[1])
@@ -499,3 +499,278 @@ class TestQuotaSnapshotSideEffect:
         base = tmp_path / "claude-statusline"
         assert (base / "quota-five_hour").read_text() == "1000000.0|12|1003600.0\n"
         assert (base / "quota-seven_day").read_text() == "1000000.0|34|1086400.0\n"
+
+
+# ---------------------------------------------------------------------------
+# Antigravity CLI payload support and agy-statusline quota snapshot contract
+# ---------------------------------------------------------------------------
+class TestAntigravityPayload:
+    def test_renders_and_persists_gemini_quota_snapshots(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        import datetime as _dt
+
+        from workflow_statusline import agy_quota
+
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        now = _dt.datetime(2026, 9, 15, 7, 0, tzinfo=_dt.UTC).timestamp()
+        reset_5h = "2026-09-15T11:00:00Z"
+        reset_7d = "2026-09-17T07:00:00Z"
+        payload = {
+            "cwd": "/tmp/fake",
+            "conversation_id": "conv-123",
+            "product": "antigravity",
+            "model": {"id": "gemini-4-neon", "display_name": "Gemini 4 Neon (High)"},
+            "context_window": {
+                "used_percentage": 14.24,
+                "remaining_percentage": 85.76,
+                "context_window_size": 1_048_576,
+            },
+            "quota": {
+                "gemini-5h": {
+                    "remaining_fraction": 0.75,
+                    "reset_time": reset_5h,
+                    "reset_in_seconds": 14400,
+                },
+                "gemini-weekly": {
+                    "remaining_fraction": 0.68,
+                    "reset_time": reset_7d,
+                    "reset_in_seconds": 172800,
+                },
+                "3p-weekly": {
+                    "remaining_fraction": 0.1,
+                    "reset_time": reset_7d,
+                    "reset_in_seconds": 172800,
+                },
+            },
+            "cost": {"total_usd": 0.4213, "subagent_usd": 0, "estimated": False},
+        }
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch("workflow_statusline.__main__.git_location", return_value=loc),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
+            mock.patch("workflow_statusline.__main__.time") as mock_time,
+            mock.patch("workflow_statusline.__main__.maybe_rename") as mock_rename,
+        ):
+            mock_time.time.return_value = now
+            main()
+
+        lines = buf.getvalue().splitlines()
+        line2 = _strip_ansi(lines[1])
+        assert "14%" in line2
+        assert "5h:25%" in line2
+        assert "7d:32%" in line2
+        assert "$0.42" in line2
+        assert "Gemini 4 Neon (High)" in line2
+        assert "0m 0s" not in line2
+        mock_rename.assert_called_once_with("testrepo", prefix="Ag")
+
+        agy_dir = tmp_path / "agy-statusline"
+        assert not (tmp_path / "claude-statusline").exists()
+        assert (agy_dir / "quota-five_hour").exists()
+        weekly_snapshot = agy_dir / "quota-seven_day"
+        assert weekly_snapshot.exists()
+
+        from workflow_statusline import cache as _cache
+
+        samples = _cache.read_rate_samples_full(str(agy_dir / "rate-seven_day"))
+        assert len(samples) == 1
+        assert samples[0][3] == "conv-123"
+
+        cell = agy_quota.status_text(weekly_snapshot, now=now)
+        assert cell.startswith("#[bg=#0e3147,fg=#86efac]32\u0245")
+        assert cell.endswith("#[default]")
+
+    def test_handles_null_model_absent_cost_and_reset_in_seconds_fallback(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        now = 1_780_000_000.0
+        payload = {
+            "cwd": "/tmp/fake",
+            "product": "antigravity",
+            "model": None,
+            "context_window": {
+                "used_percentage": 0,
+                "context_window_size": 0,
+            },
+            "quota": {
+                "gemini-weekly": {
+                    "remaining_fraction": 0.9,
+                    "reset_in_seconds": 3600,
+                },
+                "gemini-5h": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": 1800,
+                    "disabled": True,
+                },
+            },
+        }
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        fake_stdin = io.StringIO(json.dumps(payload))
+        buf = io.StringIO()
+        with (
+            mock.patch.object(sys, "stdin", fake_stdin),
+            mock.patch.object(sys, "stdout", buf),
+            mock.patch("workflow_statusline.__main__.git_location", return_value=loc),
+            mock.patch("workflow_statusline.__main__.git_changes", return_value=(0, 0)),
+            mock.patch("workflow_statusline.__main__.time") as mock_time,
+            mock.patch("workflow_statusline.__main__.maybe_rename"),
+        ):
+            mock_time.time.return_value = now
+            main()
+
+        line2 = _strip_ansi(buf.getvalue().splitlines()[1])
+        assert "7d:10%" in line2
+        assert "5h:" not in line2
+        assert "$" not in line2
+        agy_dir = tmp_path / "agy-statusline"
+        assert not (agy_dir / "quota-five_hour").exists()
+        parts = (agy_dir / "quota-seven_day").read_text().strip().split("|")
+        assert float(parts[0]) == now
+        assert round(float(parts[1]), 6) == 10.0
+        assert float(parts[2]) == now + 3600.0
+
+    def test_ignores_3p_only_disabled_and_invalid_quota_buckets(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        now = 1_780_000_000.0
+        invalid_quotas = [
+            {
+                "3p-weekly": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": 3600,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": 3600,
+                    "disabled": True,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": -0.1,
+                    "reset_in_seconds": 3600,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": 1.1,
+                    "reset_in_seconds": 3600,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": True,
+                    "reset_in_seconds": 3600,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": float("nan"),
+                    "reset_in_seconds": 3600,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": float("inf"),
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": 0,
+                }
+            },
+            {
+                "gemini-weekly": {
+                    "remaining_fraction": 0.5,
+                    "reset_in_seconds": 10**400,
+                }
+            },
+        ]
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        for quota in invalid_quotas:
+            payload = {
+                "cwd": "/tmp/fake",
+                "product": "antigravity",
+                "quota": quota,
+                "cost": {
+                    "subagent_usd": 0,
+                    "estimated": False,
+                    "total_duration_ms": None,
+                },
+            }
+            buf = io.StringIO()
+            with (
+                mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))),
+                mock.patch.object(sys, "stdout", buf),
+                mock.patch(
+                    "workflow_statusline.__main__.git_location", return_value=loc
+                ),
+                mock.patch(
+                    "workflow_statusline.__main__.git_changes", return_value=(0, 0)
+                ),
+                mock.patch("workflow_statusline.__main__.time") as mock_time,
+                mock.patch("workflow_statusline.__main__.maybe_rename"),
+            ):
+                mock_time.time.return_value = now
+                main()
+            line2 = _strip_ansi(buf.getvalue().splitlines()[1])
+            assert "7d:" not in line2
+            assert "$" not in line2
+            assert "0m 0s" not in line2
+            assert not (tmp_path / "agy-statusline" / "quota-seven_day").exists()
+
+    def test_naive_or_malformed_reset_time_falls_back_to_reset_in_seconds(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+        now = 1_780_000_000.0
+        loc = LocationInfo(display="testrepo", is_on_main=False, is_worktree=False)
+        snapshot_path = tmp_path / "agy-statusline" / "quota-seven_day"
+        for bad_reset, fallback_seconds in (
+            ("2026-09-17T07:00:00", 7200),
+            ("not-a-timestamp", 10800),
+        ):
+            if snapshot_path.exists():
+                snapshot_path.unlink()
+            payload = {
+                "cwd": "/tmp/fake",
+                "model": "non-dict-model",
+                "agent": "non-dict-agent",
+                "context_window": "non-dict-ctx",
+                "cost": "non-dict-cost",
+                "quota": {
+                    "gemini-weekly": {
+                        "remaining_fraction": 0.75,
+                        "reset_time": bad_reset,
+                        "reset_in_seconds": fallback_seconds,
+                    }
+                },
+            }
+            buf = io.StringIO()
+            with (
+                mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))),
+                mock.patch.object(sys, "stdout", buf),
+                mock.patch(
+                    "workflow_statusline.__main__.git_location", return_value=loc
+                ),
+                mock.patch(
+                    "workflow_statusline.__main__.git_changes", return_value=(0, 0)
+                ),
+                mock.patch("workflow_statusline.__main__.time") as mock_time,
+                mock.patch("workflow_statusline.__main__.maybe_rename"),
+            ):
+                mock_time.time.return_value = now
+                main()
+            parts = snapshot_path.read_text().strip().split("|")
+            assert float(parts[2]) == now + float(fallback_seconds)

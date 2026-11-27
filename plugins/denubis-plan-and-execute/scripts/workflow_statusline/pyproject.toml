@@ -1,13 +1,14 @@
 [project]
 name = "workflow-statusline"
 version = "0.1.0"
-description = "Claude Code tmux status line renderer"
+description = "Claude Code / Antigravity statusline and Byobu quota cells"
 requires-python = ">=3.14"
 
 [project.scripts]
 workflow-statusline = "workflow_statusline.__main__:main"
 byobu-codex-quota = "workflow_statusline.codex_quota:main"
 byobu-claude-quota = "workflow_statusline.claude_quota:main"
+byobu-agy-quota = "workflow_statusline.agy_quota:main"
 
 [dependency-groups]
 # pytest stays so a sync scoped to this package (`uv sync --package
